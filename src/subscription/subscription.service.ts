@@ -1,0 +1,154 @@
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model, Types } from 'mongoose';
+import { Subscription } from '../database/schemas/subscription.schema';
+import { SubscriptionPlan } from '../database/schemas/subscription-plan.schema';
+import { CreateSubscriptionDto, UpdateSubscriptionStatusDto } from './dto/create-subscription.dto';
+import { ValidationUtil } from '../common/utils/validation.util';
+
+@Injectable()
+export class SubscriptionService {
+  constructor(
+    @InjectModel('Subscription') private readonly subscriptionModel: Model<Subscription>,
+    @InjectModel('SubscriptionPlan') private readonly subscriptionPlanModel: Model<SubscriptionPlan>,
+  ) {}
+
+  async createSubscription(createSubscriptionDto: CreateSubscriptionDto): Promise<Subscription> {
+    // Validate plan exists - handle both ObjectId and plan name/type
+    let plan;
+    try {
+      // First try to find by ObjectId
+      plan = await this.subscriptionPlanModel.findById(createSubscriptionDto.planId);
+    } catch (error) {
+      // If ObjectId is invalid, try to find by plan name/type
+      plan = null;
+    }
+    
+    // If not found by ID, try to find by plan name/type
+    if (!plan) {
+      plan = await this.subscriptionPlanModel.findOne({
+        name: createSubscriptionDto.planType.toLowerCase()
+      });
+    }
+    
+    if (!plan) {
+      throw new NotFoundException(`Subscription plan not found for type: ${createSubscriptionDto.planType}`);
+    }
+
+    // Validate plan type matches
+    if (plan.name.toLowerCase() !== createSubscriptionDto.planType.toLowerCase()) {
+      throw new BadRequestException('Plan type does not match selected plan');
+    }
+
+    // Check if user already has an active subscription
+    const existingSubscription = await this.subscriptionModel.findOne({
+      userId: new Types.ObjectId(createSubscriptionDto.userId),
+      status: 'active'
+    });
+
+    if (existingSubscription) {
+      throw new BadRequestException('User already has an active subscription');
+    }
+
+    const subscriptionData = {
+      userId: new Types.ObjectId(createSubscriptionDto.userId),
+      planId: new Types.ObjectId(plan._id), // Use the actual plan ID from database
+      status: createSubscriptionDto.status || 'active',
+      startedAt: new Date(),
+      expiresAt: createSubscriptionDto.expiresAt ? new Date(createSubscriptionDto.expiresAt) : null
+    };
+
+    const subscription = new this.subscriptionModel(subscriptionData);
+    return await subscription.save();
+  }
+
+  async getSubscriptionByUser(userId: string): Promise<Subscription | null> {
+    return await this.subscriptionModel
+      .findOne({ userId: new Types.ObjectId(userId) })
+      .populate('planId')
+      .exec();
+  }
+
+  async getSubscriptionById(subscriptionId: string): Promise<Subscription> {
+    const subscription = await this.subscriptionModel
+      .findById(subscriptionId)
+      .populate('planId')
+      .exec();
+
+    if (!subscription) {
+      throw new NotFoundException('Subscription not found');
+    }
+
+    return subscription;
+  }
+
+  async updateSubscriptionStatus(
+    subscriptionId: string,
+    updateStatusDto: UpdateSubscriptionStatusDto
+  ): Promise<Subscription> {
+    const subscription = await this.subscriptionModel.findById(subscriptionId);
+    if (!subscription) {
+      throw new NotFoundException('Subscription not found');
+    }
+
+    subscription.status = updateStatusDto.status;
+    
+    // Set expiry date if cancelling
+    if (updateStatusDto.status === 'cancelled') {
+      subscription.expiresAt = new Date();
+    }
+
+    return await subscription.save();
+  }
+
+  async getAllSubscriptionPlans(): Promise<SubscriptionPlan[]> {
+    return await this.subscriptionPlanModel.find().exec();
+  }
+
+  async getSubscriptionPlan(planId: string): Promise<SubscriptionPlan> {
+    const plan = await this.subscriptionPlanModel.findById(planId);
+    if (!plan) {
+      throw new NotFoundException('Subscription plan not found');
+    }
+    return plan;
+  }
+
+  async validatePlan(planId: string, planType: string): Promise<boolean> {
+    const plan = await this.getSubscriptionPlan(planId);
+    return plan.name.toLowerCase() === planType.toLowerCase();
+  }
+
+  async validateSubscriptionLimits(
+    subscriptionId: string,
+    entityCounts: { organizations: number; complexes: number; clinics: number }
+  ): Promise<boolean> {
+    const subscription = await this.getSubscriptionById(subscriptionId);
+    const plan = subscription.planId as any; // Populated plan
+
+    return ValidationUtil.validatePlanLimits(plan.name, entityCounts);
+  }
+
+  async isSubscriptionActive(subscriptionId: string): Promise<boolean> {
+    const subscription = await this.getSubscriptionById(subscriptionId);
+    
+    if (subscription.status !== 'active') {
+      return false;
+    }
+
+    // Check if subscription has expired
+    if (subscription.expiresAt && subscription.expiresAt < new Date()) {
+      // Auto-update status to inactive
+      await this.updateSubscriptionStatus(subscriptionId, { status: 'inactive' });
+      return false;
+    }
+
+    return true;
+  }
+
+  async getSubscriptionWithPlan(subscriptionId: string): Promise<{ subscription: Subscription; plan: SubscriptionPlan }> {
+    const subscription = await this.getSubscriptionById(subscriptionId);
+    const plan = await this.getSubscriptionPlan(subscription.planId.toString());
+    
+    return { subscription, plan };
+  }
+}

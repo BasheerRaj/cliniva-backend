@@ -1,0 +1,276 @@
+{
+  "_description": "This example demonstrates hierarchical working hours validation",
+  "_scenario": "Complex works 9 AM - 5 PM, Clinic 1: 10 AM - 4:30 PM, Clinic 2: 10 AM - 1 PM",
+  
+  "complex_plan_with_hierarchical_hours": {
+    "userData": {
+      "firstName": "Dr. Fatima",
+      "lastName": "Al-Harbi", 
+      "email": "fatima@alzahra-medical.com",
+      "password": "ComplexPass456!",
+      "phone": "+966505678901",
+      "nationality": "Saudi Arabian",
+      "dateOfBirth": "1978-08-22",
+      "gender": "female"
+    },
+    "subscriptionData": {
+      "planType": "complex",
+      "planId": "complex_standard_plan_002"
+    },
+    "complexes": [{
+      "name": "Al-Zahra Medical Complex",
+      "address": "Al-Madinah Road, Jeddah, Saudi Arabia",
+      "phone": "+966126789012",
+      "email": "info@alzahra-medical.com",
+      "managerName": "Dr. Fatima Al-Harbi",
+      "departmentIds": ["gynecology", "obstetrics"],
+      "businessProfile": {
+        "yearEstablished": 2015,
+        "mission": "Exceptional women's healthcare",
+        "ceoName": "Dr. Fatima Al-Harbi"
+      },
+      "legalInfo": {
+        "vatNumber": "300987654321002",
+        "crNumber": "2050987654"
+      }
+    }],
+    "departments": [
+      { "name": "Gynecology", "description": "Women's reproductive health" },
+      { "name": "Obstetrics", "description": "Pregnancy and childbirth care" }
+    ],
+    "clinics": [
+      {
+        "name": "Women's Wellness Center",
+        "complexDepartmentId": "complex_dept_gynecology_alzahra",
+        "phone": "+966126789013",
+        "email": "wellness@alzahra-medical.com",
+        "headDoctorName": "Dr. Maryam Al-Johani",
+        "specialization": "Women's Health",
+        "capacity": { "maxStaff": 12, "maxDoctors": 4, "maxPatients": 80, "sessionDuration": 30 }
+      },
+      {
+        "name": "Maternity Center",
+        "complexDepartmentId": "complex_dept_obstetrics_alzahra", 
+        "phone": "+966126789014",
+        "email": "maternity@alzahra-medical.com",
+        "headDoctorName": "Dr. Aisha Al-Ghamdi",
+        "specialization": "Obstetrics",
+        "capacity": { "maxStaff": 20, "maxDoctors": 6, "maxPatients": 60, "sessionDuration": 60 }
+      }
+    ],
+    
+    "_working_hours_explanation": {
+      "complex_hours": "Al-Zahra Medical Complex operates 9:00 AM to 5:00 PM",
+      "clinic1_hours": "Women's Wellness Center operates 10:00 AM to 4:30 PM (within complex hours ✅)",
+      "clinic2_hours": "Maternity Center operates 10:00 AM to 1:00 PM (within complex hours ✅)",
+      "validation": "Both clinics start after complex opens and close before complex closes"
+    },
+    
+    "workingHours": [
+      {
+        "_comment": "COMPLEX WORKING HOURS: 9:00 AM - 5:00 PM",
+        "entityType": "complex",
+        "entityName": "Al-Zahra Medical Complex",
+        "dayOfWeek": "sunday",
+        "isWorkingDay": true,
+        "openingTime": "09:00",
+        "closingTime": "17:00",
+        "breakStartTime": "12:00",
+        "breakEndTime": "13:00"
+      },
+      {
+        "entityType": "complex",
+        "entityName": "Al-Zahra Medical Complex", 
+        "dayOfWeek": "monday",
+        "isWorkingDay": true,
+        "openingTime": "09:00",
+        "closingTime": "17:00",
+        "breakStartTime": "12:00",
+        "breakEndTime": "13:00"
+      },
+      {
+        "entityType": "complex",
+        "entityName": "Al-Zahra Medical Complex",
+        "dayOfWeek": "tuesday", 
+        "isWorkingDay": true,
+        "openingTime": "09:00",
+        "closingTime": "17:00",
+        "breakStartTime": "12:00",
+        "breakEndTime": "13:00"
+      },
+      {
+        "entityType": "complex",
+        "entityName": "Al-Zahra Medical Complex",
+        "dayOfWeek": "wednesday",
+        "isWorkingDay": true,
+        "openingTime": "09:00", 
+        "closingTime": "17:00",
+        "breakStartTime": "12:00",
+        "breakEndTime": "13:00"
+      },
+      {
+        "entityType": "complex",
+        "entityName": "Al-Zahra Medical Complex",
+        "dayOfWeek": "thursday",
+        "isWorkingDay": true,
+        "openingTime": "09:00",
+        "closingTime": "17:00",
+        "breakStartTime": "12:00",
+        "breakEndTime": "13:00"
+      },
+      {
+        "entityType": "complex",
+        "entityName": "Al-Zahra Medical Complex",
+        "dayOfWeek": "friday",
+        "isWorkingDay": false
+      },
+      {
+        "entityType": "complex",
+        "entityName": "Al-Zahra Medical Complex",
+        "dayOfWeek": "saturday", 
+        "isWorkingDay": false
+      },
+
+      {
+        "_comment": "CLINIC 1: Women's Wellness Center - 10:00 AM to 4:30 PM (WITHIN COMPLEX HOURS ✅)",
+        "entityType": "clinic",
+        "entityName": "Women's Wellness Center",
+        "dayOfWeek": "sunday",
+        "isWorkingDay": true,
+        "openingTime": "10:00",
+        "closingTime": "16:30",
+        "breakStartTime": "12:30",
+        "breakEndTime": "13:30"
+      },
+      {
+        "entityType": "clinic",
+        "entityName": "Women's Wellness Center",
+        "dayOfWeek": "monday",
+        "isWorkingDay": true,
+        "openingTime": "10:00",
+        "closingTime": "16:30",
+        "breakStartTime": "12:30",
+        "breakEndTime": "13:30"
+      },
+      {
+        "entityType": "clinic",
+        "entityName": "Women's Wellness Center",
+        "dayOfWeek": "tuesday",
+        "isWorkingDay": true,
+        "openingTime": "10:00",
+        "closingTime": "16:30",
+        "breakStartTime": "12:30",
+        "breakEndTime": "13:30"
+      },
+      {
+        "entityType": "clinic",
+        "entityName": "Women's Wellness Center",
+        "dayOfWeek": "wednesday",
+        "isWorkingDay": true,
+        "openingTime": "10:00",
+        "closingTime": "16:30",
+        "breakStartTime": "12:30",
+        "breakEndTime": "13:30"
+      },
+      {
+        "entityType": "clinic", 
+        "entityName": "Women's Wellness Center",
+        "dayOfWeek": "thursday",
+        "isWorkingDay": true,
+        "openingTime": "10:00",
+        "closingTime": "16:30",
+        "breakStartTime": "12:30",
+        "breakEndTime": "13:30"
+      },
+
+      {
+        "_comment": "CLINIC 2: Maternity Center - 10:00 AM to 1:00 PM (WITHIN COMPLEX HOURS ✅)",
+        "entityType": "clinic",
+        "entityName": "Maternity Center",
+        "dayOfWeek": "sunday",
+        "isWorkingDay": true,
+        "openingTime": "10:00",
+        "closingTime": "13:00"
+      },
+      {
+        "entityType": "clinic",
+        "entityName": "Maternity Center",
+        "dayOfWeek": "monday",
+        "isWorkingDay": true,
+        "openingTime": "10:00",
+        "closingTime": "13:00"
+      },
+      {
+        "entityType": "clinic",
+        "entityName": "Maternity Center",
+        "dayOfWeek": "tuesday",
+        "isWorkingDay": true,
+        "openingTime": "10:00",
+        "closingTime": "13:00"
+      },
+      {
+        "entityType": "clinic",
+        "entityName": "Maternity Center",
+        "dayOfWeek": "wednesday",
+        "isWorkingDay": true,
+        "openingTime": "10:00",
+        "closingTime": "13:00"
+      },
+      {
+        "entityType": "clinic",
+        "entityName": "Maternity Center",
+        "dayOfWeek": "thursday",
+        "isWorkingDay": true,
+        "openingTime": "10:00",
+        "closingTime": "13:00"
+      }
+    ],
+
+    "contacts": [
+      { "contactType": "facebook", "contactValue": "https://facebook.com/AlZahraMedical" },
+      { "contactType": "whatsapp", "contactValue": "https://wa.me/966505678901" }
+    ]
+  },
+
+  "_validation_examples": {
+    "valid_scenario": {
+      "complex_hours": "09:00 - 17:00",
+      "clinic1_hours": "10:00 - 16:30",
+      "clinic2_hours": "10:00 - 13:00",
+      "result": "✅ VALID - Both clinics operate within complex hours"
+    },
+    "invalid_scenarios": [
+      {
+        "scenario": "Clinic opens before complex",
+        "complex_hours": "09:00 - 17:00",
+        "clinic_hours": "08:30 - 16:00",
+        "result": "❌ INVALID - Clinic opens before complex"
+      },
+      {
+        "scenario": "Clinic closes after complex",
+        "complex_hours": "09:00 - 17:00", 
+        "clinic_hours": "10:00 - 18:00",
+        "result": "❌ INVALID - Clinic closes after complex"
+      },
+      {
+        "scenario": "Clinic works when complex is closed",
+        "complex_hours": "Friday: Closed",
+        "clinic_hours": "Friday: 09:00 - 17:00",
+        "result": "❌ INVALID - Clinic cannot work when complex is closed"
+      }
+    ]
+  },
+
+  "_api_usage": {
+    "endpoint": "POST /onboarding/complete",
+    "validation_endpoint": "POST /working-hours/validate-clinic-hours",
+    "expected_validation_result": {
+      "success": true,
+      "message": "Clinic hours are valid within complex hours",
+      "data": {
+        "isValid": true,
+        "errors": []
+      }
+    }
+  }
+}
