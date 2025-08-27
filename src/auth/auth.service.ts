@@ -12,6 +12,7 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { User } from '../database/schemas/user.schema';
 import { LoginDto, RegisterDto, AuthResponseDto, UserProfileDto } from './dto';
+import { SubscriptionService } from '../subscription/subscription.service';
 
 @Injectable()
 export class AuthService {
@@ -21,6 +22,7 @@ export class AuthService {
   constructor(
     @InjectModel(User.name) private userModel: Model<User>,
     private jwtService: JwtService,
+    private readonly subscriptionService: SubscriptionService,
   ) {}
 
   /**
@@ -68,6 +70,7 @@ export class AuthService {
           role: savedUser.role,
           isActive: savedUser.isActive,
           emailVerified: savedUser.emailVerified,
+          isOwner: savedUser.role === 'owner',
         },
       };
     } catch (error) {
@@ -116,6 +119,22 @@ export class AuthService {
       // Update last login
       await this.updateLastLogin((user._id as any).toString());
 
+      // Get planType from subscription if user has one
+      let planType: string | null = null;
+      if (user.subscriptionId) {
+        try {
+          // Note: You'll need to inject SubscriptionService
+          const subscription = await this.subscriptionService.getSubscriptionById(user.subscriptionId.toString());
+          if (subscription) {
+            // The planId is populated with the full SubscriptionPlan object
+            const plan = subscription.planId as any;
+            planType = plan.name; // The planType is stored in the plan's 'name' field
+          }
+        } catch (error) {
+          this.logger.warn(`Could not fetch planType for user ${user.email}: ${error.message}`);
+        }
+      }
+
       return {
         ...tokens,
         user: {
@@ -126,6 +145,16 @@ export class AuthService {
           role: user.role,
           isActive: user.isActive,
           emailVerified: user.emailVerified,
+          // Add onboarding-related fields
+          setupComplete: user.setupComplete || false,
+          subscriptionId: user.subscriptionId?.toString() || null,
+          organizationId: user.organizationId?.toString() || null,
+          complexId: user.complexId?.toString() || null,
+          clinicId: user.clinicId?.toString() || null,
+          onboardingComplete: user.onboardingComplete || false,
+          onboardingProgress: user.onboardingProgress || [],
+          planType: planType, // Add planType from subscription
+          isOwner: user.role === 'owner',
         },
       };
     } catch (error) {
@@ -166,6 +195,7 @@ export class AuthService {
           role: user.role,
           isActive: user.isActive,
           emailVerified: user.emailVerified,
+          isOwner: user.role === 'owner',
         },
       };
     } catch (error) {
@@ -287,6 +317,39 @@ export class AuthService {
       case 'h': return value * 3600;
       case 'd': return value * 86400;
       default: return 86400;
+    }
+  }
+
+  async getUserWithSubscriptionInfo(userId: string): Promise<any> {
+    try {
+      const user = await this.userModel.findById(userId).exec();
+      if (!user) {
+        throw new BadRequestException('User not found');
+      }
+
+      return {
+        userId: (user._id as any).toString(),
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        role: user.role,
+        isActive: user.isActive,
+        subscriptionId: user.subscriptionId?.toString() || null,
+        organizationId: user.organizationId?.toString() || null,
+        complexId: user.complexId?.toString() || null,
+        clinicId: user.clinicId?.toString() || null,
+        setupComplete: user.setupComplete || false,
+        onboardingComplete: user.onboardingComplete || false,
+        onboardingProgress: user.onboardingProgress || [],
+        // Debug info - raw user document
+        userDocument: user.toObject(),
+        hasSubscriptionId: !!user.subscriptionId,
+        hasOrganizationId: !!user.organizationId,
+        isOwner: user.role === 'owner',
+        timestamp: new Date().toISOString()
+      };
+    } catch (error) {
+      throw new BadRequestException(`Failed to get user debug info: ${error.message}`);
     }
   }
 }

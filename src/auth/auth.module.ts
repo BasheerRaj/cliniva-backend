@@ -8,11 +8,22 @@ import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { User, UserSchema } from '../database/schemas/user.schema';
+import { Subscription, SubscriptionSchema } from '../database/schemas/subscription.schema';
+import { SubscriptionPlan, SubscriptionPlanSchema } from '../database/schemas/subscription-plan.schema';
+import { SubscriptionModule } from '../subscription/subscription.module';
+import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
 @Module({
   imports: [
-    // Import User schema
-    MongooseModule.forFeature([{ name: User.name, schema: UserSchema }]),
+    // Import required schemas for JwtAuthGuard
+    MongooseModule.forFeature([
+      { name: User.name, schema: UserSchema },
+      { name: Subscription.name, schema: SubscriptionSchema },
+      { name: SubscriptionPlan.name, schema: SubscriptionPlanSchema }
+    ]),
+    
+    // Import SubscriptionModule for SubscriptionService
+    SubscriptionModule,
     
     // Passport module
     PassportModule.register({ defaultStrategy: 'jwt' }),
@@ -30,8 +41,8 @@ import { User, UserSchema } from '../database/schemas/user.schema';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy],
-  exports: [AuthService, JwtStrategy, PassportModule],
+  providers: [AuthService, JwtStrategy, JwtAuthGuard],
+  exports: [AuthService, JwtStrategy, PassportModule, JwtAuthGuard],
 })
 export class AuthModule {}
 

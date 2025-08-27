@@ -98,4 +98,11 @@ export class DepartmentService {
       .populate('departmentId')
       .exec();
   }
+
+  async getComplexDepartmentById(complexDepartmentId: string): Promise<ComplexDepartment | null> {
+    return await this.complexDepartmentModel
+      .findById(complexDepartmentId)
+      .populate('departmentId')
+      .exec();
+  }
 }

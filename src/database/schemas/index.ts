@@ -47,6 +47,7 @@ export * from './sms-template.schema';
 export * from './dynamic-info.schema';
 export * from './contact.schema';
 export * from './working-hours.schema';
+export * from './schedule.schema';
 
 // Employee Management
 export * from './employee-shift.schema';
@@ -56,3 +57,4 @@ export * from './emergency-contact.schema';
 
 // Audit Trail
 export * from './audit-log.schema';
+export * from './access-log.schema';

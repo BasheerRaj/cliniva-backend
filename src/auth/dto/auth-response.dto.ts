@@ -12,6 +12,16 @@ export class AuthResponseDto {
     role: string;
     isActive: boolean;
     emailVerified: boolean;
+    // Onboarding-related fields
+    setupComplete?: boolean;
+    subscriptionId?: string | null;
+    organizationId?: string | null;
+    complexId?: string | null;
+    clinicId?: string | null;
+    onboardingComplete?: boolean;
+    onboardingProgress?: string[];
+    planType?: string | null;
+    isOwner: boolean;
   };
 }
 
@@ -31,6 +41,16 @@ export class UserProfileDto {
   lastLogin?: Date;
   createdAt: Date;
   updatedAt: Date;
+  
+  // Onboarding-related fields
+  setupComplete?: boolean;
+  subscriptionId?: string | null;
+  organizationId?: string | null;
+  complexId?: string | null;
+  clinicId?: string | null;
+  onboardingComplete?: boolean;
+  onboardingProgress?: string[];
+  isOwner: boolean;
 
   constructor(user: User) {
     this.id = (user._id as any).toString();
@@ -48,5 +68,15 @@ export class UserProfileDto {
     this.lastLogin = user.lastLogin;
     this.createdAt = (user as any).createdAt;
     this.updatedAt = (user as any).updatedAt;
+    
+    // Include onboarding fields
+    this.setupComplete = user.setupComplete;
+    this.subscriptionId = user.subscriptionId ? (user.subscriptionId as any).toString() : null;
+    this.organizationId = user.organizationId ? (user.organizationId as any).toString() : null;
+    this.complexId = user.complexId ? (user.complexId as any).toString() : null;
+    this.clinicId = user.clinicId ? (user.clinicId as any).toString() : null;
+    this.onboardingComplete = user.onboardingComplete;
+    this.onboardingProgress = user.onboardingProgress;
+    this.isOwner = user.role === 'owner';
   }
 }

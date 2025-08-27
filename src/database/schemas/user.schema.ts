@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
+import { Document, Types } from 'mongoose';
 import { UserRole } from '../../common/enums/user-role.enum';
 
 @Schema({
@@ -56,6 +56,28 @@ export class User extends Document {
 
   @Prop()
   passwordResetExpires?: Date;
+
+  // Onboarding and setup fields
+  @Prop({ default: false })
+  setupComplete: boolean;
+
+  @Prop({ type: Types.ObjectId, ref: 'Subscription' })
+  subscriptionId?: Types.ObjectId;
+
+  @Prop({ type: Types.ObjectId, ref: 'Organization' })
+  organizationId?: Types.ObjectId;
+
+  @Prop({ type: Types.ObjectId, ref: 'Complex' })
+  complexId?: Types.ObjectId;
+
+  @Prop({ type: Types.ObjectId, ref: 'Clinic' })
+  clinicId?: Types.ObjectId;
+
+  @Prop([String])
+  onboardingProgress?: string[];
+
+  @Prop({ default: false })
+  onboardingComplete: boolean;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

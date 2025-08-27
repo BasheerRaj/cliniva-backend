@@ -1,27 +1,36 @@
-import { Controller, Post, Get, Put, Body, Param, HttpStatus, HttpCode } from '@nestjs/common';
+import { Controller, Post, Get, Put, Body, Param, HttpStatus, HttpCode, UseGuards, Request } from '@nestjs/common';
 import { OrganizationService } from './organization.service';
 import { CreateOrganizationDto, UpdateOrganizationDto, SetupLegalInfoDto } from './dto/create-organization.dto';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
-@Controller('organizations')
+@Controller('organization') // Changed from 'organizations' to match frontend call
 export class OrganizationController {
   constructor(private readonly organizationService: OrganizationService) {}
 
   @Post()
+  @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.CREATED)
-  async createOrganization(@Body() createOrganizationDto: CreateOrganizationDto) {
+  async createOrganization(@Body() createOrganizationDto: CreateOrganizationDto, @Request() req) {
     try {
-      const organization = await this.organizationService.createOrganization(createOrganizationDto);
+      const userId = req.user.userId || req.user.id;
+      const organization = await this.organizationService.createOrganization(createOrganizationDto, userId);
       
       return {
         success: true,
         message: 'Organization created successfully',
-        data: organization
+        data: {
+          organizationId: organization._id?.toString() || organization.id,
+          subscriptionId: createOrganizationDto.subscriptionId
+        }
       };
     } catch (error) {
       return {
         success: false,
-        message: 'Failed to create organization',
-        error: error.message
+        message: error.message || 'Failed to create organization',
+        data: {
+          organizationId: '',
+          subscriptionId: createOrganizationDto.subscriptionId
+        }
       };
     }
   }

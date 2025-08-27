@@ -4,6 +4,7 @@ import { SubscriptionController } from './subscription.controller';
 import { SubscriptionService } from './subscription.service';
 import { SubscriptionSchema } from '../database/schemas/subscription.schema';
 import { SubscriptionPlanSchema } from '../database/schemas/subscription-plan.schema';
+import { UserSchema } from '../database/schemas/user.schema';
 import { CommonModule } from '../common/common.module';
 
 @Module({
@@ -11,6 +12,7 @@ import { CommonModule } from '../common/common.module';
     MongooseModule.forFeature([
       { name: 'Subscription', schema: SubscriptionSchema },
       { name: 'SubscriptionPlan', schema: SubscriptionPlanSchema },
+      { name: 'User', schema: UserSchema },
     ]),
     CommonModule,
   ],

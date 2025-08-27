@@ -131,4 +131,44 @@ export class ComplexService {
       data.crNumber
     );
   }
+
+  // ======== VALIDATION METHODS ========
+  
+  async isNameAvailable(name: string, organizationId?: string): Promise<boolean> {
+    try {
+      const trimmedName = name.trim().toLowerCase();
+      if (!trimmedName) return false;
+
+      const query: any = {
+        name: { $regex: new RegExp(`^${trimmedName}$`, 'i') }
+      };
+
+      // If organizationId is provided, check within that organization scope
+      if (organizationId) {
+        query.organizationId = new Types.ObjectId(organizationId);
+      }
+
+      const existingComplex = await this.complexModel.findOne(query).exec();
+      return !existingComplex;
+    } catch (error) {
+      console.error('Error checking complex name availability:', error);
+      return false;
+    }
+  }
+
+  async isEmailAvailable(email: string): Promise<boolean> {
+    try {
+      const trimmedEmail = email.trim().toLowerCase();
+      if (!trimmedEmail) return false;
+
+      const existingComplex = await this.complexModel.findOne({
+        email: { $regex: new RegExp(`^${trimmedEmail}$`, 'i') }
+      }).exec();
+
+      return !existingComplex;
+    } catch (error) {
+      console.error('Error checking email availability:', error);
+      return false;
+    }
+  }
 }

@@ -1,22 +1,47 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
 
-@Schema({
-  timestamps: true,
-  collection: 'organizations'
-})
-export class Organization extends Document {
-  @Prop({ type: Types.ObjectId, ref: 'Subscription', required: true })
-  subscriptionId: Types.ObjectId;
-
+// Phone number subdocument
+export class PhoneNumber {
   @Prop({ required: true })
-  name: string;
+  number: string;
+
+  @Prop({ 
+    required: true, 
+    enum: ['primary', 'secondary', 'emergency', 'fax', 'mobile'],
+    default: 'primary'
+  })
+  type: 'primary' | 'secondary' | 'emergency' | 'fax' | 'mobile';
 
   @Prop()
-  legalName?: string; // Legal company name
+  label?: string;
+}
+
+// Address subdocument
+export class Address {
+  @Prop()
+  street?: string;
 
   @Prop()
-  registrationNumber?: string;
+  city?: string;
+
+  @Prop()
+  state?: string;
+
+  @Prop()
+  postalCode?: string;
+
+  @Prop()
+  country?: string;
+
+  @Prop()
+  googleLocation?: string;
+}
+
+// Emergency contact subdocument
+export class OrganizationEmergencyContact {
+  @Prop()
+  name?: string;
 
   @Prop()
   phone?: string;
@@ -25,14 +50,59 @@ export class Organization extends Document {
   email?: string;
 
   @Prop()
-  address?: string;
+  relationship?: string;
+}
+
+// Social media links subdocument
+export class SocialMediaLinks {
+  @Prop()
+  facebook?: string;
 
   @Prop()
-  googleLocation?: string; // Google Maps location/coordinates
+  instagram?: string;
+
+  @Prop()
+  twitter?: string;
+
+  @Prop()
+  linkedin?: string;
+
+  @Prop()
+  whatsapp?: string;
+
+  @Prop()
+  youtube?: string;
+
+  @Prop()
+  website?: string; // Secondary website
+}
+
+@Schema({
+  timestamps: true,
+  collection: 'organizations'
+})
+export class Organization extends Document {
+  // Core identification
+  @Prop({ type: Types.ObjectId, ref: 'Subscription', required: true })
+  subscriptionId: Types.ObjectId;
+
+  @Prop({ type: Types.ObjectId, ref: 'User', required: true })
+  ownerId: Types.ObjectId;
+
+  // Basic information
+  @Prop({ required: true })
+  name: string;
+
+  @Prop()
+  legalName?: string;
 
   @Prop()
   logoUrl?: string;
 
+  @Prop()
+  website?: string;
+
+  // Business information
   @Prop()
   yearEstablished?: number;
 
@@ -43,26 +113,91 @@ export class Organization extends Document {
   vision?: string;
 
   @Prop()
+  overview?: string; // Company overview/description
+
+  @Prop()
+  goals?: string; // Company goals
+
+  @Prop()
   ceoName?: string;
 
-  @Prop()
-  website?: string;
+  // Contact information - STANDARDIZED
+  @Prop({ 
+    type: [{ 
+      number: { type: String, required: true }, 
+      type: { 
+        type: String, 
+        enum: ['primary', 'secondary', 'emergency', 'fax', 'mobile'], 
+        default: 'primary' 
+      }, 
+      label: String 
+    }], 
+    default: [] 
+  })
+  phoneNumbers?: PhoneNumber[];
 
-  // Legal Details
   @Prop()
-  vatNumber?: string; // VAT registration number
+  email?: string;
+
+  // Address - STRUCTURED
+  @Prop({
+    type: {
+      street: String,
+      city: String,
+      state: String,
+      postalCode: String,
+      country: String,
+      googleLocation: String
+    }
+  })
+  address?: Address;
+
+  // Emergency contact - STRUCTURED
+  @Prop({
+    type: {
+      name: String,
+      phone: String,
+      email: String,
+      relationship: String
+    }
+  })
+  emergencyContact?: OrganizationEmergencyContact;
+
+  // Social media - STANDARDIZED
+  @Prop({
+    type: {
+      facebook: String,
+      instagram: String,
+      twitter: String,
+      linkedin: String,
+      whatsapp: String,
+      youtube: String,
+      website: String
+    }
+  })
+  socialMediaLinks?: SocialMediaLinks;
+
+  // Legal information
+  @Prop()
+  vatNumber?: string;
 
   @Prop()
   crNumber?: string; // Commercial registration number
+
+  @Prop()
+  termsConditionsUrl?: string;
+
+  @Prop()
+  privacyPolicyUrl?: string;
 }
 
 export const OrganizationSchema = SchemaFactory.createForClass(Organization);
 
 // Indexes
 OrganizationSchema.index({ subscriptionId: 1 });
+OrganizationSchema.index({ ownerId: 1 });
 OrganizationSchema.index({ name: 1 });
 OrganizationSchema.index({ legalName: 1 });
-OrganizationSchema.index({ registrationNumber: 1 });
 OrganizationSchema.index({ email: 1 });
 OrganizationSchema.index({ vatNumber: 1 });
 OrganizationSchema.index({ crNumber: 1 });

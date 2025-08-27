@@ -3,6 +3,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Subscription } from '../database/schemas/subscription.schema';
 import { SubscriptionPlan } from '../database/schemas/subscription-plan.schema';
+import { User } from '../database/schemas/user.schema';
 import { CreateSubscriptionDto, UpdateSubscriptionStatusDto } from './dto/create-subscription.dto';
 import { ValidationUtil } from '../common/utils/validation.util';
 
@@ -11,6 +12,7 @@ export class SubscriptionService {
   constructor(
     @InjectModel('Subscription') private readonly subscriptionModel: Model<Subscription>,
     @InjectModel('SubscriptionPlan') private readonly subscriptionPlanModel: Model<SubscriptionPlan>,
+    @InjectModel('User') private userModel: Model<User>,
   ) {}
 
   async createSubscription(createSubscriptionDto: CreateSubscriptionDto): Promise<Subscription> {
@@ -59,7 +61,20 @@ export class SubscriptionService {
     };
 
     const subscription = new this.subscriptionModel(subscriptionData);
-    return await subscription.save();
+    const savedSubscription = await subscription.save();
+
+    // Update user with subscription details and onboarding progress
+    await this.userModel.findByIdAndUpdate(
+      createSubscriptionDto.userId,
+      {
+        subscriptionId: savedSubscription._id,
+        onboardingProgress: ['plan_selected', 'account_created'],
+        onboardingComplete: false,
+        setupComplete: false
+      }
+    );
+
+    return savedSubscription;
   }
 
   async getSubscriptionByUser(userId: string): Promise<Subscription | null> {
@@ -147,7 +162,13 @@ export class SubscriptionService {
 
   async getSubscriptionWithPlan(subscriptionId: string): Promise<{ subscription: Subscription; plan: SubscriptionPlan }> {
     const subscription = await this.getSubscriptionById(subscriptionId);
-    const plan = await this.getSubscriptionPlan(subscription.planId.toString());
+    
+    // planId is already populated by getSubscriptionById, so we can use it directly
+    const plan = subscription.planId as any; // This is now the populated SubscriptionPlan object
+    
+    if (!plan || !plan._id) {
+      throw new NotFoundException('Subscription plan not found');
+    }
     
     return { subscription, plan };
   }

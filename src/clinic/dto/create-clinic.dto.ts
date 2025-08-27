@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsOptional, IsEmail, IsUrl, IsNumber } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsEmail, IsUrl, IsNumber, IsArray, IsBoolean } from 'class-validator';
 
 export class CreateClinicDto {
   @IsString()
@@ -101,6 +101,10 @@ export class UpdateClinicDto {
 
   @IsString()
   @IsOptional()
+  legalName?: string;
+
+  @IsString()
+  @IsOptional()
   address?: string;
 
   @IsString()
@@ -153,6 +157,10 @@ export class UpdateClinicDto {
 
   @IsString()
   @IsOptional()
+  goals?: string;
+
+  @IsString()
+  @IsOptional()
   ceoName?: string;
 
   @IsString()
@@ -178,6 +186,67 @@ export class UpdateClinicDto {
   @IsNumber()
   @IsOptional()
   sessionDuration?: number;
+
+  @IsArray()
+  @IsOptional()
+  serviceIds?: string[];
+
+  @IsString()
+  @IsOptional()
+  complexDepartmentId?: string;
+
+  @IsBoolean()
+  @IsOptional()
+  inheritsFromComplex?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  inheritsFromOrganization?: boolean;
+
+  // Contact information fields  
+  @IsString()
+  @IsOptional()
+  city?: string;
+
+  @IsString()
+  @IsOptional()
+  state?: string;
+
+  @IsString()
+  @IsOptional()
+  postalCode?: string;
+
+  @IsString()
+  @IsOptional()
+  country?: string;
+
+  @IsString()
+  @IsOptional()
+  emergencyContactName?: string;
+
+  @IsString()
+  @IsOptional()
+  emergencyContactPhone?: string;
+
+  @IsArray()
+  @IsOptional()
+  phoneNumbers?: any[];
+
+  @IsOptional()
+  socialMediaLinks?: any;
+
+  // Legal information fields
+  @IsString()
+  @IsOptional()
+  termsConditionsUrl?: string;
+
+  @IsString()
+  @IsOptional()
+  privacyPolicyUrl?: string;
+
+  // Schedule data
+  @IsOptional()
+  scheduleData?: any;
 }
 
 export class SetupCapacityDto {

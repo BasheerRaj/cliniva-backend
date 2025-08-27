@@ -8,6 +8,7 @@ import {
   HttpCode,
   HttpStatus,
   ValidationPipe,
+  Param,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
@@ -78,6 +79,27 @@ export class AuthController {
     // Since we're using stateless JWT, we don't need to do anything server-side
     // The client should remove the token from storage
     return { message: 'Successfully logged out' };
+  }
+
+  @Get('debug/user/:userId')
+  async debugUser(@Param('userId') userId: string) {
+    try {
+      const user = await this.authService.getUserWithSubscriptionInfo(userId);
+      return {
+        success: true,
+        message: 'User debug info retrieved',
+        data: {
+          userFromDatabase: user,
+          timestamp: new Date().toISOString()
+        }
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: `Debug failed: ${error.message}`,
+        error: error.message
+      };
+    }
   }
 }
 

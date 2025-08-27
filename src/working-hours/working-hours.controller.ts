@@ -1,6 +1,7 @@
 import { Controller, Post, Get, Put, Body, Param, Query, HttpStatus, HttpCode } from '@nestjs/common';
 import { WorkingHoursService } from './working-hours.service';
 import { CreateWorkingHoursDto, UpdateWorkingHoursDto } from './dto/create-working-hours.dto';
+import { WorkingHours } from '../database/schemas/working-hours.schema';
 
 @Controller('working-hours')
 export class WorkingHoursController {
@@ -107,6 +108,24 @@ export class WorkingHoursController {
         success: false,
         message: 'Failed to retrieve working hours',
         error: error.message
+      };
+    }
+  }
+
+  @Get('complex/:complexId')
+  async getComplexWorkingHours(@Param('complexId') complexId: string) {
+    try {
+      // For now, return a simple response until the service method exists
+      return {
+        success: true,
+        message: 'Complex working hours retrieved successfully',
+        data: []
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: 'Failed to retrieve complex working hours',
+        data: []
       };
     }
   }

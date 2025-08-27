@@ -16,10 +16,12 @@ import { WorkingHoursModule } from '../working-hours/working-hours.module';
 import { ContactModule } from '../contact/contact.module';
 import { DynamicInfoModule } from '../dynamic-info/dynamic-info.module';
 import { UserAccessModule } from '../user-access/user-access.module';
+import { UserModule } from '../user/user.module';
 import { CommonModule } from '../common/common.module';
 
 // Schemas
 import { UserSchema } from '../database/schemas/user.schema';
+import { SubscriptionSchema } from '../database/schemas/subscription.schema';
 import { SubscriptionPlanSchema } from '../database/schemas/subscription-plan.schema';
 
 @Module({
@@ -27,6 +29,7 @@ import { SubscriptionPlanSchema } from '../database/schemas/subscription-plan.sc
     // Mongoose models
     MongooseModule.forFeature([
       { name: 'User', schema: UserSchema },
+      { name: 'Subscription', schema: SubscriptionSchema },
       { name: 'SubscriptionPlan', schema: SubscriptionPlanSchema },
     ]),
     
@@ -43,6 +46,7 @@ import { SubscriptionPlanSchema } from '../database/schemas/subscription-plan.sc
     ContactModule,
     DynamicInfoModule,
     UserAccessModule,
+    UserModule,
     CommonModule,
   ],
   controllers: [OnboardingController],

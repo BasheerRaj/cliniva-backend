@@ -2,8 +2,8 @@ import { IsString, IsNotEmpty, IsOptional, IsNumber, IsArray } from 'class-valid
 
 export class CreateServiceDto {
   @IsString()
-  @IsNotEmpty()
-  complexDepartmentId: string;
+  @IsOptional()
+  complexDepartmentId?: string;
 
   @IsString()
   @IsNotEmpty()

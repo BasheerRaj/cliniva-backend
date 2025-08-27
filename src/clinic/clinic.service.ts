@@ -13,6 +13,33 @@ export class ClinicService {
     private readonly subscriptionService: SubscriptionService,
   ) {}
 
+  async findClinicBySubscription(subscriptionId: string): Promise<Clinic | null> {
+    try {
+      return await this.clinicModel.findOne({ 
+        subscriptionId: new Types.ObjectId(subscriptionId) 
+      }).exec();
+    } catch (error) {
+      console.error('Error finding clinic by subscription:', error);
+      return null;
+    }
+  }
+
+  async findClinicByUser(userId: string): Promise<Clinic | null> {
+    try {
+      // First get user's subscription
+      const subscription = await this.subscriptionService.getSubscriptionByUser(userId);
+      if (!subscription) {
+        return null;
+      }
+      return await this.findClinicBySubscription((subscription._id as any).toString());
+    } catch (error) {
+      console.error('Error finding clinic by user:', error);
+      return null;
+    }
+  }
+
+
+
   async createClinic(createClinicDto: CreateClinicDto): Promise<Clinic> {
     // Validate subscription is active
     const isActive = await this.subscriptionService.isSubscriptionActive(createClinicDto.subscriptionId);
@@ -171,5 +198,65 @@ export class ClinicService {
       data.vatNumber ||
       data.crNumber
     );
+  }
+
+  // ======== VALIDATION METHODS ========
+  
+  async isNameAvailable(name: string, complexId?: string, organizationId?: string): Promise<boolean> {
+    try {
+      const trimmedName = name.trim().toLowerCase();
+      if (!trimmedName) return false;
+
+      const query: any = {
+        name: { $regex: new RegExp(`^${trimmedName}$`, 'i') }
+      };
+
+      // Check within complex scope if provided
+      if (complexId) {
+        query.complexId = new Types.ObjectId(complexId);
+      }
+      // Otherwise check within organization scope if provided  
+      else if (organizationId) {
+        query.organizationId = new Types.ObjectId(organizationId);
+      }
+
+      const existingClinic = await this.clinicModel.findOne(query).exec();
+      return !existingClinic;
+    } catch (error) {
+      console.error('Error checking clinic name availability:', error);
+      return false;
+    }
+  }
+
+  async isEmailAvailable(email: string): Promise<boolean> {
+    try {
+      const trimmedEmail = email.trim().toLowerCase();
+      if (!trimmedEmail) return false;
+
+      const existingClinic = await this.clinicModel.findOne({
+        email: { $regex: new RegExp(`^${trimmedEmail}$`, 'i') }
+      }).exec();
+
+      return !existingClinic;
+    } catch (error) {
+      console.error('Error checking email availability:', error);
+      return false;
+    }
+  }
+
+  async isLicenseNumberAvailable(licenseNumber: string): Promise<boolean> {
+    try {
+      const trimmedLicense = licenseNumber.trim();
+      if (!trimmedLicense) return false;
+
+      const existingClinic = await this.clinicModel.findOne({
+        licenseNumber: trimmedLicense
+      }).exec();
+
+      return !existingClinic;
+    } catch (error) {
+      console.error('Error checking license number availability:', error);
+      return false;
+    }
   }
 }
