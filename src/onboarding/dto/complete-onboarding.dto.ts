@@ -253,10 +253,7 @@ export class ClinicDto {
   @IsOptional()
   complexDepartmentId?: string;
 
-  @IsArray()
-  @IsString({ each: true })
-  @IsOptional()
-  serviceIds?: string[];
+  // Services managed through ClinicService junction table
 
   @ValidateNested()
   @Type(() => CapacityDto)

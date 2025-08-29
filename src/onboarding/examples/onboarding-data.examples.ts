@@ -129,7 +129,7 @@ export const COMPANY_PLAN_ONBOARDING_EXAMPLE: CompleteOnboardingDto = {
       licenseNumber: "LC-001-2023",
       headDoctorName: "Dr. Faisal Al-Otaibi",
       specialization: "Interventional Cardiology",
-      serviceIds: ["echocardiogram", "cardiac_catheterization", "heart_surgery"],
+      // Services managed via ClinicService junction table
       
       capacity: {
         maxStaff: 25,
@@ -147,7 +147,7 @@ export const COMPANY_PLAN_ONBOARDING_EXAMPLE: CompleteOnboardingDto = {
       licenseNumber: "LC-002-2023",
       headDoctorName: "Dr. Amina Al-Mansouri",
       specialization: "General Pediatrics",
-      serviceIds: ["child_checkup", "vaccination", "pediatric_consultation"],
+      // Services managed via ClinicService junction table
       
       capacity: {
         maxStaff: 15,
@@ -347,7 +347,7 @@ export const COMPLEX_PLAN_ONBOARDING_EXAMPLE: CompleteOnboardingDto = {
       licenseNumber: "LC-WW-2023-001",
       headDoctorName: "Dr. Maryam Al-Johani", 
       specialization: "Gynecology and Women's Health",
-      serviceIds: ["gynecological_exam", "ultrasound", "family_planning"],
+      // Services managed via ClinicService junction table
 
       capacity: {
         maxStaff: 12,
@@ -365,7 +365,7 @@ export const COMPLEX_PLAN_ONBOARDING_EXAMPLE: CompleteOnboardingDto = {
       licenseNumber: "LC-MB-2023-002",
       headDoctorName: "Dr. Aisha Al-Ghamdi",
       specialization: "Obstetrics and Maternal-Fetal Medicine",
-      serviceIds: ["prenatal_care", "delivery", "cesarean_section"],
+      // Services managed via ClinicService junction table
 
       capacity: {
         maxStaff: 20,
@@ -383,7 +383,7 @@ export const COMPLEX_PLAN_ONBOARDING_EXAMPLE: CompleteOnboardingDto = {
       licenseNumber: "LC-CC-2023-003",
       headDoctorName: "Dr. Omar Al-Rashid",
       specialization: "General Pediatrics and Adolescent Medicine",
-      serviceIds: ["pediatric_consultation", "vaccination", "child_development"],
+      // Services managed via ClinicService junction table
 
       capacity: {
         maxStaff: 18,
@@ -596,7 +596,7 @@ export const CLINIC_PLAN_ONBOARDING_EXAMPLE: CompleteOnboardingDto = {
       headDoctorName: "Dr. Ali Al-Mutairi",
       specialization: "General and Cosmetic Dentistry",
       pin: "BS2023",
-      serviceIds: ["dental_cleaning", "tooth_filling", "root_canal", "teeth_whitening"],
+      // Services managed via ClinicService junction table
 
       // Capacity settings (required for clinic plan)
       capacity: {

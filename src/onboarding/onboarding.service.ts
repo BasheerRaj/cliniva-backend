@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, BadRequestException, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { Connection, Types, Model } from 'mongoose';
 import { CompleteOnboardingDto } from './dto/complete-onboarding.dto';
@@ -1771,16 +1771,13 @@ export class OnboardingService {
       const organizations = await this.organizationService.getAllOrganizations();
       const userOrg = organizations.find(org => org.ownerId?.toString() === userId);
       
-      let userComplex: any = null;
-      // Try to find complex through organization if user has one
-      if (userOrg) {
-        try {
-          const complexes = await this.complexService.getComplexesByOrganization((userOrg._id as any).toString());
-          userComplex = complexes.find((complex: any) => complex.ownerId?.toString() === userId) || complexes[0];
-        } catch (error) {
-          // User might not have a complex
-          userComplex = null;
-        }
+      // Use robust helper method to find user's complex
+      const userComplex = await this.findUserComplex(userId);
+      
+      if (userComplex) {
+        console.log('✅ Found complex for clinic linking:', userComplex._id, 'Name:', userComplex.name);
+      } else {
+        console.log('ℹ️  No complex found - this is expected for clinic-only plans');
       }
 
       // Enhanced logo inheritance and validation logic
@@ -1893,6 +1890,17 @@ export class OnboardingService {
         }
       }
 
+      // Debug: Log complexDepartmentId processing
+      console.log('🔍 DEBUG complexDepartmentId processing:', {
+        received: dto.complexDepartmentId,
+        type: typeof dto.complexDepartmentId,
+        length: dto.complexDepartmentId?.length,
+        trimmed: dto.complexDepartmentId?.trim(),
+        isEmpty: dto.complexDepartmentId?.trim() === '',
+        userComplex: userComplex?._id?.toString(),
+        userComplexName: userComplex?.name
+      });
+
       // Prepare clinic data
       let clinicData = {
         name: dto.name,
@@ -1914,8 +1922,10 @@ export class OnboardingService {
         subscriptionId: (subscription._id as any).toString(),
         organizationId: userOrg?._id || null,
         complexId: userComplex?._id || null,
-        complexDepartmentId: dto.complexDepartmentId || undefined
+        complexDepartmentId: dto.complexDepartmentId && dto.complexDepartmentId.trim() !== '' ? dto.complexDepartmentId : undefined
       };
+
+      console.log('✅ Final clinicData.complexDepartmentId:', clinicData.complexDepartmentId);
 
       // Apply inheritance from complex if exists, else from organization
       if (userComplex) {
@@ -1948,11 +1958,13 @@ export class OnboardingService {
             try {
               console.log('🏗️ Creating service:', serviceData.name);
               // Create the service in the services collection
+              // Each clinic gets its own separate services, even with duplicate names
               const newService = await this.serviceService.createService({
                 name: serviceData.name.trim(),
                 description: serviceData.description?.trim() || '',
                 durationMinutes: serviceData.durationMinutes || 30,
                 price: serviceData.price || 0,
+                clinicId: (clinic._id as any).toString(), // Link service directly to this clinic
                 complexDepartmentId: clinic.complexDepartmentId ? (clinic.complexDepartmentId as any).toString() : undefined
               });
               
@@ -1979,13 +1991,8 @@ export class OnboardingService {
           }
         }
         
-        // Update clinic with service IDs if any were created
-        if (createdServiceIds.length > 0) {
-          const updateData = { serviceIds: createdServiceIds };
-          console.log('📝 Updating clinic with serviceIds:', createdServiceIds);
-          clinic = await this.clinicService.updateClinic((clinic._id as any).toString(), updateData as any);
-          console.log('✅ Clinic updated with services successfully');
-        }
+        // Services are now managed through ClinicService junction table only
+        console.log('✅ Services created and linked via ClinicService junction table:', createdServiceIds.length);
       }
       
       return { 
@@ -1997,7 +2004,7 @@ export class OnboardingService {
           clinic: {
             id: (clinic._id as any)?.toString(),
             ...clinicData,
-            serviceIds: createdServiceIds
+            servicesCreated: createdServiceIds.length
           }
         }
       };
@@ -2025,17 +2032,8 @@ export class OnboardingService {
       const organizations = await this.organizationService.getAllOrganizations();
       const userOrg = organizations.find(org => org.ownerId?.toString() === userId);
       
-      let userComplex: any = null;
-      // Try to find complex through organization if user has one
-      if (userOrg) {
-        try {
-          const complexes = await this.complexService.getComplexesByOrganization((userOrg._id as any).toString());
-          userComplex = complexes.find((complex: any) => complex.ownerId?.toString() === userId) || complexes[0];
-        } catch (error) {
-          // User might not have a complex
-          userComplex = null;
-        }
-      }
+      // Use robust helper method to find user's complex
+      const userComplex = await this.findUserComplex(userId);
 
       console.log('📋 Inheritance sources:', { userOrg: !!userOrg, userComplex: !!userComplex });
       
@@ -2077,7 +2075,7 @@ export class OnboardingService {
     }
   }
 
-  async saveClinicServicesCapacity(userId: string, dto: any): Promise<{ updated: boolean; data: any; servicesCreated: number; serviceIds: string[] }> {
+  async saveClinicServicesCapacity(userId: string, dto: any): Promise<{ updated: boolean; data: any; servicesCreated: number; }> {
     try {
       console.log('🔍 saveClinicServicesCapacity called with:', { userId, dto });
       
@@ -2098,25 +2096,28 @@ export class OnboardingService {
         console.log('🔄 Creating services for clinic:', userClinic._id, 'Services count:', dto.services.length);
         console.log('📋 Services data:', JSON.stringify(dto.services, null, 2));
         
-        for (const serviceData of dto.services) {
-          console.log('🔄 Processing service:', serviceData);
+        // Process all services in batch for better consistency
+        const servicePromises = dto.services.map(async (serviceData, index) => {
+          console.log(`🔄 Processing service ${index + 1}/${dto.services.length}:`, serviceData);
           if (serviceData.name && serviceData.name.trim()) {
             try {
               console.log('🏗️ Creating service:', serviceData.name);
+              
               // Create the service in the services collection
+              // Each clinic gets its own separate services, even with duplicate names
               const newService = await this.serviceService.createService({
                 name: serviceData.name.trim(),
                 description: serviceData.description?.trim() || '',
                 durationMinutes: serviceData.durationMinutes || 30,
                 price: serviceData.price || 0,
+                clinicId: (userClinic._id as any).toString(), // Link service directly to this clinic
                 complexDepartmentId: userClinic.complexDepartmentId ? (userClinic.complexDepartmentId as any).toString() : undefined
               });
               
               console.log('✅ Created service:', newService._id);
-              createdServiceIds.push((newService._id as any).toString());
               
-              console.log('🔗 Linking service to clinic...');
               // Link service to clinic via ClinicService
+              console.log('🔗 Linking service to clinic...');
               await this.serviceService.assignServicesToClinic((userClinic._id as any).toString(), {
                 serviceAssignments: [{
                   serviceId: (newService._id as any).toString(),
@@ -2126,22 +2127,31 @@ export class OnboardingService {
               });
               console.log('✅ Service linked to clinic successfully');
               
+              return (newService._id as any).toString();
+              
             } catch (serviceError) {
-              console.error('Error creating service:', serviceError);
-              // Continue with other services
+              console.error(`Error creating service "${serviceData.name}":`, serviceError);
+              return null;
             }
           } else {
             console.log('⚠️ Skipping empty service:', serviceData);
+            return null;
           }
-        }
+        });
         
-        // Update clinic with service IDs
-        if (createdServiceIds.length > 0) {
-          updateData.serviceIds = createdServiceIds;
-          console.log('📝 Will update clinic with serviceIds:', createdServiceIds);
-        } else {
-          console.log('⚠️ No services created, no serviceIds to update');
-        }
+        // Wait for all service creations to complete
+        const serviceResults = await Promise.all(servicePromises);
+        const successfulServiceIds = serviceResults.filter(id => id !== null);
+        createdServiceIds.push(...successfulServiceIds);
+        
+        console.log('📊 Batch service creation completed:', { 
+          total: dto.services.length, 
+          successful: successfulServiceIds.length,
+          failed: serviceResults.length - successfulServiceIds.length
+        });
+        
+        // Services are managed through ClinicService junction table only
+        console.log('✅ Services linked via ClinicService junction table:', createdServiceIds.length);
       } else {
         console.log('⚠️ No services provided or empty services array');
       }
@@ -2164,8 +2174,7 @@ export class OnboardingService {
       return { 
         updated: true, 
         data: updatedClinic,
-        servicesCreated: createdServiceIds.length,
-        serviceIds: createdServiceIds
+        servicesCreated: createdServiceIds.length
       };
     } catch (error) {
       console.error('Error saving clinic services and capacity:', error);
@@ -2291,11 +2300,40 @@ export class OnboardingService {
     }
   }
 
-  async completeClinicSetup(userId: string): Promise<{ completed: boolean; message: string }> {
+  async completeClinicSetup(userId: string): Promise<{ completed: boolean; message: string; clinic?: any }> {
     try {
+      console.log('🏁 Starting clinic setup completion for user:', userId);
+      
+      // Find the user's clinic
+      const userClinic = await this.clinicService.findClinicByUser(userId);
+      
+      if (!userClinic) {
+        throw new NotFoundException('No clinic found for user');
+      }
+
+      console.log('🏥 Found user clinic:', userClinic._id);
+
+      // Get all services linked to this clinic via ClinicService junction table
+      const clinicServices = await this.serviceService.getServicesByClinic((userClinic._id as any).toString());
+
+      console.log('🔧 Found services for clinic:', {
+        clinicId: userClinic._id,
+        serviceCount: clinicServices.length
+      });
+
+      // Services are managed entirely through ClinicService junction table
+      // No need to update clinic document - all relationships are handled via junction table
+
+      console.log('✅ Clinic setup completion successful:', {
+        clinicId: userClinic._id,
+        serviceCount: clinicServices.length,
+        servicesLinked: true
+      });
+
       return { 
         completed: true,
-        message: 'Onboarding completed successfully!'
+        message: `Clinic setup completed successfully! ${clinicServices.length} services linked.`,
+        clinic: userClinic
       };
     } catch (error) {
       console.error('Error completing clinic setup:', error);

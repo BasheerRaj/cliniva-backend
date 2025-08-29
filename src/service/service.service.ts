@@ -13,35 +13,42 @@ export class ServiceService {
   ) {}
 
   async createService(createDto: CreateServiceDto): Promise<Service> {
-    // Enhanced validation: Check for duplicates across all relevant services
-    const duplicateValidationQuery: any = { 
-      name: { $regex: new RegExp(`^${createDto.name.trim()}$`, 'i') } // Case-insensitive exact match
-    };
-    
-    // If this is for a specific complex department, check within that department
-    if (createDto.complexDepartmentId) {
-      duplicateValidationQuery.complexDepartmentId = new Types.ObjectId(createDto.complexDepartmentId);
-    } else {
-      // For clinic-only services, ensure we don't have duplicates in the same clinic context
-      // This requires checking against other services that might be associated with the same clinic
-      duplicateValidationQuery.complexDepartmentId = { $exists: false };
-    }
-
-    // Check if service already exists
-    const existing = await this.serviceModel.findOne(duplicateValidationQuery);
-
-    if (existing) {
-      const location = createDto.complexDepartmentId ? 'this department' : 'this clinic';
-      throw new BadRequestException(`Service "${createDto.name}" already exists for ${location}. Please choose a different name.`);
-    }
-
-    // Additional validation: Check if service name contains invalid characters or is too short
+    // Validate service name length
     if (createDto.name.trim().length < 2) {
       throw new BadRequestException('Service name must be at least 2 characters long');
     }
 
     if (createDto.name.length > 100) {
       throw new BadRequestException('Service name cannot exceed 100 characters');
+    }
+
+    // Check for duplicates only within the same clinic or complex department
+    const duplicateValidationQuery: any = { 
+      name: { $regex: new RegExp(`^${createDto.name.trim()}$`, 'i') } // Case-insensitive exact match
+    };
+    
+    // If this is for a specific complex department, check within that department only
+    if (createDto.complexDepartmentId) {
+      duplicateValidationQuery.complexDepartmentId = new Types.ObjectId(createDto.complexDepartmentId);
+      duplicateValidationQuery.clinicId = { $exists: false }; // Ensure it's not a clinic-specific service
+      
+      // Check if service already exists in this complex department
+      const existing = await this.serviceModel.findOne(duplicateValidationQuery);
+      if (existing) {
+        throw new BadRequestException(`Service "${createDto.name}" already exists in this department. Please choose a different name.`);
+      }
+    } 
+    
+    // If this is for a specific clinic, check within that clinic only
+    if (createDto.clinicId) {
+      duplicateValidationQuery.clinicId = new Types.ObjectId(createDto.clinicId);
+      duplicateValidationQuery.complexDepartmentId = { $exists: false }; // Ensure it's not a department service
+      
+      // Check if service already exists for this clinic
+      const existing = await this.serviceModel.findOne(duplicateValidationQuery);
+      if (existing) {
+        throw new BadRequestException(`Service "${createDto.name}" already exists for this clinic. Please choose a different name.`);
+      }
     }
 
     // Create service data
@@ -55,6 +62,11 @@ export class ServiceService {
     // Add complex department ID only if provided
     if (createDto.complexDepartmentId) {
       serviceData.complexDepartmentId = new Types.ObjectId(createDto.complexDepartmentId);
+    }
+    
+    // Add clinic ID only if provided (for clinic-specific services)
+    if (createDto.clinicId) {
+      serviceData.clinicId = new Types.ObjectId(createDto.clinicId);
     }
 
     const service = new this.serviceModel(serviceData);
@@ -172,6 +184,7 @@ export class ServiceService {
   }
 
   async getServicesByClinic(clinicId: string): Promise<Service[]> {
+    // Get services linked via ClinicService junction table
     const clinicServices = await this.clinicServiceModel
       .find({ 
         clinicId: new Types.ObjectId(clinicId),
@@ -181,6 +194,13 @@ export class ServiceService {
       .exec();
 
     return clinicServices.map(cs => cs.serviceId as unknown as Service);
+  }
+
+  async getServicesOwnedByClinic(clinicId: string): Promise<Service[]> {
+    // Get services that are directly owned by this clinic
+    return this.serviceModel.find({ 
+      clinicId: new Types.ObjectId(clinicId)
+    }).exec();
   }
 
   async getService(serviceId: string): Promise<Service> {

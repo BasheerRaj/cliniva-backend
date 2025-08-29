@@ -134,8 +134,7 @@ export class Clinic extends Document {
   privacyPolicyUrl?: string;
 
   // Clinic-specific fields
-  @Prop([String])
-  serviceIds?: string[];
+  // Services are managed through ClinicService junction table only
 
   // Capacity settings - SET DEFAULTS to avoid frontend errors
   @Prop({ default: 50 })

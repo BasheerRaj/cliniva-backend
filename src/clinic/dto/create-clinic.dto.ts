@@ -187,9 +187,7 @@ export class UpdateClinicDto {
   @IsOptional()
   sessionDuration?: number;
 
-  @IsArray()
-  @IsOptional()
-  serviceIds?: string[];
+  // Services managed through ClinicService junction table
 
   @IsString()
   @IsOptional()

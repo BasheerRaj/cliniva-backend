@@ -99,7 +99,7 @@ export class ServiceController {
   }
 
   /**
-   * Get services for a specific clinic
+   * Get services for a specific clinic (via ClinicService junction table)
    */
   @Get('clinics/:clinicId')
   async getServicesByClinic(
@@ -109,11 +109,31 @@ export class ServiceController {
   }
 
   /**
+   * Get services directly owned by a specific clinic
+   */
+  @Get('clinics/:clinicId/owned')
+  async getServicesOwnedByClinic(
+    @Param('clinicId') clinicId: string,
+  ): Promise<Service[]> {
+    return this.serviceService.getServicesOwnedByClinic(clinicId);
+  }
+
+  /**
    * Get all services for a clinic context
    */
-  @Get('clinic/:complexDepartmentId?')
+  @Get('clinic')
   async getServicesForClinic(
-    @Param('complexDepartmentId') complexDepartmentId?: string
+    @Query('complexDepartmentId') complexDepartmentId?: string
+  ): Promise<Service[]> {
+    return this.serviceService.getServicesForClinic(complexDepartmentId);
+  }
+
+  /**
+   * Get all services for a clinic context with complex department
+   */
+  @Get('clinic/:complexDepartmentId')
+  async getServicesForClinicWithDepartment(
+    @Param('complexDepartmentId') complexDepartmentId: string
   ): Promise<Service[]> {
     return this.serviceService.getServicesForClinic(complexDepartmentId);
   }

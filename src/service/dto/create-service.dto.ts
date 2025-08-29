@@ -6,6 +6,10 @@ export class CreateServiceDto {
   complexDepartmentId?: string;
 
   @IsString()
+  @IsOptional()
+  clinicId?: string;
+
+  @IsString()
   @IsNotEmpty()
   name: string;
 
