@@ -118,28 +118,19 @@ export class SubscriptionController {
   private getFeatures(planType: string): string[] {
     const features = {
       clinic: [
-        'Patient management system',
-        'Appointment scheduling',
-        'Basic reporting',
-        'Staff management (up to 3 users)',
-        'Email support'
+        'Minimal setup',
+        'Quick onboarding',
+        'Direct management by the clinic owner or manager',
       ],
       complex: [
-        'Multi-clinic management',
+        'Localized administration',
         'Department-based control',
-        'Advanced reporting dashboard',
-        'Staff management (up to 50 users)',
-        'Inventory management',
-        'Priority support'
+        'Full visibility over all clinics',
       ],
       company: [
         'Centralized admin and reporting',
         'Multi-location support',
         'Role hierarchy across all levels',
-        'Advanced analytics',
-        'Unlimited staff users',
-        'Priority support',
-        'Custom integrations'
       ]
     };
     return features[planType] || ['Professional features', '24/7 support', 'Secure platform'];
