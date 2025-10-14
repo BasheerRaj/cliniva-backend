@@ -7,43 +7,93 @@ import {
 } from './shared-base.dto';
 
 // Organization overview form - basic entity information
+import { ApiProperty } from '@nestjs/swagger';
+
 export class OrganizationOverviewDto {
+  @ApiProperty({
+    description: 'Organization name',
+    example: 'HealthCare Group',
+  })
   @IsString()
   name: string;
 
+  @ApiProperty({
+    description: 'Legal registered name of the organization',
+    example: 'HealthCare Group LLC',
+    required: false,
+  })
   @IsString()
   @IsOptional()
   legalName?: string;
 
+  @ApiProperty({
+    description: 'Logo URL of the organization',
+    example: 'https://example.com/logo.png',
+    required: false,
+  })
   @IsUrl()
   @IsOptional()
   logoUrl?: string;
 
+  @ApiProperty({
+    description: 'Official website URL',
+    example: 'https://healthcare-group.com',
+    required: false,
+  })
   @IsUrl()
   @IsOptional()
   website?: string;
 
-  // Business information - flattened for easier form handling
+  @ApiProperty({
+    description: 'Year the organization was established',
+    example: 1998,
+    required: false,
+  })
   @IsNumber()
   @IsOptional()
   yearEstablished?: number;
 
+  @ApiProperty({
+    description: 'Organization mission statement',
+    example: 'Providing quality healthcare services for all',
+    required: false,
+  })
   @IsString()
   @IsOptional()
   mission?: string;
 
+  @ApiProperty({
+    description: 'Organization vision statement',
+    example: 'To be the leading healthcare provider in the region',
+    required: false,
+  })
   @IsString()
   @IsOptional()
   vision?: string;
 
+  @ApiProperty({
+    description: 'Overview or description of the organization',
+    example: 'HealthCare Group operates multiple hospitals and clinics nationwide.',
+    required: false,
+  })
   @IsString()
   @IsOptional()
-  overview?: string; // Company overview/description
+  overview?: string;
 
+  @ApiProperty({
+    description: 'Main goals of the organization',
+    example: 'Expanding healthcare accessibility, improving patient care.',
+    required: false,
+  })
   @IsString()
   @IsOptional()
-  goals?: string; // Company goals
+  goals?: string;
 
+  @ApiProperty({
+    description: 'Name of the CEO or main director',
+    example: 'Dr. John Smith',
+    required: false,
+  })
   @IsString()
   @IsOptional()
   ceoName?: string;

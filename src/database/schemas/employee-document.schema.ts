@@ -9,7 +9,7 @@ export class EmployeeDocument extends Document {
   @Prop({ type: Types.ObjectId, ref: 'User', required: true })
   userId: Types.ObjectId;
 
-  @Prop({ 
+  @Prop({
     required: true,
     enum: ['contract', 'certificate', 'work_permit', 'cv', 'id_copy', 'diploma', 'license', 'insurance', 'other']
   })
@@ -42,7 +42,7 @@ export class EmployeeDocument extends Document {
   @Prop()
   documentNumber?: string; // Document reference number
 
-  @Prop({ 
+  @Prop({
     default: 'active',
     enum: ['active', 'expired', 'revoked', 'pending_renewal', 'archived']
   })
@@ -65,6 +65,9 @@ export class EmployeeDocument extends Document {
 
   @Prop({ default: true })
   isActive: boolean;
+  @Prop({ default: false })
+  isDeleted?: boolean;
+
 }
 
 export const EmployeeDocumentSchema = SchemaFactory.createForClass(EmployeeDocument);

@@ -1,11 +1,12 @@
-import { 
-  Injectable, 
-  NotFoundException, 
-  BadRequestException, 
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Logger
 } from '@nestjs/common';
+import { HydratedDocument } from 'mongoose';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import * as bcrypt from 'bcrypt';
@@ -16,8 +17,8 @@ import { EmployeeShift } from '../database/schemas/employee-shift.schema';
 import { Organization } from '../database/schemas/organization.schema';
 import { Complex } from '../database/schemas/complex.schema';
 import { Clinic } from '../database/schemas/clinic.schema';
-import { 
-  CreateEmployeeDto, 
+import {
+  CreateEmployeeDto,
   UpdateEmployeeDto,
   EmployeeSearchQueryDto,
   CreateEmployeeDocumentDto,
@@ -44,15 +45,203 @@ export class EmployeeService {
     @InjectModel('Organization') private readonly organizationModel: Model<Organization>,
     @InjectModel('Complex') private readonly complexModel: Model<Complex>,
     @InjectModel('Clinic') private readonly clinicModel: Model<Clinic>,
-  ) {}
+  ) { }
+  // ═══════════════════════════════════════════════════════════
+  // 🔐 AUTHORIZATION HELPER METHODS
+  // ═══════════════════════════════════════════════════════════
 
+  /**
+   * جلب نطاق الصلاحيات للمستخدم (Owner/Admin)
+   * Returns: IDs للكيانات التي يملك المستخدم الوصول إليها
+   */
+  private async getUserAccessScope(authUser: {
+    id: string;
+    role: string;
+    organizationId?: string;
+    complexId?: string;
+    clinicId?: string;
+  }): Promise<{
+    allowedOrganizationIds: Types.ObjectId[];
+    allowedComplexIds: Types.ObjectId[];
+    allowedClinicIds: Types.ObjectId[];
+  }> {
+    let allowedOrganizationIds: Types.ObjectId[] = [];
+    let allowedComplexIds: Types.ObjectId[] = [];
+    let allowedClinicIds: Types.ObjectId[] = [];
+
+    if (authUser.role === 'owner') {
+      // جلب كل الكيانات المملوكة
+      const ownedOrganizations = await this.organizationModel.find({
+        ownerId: new Types.ObjectId(authUser.id)
+      }).exec();
+
+      const ownedComplexes = await this.complexModel.find({
+        ownerId: new Types.ObjectId(authUser.id)
+      }).exec();
+
+      const ownedClinics = await this.clinicModel.find({
+        ownerId: new Types.ObjectId(authUser.id)
+      }).exec();
+
+      if (ownedOrganizations.length > 0) {
+        allowedOrganizationIds = ownedOrganizations.map(org => org._id as Types.ObjectId);
+
+        const complexesUnderOrgs = await this.complexModel.find({
+          organizationId: { $in: allowedOrganizationIds }
+        }).exec();
+
+        allowedComplexIds = [
+          ...ownedComplexes.map(c => c._id as Types.ObjectId),
+          ...complexesUnderOrgs.map(c => c._id as Types.ObjectId)
+        ];
+
+        const clinicsUnderComplexes = await this.clinicModel.find({
+          complexId: { $in: allowedComplexIds }
+        }).exec();
+
+        allowedClinicIds = [
+          ...ownedClinics.map(c => c._id as Types.ObjectId),
+          ...clinicsUnderComplexes.map(c => c._id as Types.ObjectId)
+        ];
+
+      } else if (ownedComplexes.length > 0) {
+        allowedComplexIds = ownedComplexes.map(c => c._id as Types.ObjectId);
+
+        const clinicsUnderComplexes = await this.clinicModel.find({
+          complexId: { $in: allowedComplexIds }
+        }).exec();
+
+        allowedClinicIds = [
+          ...ownedClinics.map(c => c._id as Types.ObjectId),
+          ...clinicsUnderComplexes.map(c => c._id as Types.ObjectId)
+        ];
+
+      } else if (ownedClinics.length > 0) {
+        allowedClinicIds = ownedClinics.map(c => c._id as Types.ObjectId);
+      } else {
+        throw new ForbiddenException('You do not own any organizations, complexes, or clinics');
+      }
+
+    } else if (authUser.role === 'admin') {
+      if (authUser.organizationId) {
+        allowedOrganizationIds = [new Types.ObjectId(authUser.organizationId)];
+
+        const complexes = await this.complexModel.find({
+          organizationId: authUser.organizationId
+        }).exec();
+        allowedComplexIds = complexes.map(c => c._id as Types.ObjectId);
+
+        const clinics = await this.clinicModel.find({
+          complexId: { $in: allowedComplexIds }
+        }).exec();
+        allowedClinicIds = clinics.map(c => c._id as Types.ObjectId);
+
+      } else if (authUser.complexId) {
+        allowedComplexIds = [new Types.ObjectId(authUser.complexId)];
+
+        const clinics = await this.clinicModel.find({
+          complexId: authUser.complexId
+        }).exec();
+        allowedClinicIds = clinics.map(c => c._id as Types.ObjectId);
+
+      } else if (authUser.clinicId) {
+        allowedClinicIds = [new Types.ObjectId(authUser.clinicId)];
+
+      } else {
+        throw new ForbiddenException('Admin account is not assigned to any entity');
+      }
+
+    } else {
+      throw new ForbiddenException('Only owners and admins can access employee data');
+    }
+
+    return {
+      allowedOrganizationIds,
+      allowedComplexIds,
+      allowedClinicIds
+    };
+  }
+
+  /**
+   * التحقق من أن الموظف ضمن نطاق صلاحيات المستخدم
+   */
+  private async validateEmployeeAccess(
+    employeeId: string,
+    authUser: {
+      id: string;
+      role: string;
+      organizationId?: string;
+      complexId?: string;
+      clinicId?: string;
+    }
+  ): Promise<void> {
+    // جلب الموظف
+    const employee = await this.userModel.findById(employeeId).exec();
+    if (!employee) {
+      throw new NotFoundException('Employee not found');
+    }
+
+    // جلب نطاق الصلاحيات
+    const scope = await this.getUserAccessScope(authUser);
+
+    // التحقق من أن الموظف ضمن النطاق
+    const hasAccess =
+      (employee.organizationId &&
+        scope.allowedOrganizationIds.some(
+          id => id.toString() === employee.organizationId?.toString()
+        )) ||
+      (employee.complexId &&
+        scope.allowedComplexIds.some(
+          id => id.toString() === employee.complexId?.toString()
+        )) ||
+      (employee.clinicId &&
+        scope.allowedClinicIds.some(
+          id => id.toString() === employee.clinicId?.toString()
+        ));
+
+    if (!hasAccess) {
+      throw new ForbiddenException(
+        'You do not have permission to access this employee'
+      );
+    }
+  }
+
+  /**
+   * فلتر الموظفين حسب نطاق الصلاحيات
+   */
+  private buildAccessScopeFilter(scope: {
+    allowedOrganizationIds: Types.ObjectId[];
+    allowedComplexIds: Types.ObjectId[];
+    allowedClinicIds: Types.ObjectId[];
+  }): any {
+    const scopeConditions: any[] = [];
+
+    if (scope.allowedOrganizationIds.length > 0) {
+      scopeConditions.push({
+        organizationId: { $in: scope.allowedOrganizationIds }
+      });
+    }
+    if (scope.allowedComplexIds.length > 0) {
+      scopeConditions.push({ complexId: { $in: scope.allowedComplexIds } });
+    }
+    if (scope.allowedClinicIds.length > 0) {
+      scopeConditions.push({ clinicId: { $in: scope.allowedClinicIds } });
+    }
+
+    if (scopeConditions.length === 0) {
+      throw new ForbiddenException('No accessible entities found');
+    }
+
+    return { $or: scopeConditions };
+  }
   /**
    * Generate unique employee number
    */
+
   private async generateEmployeeNumber(): Promise<string> {
     const currentYear = new Date().getFullYear();
     const prefix = `EMP${currentYear}`;
-    
+
     // Find the last employee number for this year
     const lastEmployee = await this.employeeProfileModel
       .findOne({
@@ -79,23 +268,25 @@ export class EmployeeService {
     employeeId?: string
   ): Promise<void> {
     const createDto = employeeDto as CreateEmployeeDto;
+    const employeeNumber =
+      createDto.employeeNumber || (await this.generateEmployeeNumber());
 
     // For creation, validate required fields and uniqueness
     if (!isUpdate) {
       // Check email uniqueness
-      const existingUserByEmail = await this.userModel.findOne({ 
-        email: createDto.email 
+      const existingUserByEmail = await this.userModel.findOne({
+        email: createDto.email
       });
-      
+
       if (existingUserByEmail) {
         throw new ConflictException('Email already exists');
       }
 
       // Validate phone uniqueness
-      const existingUserByPhone = await this.userModel.findOne({ 
-        phone: createDto.phone 
+      const existingUserByPhone = await this.userModel.findOne({
+        phone: createDto.phone
       });
-      
+
       if (existingUserByPhone) {
         throw new ConflictException('Phone number already exists');
       }
@@ -105,7 +296,7 @@ export class EmployeeService {
         const existingEmployee = await this.employeeProfileModel.findOne({
           employeeNumber: createDto.employeeNumber
         });
-        
+
         if (existingEmployee) {
           throw new ConflictException('Employee number already exists');
         }
@@ -116,7 +307,7 @@ export class EmployeeService {
         const existingEmployeeByCard = await this.employeeProfileModel.findOne({
           cardNumber: createDto.cardNumber
         });
-        
+
         if (existingEmployeeByCard) {
           throw new ConflictException('Card number already exists');
         }
@@ -128,11 +319,11 @@ export class EmployeeService {
       const birthDate = new Date(createDto.dateOfBirth);
       const today = new Date();
       const minAge = new Date(today.getFullYear() - 16, today.getMonth(), today.getDate());
-      
+
       if (birthDate > today) {
         throw new BadRequestException('Date of birth cannot be in the future');
       }
-      
+
       if (birthDate > minAge) {
         throw new BadRequestException('Employee must be at least 16 years old');
       }
@@ -143,7 +334,7 @@ export class EmployeeService {
       const hiringDate = new Date(createDto.dateOfHiring);
       const today = new Date();
       const maxFutureDate = new Date(today.getFullYear() + 1, today.getMonth(), today.getDate());
-      
+
       if (hiringDate > maxFutureDate) {
         throw new BadRequestException('Hiring date cannot be more than 1 year in the future');
       }
@@ -182,74 +373,131 @@ export class EmployeeService {
    */
   async createEmployee(
     createEmployeeDto: CreateEmployeeDto,
-    createdByUserId?: string
+    authUser: {
+      id: string;
+      role: string;
+      organizationId?: string;
+      complexId?: string;
+      clinicId?: string;
+    }
   ): Promise<any> {
-    this.logger.log(`Creating employee: ${createEmployeeDto.email}`);
+    this.logger.log('Creating new employee');
 
+    // 🔐 التحقق من صلاحيات إنشاء موظف في الكيانات المحددة
+    await this.validateCreateEmployeeEntities(createEmployeeDto, authUser);
+
+    // التحقق من البيانات
     await this.validateEmployeeData(createEmployeeDto);
 
-    // Hash the password
-    const saltRounds = 10;
-    const hashedPassword = await bcrypt.hash(createEmployeeDto.password, saltRounds);
+    // Check if email already exists
+    const existingUser = await this.userModel
+      .findOne({ email: createEmployeeDto.email.toLowerCase() })
+      .exec();
 
-    // Generate employee number if not provided
-    const employeeNumber = createEmployeeDto.employeeNumber || await this.generateEmployeeNumber();
+    if (existingUser) {
+      throw new ConflictException('Email already exists');
+    }
 
-    // Create user account
-    const userData = {
-      email: createEmployeeDto.email,
-      password: hashedPassword,
+    // Check if employee number already exists (if provided)
+    if (createEmployeeDto.employeeNumber) {
+      const existingEmployeeNumber = await this.employeeProfileModel
+        .findOne({ employeeNumber: createEmployeeDto.employeeNumber })
+        .exec();
+
+      if (existingEmployeeNumber) {
+        throw new ConflictException('Employee number already exists');
+      }
+    }
+
+    // Hash password
+    const hashedPassword = await bcrypt.hash(createEmployeeDto.password, 10);
+
+    // Create user
+    const user = await this.userModel.create({
+      email: createEmployeeDto.email.toLowerCase(),
+      passwordHash: hashedPassword,
       firstName: createEmployeeDto.firstName,
       lastName: createEmployeeDto.lastName,
       phone: createEmployeeDto.phone,
-      role: createEmployeeDto.role,
-      nationality: createEmployeeDto.nationality,
+      role: createEmployeeDto.role || 'staff',
       gender: createEmployeeDto.gender,
-      dateOfBirth: new Date(createEmployeeDto.dateOfBirth),
+      dateOfBirth: createEmployeeDto.dateOfBirth
+        ? new Date(createEmployeeDto.dateOfBirth)
+        : undefined,
+      nationality: createEmployeeDto.nationality,
       address: createEmployeeDto.address,
       isActive: true,
-      emailVerified: false, // Will need to verify email
-      setupComplete: false,
-      onboardingComplete: false,
-    };
-
-    const user = new this.userModel(userData);
-    const savedUser = await user.save();
+      emailVerified: false,
+      organizationId: createEmployeeDto.organizationId
+        ? new Types.ObjectId(createEmployeeDto.organizationId)
+        : undefined,
+      complexId: createEmployeeDto.complexId
+        ? new Types.ObjectId(createEmployeeDto.complexId)
+        : undefined,
+      clinicId: createEmployeeDto.clinicId
+        ? new Types.ObjectId(createEmployeeDto.clinicId)
+        : undefined,
+    });
 
     // Create employee profile
-    const profileData = {
-      userId: savedUser._id,
-      employeeNumber,
+    const employeeProfile = await this.employeeProfileModel.create({
+      userId: user._id,
+      employeeNumber: createEmployeeDto.employeeNumber,
+      dateOfHiring: createEmployeeDto.dateOfHiring
+        ? new Date(createEmployeeDto.dateOfHiring)
+        : new Date(),
+      jobTitle: createEmployeeDto.jobTitle,
+      salary: createEmployeeDto.salary,
       cardNumber: createEmployeeDto.cardNumber,
       maritalStatus: createEmployeeDto.maritalStatus,
       numberOfChildren: createEmployeeDto.numberOfChildren || 0,
       profilePictureUrl: createEmployeeDto.profilePictureUrl,
-      jobTitle: createEmployeeDto.jobTitle,
-      dateOfHiring: new Date(createEmployeeDto.dateOfHiring),
-      salary: createEmployeeDto.salary,
       bankAccount: createEmployeeDto.bankAccount,
       socialSecurityNumber: createEmployeeDto.socialSecurityNumber,
       taxId: createEmployeeDto.taxId,
       notes: createEmployeeDto.notes,
+      specialties: createEmployeeDto.specialties || [],
       isActive: true,
-    };
+    });
 
-    const employeeProfile = new this.employeeProfileModel(profileData);
-    const savedProfile = await employeeProfile.save();
+    // ✅ Create default shifts if provided
+    if (createEmployeeDto.shifts && createEmployeeDto.shifts.length > 0) {
+      const shifts = createEmployeeDto.shifts.map(shift => ({
+        userId: user._id,
+        entityType: shift.entityType,
+        entityId: new Types.ObjectId(shift.entityId),
+        shiftName: shift.shiftName,
+        dayOfWeek: shift.dayOfWeek,
+        startTime: shift.startTime,
+        endTime: shift.endTime,
+        breakDurationMinutes: shift.breakDurationMinutes || 0,
+        isActive: true,
+      }));
 
-    this.logger.log(`Employee created successfully: ${savedUser.email} (ID: ${savedUser._id})`);
+      await this.employeeShiftModel.insertMany(shifts);
+    }
 
-    // Return combined user and profile data
-    return {
-      ...savedUser.toObject(),
-      employeeProfile: savedProfile.toObject(),
-    };
+    this.logger.log(`Employee created successfully: ${user._id}`);
+
+
+    return await this.getEmployeeById((user._id as Types.ObjectId).toString());
   }
+
+
 
   /**
    * Get employees with filtering and pagination
    */
-  async getEmployees(query: EmployeeSearchQueryDto): Promise<{
+  async getEmployees(
+    query: EmployeeSearchQueryDto,
+    authUser: {
+      id: string;
+      role: string;
+      organizationId?: string;
+      complexId?: string;
+      clinicId?: string;
+    }
+  ): Promise<{
     employees: any[];
     total: number;
     page: number;
@@ -263,49 +511,53 @@ export class EmployeeService {
       employeeNumber,
       role,
       jobTitle,
-      organizationId,
-      complexId,
-      clinicId,
       isActive,
       dateHiredFrom,
       dateHiredTo,
       page = '1',
       limit = '10',
       sortBy = 'createdAt',
-      sortOrder = 'desc'
+      sortOrder = 'desc',
     } = query;
 
-    // Build user filter
-    const userFilter: any = {};
-    
+    // جلب المستخدم
+    const user = await this.userModel.findById(authUser.id).exec();
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    // بناء فلتر البحث الأساسي
+    const userFilter: any = { isDeleted: { $ne: true } };
     if (firstName) userFilter.firstName = { $regex: firstName, $options: 'i' };
     if (lastName) userFilter.lastName = { $regex: lastName, $options: 'i' };
     if (email) userFilter.email = { $regex: email, $options: 'i' };
     if (role) userFilter.role = role;
     if (isActive !== undefined) userFilter.isActive = isActive;
 
-    // Search across multiple fields
     if (search) {
       userFilter.$or = [
         { firstName: { $regex: search, $options: 'i' } },
         { lastName: { $regex: search, $options: 'i' } },
         { email: { $regex: search, $options: 'i' } },
-        { phone: { $regex: search, $options: 'i' } }
+        { phone: { $regex: search, $options: 'i' } },
       ];
     }
 
-    // Build employee profile filter
-    const profileFilter: any = { isActive: true };
-    
+    // فلترة ملف الموظف
+    const profileFilter: any = {};
     if (employeeNumber) profileFilter.employeeNumber = { $regex: employeeNumber, $options: 'i' };
     if (jobTitle) profileFilter.jobTitle = { $regex: jobTitle, $options: 'i' };
 
-    // Date filtering
     if (dateHiredFrom || dateHiredTo) {
       profileFilter.dateOfHiring = {};
       if (dateHiredFrom) profileFilter.dateOfHiring.$gte = new Date(dateHiredFrom);
       if (dateHiredTo) profileFilter.dateOfHiring.$lte = new Date(dateHiredTo);
     }
+
+    // 🔐 استخدام Helper Methods
+    const scope = await this.getUserAccessScope(authUser);
+    const accessFilter = this.buildAccessScopeFilter(scope);
+    userFilter.$and = [accessFilter];
 
     // Pagination
     const pageNum = Math.max(1, parseInt(page));
@@ -314,112 +566,111 @@ export class EmployeeService {
 
     // Sorting
     const sort: any = {};
-    if (sortBy.includes('.')) {
-      // Handle nested sorting like 'employeeProfile.dateOfHiring'
-      sort[sortBy] = sortOrder === 'asc' ? 1 : -1;
-    } else {
-      sort[sortBy] = sortOrder === 'asc' ? 1 : -1;
-    }
+    sort[sortBy] = sortOrder === 'asc' ? 1 : -1;
 
-    // Aggregate pipeline to join users with employee profiles
+    // Aggregate pipeline
     const pipeline = [
       {
         $lookup: {
           from: 'employee_profiles',
           localField: '_id',
           foreignField: 'userId',
-          as: 'employeeProfile'
-        }
+          as: 'employeeProfile',
+        },
       },
-      {
-        $unwind: {
-          path: '$employeeProfile',
-          preserveNullAndEmptyArrays: false
-        }
-      },
+      { $unwind: { path: '$employeeProfile', preserveNullAndEmptyArrays: false } },
       {
         $match: {
           ...userFilter,
-          'employeeProfile.isActive': true,
-          ...(Object.keys(profileFilter).length > 1 && {
+          ...(Object.keys(profileFilter).length > 0 && {
             $and: Object.entries(profileFilter).map(([key, value]) => ({
-              [`employeeProfile.${key}`]: value
-            }))
-          })
-        }
+              [`employeeProfile.${key}`]: value,
+            })),
+          }),
+        },
       },
       {
         $lookup: {
           from: 'organizations',
           localField: 'organizationId',
           foreignField: '_id',
-          as: 'organization'
-        }
+          as: 'organization',
+        },
       },
       {
         $lookup: {
           from: 'complexes',
           localField: 'complexId',
           foreignField: '_id',
-          as: 'complex'
-        }
+          as: 'complex',
+        },
       },
       {
         $lookup: {
           from: 'clinics',
           localField: 'clinicId',
           foreignField: '_id',
-          as: 'clinic'
-        }
+          as: 'clinic',
+        },
       },
       {
         $addFields: {
           organization: { $arrayElemAt: ['$organization', 0] },
           complex: { $arrayElemAt: ['$complex', 0] },
-          clinic: { $arrayElemAt: ['$clinic', 0] }
-        }
+          clinic: { $arrayElemAt: ['$clinic', 0] },
+        },
       },
-      {
-        $sort: sort
-      },
+      { $sort: sort },
       {
         $facet: {
-          data: [
-            { $skip: skip },
-            { $limit: pageSize }
-          ],
-          count: [
-            { $count: 'total' }
-          ]
-        }
-      }
+          data: [{ $skip: skip }, { $limit: pageSize }],
+          count: [{ $count: 'total' }],
+        },
+      },
     ];
 
     const result = await this.userModel.aggregate(pipeline).exec();
-    
+
     const employees = result[0].data || [];
     const total = result[0].count[0]?.total || 0;
     const totalPages = Math.ceil(total / pageSize);
 
-    return {
-      employees,
-      total,
-      page: pageNum,
-      totalPages
-    };
+    return { employees, total, page: pageNum, totalPages };
   }
+
+
+
 
   /**
    * Get employee by ID
    */
-  async getEmployeeById(employeeId: string): Promise<any> {
+  async getEmployeeById(
+    employeeId: string,
+    authUser?: {
+      id: string;
+      role: string;
+      organizationId?: string;
+      complexId?: string;
+      clinicId?: string;
+    }
+  ): Promise<any> {
     if (!Types.ObjectId.isValid(employeeId)) {
       throw new BadRequestException('Invalid employee ID format');
     }
 
+    // 🔐 التحقق من الصلاحيات إذا كان authUser موجود
+    if (authUser) {
+      await this.validateEmployeeAccess(employeeId, authUser);
+    }
+
     const pipeline = [
       {
-        $match: { _id: new Types.ObjectId(employeeId) }
+        $match: {
+          _id: new Types.ObjectId(employeeId),
+          isDeleted: { $ne: true }
+
+        }
+
       },
       {
         $lookup: {
@@ -485,7 +736,7 @@ export class EmployeeService {
     ];
 
     const result = await this.userModel.aggregate(pipeline).exec();
-    
+
     if (!result || result.length === 0) {
       throw new NotFoundException('Employee not found');
     }
@@ -499,7 +750,14 @@ export class EmployeeService {
   async updateEmployee(
     employeeId: string,
     updateEmployeeDto: UpdateEmployeeDto,
-    updatedByUserId?: string
+    updatedByUserId?: string,
+    authUser?: {
+      id: string;
+      role: string;
+      organizationId?: string;
+      complexId?: string;
+      clinicId?: string;
+    }
   ): Promise<any> {
     if (!Types.ObjectId.isValid(employeeId)) {
       throw new BadRequestException('Invalid employee ID format');
@@ -507,15 +765,18 @@ export class EmployeeService {
 
     this.logger.log(`Updating employee: ${employeeId}`);
 
+    // 🔐 التحقق من الصلاحيات
+    if (authUser) {
+      await this.validateEmployeeAccess(employeeId, authUser);
+    }
+
     await this.validateEmployeeData(updateEmployeeDto, true, employeeId);
 
-    // Get current employee
     const currentEmployee = await this.getEmployeeById(employeeId);
     if (!currentEmployee) {
       throw new NotFoundException('Employee not found');
     }
 
-    // Separate user updates from profile updates
     const userUpdates: any = {};
     const profileUpdates: any = {};
 
@@ -538,8 +799,9 @@ export class EmployeeService {
     if (updateEmployeeDto.socialSecurityNumber) profileUpdates.socialSecurityNumber = updateEmployeeDto.socialSecurityNumber;
     if (updateEmployeeDto.taxId) profileUpdates.taxId = updateEmployeeDto.taxId;
     if (updateEmployeeDto.notes) profileUpdates.notes = updateEmployeeDto.notes;
+    if (updateEmployeeDto.employeeNumber) profileUpdates.employeeNumber = updateEmployeeDto.employeeNumber;
+    if (updateEmployeeDto.specialties) profileUpdates.specialties = updateEmployeeDto.specialties;
 
-    // Update user if there are user updates
     if (Object.keys(userUpdates).length > 0) {
       await this.userModel.findByIdAndUpdate(
         employeeId,
@@ -548,7 +810,6 @@ export class EmployeeService {
       );
     }
 
-    // Update employee profile if there are profile updates
     if (Object.keys(profileUpdates).length > 0) {
       await this.employeeProfileModel.findOneAndUpdate(
         { userId: new Types.ObjectId(employeeId) },
@@ -559,56 +820,135 @@ export class EmployeeService {
 
     this.logger.log(`Employee updated successfully: ${employeeId}`);
 
-    // Return updated employee
     return await this.getEmployeeById(employeeId);
   }
+
 
   /**
    * Soft delete employee
    */
-  async deleteEmployee(employeeId: string, deletedByUserId?: string): Promise<void> {
+  // في employee.service.ts
+
+  /**
+   * Delete employee with safety constraints
+   */
+  async deleteEmployee(
+    employeeId: string,
+    deletedByUserId?: string,
+    authUser?: {
+      id: string;
+      role: string;
+      organizationId?: string;
+      complexId?: string;
+      clinicId?: string;
+    }
+  ): Promise<void> {
     if (!Types.ObjectId.isValid(employeeId)) {
       throw new BadRequestException('Invalid employee ID format');
     }
 
-    this.logger.log(`Soft deleting employee: ${employeeId}`);
+    this.logger.log(`Attempting to delete employee: ${employeeId}`);
 
-    const employee = await this.getEmployeeById(employeeId);
+    // 🔐 1. التحقق من الصلاحيات
+    if (authUser) {
+      await this.validateEmployeeAccess(employeeId, authUser);
+    }
+
+    // 🔐 2. منع حذف المستخدم نفسه
+    if (authUser && authUser.id === employeeId) {
+      throw new ForbiddenException(
+        'You cannot delete your own account. Please contact another administrator.'
+      );
+    }
+
+    // 🔐 3. جلب بيانات الموظف
+    const employee = await this.userModel.findById(employeeId).exec();
     if (!employee) {
       throw new NotFoundException('Employee not found');
     }
 
-    // Deactivate user account
-    await this.userModel.findByIdAndUpdate(
-      employeeId,
-      { 
-        $set: { 
-          isActive: false 
-        }
-      }
-    );
+    // 🔐 4. منع حذف Owner
+    if (employee.role === 'owner') {
+      throw new ForbiddenException(
+        'Owner accounts cannot be deleted. Please contact system support.'
+      );
+    }
 
-    // Deactivate employee profile
+    // 🔐 5. التحقق من أن الحساب معطل
+    if (employee.isActive) {
+      throw new BadRequestException(
+        'Active accounts cannot be deleted. Please deactivate the account first.'
+      );
+    }
+
+    // 🔐 6. التحقق من عدم وجود مواعيد مستقبلية (إذا كان طبيب)
+    if (employee.role === 'doctor') {
+      // TODO: عند إنشاء Appointment System
+      // const futureAppointments = await this.appointmentModel.countDocuments({
+      //   doctorId: employeeId,
+      //   appointmentDate: { $gte: new Date() },
+      //   status: { $in: ['scheduled', 'confirmed'] }
+      // });
+      // 
+      // if (futureAppointments > 0) {
+      //   throw new BadRequestException(
+      //     `Cannot delete doctor with ${futureAppointments} upcoming appointments. ` +
+      //     'Please reassign or cancel appointments first.'
+      //   );
+      // }
+
+      this.logger.warn(
+        `Deleting doctor ${employeeId}. Appointment check not implemented yet.`
+      );
+    }
+
+    // ✅ 7. Soft Delete (تغيير إلى deleted بدلاً من حذف نهائي)
+    await this.userModel.findByIdAndUpdate(employeeId, {
+      $set: {
+        isActive: false,
+        deletedAt: new Date(),
+        deletedBy: deletedByUserId ? new Types.ObjectId(deletedByUserId) : null,
+        // يمكن إضافة flag للإشارة إلى الحذف
+        isDeleted: true
+      }
+    });
+
+    // Soft delete employee profile
     await this.employeeProfileModel.findOneAndUpdate(
       { userId: new Types.ObjectId(employeeId) },
-      { 
-        $set: { 
-          isActive: false 
+      {
+        $set: {
+          isActive: false,
+          isDeleted: true
         }
       }
     );
 
-    // Deactivate all shifts
+    // Soft delete all shifts
     await this.employeeShiftModel.updateMany(
       { userId: new Types.ObjectId(employeeId) },
-      { 
-        $set: { 
-          isActive: false 
+      {
+        $set: {
+          isActive: false,
+          isDeleted: true
         }
       }
     );
 
-    this.logger.log(`Employee soft deleted successfully: ${employeeId}`);
+    // Soft delete all documents
+    await this.employeeDocumentModel.updateMany(
+      { userId: new Types.ObjectId(employeeId) },
+      {
+        $set: {
+          isActive: false,
+          isDeleted: true
+        }
+      }
+    );
+
+    this.logger.log(
+      `Employee deleted successfully: ${employeeId} by user: ${deletedByUserId || 'system'}`
+    );
   }
 
   /**
@@ -617,13 +957,22 @@ export class EmployeeService {
   async terminateEmployee(
     employeeId: string,
     terminateDto: TerminateEmployeeDto,
-    terminatedByUserId?: string
+    userAuth: {
+      id: string;
+      role: string;
+      organizationId?: string;
+      complexId?: string;
+      clinicId?: string;
+    }
   ): Promise<any> {
     if (!Types.ObjectId.isValid(employeeId)) {
       throw new BadRequestException('Invalid employee ID format');
     }
 
     this.logger.log(`Terminating employee: ${employeeId}`);
+
+    // 🔐 التحقق من الصلاحيات (استخدام الـ helper method)
+    await this.validateEmployeeAccess(employeeId, userAuth);
 
     const employee = await this.getEmployeeById(employeeId);
     if (!employee) {
@@ -635,27 +984,22 @@ export class EmployeeService {
     }
 
     const terminationDate = new Date(terminateDto.terminationDate);
-    
+
     // Validate termination date
     if (terminationDate < employee.employeeProfile.dateOfHiring) {
       throw new BadRequestException('Termination date cannot be before hiring date');
     }
 
     // Update user account
-    await this.userModel.findByIdAndUpdate(
-      employeeId,
-      { 
-        $set: { 
-          isActive: false 
-        }
-      }
-    );
+    await this.userModel.findByIdAndUpdate(employeeId, {
+      $set: { isActive: false }
+    });
 
     // Update employee profile with termination details
     await this.employeeProfileModel.findOneAndUpdate(
       { userId: new Types.ObjectId(employeeId) },
-      { 
-        $set: { 
+      {
+        $set: {
           isActive: false,
           terminationDate: terminationDate,
           notes: `${employee.employeeProfile.notes || ''}\n\nTERMINATION:\nType: ${terminateDto.terminationType}\nReason: ${terminateDto.reason}\n${terminateDto.finalNotes || ''}`.trim()
@@ -666,11 +1010,7 @@ export class EmployeeService {
     // Deactivate all shifts
     await this.employeeShiftModel.updateMany(
       { userId: new Types.ObjectId(employeeId) },
-      { 
-        $set: { 
-          isActive: false 
-        }
-      }
+      { $set: { isActive: false } }
     );
 
     this.logger.log(`Employee terminated successfully: ${employeeId}`);
@@ -821,7 +1161,7 @@ export class EmployeeService {
       // Salary statistics
       this.employeeProfileModel.aggregate([
         {
-          $match: { 
+          $match: {
             isActive: true,
             salary: { $gt: 0 }
           }
@@ -880,8 +1220,8 @@ export class EmployeeService {
       this.employeeProfileModel.aggregate([
         {
           $match: {
-            dateOfHiring: { 
-              $gte: new Date(now.getFullYear() - 1, now.getMonth(), 1) 
+            dateOfHiring: {
+              $gte: new Date(now.getFullYear() - 1, now.getMonth(), 1)
             }
           }
         },
@@ -946,7 +1286,7 @@ export class EmployeeService {
 
     // Calculate additional statistics
     const inactiveEmployees = totalEmployees - activeEmployees;
-    
+
     // Calculate average tenure
     const tenureResult = await this.employeeProfileModel.aggregate([
       {
@@ -1106,9 +1446,9 @@ export class EmployeeService {
     }
 
     return await this.employeeDocumentModel
-      .find({ 
+      .find({
         userId: new Types.ObjectId(employeeId),
-        isActive: true 
+        isActive: true
       })
       .populate('uploadedBy', 'firstName lastName')
       .populate('verifiedBy', 'firstName lastName')
@@ -1172,9 +1512,9 @@ export class EmployeeService {
     }
 
     return await this.employeeShiftModel
-      .find({ 
+      .find({
         userId: new Types.ObjectId(employeeId),
-        isActive: true 
+        isActive: true
       })
       .populate('entityId')
       .sort({ dayOfWeek: 1, startTime: 1 })
@@ -1207,13 +1547,16 @@ export class EmployeeService {
               throw new BadRequestException('Termination requires effective date and reason');
             }
             await this.terminateEmployee(
-              employeeId, 
+              employeeId,
               {
                 terminationDate: effectiveDate,
                 terminationType: 'other',
                 reason,
               },
-              actionByUserId
+              {
+                id: actionByUserId || '', // Provide a fallback if undefined
+                role: 'admin', // Or another appropriate role if you have it
+              }
             );
             break;
           case 'export':
@@ -1228,5 +1571,299 @@ export class EmployeeService {
     }
 
     return { success, failed, errors };
+  }
+  /**
+ * إعادة تفعيل موظف معطل
+ */
+  async activateEmployee(
+    employeeId: string,
+    activatedByUserId: string,
+    authUser: {
+      id: string;
+      role: string;
+      organizationId?: string;
+      complexId?: string;
+      clinicId?: string;
+    }
+  ): Promise<any> {
+    if (!Types.ObjectId.isValid(employeeId)) {
+      throw new BadRequestException('Invalid employee ID format');
+    }
+
+    this.logger.log(`Activating employee: ${employeeId}`);
+
+    // 🔐 التحقق من الصلاحيات
+    await this.validateEmployeeAccess(employeeId, authUser);
+
+    // جلب الموظف
+    const employee = await this.getEmployeeById(employeeId);
+    if (!employee) {
+      throw new NotFoundException('Employee not found');
+    }
+  // ✅ التحقق من أنه غير محذوف
+  if (employee.isDeleted) {
+    throw new BadRequestException(
+      'Cannot activate a deleted employee. Use restore functionality instead.'
+    );
+  }
+    // التحقق من أنه معطل بالفعل
+    if (employee.isActive) {
+      throw new BadRequestException('Employee is already active');
+    }
+
+    // إعادة التفعيل
+    await this.userModel.findByIdAndUpdate(employeeId, {
+      $set: { isActive: true }
+    });
+
+    await this.employeeProfileModel.findOneAndUpdate(
+      { userId: new Types.ObjectId(employeeId) },
+      { $set: { isActive: true } }
+    );
+
+    // إعادة تفعيل المناوبات
+    await this.employeeShiftModel.updateMany(
+      { userId: new Types.ObjectId(employeeId) },
+      { $set: { isActive: true } }
+    );
+
+    this.logger.log(`Employee activated successfully: ${employeeId} by user: ${activatedByUserId}`);
+
+    return await this.getEmployeeById(employeeId);
+  }
+
+  /**
+   * إعادة تفعيل موظف منتهي الخدمة (Reactivation بعد Termination)
+   */
+  async reactivateTerminatedEmployee(
+    employeeId: string,
+    reactivationDto: {
+      reason: string;
+      newJobTitle?: string;
+      newSalary?: number;
+      dateOfReactivation: string;
+    },
+    reactivatedByUserId: string,
+    authUser: {
+      id: string;
+      role: string;
+      organizationId?: string;
+      complexId?: string;
+      clinicId?: string;
+    }
+  ): Promise<any> {
+    if (!Types.ObjectId.isValid(employeeId)) {
+      throw new BadRequestException('Invalid employee ID format');
+    }
+
+    this.logger.log(`Reactivating terminated employee: ${employeeId}`);
+
+    // 🔐 التحقق من الصلاحيات
+    await this.validateEmployeeAccess(employeeId, authUser);
+
+    const employee = await this.getEmployeeById(employeeId);
+    if (!employee) {
+      throw new NotFoundException('Employee not found');
+    }
+
+    if (employee.isActive) {
+      throw new BadRequestException('Employee is already active');
+    }
+
+    // التحقق من أن لديه terminationDate (كان منتهي الخدمة)
+    if (!employee.employeeProfile.terminationDate) {
+      throw new BadRequestException('This employee was not terminated. Use activate endpoint instead.');
+    }
+
+    const reactivationDate = new Date(reactivationDto.dateOfReactivation);
+
+    // التحقق من التاريخ
+    if (reactivationDate < employee.employeeProfile.terminationDate) {
+      throw new BadRequestException('Reactivation date must be after termination date');
+    }
+
+    // إعادة التفعيل
+    await this.userModel.findByIdAndUpdate(employeeId, {
+      $set: { isActive: true }
+    });
+
+    const profileUpdates: any = {
+      isActive: true,
+      terminationDate: null, // إزالة تاريخ الإنهاء
+      dateOfHiring: reactivationDate, // تاريخ إعادة التوظيف
+      notes: `${employee.employeeProfile.notes || ''}\n\nREACTIVATION:\nDate: ${reactivationDate.toISOString()}\nReason: ${reactivationDto.reason}`.trim()
+    };
+
+    if (reactivationDto.newJobTitle) {
+      profileUpdates.jobTitle = reactivationDto.newJobTitle;
+    }
+    if (reactivationDto.newSalary) {
+      profileUpdates.salary = reactivationDto.newSalary;
+    }
+
+    await this.employeeProfileModel.findOneAndUpdate(
+      { userId: new Types.ObjectId(employeeId) },
+      { $set: profileUpdates }
+    );
+
+    // إعادة تفعيل المناوبات (اختياري - قد تحتاج إنشاء جديدة)
+    await this.employeeShiftModel.updateMany(
+      { userId: new Types.ObjectId(employeeId) },
+      { $set: { isActive: true } }
+    );
+
+    this.logger.log(`Employee reactivated successfully: ${employeeId} by user: ${reactivatedByUserId}`);
+
+    return await this.getEmployeeById(employeeId);
+  }
+  /**
+   * التحقق من أن المستخدم يملك الوصول للكيان المحدد
+   */
+  private async validateEntityOwnership(
+    entityId: string,
+    entityType: 'organization' | 'complex' | 'clinic',
+    authUser: {
+      id: string;
+      role: string;
+      organizationId?: string;
+      complexId?: string;
+      clinicId?: string;
+    }
+  ): Promise<void> {
+    if (!entityId) {
+      return; // لا يوجد كيان محدد
+    }
+
+    // جلب نطاق الصلاحيات
+    const scope = await this.getUserAccessScope(authUser);
+
+    let hasAccess = false;
+    const entityObjectId = new Types.ObjectId(entityId);
+
+    switch (entityType) {
+      case 'organization':
+        hasAccess = scope.allowedOrganizationIds.some(
+          id => id.toString() === entityObjectId.toString()
+        );
+        break;
+      case 'complex':
+        hasAccess = scope.allowedComplexIds.some(
+          id => id.toString() === entityObjectId.toString()
+        );
+        break;
+      case 'clinic':
+        hasAccess = scope.allowedClinicIds.some(
+          id => id.toString() === entityObjectId.toString()
+        );
+        break;
+    }
+
+    if (!hasAccess) {
+      throw new ForbiddenException(
+        `You do not have permission to create employees in this ${entityType}`
+      );
+    }
+  }
+
+  /**
+   * التحقق من صحة الكيانات المُرسلة عند الإنشاء
+   */
+  private async validateCreateEmployeeEntities(
+    createEmployeeDto: CreateEmployeeDto,
+    authUser: {
+      id: string;
+      role: string;
+      organizationId?: string;
+      complexId?: string;
+      clinicId?: string;
+    }
+  ): Promise<void> {
+    const { organizationId, complexId, clinicId } = createEmployeeDto;
+
+    // على الأقل يجب تحديد كيان واحد
+    if (!organizationId && !complexId && !clinicId) {
+      throw new BadRequestException(
+        'At least one of organizationId, complexId, or clinicId must be provided'
+      );
+    }
+
+    // التحقق من ملكية كل كيان محدد
+    if (organizationId) {
+      await this.validateEntityOwnership(organizationId, 'organization', authUser);
+    }
+
+    if (complexId) {
+      await this.validateEntityOwnership(complexId, 'complex', authUser);
+
+      // التحقق من أن Complex ينتمي للـ Organization المحددة
+      if (organizationId) {
+        const complex = await this.complexModel.findById(complexId).exec();
+        if (!complex) {
+          throw new NotFoundException('Complex not found');
+        }
+        if (complex.organizationId?.toString() !== organizationId) {
+          throw new BadRequestException(
+            'Complex does not belong to the specified organization'
+          );
+        }
+      }
+    }
+
+    if (clinicId) {
+      await this.validateEntityOwnership(clinicId, 'clinic', authUser);
+
+      // التحقق من أن Clinic ينتمي للـ Complex المحدد
+      if (complexId) {
+        const clinic = await this.clinicModel.findById(clinicId).exec();
+        if (!clinic) {
+          throw new NotFoundException('Clinic not found');
+        }
+        if (clinic.complexId?.toString() !== complexId) {
+          throw new BadRequestException(
+            'Clinic does not belong to the specified complex'
+          );
+        }
+      }
+    }
+  }
+  /**
+   * جلب الكيانات المتاحة للمستخدم لإنشاء موظفين فيها
+   */
+  async getAvailableEntitiesForUser(authUser: {
+    id: string;
+    role: string;
+    organizationId?: string;
+    complexId?: string;
+    clinicId?: string;
+  }): Promise<{
+    organizations: any[];
+    complexes: any[];
+    clinics: any[];
+  }> {
+    const scope = await this.getUserAccessScope(authUser);
+
+    // جلب تفاصيل Organizations
+    const organizations = await this.organizationModel
+      .find({ _id: { $in: scope.allowedOrganizationIds } })
+      .select('_id name email')
+      .exec();
+
+    // جلب تفاصيل Complexes
+    const complexes = await this.complexModel
+      .find({ _id: { $in: scope.allowedComplexIds } })
+      .select('_id name organizationId')
+      .exec();
+
+    // جلب تفاصيل Clinics
+    const clinics = await this.clinicModel
+      .find({ _id: { $in: scope.allowedClinicIds } })
+      .select('_id name complexId organizationId')
+      .exec();
+
+    return {
+      organizations,
+      complexes,
+      clinics
+    };
   }
 } 

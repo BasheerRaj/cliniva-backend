@@ -8,6 +8,10 @@ import { Complex, ComplexSchema } from '../database/schemas/complex.schema';
 import { Clinic, ClinicSchema } from '../database/schemas/clinic.schema';
 import { Subscription, SubscriptionSchema } from '../database/schemas/subscription.schema';
 import { SubscriptionPlan, SubscriptionPlanSchema } from '../database/schemas/subscription-plan.schema';
+import { EmployeeProfile, EmployeeProfileSchema } from '../database/schemas/employee-profile.schema';
+import { EmployeeShift, EmployeeShiftSchema } from '../database/schemas/employee-shift.schema';
+import { EmployeeDocument, EmployeeDocumentSchema } from '../database/schemas/employee-document.schema';
+import { UserAccess, UserAccessSchema } from '../database/schemas/user-access.schema';
 
 @Module({
   imports: [
@@ -18,6 +22,10 @@ import { SubscriptionPlan, SubscriptionPlanSchema } from '../database/schemas/su
       { name: Clinic.name, schema: ClinicSchema },
       { name: Subscription.name, schema: SubscriptionSchema },
       { name: SubscriptionPlan.name, schema: SubscriptionPlanSchema },
+      { name: EmployeeProfile.name, schema: EmployeeProfileSchema },
+      { name: EmployeeShift.name, schema: EmployeeShiftSchema },
+      { name: EmployeeDocument.name, schema: EmployeeDocumentSchema },
+      { name: UserAccess.name, schema: UserAccessSchema },
     ]),
   ],
   controllers: [UserController],

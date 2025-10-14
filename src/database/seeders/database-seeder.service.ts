@@ -19,18 +19,18 @@ export class DatabaseSeederService {
     @InjectModel(Specialty.name) private specialtyModel: Model<Specialty>,
     @InjectModel(EmailTemplate.name) private emailTemplateModel: Model<EmailTemplate>,
     @InjectModel(SmsTemplate.name) private smsTemplateModel: Model<SmsTemplate>,
-  ) {}
+  ) { }
 
   async seedAll(): Promise<void> {
     this.logger.log('🌱 Starting database seeding...');
-    
+
     try {
       await this.seedSubscriptionPlans();
       await this.seedDepartments();
       await this.seedSpecialties();
       await this.seedEmailTemplates();
       await this.seedSmsTemplates();
-      
+
       this.logger.log('✅ Database seeding completed successfully');
     } catch (error) {
       this.logger.error('❌ Database seeding failed:', error.message);
@@ -40,7 +40,7 @@ export class DatabaseSeederService {
 
   private async seedSubscriptionPlans(): Promise<void> {
     this.logger.log('📋 Seeding subscription plans...');
-    
+
     const plans = [
       {
         name: 'clinic',
@@ -76,7 +76,7 @@ export class DatabaseSeederService {
 
   private async seedDepartments(): Promise<void> {
     this.logger.log('🏥 Seeding departments...');
-    
+
     const departments = [
       { name: 'Cardiology', description: 'Heart and cardiovascular system care' },
       { name: 'Dermatology', description: 'Skin, hair, and nail disorders' },
@@ -109,7 +109,7 @@ export class DatabaseSeederService {
 
   private async seedSpecialties(): Promise<void> {
     this.logger.log('👨‍⚕️ Seeding medical specialties...');
-    
+
     const specialties = [
       { name: 'Cardiologist', description: 'Heart specialist' },
       { name: 'Dermatologist', description: 'Skin specialist' },
@@ -142,7 +142,7 @@ export class DatabaseSeederService {
 
   private async seedEmailTemplates(): Promise<void> {
     this.logger.log('📧 Seeding email templates...');
-    
+
     const templates = [
       {
         templateName: 'appointment_confirmation',
@@ -252,7 +252,7 @@ export class DatabaseSeederService {
 
   private async seedSmsTemplates(): Promise<void> {
     this.logger.log('📱 Seeding SMS templates...');
-    
+
     const templates = [
       {
         templateName: 'appointment_reminder_sms',
@@ -292,14 +292,14 @@ export class DatabaseSeederService {
 
   async clearDatabase(): Promise<void> {
     this.logger.warn('🗑️ Clearing database...');
-    
+
     try {
       await this.subscriptionPlanModel.deleteMany({});
       await this.departmentModel.deleteMany({});
       await this.specialtyModel.deleteMany({});
       await this.emailTemplateModel.deleteMany({});
       await this.smsTemplateModel.deleteMany({});
-      
+
       this.logger.log('✅ Database cleared successfully');
     } catch (error) {
       this.logger.error('❌ Database clearing failed:', error.message);

@@ -14,6 +14,7 @@ import {
   ValidationPipe,
   ParseIntPipe,
   BadRequestException,
+  Req,
 } from '@nestjs/common';
 import { EmployeeService } from './employee.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -30,26 +31,29 @@ import {
   AssignEmployeeDto,
   EmployeeAttendanceDto,
   TerminateEmployeeDto,
+  ReactivateEmployeeDto
 } from './dto';
 
 @Controller('employees')
 @UseGuards(JwtAuthGuard)
 export class EmployeeController {
-  constructor(private readonly employeeService: EmployeeService) {}
+  constructor(private readonly employeeService: EmployeeService) { }
 
   /**
    * Create a new employee
    * POST /employees
    */
+
   @Post()
   async createEmployee(
     @Body(new ValidationPipe()) createEmployeeDto: CreateEmployeeDto,
     @Request() req: any
   ) {
     try {
+      // 🔐 تمرير authUser للتحقق من الصلاحيات
       const employee = await this.employeeService.createEmployee(
         createEmployeeDto,
-        req.user?.userId
+        req.user // ✅ إضافة authUser
       );
       return {
         success: true,
@@ -70,12 +74,13 @@ export class EmployeeController {
    * GET /employees
    */
   @Get()
-  async getEmployees(@Query(new ValidationPipe()) query: EmployeeSearchQueryDto) {
+  async getEmployees(@Query(new ValidationPipe()) query: EmployeeSearchQueryDto, @Req() req: any) {
     try {
-      const result = await this.employeeService.getEmployees(query);
+      const user = req.user;
+      const result = await this.employeeService.getEmployees(query, user);
       return {
         success: true,
-        message: 'Employees retrieved successfully',
+        message: 'Employees retrieveddd successfully',
         data: result.employees,
         pagination: {
           total: result.total,
@@ -98,9 +103,10 @@ export class EmployeeController {
    * GET /employees/:id
    */
   @Get(':id')
-  async getEmployee(@Param('id') id: string) {
+  async getEmployee(@Param('id') id: string, @Request() req: any) {
     try {
-      const employee = await this.employeeService.getEmployeeById(id);
+      // 🔐 تمرير authUser للتحقق من الصلاحيات
+      const employee = await this.employeeService.getEmployeeById(id, req.user);
       return {
         success: true,
         message: 'Employee retrieved successfully',
@@ -126,10 +132,12 @@ export class EmployeeController {
     @Request() req: any
   ) {
     try {
+      // 🔐 تمرير authUser للتحقق من الصلاحيات
       const employee = await this.employeeService.updateEmployee(
         id,
         updateEmployeeDto,
-        req.user?.userId
+        req.user?.id,
+        req.user // ✅ إضافة authUser
       );
       return {
         success: true,
@@ -144,7 +152,6 @@ export class EmployeeController {
       };
     }
   }
-
   /**
    * Soft delete employee
    * DELETE /employees/:id
@@ -153,7 +160,12 @@ export class EmployeeController {
   @HttpCode(HttpStatus.OK)
   async deleteEmployee(@Param('id') id: string, @Request() req: any) {
     try {
-      await this.employeeService.deleteEmployee(id, req.user?.userId);
+      // 🔐 تمرير authUser للتحقق من الصلاحيات
+      await this.employeeService.deleteEmployee(
+        id,
+        req.user?.id,
+        req.user // ✅ إضافة authUser
+      );
       return {
         success: true,
         message: 'Employee deleted successfully'
@@ -181,7 +193,7 @@ export class EmployeeController {
       const employee = await this.employeeService.terminateEmployee(
         id,
         terminateDto,
-        req.user?.userId
+        req.user
       );
       return {
         success: true,
@@ -274,162 +286,220 @@ export class EmployeeController {
       };
     }
   }
-
   /**
-   * Get employees by role
-   * GET /employees/role/:role
+   * إعادة تفعيل موظف معطل
+   * POST /employees/:id/activate
    */
-  @Get('role/:role')
-  async getEmployeesByRole(
-    @Param('role') role: string,
-    @Query('page') page?: string,
-    @Query('limit') limit?: string
+  @Post(':id/activate')
+  async activateEmployee(
+    @Param('id') id: string,
+    @Request() req: any
   ) {
     try {
-      const query: EmployeeSearchQueryDto = {
-        role,
-        page: page || '1',
-        limit: limit || '10'
-      };
-
-      const result = await this.employeeService.getEmployees(query);
+      const employee = await this.employeeService.activateEmployee(
+        id,
+        req.user.id,
+        req.user
+      );
       return {
         success: true,
-        message: `Employees with role '${role}' retrieved successfully`,
-        data: result.employees,
-        pagination: {
-          total: result.total,
-          page: result.page,
-          totalPages: result.totalPages
-        }
+        message: 'Employee activated successfully',
+        data: employee
       };
     } catch (error) {
       return {
         success: false,
-        message: 'Failed to retrieve employees by role',
+        message: 'Failed to activate employee',
         error: error.message
       };
     }
   }
+
+  /**
+   * إعادة تفعيل موظف منتهي الخدمة
+   * POST /employees/:id/reactivate
+   */
+  @Post(':id/reactivate')
+  async reactivateEmployee(
+    @Param('id') id: string,
+    @Body(new ValidationPipe()) reactivationDto: ReactivateEmployeeDto,
+    @Request() req: any
+  ) {
+    try {
+      const employee = await this.employeeService.reactivateTerminatedEmployee(
+        id,
+        reactivationDto,
+        req.user.id,
+        req.user
+      );
+      return {
+        success: true,
+        message: 'Employee reactivated successfully',
+        data: employee
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: 'Failed to reactivate employee',
+        error: error.message
+      };
+    }
+  }
+  /**
+   * Get employees by role
+   * GET /employees/role/:role
+   */
+  // @Get('role/:role')
+  // async getEmployeesByRole(
+  //   @Param('role') role: string,
+  //   @Query('page') page?: string,
+  //   @Query('limit') limit?: string
+  // ) {
+  //   try {
+  //     const query: EmployeeSearchQueryDto = {
+  //       role,
+  //       page: page || '1',
+  //       limit: limit || '10'
+  //     };
+
+  //     const result = await this.employeeService.getEmployees(query);
+  //     return {
+  //       success: true,
+  //       message: `Employees with role '${role}' retrieved successfully`,
+  //       data: result.employees,
+  //       pagination: {
+  //         total: result.total,
+  //         page: result.page,
+  //         totalPages: result.totalPages
+  //       }
+  //     };
+  //   } catch (error) {
+  //     return {
+  //       success: false,
+  //       message: 'Failed to retrieve employees by role',
+  //       error: error.message
+  //     };
+  //   }
+  // }
 
   /**
    * Get active employees
    * GET /employees/status/active
    */
-  @Get('status/active')
-  async getActiveEmployees(
-    @Query('page') page?: string,
-    @Query('limit') limit?: string
-  ) {
-    try {
-      const query: EmployeeSearchQueryDto = {
-        isActive: true,
-        page: page || '1',
-        limit: limit || '10'
-      };
+  // @Get('status/active')
+  // async getActiveEmployees(
+  //   @Query('page') page?: string,
+  //   @Query('limit') limit?: string
+  // ) {
+  //   try {
+  //     const query: EmployeeSearchQueryDto = {
+  //       isActive: true,
+  //       page: page || '1',
+  //       limit: limit || '10'
+  //     };
 
-      const result = await this.employeeService.getEmployees(query);
-      return {
-        success: true,
-        message: 'Active employees retrieved successfully',
-        data: result.employees,
-        pagination: {
-          total: result.total,
-          page: result.page,
-          totalPages: result.totalPages
-        }
-      };
-    } catch (error) {
-      return {
-        success: false,
-        message: 'Failed to retrieve active employees',
-        error: error.message
-      };
-    }
-  }
+  //     const result = await this.employeeService.getEmployees(query);
+  //     return {
+  //       success: true,
+  //       message: 'Active employees retrieved successfully',
+  //       data: result.employees,
+  //       pagination: {
+  //         total: result.total,
+  //         page: result.page,
+  //         totalPages: result.totalPages
+  //       }
+  //     };
+  //   } catch (error) {
+  //     return {
+  //       success: false,
+  //       message: 'Failed to retrieve active employees',
+  //       error: error.message
+  //     };
+  //   }
+  // }
 
   /**
    * Get inactive employees
    * GET /employees/status/inactive
    */
-  @Get('status/inactive')
-  async getInactiveEmployees(
-    @Query('page') page?: string,
-    @Query('limit') limit?: string
-  ) {
-    try {
-      const query: EmployeeSearchQueryDto = {
-        isActive: false,
-        page: page || '1',
-        limit: limit || '10'
-      };
+  // @Get('status/inactive')
+  // async getInactiveEmployees(
+  //   @Query('page') page?: string,
+  //   @Query('limit') limit?: string
+  // ) {
+  //   try {
+  //     const query: EmployeeSearchQueryDto = {
+  //       isActive: false,
+  //       page: page || '1',
+  //       limit: limit || '10'
+  //     };
 
-      const result = await this.employeeService.getEmployees(query);
-      return {
-        success: true,
-        message: 'Inactive employees retrieved successfully',
-        data: result.employees,
-        pagination: {
-          total: result.total,
-          page: result.page,
-          totalPages: result.totalPages
-        }
-      };
-    } catch (error) {
-      return {
-        success: false,
-        message: 'Failed to retrieve inactive employees',
-        error: error.message
-      };
-    }
-  }
+  //     const result = await this.employeeService.getEmployees(query);
+  //     return {
+  //       success: true,
+  //       message: 'Inactive employees retrieved successfully',
+  //       data: result.employees,
+  //       pagination: {
+  //         total: result.total,
+  //         page: result.page,
+  //         totalPages: result.totalPages
+  //       }
+  //     };
+  //   } catch (error) {
+  //     return {
+  //       success: false,
+  //       message: 'Failed to retrieve inactive employees',
+  //       error: error.message
+  //     };
+  //   }
+  // }
 
-  /**
-   * Get employees hired in date range
-   * GET /employees/hired/date-range?from=YYYY-MM-DD&to=YYYY-MM-DD
-   */
-  @Get('hired/date-range')
-  async getEmployeesHiredInRange(
-    @Query('from') dateFrom: string,
-    @Query('to') dateTo: string,
-    @Query('page') page?: string,
-    @Query('limit') limit?: string
-  ) {
-    try {
-      if (!dateFrom || !dateTo) {
-        throw new BadRequestException('Both from and to date parameters are required');
-      }
+  // /**
+  //  * Get employees hired in date range
+  //  * GET /employees/hired/date-range?from=YYYY-MM-DD&to=YYYY-MM-DD
+  //  */
+  // @Get('hired/date-range')
+  // async getEmployeesHiredInRange(
+  //   @Query('from') dateFrom: string,
+  //   @Query('to') dateTo: string,
+  //   @Query('page') page?: string,
+  //   @Query('limit') limit?: string
+  // ) {
+  //   try {
+  //     if (!dateFrom || !dateTo) {
+  //       throw new BadRequestException('Both from and to date parameters are required');
+  //     }
 
-      const query: EmployeeSearchQueryDto = {
-        dateHiredFrom: dateFrom,
-        dateHiredTo: dateTo,
-        page: page || '1',
-        limit: limit || '20'
-      };
+  //     const query: EmployeeSearchQueryDto = {
+  //       dateHiredFrom: dateFrom,
+  //       dateHiredTo: dateTo,
+  //       page: page || '1',
+  //       limit: limit || '20'
+  //     };
 
-      const result = await this.employeeService.getEmployees(query);
-      return {
-        success: true,
-        message: 'Employees hired in date range retrieved successfully',
-        data: result.employees,
-        pagination: {
-          total: result.total,
-          page: result.page,
-          totalPages: result.totalPages
-        },
-        dateRange: {
-          from: dateFrom,
-          to: dateTo
-        }
-      };
-    } catch (error) {
-      return {
-        success: false,
-        message: 'Failed to retrieve employees by hiring date range',
-        error: error.message
-      };
-    }
-  }
+  //     const result = await this.employeeService.getEmployees(query);
+  //     return {
+  //       success: true,
+  //       message: 'Employees hired in date range retrieved successfully',
+  //       data: result.employees,
+  //       pagination: {
+  //         total: result.total,
+  //         page: result.page,
+  //         totalPages: result.totalPages
+  //       },
+  //       dateRange: {
+  //         from: dateFrom,
+  //         to: dateTo
+  //       }
+  //     };
+  //   } catch (error) {
+  //     return {
+  //       success: false,
+  //       message: 'Failed to retrieve employees by hiring date range',
+  //       error: error.message
+  //     };
+  //   }
+  // }
 
   /**
    * Bulk employee actions
@@ -603,112 +673,112 @@ export class EmployeeController {
    * Get employees by organization
    * GET /employees/organization/:organizationId
    */
-  @Get('organization/:organizationId')
-  async getEmployeesByOrganization(
-    @Param('organizationId') organizationId: string,
-    @Query('page') page?: string,
-    @Query('limit') limit?: string
-  ) {
-    try {
-      const query: EmployeeSearchQueryDto = {
-        organizationId,
-        page: page || '1',
-        limit: limit || '10'
-      };
+  // @Get('organization/:organizationId')
+  // async getEmployeesByOrganization(
+  //   @Param('organizationId') organizationId: string,
+  //   @Query('page') page?: string,
+  //   @Query('limit') limit?: string
+  // ) {
+  //   try {
+  //     const query: EmployeeSearchQueryDto = {
+  //       organizationId,
+  //       page: page || '1',
+  //       limit: limit || '10'
+  //     };
 
-      const result = await this.employeeService.getEmployees(query);
-      return {
-        success: true,
-        message: 'Organization employees retrieved successfully',
-        data: result.employees,
-        pagination: {
-          total: result.total,
-          page: result.page,
-          totalPages: result.totalPages
-        }
-      };
-    } catch (error) {
-      return {
-        success: false,
-        message: 'Failed to retrieve organization employees',
-        error: error.message
-      };
-    }
-  }
+  //     const result = await this.employeeService.getEmployees(query);
+  //     return {
+  //       success: true,
+  //       message: 'Organization employees retrieved successfully',
+  //       data: result.employees,
+  //       pagination: {
+  //         total: result.total,
+  //         page: result.page,
+  //         totalPages: result.totalPages
+  //       }
+  //     };
+  //   } catch (error) {
+  //     return {
+  //       success: false,
+  //       message: 'Failed to retrieve organization employees',
+  //       error: error.message
+  //     };
+  //   }
+  // }
 
   /**
    * Get employees by complex
    * GET /employees/complex/:complexId
    */
-  @Get('complex/:complexId')
-  async getEmployeesByComplex(
-    @Param('complexId') complexId: string,
-    @Query('page') page?: string,
-    @Query('limit') limit?: string
-  ) {
-    try {
-      const query: EmployeeSearchQueryDto = {
-        complexId,
-        page: page || '1',
-        limit: limit || '10'
-      };
+  // @Get('complex/:complexId')
+  // async getEmployeesByComplex(
+  //   @Param('complexId') complexId: string,
+  //   @Query('page') page?: string,
+  //   @Query('limit') limit?: string
+  // ) {
+  //   try {
+  //     const query: EmployeeSearchQueryDto = {
+  //       complexId,
+  //       page: page || '1',
+  //       limit: limit || '10'
+  //     };
 
-      const result = await this.employeeService.getEmployees(query);
-      return {
-        success: true,
-        message: 'Complex employees retrieved successfully',
-        data: result.employees,
-        pagination: {
-          total: result.total,
-          page: result.page,
-          totalPages: result.totalPages
-        }
-      };
-    } catch (error) {
-      return {
-        success: false,
-        message: 'Failed to retrieve complex employees',
-        error: error.message
-      };
-    }
-  }
+  //     const result = await this.employeeService.getEmployees(query);
+  //     return {
+  //       success: true,
+  //       message: 'Complex employees retrieved successfully',
+  //       data: result.employees,
+  //       pagination: {
+  //         total: result.total,
+  //         page: result.page,
+  //         totalPages: result.totalPages
+  //       }
+  //     };
+  //   } catch (error) {
+  //     return {
+  //       success: false,
+  //       message: 'Failed to retrieve complex employees',
+  //       error: error.message
+  //     };
+  //   }
+  // }
 
   /**
    * Get employees by clinic
    * GET /employees/clinic/:clinicId
    */
-  @Get('clinic/:clinicId')
-  async getEmployeesByClinic(
-    @Param('clinicId') clinicId: string,
-    @Query('page') page?: string,
-    @Query('limit') limit?: string
-  ) {
-    try {
-      const query: EmployeeSearchQueryDto = {
-        clinicId,
-        page: page || '1',
-        limit: limit || '10'
-      };
+  // @Get('clinic/:clinicId')
+  // async getEmployeesByClinic(
+  //   @Param('clinicId') clinicId: string,
+  //   @Query('page') page?: string,
+  //   @Query('limit') limit?: string
+  // ) {
+  //   try {
+  //     const query: EmployeeSearchQueryDto = {
+  //       clinicId,
+  //       page: page || '1',
+  //       limit: limit || '10'
+  //     };
 
-      const result = await this.employeeService.getEmployees(query);
-      return {
-        success: true,
-        message: 'Clinic employees retrieved successfully',
-        data: result.employees,
-        pagination: {
-          total: result.total,
-          page: result.page,
-          totalPages: result.totalPages
-        }
-      };
-    } catch (error) {
-      return {
-        success: false,
-        message: 'Failed to retrieve clinic employees',
-        error: error.message
-      };
-    }
-  }
+  //     const result = await this.employeeService.getEmployees(query);
+  //     return {
+  //       success: true,
+  //       message: 'Clinic employees retrieved successfully',
+  //       data: result.employees,
+  //       pagination: {
+  //         total: result.total,
+  //         page: result.page,
+  //         totalPages: result.totalPages
+  //       }
+  //     };
+  //   } catch (error) {
+  //     return {
+  //       success: false,
+  //       message: 'Failed to retrieve clinic employees',
+  //       error: error.message
+  //     };
+  //   }
+  // }
 
   /**
    * Get employee analytics by role
@@ -718,7 +788,7 @@ export class EmployeeController {
   async getEmployeeRoleAnalytics() {
     try {
       const stats = await this.employeeService.getEmployeeStats();
-      
+
       return {
         success: true,
         message: 'Employee role analytics retrieved successfully',
@@ -745,7 +815,7 @@ export class EmployeeController {
   async getEmployeeSalaryAnalytics() {
     try {
       const stats = await this.employeeService.getEmployeeStats();
-      
+
       return {
         success: true,
         message: 'Employee salary analytics retrieved successfully',
@@ -771,7 +841,7 @@ export class EmployeeController {
   async getHiringTrends() {
     try {
       const stats = await this.employeeService.getEmployeeStats();
-      
+
       return {
         success: true,
         message: 'Hiring trends retrieved successfully',
@@ -801,7 +871,7 @@ export class EmployeeController {
   ) {
     try {
       const stats = await this.employeeService.getEmployeeStats();
-      
+
       return {
         success: true,
         message: 'Upcoming document expirations retrieved successfully',
@@ -851,35 +921,66 @@ export class EmployeeController {
    * Export employees data
    * GET /employees/export/data?format=csv
    */
-  @Get('export/data')
-  async exportEmployeesData(
-    @Query('format') format?: string,
-    @Query() filters?: EmployeeSearchQueryDto
-  ) {
-    try {
-      // This would implement actual CSV/Excel export
-      const result = await this.employeeService.getEmployees({
-        ...filters,
-        limit: '1000' // Export more records
-      });
-      
-      return {
-        success: true,
-        message: 'Employee export prepared successfully',
-        data: {
-          employees: result.employees,
-          totalExported: result.total,
-          format: format || 'json',
-          exportDate: new Date(),
-          message: 'Export functionality would generate CSV/Excel file here'
-        }
-      };
-    } catch (error) {
-      return {
-        success: false,
-        message: 'Failed to export employees data',
-        error: error.message
-      };
-    }
+  // @Get('export/data')
+  // async exportEmployeesData(
+  //   @Query('format') format?: string,
+  //   @Query() filters?: EmployeeSearchQueryDto
+  // ) {
+  //   try {
+  //     // This would implement actual CSV/Excel export
+  //     const result = await this.employeeService.getEmployees({
+
+  //       ...filters,
+  //       limit: '1000' // Export more records
+  //     });
+
+  //     return {
+  //       success: true,
+  //       message: 'Employee export prepared successfully',
+  //       data: {
+  //         employees: result.employees,
+  //         totalExported: result.total,
+  //         format: format || 'json',
+  //         exportDate: new Date(),
+  //         message: 'Export functionality would generate CSV/Excel file here'
+  //       }
+  //     };
+  //   } catch (error) {
+  //     return {
+  //       success: false,
+  //       message: 'Failed to export employees data',
+  //       error: error.message
+  //     };
+  //   }
+  // }
+  // في employee.service.ts
+
+/**
+ * جلب الكيانات المتاحة للمستخدم لإنشاء موظفين فيها
+ */
+
+
+/**
+ * Get available entities for creating employees
+ * GET /employees/available-entities
+ */
+@Get('available-entities')
+async getAvailableEntities(@Request() req: any) {
+  try {
+    const entities = await this.employeeService.getAvailableEntitiesForUser(
+      req.user
+    );
+    return {
+      success: true,
+      message: 'Available entities retrieved successfully',
+      data: entities
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: 'Failed to retrieve available entities',
+      error: error.message
+    };
   }
+}
 } 

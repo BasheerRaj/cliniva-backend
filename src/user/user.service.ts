@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  Logger,
+
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { User } from '../database/schemas/user.schema';
@@ -8,18 +13,20 @@ import { Clinic } from '../database/schemas/clinic.schema';
 import { Subscription } from '../database/schemas/subscription.schema';
 import { SubscriptionPlan } from '../database/schemas/subscription-plan.schema';
 import { UserEntitiesResponseDto } from './dto/check-user-entities.dto';
-
 @Injectable()
 export class UserService {
   private readonly logger = new Logger(UserService.name);
 
   constructor(
     @InjectModel(User.name) private userModel: Model<User>,
-    @InjectModel(Organization.name) private organizationModel: Model<Organization>,
+    @InjectModel(Organization.name)
+    private organizationModel: Model<Organization>,
     @InjectModel(Complex.name) private complexModel: Model<Complex>,
     @InjectModel(Clinic.name) private clinicModel: Model<Clinic>,
-    @InjectModel(Subscription.name) private subscriptionModel: Model<Subscription>,
-    @InjectModel(SubscriptionPlan.name) private subscriptionPlanModel: Model<SubscriptionPlan>,
+    @InjectModel(Subscription.name)
+    private subscriptionModel: Model<Subscription>,
+    @InjectModel(SubscriptionPlan.name)
+    private subscriptionPlanModel: Model<SubscriptionPlan>,
   ) {}
 
   async checkUserEntities(userId: string): Promise<UserEntitiesResponseDto> {
@@ -31,14 +38,23 @@ export class UserService {
 
       // Get user with subscription info
       console.log('🔍 Looking for user with ID:', userId);
-      const user = await this.userModel.findById(userId).populate('subscriptionId').exec();
-      console.log('👤 Found user:', user ? `${user.email} (${user.role})` : 'null');
+      const user = await this.userModel
+        .findById(userId)
+        .populate('subscriptionId')
+        .exec();
+      console.log(
+        '👤 Found user:',
+        user ? `${user.email} (${user.role})` : 'null',
+      );
       if (!user) {
         throw new NotFoundException('User not found');
       }
 
       // Get subscription details
-      const subscription = await this.subscriptionModel.findById(user.subscriptionId).populate('planId').exec();
+      const subscription = await this.subscriptionModel
+        .findById(user.subscriptionId)
+        .populate('planId')
+        .exec();
       if (!subscription) {
         throw new NotFoundException('User subscription not found');
       }
@@ -48,16 +64,22 @@ export class UserService {
 
       // Check existing entities
       const [organizationCount, complexCount, clinicCount] = await Promise.all([
-        this.organizationModel.countDocuments({ ownerId: new Types.ObjectId(userId) }).exec(),
-        this.complexModel.countDocuments({ ownerId: new Types.ObjectId(userId) }).exec(),
-        this.clinicModel.countDocuments({ ownerId: new Types.ObjectId(userId) }).exec(),
+        this.organizationModel
+          .countDocuments({ ownerId: new Types.ObjectId(userId) })
+          .exec(),
+        this.complexModel
+          .countDocuments({ ownerId: new Types.ObjectId(userId) })
+          .exec(),
+        this.clinicModel
+          .countDocuments({ ownerId: new Types.ObjectId(userId) })
+          .exec(),
       ]);
 
       console.log('📊 Entity counts:', {
         organizationCount,
-        complexCount, 
+        complexCount,
         clinicCount,
-        userId
+        userId,
       });
 
       const hasOrganization = organizationCount > 0;
@@ -113,7 +135,10 @@ export class UserService {
         nextStep,
       };
     } catch (error) {
-      this.logger.error(`Error checking user entities for user ${userId}:`, error);
+      this.logger.error(
+        `Error checking user entities for user ${userId}:`,
+        error,
+      );
       throw error;
     }
   }

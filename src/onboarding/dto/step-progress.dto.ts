@@ -1,7 +1,10 @@
-import { IsString, IsOptional, IsBoolean, IsArray, IsNumber, IsEnum, ValidateNested } from 'class-validator';
+import { 
+  IsString, IsOptional, IsBoolean, IsArray, IsNumber, IsEnum, ValidateNested, IsEmail, IsUrl 
+} from 'class-validator';
 import { Type } from 'class-transformer';
+import { ApiProperty } from '@nestjs/swagger';
 
-// Step types for the onboarding flow
+// --- Step types for the onboarding flow ---
 export type OnboardingStepType = 
   | 'organization-overview'
   | 'organization-contact' 
@@ -16,242 +19,310 @@ export type OnboardingStepType =
 
 export type PlanType = 'company' | 'complex' | 'clinic';
 
+// --- Onboarding progress DTO ---
 export class OnboardingStepProgressDto {
+  @ApiProperty({ description: 'ID of the user', example: '64fcd123ab12cd34ef567890' })
   @IsString()
   userId: string;
 
+  @ApiProperty({ description: 'Current onboarding step', enum: [
+    'organization-overview','organization-contact','organization-legal',
+    'complex-overview','complex-contact','complex-schedule',
+    'clinic-overview','clinic-contact','clinic-schedule','completed'
+  ] })
   @IsString()
-  @IsEnum(['organization-overview', 'organization-contact', 'organization-legal', 
-          'complex-overview', 'complex-contact', 'complex-schedule',
-          'clinic-overview', 'clinic-contact', 'clinic-schedule', 'completed'])
+  @IsEnum([
+    'organization-overview','organization-contact','organization-legal',
+    'complex-overview','complex-contact','complex-schedule',
+    'clinic-overview','clinic-contact','clinic-schedule','completed'
+  ])
   currentStep: OnboardingStepType;
 
+  @ApiProperty({ description: 'Plan type for the onboarding', enum: ['company','complex','clinic'] })
   @IsString()
   @IsEnum(['company', 'complex', 'clinic'])
   planType: PlanType;
 
+  @ApiProperty({ description: 'Steps that have been completed', type: [String], required: false })
   @IsArray()
   @IsString({ each: true })
   @IsOptional()
   completedSteps?: string[];
 
+  @ApiProperty({ description: 'Steps that were skipped', type: [String], required: false })
   @IsArray()
   @IsString({ each: true })
   @IsOptional()
   skippedSteps?: string[];
 
+  @ApiProperty({ description: 'Indicates if the current step can be skipped', required: false })
   @IsBoolean()
   @IsOptional()
-  canSkipCurrent?: boolean; // Whether current step can be skipped
+  canSkipCurrent?: boolean;
 
+  @ApiProperty({ description: 'Total steps for the current plan type', required: false })
   @IsNumber()
   @IsOptional()
-  totalSteps?: number; // Total steps for the plan type
+  totalSteps?: number;
 
+  @ApiProperty({ description: 'Current step number (1-based)', required: false })
   @IsNumber()
   @IsOptional()
-  currentStepNumber?: number; // Current step number (1-based)
+  currentStepNumber?: number;
 
+  @ApiProperty({ description: 'Temporary data stored between steps', required: false })
   @IsOptional()
-  temporaryData?: any; // Temporary data stored between steps
+  temporaryData?: any;
 
+  @ApiProperty({ description: 'ID of the created organization, if any', required: false })
   @IsString()
   @IsOptional()
-  organizationId?: string; // Created organization ID
+  organizationId?: string;
 
+  @ApiProperty({ description: 'ID of the created complex, if any', required: false })
   @IsString()
   @IsOptional()
-  complexId?: string; // Created complex ID
+  complexId?: string;
 
+  @ApiProperty({ description: 'ID of the created clinic, if any', required: false })
   @IsString()
   @IsOptional()
-  clinicId?: string; // Created clinic ID
+  clinicId?: string;
 }
 
+// --- Step validation result DTO ---
 export class StepValidationResultDto {
+  @ApiProperty({ description: 'Indicates if the step data is valid' })
   @IsBoolean()
   isValid: boolean;
 
+  @ApiProperty({ description: 'Validation errors', type: [String], required: false })
   @IsArray()
   @IsString({ each: true })
   @IsOptional()
-  errors?: string[]; // Validation errors
+  errors?: string[];
 
+  @ApiProperty({ description: 'Non-blocking warnings', type: [String], required: false })
   @IsArray()
   @IsString({ each: true })
   @IsOptional()
-  warnings?: string[]; // Non-blocking warnings
+  warnings?: string[];
 
-  @IsString()
-  @IsOptional()
-  nextStep?: string; // Next step to navigate to
-
-  @IsBoolean()
-  @IsOptional()
-  canProceed?: boolean; // Whether user can proceed to next step
-
-  @IsOptional()
-  validationDetails?: any; // Additional validation context
-}
-
-export class StepSaveResponseDto {
-  @IsBoolean()
-  success: boolean;
-
-  @IsString()
-  @IsOptional()
-  message?: string;
-
-  @IsOptional()
-  data?: any; // Saved data or created entity
-
+  @ApiProperty({ description: 'Next step to navigate to', required: false })
   @IsString()
   @IsOptional()
   nextStep?: string;
 
+  @ApiProperty({ description: 'Indicates if the user can proceed', required: false })
   @IsBoolean()
   @IsOptional()
   canProceed?: boolean;
 
+  @ApiProperty({ description: 'Additional validation details', required: false })
+  @IsOptional()
+  validationDetails?: any;
+}
+
+// --- Step save response DTO ---
+export class StepSaveResponseDto {
+  @ApiProperty({ description: 'Indicates if the save operation was successful' })
+  @IsBoolean()
+  success: boolean;
+
+  @ApiProperty({ description: 'Optional message', required: false })
   @IsString()
   @IsOptional()
-  entityId?: string; // ID of created/updated entity
+  message?: string;
+
+  @ApiProperty({ description: 'Optional saved data or created entity', required: false })
+  @IsOptional()
+  data?: any;
+
+  @ApiProperty({ description: 'Next step to navigate to', required: false })
+  @IsString()
+  @IsOptional()
+  nextStep?: string;
+
+  @ApiProperty({ description: 'Whether the user can proceed', required: false })
+  @IsBoolean()
+  @IsOptional()
+  canProceed?: boolean;
+
+  @ApiProperty({ description: 'ID of created or updated entity', required: false })
+  @IsString()
+  @IsOptional()
+  entityId?: string;
 
   @ValidateNested()
   @Type(() => StepValidationResultDto)
   @IsOptional()
+  @ApiProperty({ description: 'Validation results', required: false, type: StepValidationResultDto })
   validation?: StepValidationResultDto;
 }
 
-// Real-time validation request DTO
+// --- Real-time validation DTO ---
 export class RealTimeValidationDto {
+  @ApiProperty({ description: 'Field name being validated', example: 'email' })
   @IsString()
-  field: string; // Field being validated
+  field: string;
 
+  @ApiProperty({ description: 'Value to validate', example: 'user@example.com' })
   @IsString()
-  value: string; // Value to validate
+  value: string;
 
+  @ApiProperty({ description: 'Entity context', required: false, enum: ['organization','complex','clinic'] })
   @IsString()
   @IsOptional()
-  entityType?: 'organization' | 'complex' | 'clinic'; // Entity context
+  entityType?: 'organization' | 'complex' | 'clinic';
 
+  @ApiProperty({ description: 'Parent entity ID for scoped validation', required: false })
   @IsString()
   @IsOptional()
-  entityId?: string; // Parent entity ID for scoped validation
+  entityId?: string;
 
+  @ApiProperty({ description: 'User ID context', required: false })
   @IsString()
   @IsOptional()
-  userId?: string; // User context for ownership validation
+  userId?: string;
 }
 
-// Real-time validation response DTO
+// --- Real-time validation response DTO ---
 export class RealTimeValidationResponseDto {
+  @ApiProperty({ description: 'Indicates if the value is valid' })
   @IsBoolean()
   isValid: boolean;
 
+  @ApiProperty({ description: 'Indicates availability for uniqueness checks', required: false })
   @IsBoolean()
-  isAvailable?: boolean; // For uniqueness checks
+  @IsOptional()
+  isAvailable?: boolean;
 
+  @ApiProperty({ description: 'Validation message', required: false })
   @IsString()
   @IsOptional()
-  message?: string; // Validation message
+  message?: string;
 
+  @ApiProperty({ description: 'Primary suggestion if not available', required: false })
   @IsString()
   @IsOptional()
-  suggestion?: string; // Primary alternative suggestion if not available
+  suggestion?: string;
 
+  @ApiProperty({ description: 'Multiple suggestions', type: [String], required: false })
   @IsArray()
   @IsString({ each: true })
   @IsOptional()
-  suggestions?: string[]; // Multiple alternative suggestions
+  suggestions?: string[];
 
+  @ApiProperty({ description: 'Indicates ongoing async check', required: false })
   @IsBoolean()
   @IsOptional()
-  isChecking?: boolean; // Still validating (for async checks)
+  isChecking?: boolean;
 }
 
-// Working hours hierarchy validation DTO
+// --- Working hours validation DTO ---
 export class WorkingHoursValidationDto {
+  @ApiProperty({ description: 'Day of the week', enum: ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'] })
   @IsString()
-  @IsEnum(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'])
+  @IsEnum(['monday','tuesday','wednesday','thursday','friday','saturday','sunday'])
   dayOfWeek: string;
 
+  @ApiProperty({ description: 'Indicates if it is a working day' })
   @IsBoolean()
   isWorkingDay: boolean;
 
+  @ApiProperty({ description: 'Opening time (HH:mm)', required: false })
   @IsString()
   @IsOptional()
   openingTime?: string;
 
+  @ApiProperty({ description: 'Closing time (HH:mm)', required: false })
   @IsString()
   @IsOptional()
   closingTime?: string;
 
+  @ApiProperty({ description: 'Parent entity type for validation', enum: ['organization','complex'], required: false })
   @IsString()
   @IsOptional()
-  parentEntityType?: 'organization' | 'complex'; // Parent entity type
+  parentEntityType?: 'organization' | 'complex';
 
+  @ApiProperty({ description: 'Parent entity ID', required: false })
   @IsString()
   @IsOptional()
-  parentEntityId?: string; // Parent entity ID
+  parentEntityId?: string;
 
-  // Parent working hours for validation
+  @ApiProperty({ description: 'Parent working day flag', required: false })
   @IsBoolean()
   @IsOptional()
   parentIsWorkingDay?: boolean;
 
+  @ApiProperty({ description: 'Parent opening time', required: false })
   @IsString()
   @IsOptional()
   parentOpeningTime?: string;
 
+  @ApiProperty({ description: 'Parent closing time', required: false })
   @IsString()
   @IsOptional()
   parentClosingTime?: string;
 }
 
-// Inheritance settings DTO
+// --- Inheritance settings DTO ---
 export class InheritanceSettingsDto {
+  @ApiProperty({ description: 'Inherit fields from organization', required: false })
   @IsBoolean()
   @IsOptional()
   inheritsFromOrganization?: boolean;
 
+  @ApiProperty({ description: 'Inherit fields from complex', required: false })
   @IsBoolean()
   @IsOptional()
   inheritsFromComplex?: boolean;
 
+  @ApiProperty({ description: 'Fields to inherit', type: [String], required: false })
   @IsArray()
   @IsString({ each: true })
   @IsOptional()
-  fieldsToInherit?: string[]; // Specific fields to inherit
+  fieldsToInherit?: string[];
 
+  @ApiProperty({ description: 'Fields to override', type: [String], required: false })
   @IsArray()
   @IsString({ each: true })
   @IsOptional()
-  fieldsToOverride?: string[]; // Fields to override despite inheritance
+  fieldsToOverride?: string[];
 }
 
-// Complete step data DTO (for saving between steps)
+// --- Step data DTO ---
 export class StepDataDto {
+  @ApiProperty({ description: 'Step type', enum: [
+    'organization-overview','organization-contact','organization-legal',
+    'complex-overview','complex-contact','complex-schedule',
+    'clinic-overview','clinic-contact','clinic-schedule','completed'
+  ] })
   @IsString()
   stepType: OnboardingStepType;
 
+  @ApiProperty({ description: 'Step-specific data', required: false })
   @IsOptional()
-  data: any; // Step-specific data
+  data: any;
 
   @ValidateNested()
   @Type(() => InheritanceSettingsDto)
   @IsOptional()
+  @ApiProperty({ description: 'Inheritance settings for step', required: false, type: InheritanceSettingsDto })
   inheritanceSettings?: InheritanceSettingsDto;
 
+  @ApiProperty({ description: 'Timestamp of step save', required: false })
   @IsString()
   @IsOptional()
-  timestamp?: string; // When data was saved
+  timestamp?: string;
 
+  @ApiProperty({ description: 'Whether step is completed', required: false })
   @IsBoolean()
   @IsOptional()
-  isCompleted?: boolean; // Whether step is completed
+  isCompleted?: boolean;
 
+  @ApiProperty({ description: 'Whether step was skipped', required: false })
   @IsBoolean()
   @IsOptional()
-  isSkipped?: boolean; // Whether step was skipped
-} 
+  isSkipped?: boolean;
+}

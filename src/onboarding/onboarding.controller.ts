@@ -3,10 +3,10 @@ import { OnboardingService } from './onboarding.service';
 import { SubscriptionService } from '../subscription/subscription.service';
 import { CompleteOnboardingDto } from './dto/complete-onboarding.dto';
 import { ValidateOnboardingDto, OnboardingProgressDto } from './dto/validate-onboarding.dto';
-import { 
-  OrganizationStepDto, 
-  OrganizationOverviewDto, 
-  OrganizationContactDto, 
+import {
+  OrganizationStepDto,
+  OrganizationOverviewDto,
+  OrganizationContactDto,
   OrganizationLegalDto,
   ComplexStepDto,
   ComplexOverviewDto,
@@ -29,7 +29,7 @@ export class OnboardingController {
   constructor(
     private readonly onboardingService: OnboardingService,
     private readonly subscriptionService: SubscriptionService,
-  ) {}
+  ) { }
 
   // ======== EXISTING ENDPOINTS ========
   @Post('complete')
@@ -37,7 +37,7 @@ export class OnboardingController {
   async completeOnboarding(@Body() completeOnboardingDto: CompleteOnboardingDto) {
     try {
       const result = await this.onboardingService.completeOnboarding(completeOnboardingDto);
-      
+
       return {
         success: true,
         message: 'Onboarding completed successfully',
@@ -56,7 +56,7 @@ export class OnboardingController {
   async getAvailablePlans() {
     try {
       const plans = await this.subscriptionService.getAllSubscriptionPlans();
-      
+
       return {
         success: true,
         message: 'Available plans retrieved successfully',
@@ -76,7 +76,7 @@ export class OnboardingController {
   async validateOnboardingData(@Body() validateOnboardingDto: ValidateOnboardingDto) {
     try {
       const validation = await this.onboardingService.validateOnboardingData(validateOnboardingDto);
-      
+
       return {
         success: validation.isValid,
         message: validation.isValid ? 'Validation passed' : 'Validation failed',
@@ -106,7 +106,7 @@ export class OnboardingController {
       }
 
       const status = await this.onboardingService.getOnboardingStatus(userId);
-      
+
       return {
         success: true,
         message: 'Onboarding status retrieved successfully',
@@ -125,7 +125,7 @@ export class OnboardingController {
   async getOnboardingProgress(@Param('userId') userId: string) {
     try {
       const progress = await this.onboardingService.getOnboardingProgress(userId);
-      
+
       return {
         success: true,
         message: progress ? 'Progress found' : 'No progress found',
@@ -149,7 +149,7 @@ export class OnboardingController {
     try {
       const userId = req.user.id;
       const progress = await this.onboardingService.getStepProgress(userId);
-      
+
       return {
         success: true,
         message: 'Progress retrieved successfully',
@@ -172,7 +172,7 @@ export class OnboardingController {
     try {
       const userId = req.user.id;
       await this.onboardingService.markAsSkipped(userId);
-      
+
       return {
         success: true,
         message: 'Setup saved as incomplete, redirecting to dashboard',
@@ -192,13 +192,13 @@ export class OnboardingController {
   @Post('organization/overview')
   @UseGuards(JwtAuthGuard)
   async saveOrganizationOverview(
-    @Request() req, 
+    @Request() req,
     @Body() organizationOverviewDto: OrganizationOverviewDto
   ): Promise<StepSaveResponseDto> {
     try {
       const userId = req.user.id;
       const result = await this.onboardingService.saveOrganizationOverview(userId, organizationOverviewDto);
-      
+
       return {
         success: true,
         message: 'Organization overview saved successfully',
@@ -226,7 +226,7 @@ export class OnboardingController {
     try {
       const userId = req.user.id;
       const result = await this.onboardingService.saveOrganizationContact(userId, organizationContactDto);
-      
+
       return {
         success: true,
         message: 'Organization contact information saved successfully',
@@ -252,7 +252,7 @@ export class OnboardingController {
     try {
       const userId = req.user.id;
       const result = await this.onboardingService.saveOrganizationLegal(userId, organizationLegalDto);
-      
+
       return {
         success: true,
         message: 'Organization legal information saved successfully',
@@ -275,7 +275,7 @@ export class OnboardingController {
     try {
       const userId = req.user.id;
       const result = await this.onboardingService.completeOrganizationSetup(userId);
-      
+
       return {
         success: true,
         message: 'Organization setup completed successfully',
@@ -302,7 +302,7 @@ export class OnboardingController {
     try {
       const userId = req.user.id;
       const result = await this.onboardingService.saveComplexOverview(userId, complexOverviewDto);
-      
+
       return {
         success: true,
         message: 'Complex overview saved successfully',
@@ -329,7 +329,7 @@ export class OnboardingController {
     try {
       const userId = req.user.id;
       const result = await this.onboardingService.saveComplexContact(userId, complexContactDto);
-      
+
       return {
         success: true,
         message: 'Complex contact information saved successfully',
@@ -357,7 +357,7 @@ export class OnboardingController {
     try {
       const userId = req.user.id;
       const result = await this.onboardingService.saveComplexLegal(userId, complexLegalDto);
-      
+
       return {
         success: true,
         message: 'Complex legal information saved successfully',
@@ -383,7 +383,7 @@ export class OnboardingController {
     try {
       const userId = req.user.id;
       const result = await this.onboardingService.saveComplexSchedule(userId, workingHoursDto);
-      
+
       return {
         success: true,
         message: 'Complex schedule saved successfully',
@@ -406,7 +406,7 @@ export class OnboardingController {
     try {
       const userId = req.user.id;
       const result = await this.onboardingService.completeComplexSetup(userId);
-      
+
       return {
         success: true,
         message: 'Complex setup completed successfully',
@@ -433,7 +433,7 @@ export class OnboardingController {
     try {
       const userId = req.user.id;
       const result = await this.onboardingService.saveClinicOverview(userId, clinicOverviewDto);
-      
+
       return {
         success: true,
         message: 'Clinic overview saved successfully',
@@ -460,7 +460,7 @@ export class OnboardingController {
     try {
       const userId = req.user.id;
       const result = await this.onboardingService.saveClinicContact(userId, clinicContactDto);
-      
+
       return {
         success: true,
         message: 'Clinic contact information saved successfully',
@@ -486,7 +486,7 @@ export class OnboardingController {
     try {
       const userId = req.user.id;
       const result = await this.onboardingService.saveClinicServicesCapacity(userId, servicesCapacityDto);
-      
+
       return {
         success: true,
         message: 'Clinic services and capacity saved successfully',
@@ -512,7 +512,7 @@ export class OnboardingController {
     try {
       const userId = req.user.id;
       const result = await this.onboardingService.saveClinicLegal(userId, clinicLegalDto);
-      
+
       return {
         success: true,
         message: 'Clinic legal information saved successfully',
@@ -538,7 +538,7 @@ export class OnboardingController {
     try {
       const userId = req.user.id;
       const result = await this.onboardingService.saveClinicSchedule(userId, workingHoursDto);
-      
+
       return {
         success: true,
         message: 'Clinic schedule saved successfully',
@@ -561,7 +561,7 @@ export class OnboardingController {
     try {
       const userId = req.user.id;
       const result = await this.onboardingService.completeClinicSetup(userId);
-      
+
       return {
         success: true,
         message: 'Clinic setup and onboarding completed successfully',
@@ -584,7 +584,7 @@ export class OnboardingController {
   async validateOrganizationName(@Body() body: { name: string }) {
     try {
       const isAvailable = await this.onboardingService.validateOrganizationName(body.name);
-      
+
       return {
         success: true,
         message: isAvailable ? 'Organization name is available' : 'Organization name is already taken',
@@ -607,7 +607,7 @@ export class OnboardingController {
   async validateEmail(@Body() body: { email: string }) {
     try {
       const isAvailable = await this.onboardingService.validateEmail(body.email);
-      
+
       return {
         success: true,
         message: isAvailable ? 'Email is available' : 'Email is already taken',
@@ -630,7 +630,7 @@ export class OnboardingController {
   async validateVatNumber(@Body() body: { vatNumber: string }) {
     try {
       const isValid = await this.onboardingService.validateVatNumber(body.vatNumber);
-      
+
       return {
         isUnique: isValid,
         message: isValid ? 'VAT number is valid' : 'Invalid VAT number format or already in use'
@@ -648,7 +648,7 @@ export class OnboardingController {
   async validateCrNumber(@Body() body: { crNumber: string }) {
     try {
       const isValid = await this.onboardingService.validateCrNumber(body.crNumber);
-      
+
       return {
         isUnique: isValid,
         message: isValid ? 'CR number is valid' : 'Invalid CR number format or already in use'
@@ -666,7 +666,7 @@ export class OnboardingController {
   async validateComplexName(@Body() body: { name: string; organizationId?: string }) {
     try {
       const isAvailable = await this.onboardingService.validateComplexName(body.name, body.organizationId);
-      
+
       return {
         isUnique: isAvailable,
         message: isAvailable ? 'Complex name is available' : 'Complex name is already taken'
@@ -684,7 +684,7 @@ export class OnboardingController {
   async validateClinicName(@Body() body: { name: string; complexId?: string; organizationId?: string }) {
     try {
       const isAvailable = await this.onboardingService.validateClinicName(body.name, body.complexId, body.organizationId);
-      
+
       return {
         isUnique: isAvailable,
         message: isAvailable ? 'Clinic name is available' : 'Clinic name is already taken'

@@ -1719,7 +1719,7 @@ export class OnboardingService {
       }
 
       const complexId = (userComplex._id as any).toString();
-      console.log('✅ Found complex for completion:', complexId);
+      console.log(' Found complex for completion:', complexId);
 
       // Get associated departments
       const departments = await this.departmentService.getDepartmentsByComplex(complexId);

@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import mongoose, { Document, Types } from 'mongoose';
 import { UserRole } from '../../common/enums/user-role.enum';
 
 @Schema({
@@ -22,7 +22,7 @@ export class User extends Document {
   @Prop()
   phone?: string;
 
-  @Prop({ 
+  @Prop({
     required: true,
     type: String,
     enum: Object.values(UserRole),
@@ -78,6 +78,15 @@ export class User extends Document {
 
   @Prop({ default: false })
   onboardingComplete: boolean;
+
+  @Prop({ default: false })
+  isDeleted?: boolean;
+
+  @Prop({ type: Date })
+  deletedAt?: Date;
+
+  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'User' })
+  deletedBy?: mongoose.Types.ObjectId;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

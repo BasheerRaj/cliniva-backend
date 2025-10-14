@@ -19,6 +19,49 @@ import {
   IsUrl
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
+import * as mongoose from 'mongoose';
+
+
+// Employee Profile DTOs
+export class CreateEmployeeShiftInputDto {
+  @IsEnum(['organization', 'complex', 'clinic'])
+  @IsNotEmpty()
+  entityType: string;
+
+  @IsMongoId()
+  @IsNotEmpty()
+  entityId: string;
+
+  @IsString()
+  @IsNotEmpty()
+  @MinLength(2)
+  @MaxLength(50)
+  shiftName: string;
+
+  @IsEnum(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'])
+  @IsNotEmpty()
+  dayOfWeek: string;
+
+  @IsString()
+  @IsNotEmpty()
+  @Matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, {
+    message: 'Start time must be in HH:mm format (e.g., 08:00)'
+  })
+  startTime: string;
+
+  @IsString()
+  @IsNotEmpty()
+  @Matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, {
+    message: 'End time must be in HH:mm format (e.g., 17:00)'
+  })
+  endTime: string;
+
+  @IsNumber()
+  @IsOptional()
+  @Min(0)
+  @Max(480)
+  breakDurationMinutes?: number;
+}
 
 // Employee Profile DTOs
 export class CreateEmployeeDto {
@@ -150,10 +193,20 @@ export class CreateEmployeeDto {
   @IsString({ each: true })
   @IsOptional()
   specialties?: string[];
+
+  // ✅ Shifts Information (بدون userId)
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateEmployeeShiftInputDto)
+  @IsOptional()
+  shifts?: CreateEmployeeShiftInputDto[];
 }
 
+
+
+// نسخ كامل من CreateEmployeeDto مع جعل كل الحقول اختيارية
 export class UpdateEmployeeDto {
-  // User Information Updates
+  // User Information Updates (بدون password و role)
   @IsString()
   @IsOptional()
   @MinLength(2)
@@ -182,7 +235,17 @@ export class UpdateEmployeeDto {
   @MaxLength(200)
   address?: string;
 
+  @IsBoolean()
+  @IsOptional()
+  @Transform(({ value }) => value === 'true' || value === true)
+  isActive?: boolean;
+
   // Employee Profile Updates
+  @IsString()
+  @IsOptional()
+  @MaxLength(20)
+  employeeNumber?: string;
+
   @IsString()
   @IsOptional()
   @MaxLength(30)
@@ -207,6 +270,10 @@ export class UpdateEmployeeDto {
   @MinLength(2)
   @MaxLength(100)
   jobTitle?: string;
+
+  @IsDateString()
+  @IsOptional()
+  dateOfHiring?: string;
 
   @IsNumber()
   @IsOptional()
@@ -233,16 +300,21 @@ export class UpdateEmployeeDto {
   @MaxLength(500)
   notes?: string;
 
-  @IsBoolean()
-  @IsOptional()
-  @Transform(({ value }) => value === 'true' || value === true)
-  isActive?: boolean;
-
   @IsArray()
   @IsString({ each: true })
   @IsOptional()
   specialties?: string[];
+
+  // Shifts & Documents Updates
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => UpdateEmployeeShiftDto)
+  @IsOptional()
+  shifts?: UpdateEmployeeShiftDto[];
+
 }
+
+
 
 // Employee Document DTOs
 export class CreateEmployeeDocumentDto {
@@ -449,15 +521,15 @@ export class EmployeeSearchQueryDto {
 
   @IsMongoId()
   @IsOptional()
-  organizationId?: string;
+  organizationId?: mongoose.Types.ObjectId;
 
   @IsMongoId()
   @IsOptional()
-  complexId?: string;
+  complexId?: mongoose.Types.ObjectId;
 
   @IsMongoId()
   @IsOptional()
-  clinicId?: string;
+  clinicId?: mongoose.Types.ObjectId;
 
   @IsBoolean()
   @IsOptional()
@@ -751,3 +823,28 @@ export class TerminateEmployeeDto {
   @MaxLength(500)
   finalNotes?: string;
 } 
+/**
+ * DTO لإعادة تفعيل موظف منتهي الخدمة
+ */
+export class ReactivateEmployeeDto {
+  @IsString()
+  @IsNotEmpty()
+  @MinLength(10)
+  @MaxLength(1000)
+  reason: string;
+
+  @IsString()
+  @IsOptional()
+  @MinLength(2)
+  @MaxLength(100)
+  newJobTitle?: string;
+
+  @IsNumber()
+  @IsOptional()
+  @Min(0)
+  newSalary?: number;
+
+  @IsDateString()
+  @IsNotEmpty()
+  dateOfReactivation: string;
+}

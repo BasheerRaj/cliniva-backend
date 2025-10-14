@@ -1,3 +1,5 @@
+import { model, Schema } from 'mongoose';
+
 // Subscription Management
 export * from './subscription-plan.schema';
 export * from './subscription.schema';
@@ -58,3 +60,45 @@ export * from './emergency-contact.schema';
 // Audit Trail
 export * from './audit-log.schema';
 export * from './access-log.schema';
+
+// Define your schemas here or import them from separate files
+const userSchema = new Schema({
+    // your user schema definition
+});
+
+const organizationSchema = new Schema({
+    // your organization schema definition
+});
+
+// ... other schemas ...
+
+// Ensure models are properly defined with schemas before export
+const models = {
+    User: model('User', new Schema({})),
+    Organization: model('Organization', new Schema({})),
+    Complex: model('Complex', new Schema({})),
+    Clinic: model('Clinic', new Schema({})),
+    Patient: model('Patient', new Schema({})),
+    Service: model('Service', new Schema({})),
+    Appointment: model('Appointment', new Schema({})),
+    Invoice: model('Invoice', new Schema({})),
+    Payment: model('Payment', new Schema({})),
+    InsuranceClaim: model('InsuranceClaim', new Schema({})),
+    EmployeeProfile: model('EmployeeProfile', new Schema({})),
+    EmployeeDocument: model('EmployeeDocument', new Schema({})),
+    EmployeeShift: model('EmployeeShift', new Schema({})),
+    MedicalReport: model('MedicalReport', new Schema({})),
+    Offer: model('Offer', new Schema({})),
+    AppointmentOffer: model('AppointmentOffer', new Schema({})),
+    AccessLog: model('AccessLog', new Schema({})),
+    AuditLog: model('AuditLog', new Schema({})),
+    Notification: model('Notification', new Schema({}))
+};
+
+export const {
+    User, Organization, Complex, Clinic, Patient,
+    Service, Appointment, Invoice, Payment, InsuranceClaim,
+    EmployeeProfile, EmployeeDocument, EmployeeShift,
+    MedicalReport, Offer, AppointmentOffer, AccessLog,
+    AuditLog, Notification
+} = models;

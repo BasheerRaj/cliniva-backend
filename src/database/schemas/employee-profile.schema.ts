@@ -15,8 +15,8 @@ export class EmployeeProfile extends Document {
   @Prop()
   cardNumber?: string; // National ID or government-issued ID
 
-  @Prop({ 
-    enum: ['single', 'married', 'divorced', 'widowed', 'separated', 'other'] 
+  @Prop({
+    enum: ['single', 'married', 'divorced', 'widowed', 'separated', 'other']
   })
   maritalStatus?: string;
 
@@ -52,6 +52,8 @@ export class EmployeeProfile extends Document {
 
   @Prop()
   notes?: string; // Additional notes about the employee
+  @Prop({ default: false })
+  isDeleted?: boolean;
 }
 
 export const EmployeeProfileSchema = SchemaFactory.createForClass(EmployeeProfile);

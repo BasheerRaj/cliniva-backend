@@ -18,6 +18,11 @@ import {
   RefreshTokenDto,
   AuthResponseDto,
   UserProfileDto,
+  ForgotPasswordDto,
+  ResetPasswordDto,
+  ChangePasswordDto,
+  ForgotPasswordResponseDto,
+  ValidateResetTokenResponseDto,
 } from './dto';
 
 @Controller('auth')
@@ -100,6 +105,58 @@ export class AuthController {
         error: error.message
       };
     }
+  }
+  /**
+   * طلب إعادة تعيين كلمة المرور
+   * POST /auth/forgot-password
+   */
+  @Post('forgot-password')
+  @HttpCode(HttpStatus.OK)
+  async forgotPassword(
+    @Body(new ValidationPipe({ transform: true, whitelist: true }))
+    forgotPasswordDto: ForgotPasswordDto,
+  ): Promise<ForgotPasswordResponseDto> {
+    return this.authService.forgotPassword(forgotPasswordDto);
+  }
+
+  /**
+   * التحقق من صلاحية reset token
+   * GET /auth/validate-reset-token/:token
+   */
+  @Get('validate-reset-token/:token')
+  @HttpCode(HttpStatus.OK)
+  async validateResetToken(
+    @Param('token') token: string,
+  ): Promise<ValidateResetTokenResponseDto> {
+    return this.authService.validateResetToken(token);
+  }
+
+  /**
+   * إعادة تعيين كلمة المرور
+   * POST /auth/reset-password
+   */
+  @Post('reset-password')
+  @HttpCode(HttpStatus.OK)
+  async resetPassword(
+    @Body(new ValidationPipe({ transform: true, whitelist: true }))
+    resetPasswordDto: ResetPasswordDto,
+  ): Promise<{ message: string }> {
+    return this.authService.resetPassword(resetPasswordDto);
+  }
+
+  /**
+   * تغيير كلمة المرور (للمستخدم المسجل دخول)
+   * POST /auth/change-password
+   */
+  @Post('change-password')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async changePassword(
+    @Request() req,
+    @Body(new ValidationPipe({ transform: true, whitelist: true }))
+    changePasswordDto: ChangePasswordDto,
+  ): Promise<{ message: string }> {
+    return this.authService.changePassword(req.user.id, changePasswordDto);
   }
 }
 

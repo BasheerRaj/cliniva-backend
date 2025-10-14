@@ -13,6 +13,14 @@ import * as bcrypt from 'bcrypt';
 import { User } from '../database/schemas/user.schema';
 import { LoginDto, RegisterDto, AuthResponseDto, UserProfileDto } from './dto';
 import { SubscriptionService } from '../subscription/subscription.service';
+import * as crypto from 'crypto';
+import {
+  ForgotPasswordDto,
+  ResetPasswordDto,
+  ChangePasswordDto,
+  ForgotPasswordResponseDto,
+  ValidateResetTokenResponseDto,
+} from './dto';
 
 @Injectable()
 export class AuthService {
@@ -350,6 +358,283 @@ export class AuthService {
       };
     } catch (error) {
       throw new BadRequestException(`Failed to get user debug info: ${error.message}`);
+    }
+  }
+  /**
+   * طلب إعادة تعيين كلمة المرور
+   */
+  async forgotPassword(forgotPasswordDto: ForgotPasswordDto): Promise<{
+    message: string;
+    email: string;
+    expiresIn: string;
+  }> {
+    const { email } = forgotPasswordDto;
+
+    try {
+      // البحث عن المستخدم
+      const user = await this.userModel.findOne({ 
+        email: email.toLowerCase() 
+      });
+
+      // ⚠️ أمان: لا نكشف إذا كان الإيميل موجود أم لا
+      if (!user) {
+        this.logger.warn(`Password reset requested for non-existent email: ${email}`);
+        // نرجع نفس الرسالة للأمان
+        return {
+          message: 'If the email exists, a password reset link has been sent',
+          email: email,
+          expiresIn: '1 hour'
+        };
+      }
+
+      // التحقق من أن الحساب نشط
+      if (!user.isActive) {
+        throw new BadRequestException('Account is inactive. Please contact support.');
+      }
+
+      // توليد token عشوائي آمن
+      const resetToken = crypto.randomBytes(32).toString('hex');
+      
+      // Hash الـ token قبل حفظه في قاعدة البيانات
+      const hashedToken = crypto
+        .createHash('sha256')
+        .update(resetToken)
+        .digest('hex');
+
+      // تحديد مدة انتهاء الصلاحية (1 ساعة)
+      const tokenExpiry = new Date();
+      tokenExpiry.setHours(tokenExpiry.getHours() + 1);
+
+      // حفظ الـ token في قاعدة البيانات
+      user.passwordResetToken = hashedToken;
+      user.passwordResetExpires = tokenExpiry;
+      await user.save();
+
+      this.logger.log(`Password reset token generated for user: ${email}`);
+
+      // 📧 إرسال Email (TODO: integrate with email service)
+      // في الإنتاج، سترسل هذا عبر email service
+      const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:3001'}/reset-password?token=${resetToken}`;
+      
+      this.logger.log(`Reset URL (development): ${resetUrl}`);
+      
+      // TODO: استخدام EmailService لإرسال email
+      /*
+      await this.emailService.sendPasswordResetEmail({
+        to: user.email,
+        firstName: user.firstName,
+        resetUrl: resetUrl,
+        expiresIn: '1 hour'
+      });
+      */
+
+      return {
+        message: 'If the email exists, a password reset link has been sent',
+        email: email,
+        expiresIn: '1 hour'
+      };
+
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      this.logger.error(`Forgot password error: ${error.message}`, error.stack);
+      throw new BadRequestException('Failed to process password reset request');
+    }
+  }
+
+  /**
+   * التحقق من صلاحية reset token
+   */
+  async validateResetToken(token: string): Promise<{
+    isValid: boolean;
+    message: string;
+    email?: string;
+    expiresAt?: Date;
+  }> {
+    try {
+      // Hash الـ token للمقارنة
+      const hashedToken = crypto
+        .createHash('sha256')
+        .update(token)
+        .digest('hex');
+
+      // البحث عن المستخدم بالـ token
+      const user = await this.userModel.findOne({
+        passwordResetToken: hashedToken,
+        passwordResetExpires: { $gt: new Date() } // لم ينتهي بعد
+      });
+
+      if (!user) {
+        return {
+          isValid: false,
+          message: 'Invalid or expired reset token'
+        };
+      }
+
+      return {
+        isValid: true,
+        message: 'Reset token is valid',
+        email: user.email,
+        expiresAt: user.passwordResetExpires
+      };
+
+    } catch (error) {
+      this.logger.error(`Validate reset token error: ${error.message}`, error.stack);
+      return {
+        isValid: false,
+        message: 'Failed to validate reset token'
+      };
+    }
+  }
+
+  /**
+   * إعادة تعيين كلمة المرور
+   */
+  async resetPassword(resetPasswordDto: ResetPasswordDto): Promise<{
+    message: string;
+  }> {
+    const { token, newPassword, confirmPassword } = resetPasswordDto;
+
+    try {
+      // التحقق من تطابق كلمات المرور
+      if (newPassword !== confirmPassword) {
+        throw new BadRequestException('Passwords do not match');
+      }
+
+      // Hash الـ token للمقارنة
+      const hashedToken = crypto
+        .createHash('sha256')
+        .update(token)
+        .digest('hex');
+
+      // البحث عن المستخدم بالـ token
+      const user = await this.userModel.findOne({
+        passwordResetToken: hashedToken,
+        passwordResetExpires: { $gt: new Date() }
+      });
+
+      if (!user) {
+        throw new BadRequestException('Invalid or expired reset token');
+      }
+
+      // التحقق من أن الحساب نشط
+      if (!user.isActive) {
+        throw new BadRequestException('Account is inactive. Please contact support.');
+      }
+
+      // التحقق من أن كلمة المرور الجديدة مختلفة عن القديمة
+      const isSamePassword = await bcrypt.compare(newPassword, user.passwordHash);
+      if (isSamePassword) {
+        throw new BadRequestException('New password must be different from the old password');
+      }
+
+      // Hash كلمة المرور الجديدة
+      const hashedPassword = await this.hashPassword(newPassword);
+
+      // تحديث كلمة المرور وحذف الـ token
+      user.passwordHash = hashedPassword;
+      user.passwordResetToken = undefined;
+      user.passwordResetExpires = undefined;
+      await user.save();
+
+      this.logger.log(`Password reset successful for user: ${user.email}`);
+
+      // TODO: إرسال email تأكيد تغيير كلمة المرور
+      /*
+      await this.emailService.sendPasswordChangedEmail({
+        to: user.email,
+        firstName: user.firstName
+      });
+      */
+
+      return {
+        message: 'Password has been reset successfully. You can now login with your new password.'
+      };
+
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      this.logger.error(`Reset password error: ${error.message}`, error.stack);
+      throw new BadRequestException('Failed to reset password');
+    }
+  }
+
+  /**
+   * تغيير كلمة المرور (للمستخدم المسجل دخول)
+   */
+  async changePassword(
+    userId: string,
+    changePasswordDto: ChangePasswordDto
+  ): Promise<{
+    message: string;
+  }> {
+    const { currentPassword, newPassword, confirmPassword } = changePasswordDto;
+
+    try {
+      // التحقق من تطابق كلمات المرور الجديدة
+      if (newPassword !== confirmPassword) {
+        throw new BadRequestException('New passwords do not match');
+      }
+
+      // البحث عن المستخدم
+      const user = await this.userModel.findById(userId);
+      if (!user) {
+        throw new NotFoundException('User not found');
+      }
+
+      // التحقق من أن الحساب نشط
+      if (!user.isActive) {
+        throw new BadRequestException('Account is inactive');
+      }
+
+      // التحقق من كلمة المرور الحالية
+      const isCurrentPasswordValid = await bcrypt.compare(
+        currentPassword,
+        user.passwordHash
+      );
+
+      if (!isCurrentPasswordValid) {
+        throw new UnauthorizedException('Current password is incorrect');
+      }
+
+      // التحقق من أن كلمة المرور الجديدة مختلفة عن القديمة
+      if (currentPassword === newPassword) {
+        throw new BadRequestException('New password must be different from current password');
+      }
+
+      // Hash كلمة المرور الجديدة
+      const hashedPassword = await this.hashPassword(newPassword);
+
+      // تحديث كلمة المرور
+      user.passwordHash = hashedPassword;
+      await user.save();
+
+      this.logger.log(`Password changed successfully for user: ${user.email}`);
+
+      // TODO: إرسال email تأكيد
+      /*
+      await this.emailService.sendPasswordChangedEmail({
+        to: user.email,
+        firstName: user.firstName
+      });
+      */
+
+      return {
+        message: 'Password has been changed successfully'
+      };
+
+    } catch (error) {
+      if (
+        error instanceof BadRequestException ||
+        error instanceof UnauthorizedException ||
+        error instanceof NotFoundException
+      ) {
+        throw error;
+      }
+      this.logger.error(`Change password error: ${error.message}`, error.stack);
+      throw new BadRequestException('Failed to change password');
     }
   }
 }
