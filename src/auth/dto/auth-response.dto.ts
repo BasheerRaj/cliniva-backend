@@ -7,8 +7,7 @@ export class AuthResponseDto {
   user: {
     id: string;
     email: string;
-    firstName: string;
-    lastName: string;
+    username: string;
     role: string;
     isActive: boolean;
     emailVerified: boolean;
@@ -28,13 +27,8 @@ export class AuthResponseDto {
 export class UserProfileDto {
   id: string;
   email: string;
-  firstName: string;
-  lastName: string;
-  phone?: string;
+  username: string; // ✅ إضافة username
   role: string;
-  nationality?: string;
-  dateOfBirth?: Date;
-  gender?: string;
   isActive: boolean;
   emailVerified: boolean;
   twoFactorEnabled: boolean;
@@ -55,13 +49,8 @@ export class UserProfileDto {
   constructor(user: User) {
     this.id = (user._id as any).toString();
     this.email = user.email;
-    this.firstName = user.firstName;
-    this.lastName = user.lastName;
-    this.phone = user.phone;
+    this.username = user.username; // ✅ إضافة username
     this.role = user.role;
-    this.nationality = user.nationality;
-    this.dateOfBirth = user.dateOfBirth;
-    this.gender = user.gender;
     this.isActive = user.isActive;
     this.emailVerified = user.emailVerified;
     this.twoFactorEnabled = user.twoFactorEnabled;

@@ -38,29 +38,39 @@ export class AuthService {
    */
   async register(registerDto: RegisterDto): Promise<AuthResponseDto> {
     try {
-      // Check if user already exists
-      const existingUser = await this.userModel.findOne({ 
+      // ✅ Check if email already exists
+      const existingUserByEmail = await this.userModel.findOne({ 
         email: registerDto.email.toLowerCase() 
       });
 
-      if (existingUser) {
+      if (existingUserByEmail) {
         throw new ConflictException('User with this email already exists');
+      }
+
+      // ✅ Check if username already exists
+      const existingUserByUsername = await this.userModel.findOne({ 
+        username: registerDto.username.toLowerCase() 
+      });
+
+      if (existingUserByUsername) {
+        throw new ConflictException('Username is already taken');
       }
 
       // Hash password
       const hashedPassword = await this.hashPassword(registerDto.password);
 
-      // Create new user
+      // ✅ Create new user with username
       const newUser = new this.userModel({
-        ...registerDto,
         email: registerDto.email.toLowerCase(),
+        username: registerDto.username.toLowerCase(), // ✅ إضافة username
         passwordHash: hashedPassword,
+        role: registerDto.role,
         isActive: true,
         emailVerified: false,
       });
 
       const savedUser = await newUser.save();
-      this.logger.log(`New user registered: ${savedUser.email}`);
+      this.logger.log(`New user registered: ${savedUser.email} (@${savedUser.username})`);
 
       // Generate tokens
       const tokens = await this.generateTokens(savedUser);
@@ -73,8 +83,7 @@ export class AuthService {
         user: {
           id: (savedUser._id as any).toString(),
           email: savedUser.email,
-          firstName: savedUser.firstName,
-          lastName: savedUser.lastName,
+          username: savedUser.username, // ✅ إضافة username
           role: savedUser.role,
           isActive: savedUser.isActive,
           emailVerified: savedUser.emailVerified,
@@ -91,13 +100,18 @@ export class AuthService {
   }
 
   /**
-   * Login user
+   * Login user - ✅ Support both email and username
    */
   async login(loginDto: LoginDto): Promise<AuthResponseDto> {
     try {
-      // Find user by email
-      const user = await this.userModel.findOne({ 
-        email: loginDto.email.toLowerCase() 
+      const { emailOrUsername, password } = loginDto;
+
+      // ✅ Find user by email OR username
+      const user = await this.userModel.findOne({
+        $or: [
+          { email: emailOrUsername.toLowerCase() },
+          { username: emailOrUsername.toLowerCase() }
+        ]
       });
 
       if (!user) {
@@ -111,7 +125,7 @@ export class AuthService {
 
       // Validate password
       const isPasswordValid = await this.validatePassword(
-        loginDto.password,
+        password,
         user.passwordHash,
       );
 
@@ -119,7 +133,7 @@ export class AuthService {
         throw new UnauthorizedException('Invalid credentials');
       }
 
-      this.logger.log(`User logged in: ${user.email}`);
+      this.logger.log(`User logged in: ${user.email} (@${user.username})`);
 
       // Generate tokens
       const tokens = await this.generateTokens(user);
@@ -131,12 +145,10 @@ export class AuthService {
       let planType: string | null = null;
       if (user.subscriptionId) {
         try {
-          // Note: You'll need to inject SubscriptionService
           const subscription = await this.subscriptionService.getSubscriptionById(user.subscriptionId.toString());
           if (subscription) {
-            // The planId is populated with the full SubscriptionPlan object
             const plan = subscription.planId as any;
-            planType = plan.name; // The planType is stored in the plan's 'name' field
+            planType = plan.name;
           }
         } catch (error) {
           this.logger.warn(`Could not fetch planType for user ${user.email}: ${error.message}`);
@@ -148,12 +160,10 @@ export class AuthService {
         user: {
           id: (user._id as any).toString(),
           email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName,
+          username: user.username, // ✅ إضافة username
           role: user.role,
           isActive: user.isActive,
           emailVerified: user.emailVerified,
-          // Add onboarding-related fields
           setupComplete: user.setupComplete || false,
           subscriptionId: user.subscriptionId?.toString() || null,
           organizationId: user.organizationId?.toString() || null,
@@ -161,7 +171,7 @@ export class AuthService {
           clinicId: user.clinicId?.toString() || null,
           onboardingComplete: user.onboardingComplete || false,
           onboardingProgress: user.onboardingProgress || [],
-          planType: planType, // Add planType from subscription
+          planType: planType,
           isOwner: user.role === 'owner',
         },
       };
@@ -173,6 +183,10 @@ export class AuthService {
       throw new UnauthorizedException('Authentication failed');
     }
   }
+
+  /**
+   * Login user
+   */
 
   /**
    * Refresh access token
@@ -197,9 +211,8 @@ export class AuthService {
         ...tokens,
         user: {
           id: (user._id as any).toString(),
+          username:user.username,
           email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName,
           role: user.role,
           isActive: user.isActive,
           emailVerified: user.emailVerified,

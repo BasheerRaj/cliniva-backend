@@ -7,11 +7,24 @@ export class RegisterDto {
   @IsEmail({}, { message: 'Please provide a valid email address' })
   @IsNotEmpty({ message: 'Email is required' })
   email: string;
-
-  @ApiProperty({ 
-    example: 'Password123!', 
-    description: 'Password must contain uppercase, lowercase, number, and special character', 
-    minLength: 8 
+  @ApiProperty({
+    example: 'john_doe',
+    description: 'Unique username for the user (3-30 characters, letters, numbers, underscore, hyphen)',
+    minLength: 3,
+    maxLength: 30
+  })
+  @IsString({ message: 'Username must be a string' })
+  @IsNotEmpty({ message: 'Username is required' })
+  @MinLength(3, { message: 'Username must be at least 3 characters long' })
+  @Matches(
+    /^[a-zA-Z0-9_-]{3,30}$/,
+    { message: 'Username can only contain letters, numbers, underscore, and hyphen (3-30 characters)' }
+  )
+  username: string;
+  @ApiProperty({
+    example: 'Password123!',
+    description: 'Password must contain uppercase, lowercase, number, and special character',
+    minLength: 8
   })
   @IsString({ message: 'Password must be a string' })
   @IsNotEmpty({ message: 'Password is required' })
@@ -22,16 +35,6 @@ export class RegisterDto {
   )
   password: string;
 
-  @ApiProperty({ example: 'Mohammed', description: 'First name of the user' })
-  @IsString({ message: 'First name must be a string' })
-  @IsNotEmpty({ message: 'First name is required' })
-  firstName: string;
-
-  @ApiProperty({ example: 'Ali', description: 'Last name of the user' })
-  @IsString({ message: 'Last name must be a string' })
-  @IsNotEmpty({ message: 'Last name is required' })
-  lastName: string;
-
   @ApiProperty({ enum: UserRole, example: UserRole.ADMIN, description: 'Role of the user' })
   @IsEnum(UserRole, {
     message: 'Role must be one of: super_admin, owner, admin, doctor, staff, patient'
@@ -39,20 +42,4 @@ export class RegisterDto {
   @IsNotEmpty({ message: 'Role is required' })
   role: UserRole;
 
-  @ApiPropertyOptional({ example: '+491234567890', description: 'Phone number of the user' })
-  @IsOptional()
-  @IsString({ message: 'Phone must be a string' })
-  phone?: string;
-
-  @ApiPropertyOptional({ example: 'German', description: 'Nationality of the user' })
-  @IsOptional()
-  @IsString({ message: 'Nationality must be a string' })
-  nationality?: string;
-
-  @ApiPropertyOptional({ enum: ['male', 'female', 'other'], description: 'Gender of the user' })
-  @IsOptional()
-  @IsEnum(['male', 'female', 'other'], {
-    message: 'Gender must be one of: male, female, other'
-  })
-  gender?: string;
 }

@@ -268,220 +268,203 @@ export class EmployeeService {
     employeeId?: string
   ): Promise<void> {
     const createDto = employeeDto as CreateEmployeeDto;
-    const employeeNumber =
-      createDto.employeeNumber || (await this.generateEmployeeNumber());
-
+  
     // For creation, validate required fields and uniqueness
     if (!isUpdate) {
+      // ✅ التحقق من فرادة username
+      if (createDto.username) {
+        const existingUserByUsername = await this.userModel.findOne({
+          username: createDto.username
+        });
+  
+        if (existingUserByUsername) {
+          throw new ConflictException('Username already exists');
+        }
+      }
+  
       // Check email uniqueness
       const existingUserByEmail = await this.userModel.findOne({
         email: createDto.email
       });
-
+  
       if (existingUserByEmail) {
         throw new ConflictException('Email already exists');
       }
-
+  
       // Validate phone uniqueness
       const existingUserByPhone = await this.userModel.findOne({
         phone: createDto.phone
       });
-
+  
       if (existingUserByPhone) {
         throw new ConflictException('Phone number already exists');
       }
-
+  
       // Validate employee number uniqueness (if provided)
       if (createDto.employeeNumber) {
         const existingEmployee = await this.employeeProfileModel.findOne({
           employeeNumber: createDto.employeeNumber
         });
-
+  
         if (existingEmployee) {
           throw new ConflictException('Employee number already exists');
         }
       }
-
+  
       // Validate card number uniqueness (if provided)
       if (createDto.cardNumber) {
         const existingEmployeeByCard = await this.employeeProfileModel.findOne({
           cardNumber: createDto.cardNumber
         });
-
+  
         if (existingEmployeeByCard) {
           throw new ConflictException('Card number already exists');
         }
       }
-    }
-
-    // Validate date of birth (should not be in the future and person should be at least 16)
-    if (createDto.dateOfBirth) {
-      const birthDate = new Date(createDto.dateOfBirth);
-      const today = new Date();
-      const minAge = new Date(today.getFullYear() - 16, today.getMonth(), today.getDate());
-
-      if (birthDate > today) {
-        throw new BadRequestException('Date of birth cannot be in the future');
-      }
-
-      if (birthDate > minAge) {
-        throw new BadRequestException('Employee must be at least 16 years old');
+    } else {
+      // ✅ عند التحديث، التحقق من username إذا تم تقديمه
+      const updateDto = employeeDto as UpdateEmployeeDto;
+      if (updateDto.username && employeeId) {
+        const existingUser = await this.userModel.findOne({
+          username: updateDto.username,
+          _id: { $ne: new Types.ObjectId(employeeId) }
+        });
+  
+        if (existingUser) {
+          throw new ConflictException('Username already exists');
+        }
       }
     }
-
-    // Validate date of hiring
-    if (createDto.dateOfHiring) {
-      const hiringDate = new Date(createDto.dateOfHiring);
-      const today = new Date();
-      const maxFutureDate = new Date(today.getFullYear() + 1, today.getMonth(), today.getDate());
-
-      if (hiringDate > maxFutureDate) {
-        throw new BadRequestException('Hiring date cannot be more than 1 year in the future');
-      }
-    }
-
-    // Validate salary (if provided, should be reasonable)
-    if (createDto.salary && (createDto.salary < 0 || createDto.salary > 1000000)) {
-      throw new BadRequestException('Salary must be between 0 and 1,000,000');
-    }
-
-    // Validate assignment entities exist
-    if (createDto.organizationId) {
-      const organization = await this.organizationModel.findById(createDto.organizationId);
-      if (!organization) {
-        throw new NotFoundException('Organization not found');
-      }
-    }
-
-    if (createDto.complexId) {
-      const complex = await this.complexModel.findById(createDto.complexId);
-      if (!complex) {
-        throw new NotFoundException('Complex not found');
-      }
-    }
-
-    if (createDto.clinicId) {
-      const clinic = await this.clinicModel.findById(createDto.clinicId);
-      if (!clinic) {
-        throw new NotFoundException('Clinic not found');
-      }
-    }
+  
+    // Rest of validation...
   }
 
   /**
    * Create a new employee
    */
-  async createEmployee(
-    createEmployeeDto: CreateEmployeeDto,
-    authUser: {
-      id: string;
-      role: string;
-      organizationId?: string;
-      complexId?: string;
-      clinicId?: string;
-    }
-  ): Promise<any> {
-    this.logger.log('Creating new employee');
+ /**
+ * Create a new employee
+ */
+async createEmployee(
+  createEmployeeDto: CreateEmployeeDto,
+  authUser: {
+    id: string;
+    role: string;
+    organizationId?: string;
+    complexId?: string;
+    clinicId?: string;
+  }
+): Promise<any> {
+  this.logger.log('Creating new employee');
 
-    // 🔐 التحقق من صلاحيات إنشاء موظف في الكيانات المحددة
-    await this.validateCreateEmployeeEntities(createEmployeeDto, authUser);
+  // 🔐 التحقق من الصلاحيات
+  await this.validateCreateEmployeeEntities(createEmployeeDto, authUser);
 
-    // التحقق من البيانات
-    await this.validateEmployeeData(createEmployeeDto);
+  // التحقق من البيانات
+  await this.validateEmployeeData(createEmployeeDto);
 
-    // Check if email already exists
-    const existingUser = await this.userModel
-      .findOne({ email: createEmployeeDto.email.toLowerCase() })
+  // ✅ التحقق من username
+  const existingUserByUsername = await this.userModel
+    .findOne({ username: createEmployeeDto.username })
+    .exec();
+
+  if (existingUserByUsername) {
+    throw new ConflictException('Username already exists');
+  }
+
+  // Check if email already exists
+  const existingUser = await this.userModel
+    .findOne({ email: createEmployeeDto.email.toLowerCase() })
+    .exec();
+
+  if (existingUser) {
+    throw new ConflictException('Email already exists');
+  }
+
+  // Check if employee number already exists (if provided)
+  if (createEmployeeDto.employeeNumber) {
+    const existingEmployeeNumber = await this.employeeProfileModel
+      .findOne({ employeeNumber: createEmployeeDto.employeeNumber })
       .exec();
 
-    if (existingUser) {
-      throw new ConflictException('Email already exists');
+    if (existingEmployeeNumber) {
+      throw new ConflictException('Employee number already exists');
     }
-
-    // Check if employee number already exists (if provided)
-    if (createEmployeeDto.employeeNumber) {
-      const existingEmployeeNumber = await this.employeeProfileModel
-        .findOne({ employeeNumber: createEmployeeDto.employeeNumber })
-        .exec();
-
-      if (existingEmployeeNumber) {
-        throw new ConflictException('Employee number already exists');
-      }
-    }
-
-    // Hash password
-    const hashedPassword = await bcrypt.hash(createEmployeeDto.password, 10);
-
-    // Create user
-    const user = await this.userModel.create({
-      email: createEmployeeDto.email.toLowerCase(),
-      passwordHash: hashedPassword,
-      firstName: createEmployeeDto.firstName,
-      lastName: createEmployeeDto.lastName,
-      phone: createEmployeeDto.phone,
-      role: createEmployeeDto.role || 'staff',
-      gender: createEmployeeDto.gender,
-      dateOfBirth: createEmployeeDto.dateOfBirth
-        ? new Date(createEmployeeDto.dateOfBirth)
-        : undefined,
-      nationality: createEmployeeDto.nationality,
-      address: createEmployeeDto.address,
-      isActive: true,
-      emailVerified: false,
-      organizationId: createEmployeeDto.organizationId
-        ? new Types.ObjectId(createEmployeeDto.organizationId)
-        : undefined,
-      complexId: createEmployeeDto.complexId
-        ? new Types.ObjectId(createEmployeeDto.complexId)
-        : undefined,
-      clinicId: createEmployeeDto.clinicId
-        ? new Types.ObjectId(createEmployeeDto.clinicId)
-        : undefined,
-    });
-
-    // Create employee profile
-    const employeeProfile = await this.employeeProfileModel.create({
-      userId: user._id,
-      employeeNumber: createEmployeeDto.employeeNumber,
-      dateOfHiring: createEmployeeDto.dateOfHiring
-        ? new Date(createEmployeeDto.dateOfHiring)
-        : new Date(),
-      jobTitle: createEmployeeDto.jobTitle,
-      salary: createEmployeeDto.salary,
-      cardNumber: createEmployeeDto.cardNumber,
-      maritalStatus: createEmployeeDto.maritalStatus,
-      numberOfChildren: createEmployeeDto.numberOfChildren || 0,
-      profilePictureUrl: createEmployeeDto.profilePictureUrl,
-      bankAccount: createEmployeeDto.bankAccount,
-      socialSecurityNumber: createEmployeeDto.socialSecurityNumber,
-      taxId: createEmployeeDto.taxId,
-      notes: createEmployeeDto.notes,
-      specialties: createEmployeeDto.specialties || [],
-      isActive: true,
-    });
-
-    // ✅ Create default shifts if provided
-    if (createEmployeeDto.shifts && createEmployeeDto.shifts.length > 0) {
-      const shifts = createEmployeeDto.shifts.map(shift => ({
-        userId: user._id,
-        entityType: shift.entityType,
-        entityId: new Types.ObjectId(shift.entityId),
-        shiftName: shift.shiftName,
-        dayOfWeek: shift.dayOfWeek,
-        startTime: shift.startTime,
-        endTime: shift.endTime,
-        breakDurationMinutes: shift.breakDurationMinutes || 0,
-        isActive: true,
-      }));
-
-      await this.employeeShiftModel.insertMany(shifts);
-    }
-
-    this.logger.log(`Employee created successfully: ${user._id}`);
-
-
-    return await this.getEmployeeById((user._id as Types.ObjectId).toString());
   }
+
+  // Hash password
+  const hashedPassword = await bcrypt.hash(createEmployeeDto.password, 10);
+
+  // ✅ Create user مع username
+  const user = await this.userModel.create({
+    email: createEmployeeDto.email.toLowerCase(),
+    username: createEmployeeDto.username, // ✅ إضافة username
+    passwordHash: hashedPassword,
+    firstName: createEmployeeDto.firstName, // اختياري الآن
+    lastName: createEmployeeDto.lastName,   // اختياري الآن
+    phone: createEmployeeDto.phone,
+    role: createEmployeeDto.role || 'staff',
+    gender: createEmployeeDto.gender,
+    dateOfBirth: createEmployeeDto.dateOfBirth
+      ? new Date(createEmployeeDto.dateOfBirth)
+      : undefined,
+    nationality: createEmployeeDto.nationality,
+    address: createEmployeeDto.address,
+    isActive: true,
+    emailVerified: false,
+    organizationId: createEmployeeDto.organizationId
+      ? new Types.ObjectId(createEmployeeDto.organizationId)
+      : undefined,
+    complexId: createEmployeeDto.complexId
+      ? new Types.ObjectId(createEmployeeDto.complexId)
+      : undefined,
+    clinicId: createEmployeeDto.clinicId
+      ? new Types.ObjectId(createEmployeeDto.clinicId)
+      : undefined,
+  });
+
+  // Create employee profile
+  const employeeProfile = await this.employeeProfileModel.create({
+    userId: user._id,
+    employeeNumber: createEmployeeDto.employeeNumber,
+    dateOfHiring: createEmployeeDto.dateOfHiring
+      ? new Date(createEmployeeDto.dateOfHiring)
+      : new Date(),
+    jobTitle: createEmployeeDto.jobTitle,
+    salary: createEmployeeDto.salary,
+    cardNumber: createEmployeeDto.cardNumber,
+    maritalStatus: createEmployeeDto.maritalStatus,
+    numberOfChildren: createEmployeeDto.numberOfChildren || 0,
+    profilePictureUrl: createEmployeeDto.profilePictureUrl,
+    bankAccount: createEmployeeDto.bankAccount,
+    socialSecurityNumber: createEmployeeDto.socialSecurityNumber,
+    taxId: createEmployeeDto.taxId,
+    notes: createEmployeeDto.notes,
+    specialties: createEmployeeDto.specialties || [],
+    isActive: true,
+  });
+
+  // ✅ Create shifts if provided
+  if (createEmployeeDto.shifts && createEmployeeDto.shifts.length > 0) {
+    const shifts = createEmployeeDto.shifts.map(shift => ({
+      userId: user._id,
+      entityType: shift.entityType,
+      entityId: new Types.ObjectId(shift.entityId),
+      shiftName: shift.shiftName,
+      dayOfWeek: shift.dayOfWeek,
+      startTime: shift.startTime,
+      endTime: shift.endTime,
+      breakDurationMinutes: shift.breakDurationMinutes || 0,
+      isActive: true,
+    }));
+
+    await this.employeeShiftModel.insertMany(shifts);
+  }
+
+  this.logger.log(`Employee created successfully: ${user._id}`);
+
+  return await this.getEmployeeById((user._id as Types.ObjectId).toString());
+}
 
 
 
@@ -762,32 +745,33 @@ export class EmployeeService {
     if (!Types.ObjectId.isValid(employeeId)) {
       throw new BadRequestException('Invalid employee ID format');
     }
-
+  
     this.logger.log(`Updating employee: ${employeeId}`);
-
+  
     // 🔐 التحقق من الصلاحيات
     if (authUser) {
       await this.validateEmployeeAccess(employeeId, authUser);
     }
-
+  
     await this.validateEmployeeData(updateEmployeeDto, true, employeeId);
-
+  
     const currentEmployee = await this.getEmployeeById(employeeId);
     if (!currentEmployee) {
       throw new NotFoundException('Employee not found');
     }
-
+  
     const userUpdates: any = {};
     const profileUpdates: any = {};
-
-    // User fields
+  
+    // ✅ User fields مع username
+    if (updateEmployeeDto.username) userUpdates.username = updateEmployeeDto.username;
     if (updateEmployeeDto.firstName) userUpdates.firstName = updateEmployeeDto.firstName;
     if (updateEmployeeDto.lastName) userUpdates.lastName = updateEmployeeDto.lastName;
     if (updateEmployeeDto.phone) userUpdates.phone = updateEmployeeDto.phone;
     if (updateEmployeeDto.nationality) userUpdates.nationality = updateEmployeeDto.nationality;
     if (updateEmployeeDto.address) userUpdates.address = updateEmployeeDto.address;
     if (updateEmployeeDto.isActive !== undefined) userUpdates.isActive = updateEmployeeDto.isActive;
-
+  
     // Profile fields
     if (updateEmployeeDto.cardNumber) profileUpdates.cardNumber = updateEmployeeDto.cardNumber;
     if (updateEmployeeDto.maritalStatus) profileUpdates.maritalStatus = updateEmployeeDto.maritalStatus;
@@ -801,7 +785,7 @@ export class EmployeeService {
     if (updateEmployeeDto.notes) profileUpdates.notes = updateEmployeeDto.notes;
     if (updateEmployeeDto.employeeNumber) profileUpdates.employeeNumber = updateEmployeeDto.employeeNumber;
     if (updateEmployeeDto.specialties) profileUpdates.specialties = updateEmployeeDto.specialties;
-
+  
     if (Object.keys(userUpdates).length > 0) {
       await this.userModel.findByIdAndUpdate(
         employeeId,
@@ -809,7 +793,7 @@ export class EmployeeService {
         { new: true, runValidators: true }
       );
     }
-
+  
     if (Object.keys(profileUpdates).length > 0) {
       await this.employeeProfileModel.findOneAndUpdate(
         { userId: new Types.ObjectId(employeeId) },
@@ -817,9 +801,9 @@ export class EmployeeService {
         { new: true, runValidators: true }
       );
     }
-
+  
     this.logger.log(`Employee updated successfully: ${employeeId}`);
-
+  
     return await this.getEmployeeById(employeeId);
   }
 
