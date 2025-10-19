@@ -29,9 +29,9 @@ import { PlanConfigUtil } from '../common/utils/plan-config.util';
 import { DataTransformerUtil } from '../common/utils/data-transformer.util';
 
 // Step DTOs
-import { 
-  OrganizationOverviewDto, 
-  OrganizationContactDto, 
+import {
+  OrganizationOverviewDto,
+  OrganizationContactDto,
   OrganizationLegalDto,
   ComplexOverviewDto,
   ComplexContactDto,
@@ -91,11 +91,11 @@ export class OnboardingService {
     private readonly dynamicInfoService: DynamicInfoService,
     private readonly userAccessService: UserAccessService,
     private readonly userService: UserService,
-  ) {}
+  ) { }
 
   async completeOnboarding(onboardingDto: CompleteOnboardingDto): Promise<OnboardingResult> {
     const session = await this.connection.startSession();
-    
+
     try {
       session.startTransaction();
 
@@ -326,7 +326,7 @@ export class OnboardingService {
       for (const serviceData of onboardingDto.services) {
         // Determine the appropriate parent entity for the service
         let serviceDto;
-        
+
         if (planType === 'clinic' && entities.clinics?.length > 0) {
           // For clinic plan, link services directly to clinic
           serviceDto = {
@@ -362,7 +362,7 @@ export class OnboardingService {
     if (!organizationData?.name) {
       throw new BadRequestException('Organization name is required for company plan');
     }
-    
+
     const organization = await this.organizationService.createOrganization({
       subscriptionId,
       name: organizationData.name,
@@ -558,7 +558,7 @@ export class OnboardingService {
       if (!validation.isValid) {
         throw new BadRequestException(`Working hours validation failed: ${validation.errors.join(', ')}`);
       }
-      
+
       // Create working hours with hierarchical validation
       await this.createHierarchicalWorkingHours(onboardingDto.workingHours, entities);
     }
@@ -603,7 +603,7 @@ export class OnboardingService {
 
     // Group working hours by entity type and day
     const hoursByEntityAndDay = new Map<string, Map<string, any>>();
-    
+
     workingHours.forEach(wh => {
       const entityKey = `${wh.entityType || 'unknown'}_${wh.entityName || 'unknown'}`;
       if (!hoursByEntityAndDay.has(entityKey)) {
@@ -672,7 +672,7 @@ export class OnboardingService {
   private async setupUserAccess(userId: string, planType: string, entities: any): Promise<void> {
     // Create user access records based on plan type and created entities
     const entityMappings = this.buildEntityMappingsWithHierarchy(entities);
-    
+
     for (const mapping of entityMappings) {
       await this.userAccessService.createUserAccessLegacy(
         userId,
@@ -685,22 +685,22 @@ export class OnboardingService {
 
   private async createHierarchicalWorkingHours(workingHours: any[], entities: any): Promise<void> {
     const entityMappings = this.buildEntityMappingsWithHierarchy(entities);
-    
+
     // Group working hours by entity
     const workingHoursByEntity = new Map<string, any[]>();
-    
+
     for (const wh of workingHours) {
       // Find entity mapping by name and type
-      const entityMapping = entityMappings.find(m => 
+      const entityMapping = entityMappings.find(m =>
         m.name === wh.entityName && m.type === wh.entityType
       );
-      
+
       if (entityMapping) {
         const key = `${entityMapping.type}-${entityMapping.id}`;
         if (!workingHoursByEntity.has(key)) {
           workingHoursByEntity.set(key, []);
         }
-        
+
         // Add entityName to working hours data for mapping
         workingHoursByEntity.get(key)!.push({
           dayOfWeek: wh.dayOfWeek,
@@ -715,11 +715,11 @@ export class OnboardingService {
         console.warn(`Could not find entity mapping for ${wh.entityType}: ${wh.entityName}`);
       }
     }
-    
+
     // Create working hours for each entity
     for (const [key, schedule] of workingHoursByEntity) {
       const [entityType, entityId] = key.split('-');
-      
+
       try {
         await this.workingHoursService.createWorkingHours({
           entityType,
@@ -744,8 +744,8 @@ export class OnboardingService {
     const mappings: Array<{ type: string; id: string; name: string }> = [];
 
     if (entities.organization) {
-      mappings.push({ 
-        type: 'organization', 
+      mappings.push({
+        type: 'organization',
         id: entities.organization.id || entities.organization._id?.toString() || '',
         name: entities.organization.name
       });
@@ -753,8 +753,8 @@ export class OnboardingService {
 
     if (entities.complexes && Array.isArray(entities.complexes)) {
       entities.complexes.forEach((complex: any) => {
-        mappings.push({ 
-          type: 'complex', 
+        mappings.push({
+          type: 'complex',
           id: complex.id || complex._id?.toString() || '',
           name: complex.name
         });
@@ -763,8 +763,8 @@ export class OnboardingService {
 
     if (entities.clinics && Array.isArray(entities.clinics)) {
       entities.clinics.forEach((clinic: any) => {
-        mappings.push({ 
-          type: 'clinic', 
+        mappings.push({
+          type: 'clinic',
           id: clinic.id || clinic._id?.toString() || '',
           name: clinic.name
         });
@@ -790,13 +790,13 @@ export class OnboardingService {
   async getOnboardingProgress(userId: string): Promise<OnboardingProgressDto | null> {
     const user = await this.userModel.findById(userId).exec();
     if (!user) {
-    return null;
+      return null;
     }
 
     // Get subscription information
     let subscription: any = null;
     let plan: any = null;
-    
+
     if (user.subscriptionId) {
       subscription = await this.subscriptionService.getSubscriptionByUser(userId);
       if (subscription) {
@@ -828,7 +828,7 @@ export class OnboardingService {
       if (user.subscriptionId) {
         hasSubscription = true;
         subscriptionId = user.subscriptionId.toString();
-        
+
         try {
           const subscription = await this.subscriptionService.getSubscriptionByUser(userId);
           if (subscription) {
@@ -877,19 +877,19 @@ export class OnboardingService {
 
     try {
       const trimmedName = name.trim();
-      
+
       // Basic validation - check if name is reasonable length and format
       if (trimmedName.length < 2) {
         return false; // Too short
       }
-      
+
       if (trimmedName.length > 100) {
         return false; // Too long
       }
-      
+
       // Check if organization name already exists
       const existingOrg = await this.organizationService.getOrganizationByName(trimmedName);
-      
+
       // Return true if name is available (not taken)
       return !existingOrg;
     } catch (error) {
@@ -904,34 +904,34 @@ export class OnboardingService {
 
     try {
       const trimmedEmail = email.trim().toLowerCase();
-      
+
       // Basic email format validation
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(trimmedEmail)) {
         return false; // Invalid email format
       }
-      
+
       if (trimmedEmail.length < 5) {
         return false; // Too short
       }
-      
+
       if (trimmedEmail.length > 254) {
         return false; // Too long (RFC 5321 limit)
       }
-      
+
       // Check if email already exists in users
       const existingUser = await this.userModel.findOne({ email: trimmedEmail }).exec();
       if (existingUser) {
         return false; // Email is already taken by a user
       }
-      
+
       // Check if email already exists in organizations
       const existingOrg = await this.organizationService.getAllOrganizations();
       const orgWithEmail = existingOrg.find(org => org.email?.toLowerCase() === trimmedEmail);
       if (orgWithEmail) {
         return false; // Email is already taken by an organization
       }
-      
+
       // Return true if email is available (not taken)
       return true;
     } catch (error) {
@@ -946,20 +946,20 @@ export class OnboardingService {
 
     try {
       const trimmedVat = vatNumber.trim().replace(/\s+/g, ''); // Remove spaces
-      
+
       // Basic VAT number format validation - allow 10-15 digits for flexibility
       const vatRegex = /^[0-9]{10,15}$/;
       if (!vatRegex.test(trimmedVat)) {
         return false; // Invalid VAT format - must be 10-15 digits
       }
-      
+
       // Check if VAT number already exists in organizations
       const existingOrgs = await this.organizationService.getAllOrganizations();
       const orgWithVat = existingOrgs.find(org => org.vatNumber === trimmedVat);
       if (orgWithVat) {
         return false; // VAT number is already in use
       }
-      
+
       // Return true if VAT number is valid and available
       return true;
     } catch (error) {
@@ -974,20 +974,20 @@ export class OnboardingService {
 
     try {
       const trimmedCr = crNumber.trim().replace(/\s+/g, ''); // Remove spaces
-      
+
       // Basic CR number format validation - allow 7-12 digits for flexibility
       const crRegex = /^[0-9]{7,12}$/;
       if (!crRegex.test(trimmedCr)) {
         return false; // Invalid CR format - must be 7-12 digits
       }
-      
+
       // Check if CR number already exists in organizations
       const existingOrgs = await this.organizationService.getAllOrganizations();
       const orgWithCr = existingOrgs.find(org => org.crNumber === trimmedCr);
       if (orgWithCr) {
         return false; // CR number is already in use
       }
-      
+
       // Return true if CR number is valid and available
       return true;
     } catch (error) {
@@ -1002,22 +1002,22 @@ export class OnboardingService {
 
     try {
       const trimmedName = name.trim().toLowerCase();
-      
+
       if (trimmedName.length < 2) {
         return false; // Name too short
       }
-      
+
       // Check if complex name already exists
       // For now, we'll implement a simple check - you can expand this based on your complex data model
       // This is a placeholder implementation that assumes complex uniqueness
-      
+
       // If organizationId is provided, check within that organization scope
       if (organizationId) {
         // Check for complex name uniqueness within the organization
         // This would need to be implemented based on your complex-organization relationship
         console.log(`Validating complex name "${trimmedName}" within organization "${organizationId}"`);
       }
-      
+
       // For now, return true (available) - implement actual logic based on your data model
       return true;
     } catch (error) {
@@ -1032,25 +1032,25 @@ export class OnboardingService {
 
     try {
       const trimmedName = name.trim().toLowerCase();
-      
+
       if (trimmedName.length < 2) {
         return false; // Name too short
       }
-      
+
       // Check if clinic name already exists
       // For now, we'll implement a simple check - you can expand this based on your clinic data model
       // This is a placeholder implementation that assumes clinic uniqueness
-      
+
       // If complexId is provided, check within that complex scope
       if (complexId) {
         console.log(`Validating clinic name "${trimmedName}" within complex "${complexId}"`);
       }
-      
+
       // If organizationId is provided, check within that organization scope
       if (organizationId) {
         console.log(`Validating clinic name "${trimmedName}" within organization "${organizationId}"`);
       }
-      
+
       // For now, return true (available) - implement actual logic based on your data model
       return true;
     } catch (error) {
@@ -1059,7 +1059,7 @@ export class OnboardingService {
   }
 
   // ======== STEP-BY-STEP ONBOARDING METHODS ========
-  
+
   private stepProgressCache = new Map<string, StepProgress>();
 
   async getStepProgress(userId: string): Promise<OnboardingStepProgressDto> {
@@ -1093,7 +1093,7 @@ export class OnboardingService {
       if (!user) {
         throw new BadRequestException('User not found');
       }
-      
+
       return { skipped: true, timestamp: new Date(), redirectTo: 'dashboard' };
     } catch (error) {
       console.error('Error marking as skipped:', error);
@@ -1129,11 +1129,11 @@ export class OnboardingService {
         };
 
         const updatedOrg = await this.organizationService.updateOrganization(
-          (existingOrg._id as any).toString(), 
+          (existingOrg._id as any).toString(),
           updateData
         );
-        
-        return { 
+
+        return {
           success: true,
           entityId: (updatedOrg._id as any).toString(),
           canProceed: true,
@@ -1167,8 +1167,8 @@ export class OnboardingService {
         };
 
         const organization = await this.organizationService.createOrganization(organizationData as any, userId);
-        
-        return { 
+
+        return {
           success: true,
           entityId: (organization._id as any).toString(),
           canProceed: true,
@@ -1178,12 +1178,12 @@ export class OnboardingService {
       }
     } catch (error) {
       console.error('Error saving organization overview:', error);
-      
+
       // More specific error handling
       if (error instanceof BadRequestException) {
         throw error;
       }
-      
+
       throw new InternalServerErrorException('Failed to save organization overview');
     }
   }
@@ -1193,7 +1193,7 @@ export class OnboardingService {
       // Find existing organization for this user
       const organizations = await this.organizationService.getAllOrganizations();
       const userOrg = organizations.find(org => org.ownerId?.toString() === userId);
-      
+
       if (!userOrg) {
         throw new BadRequestException('Organization not found for user. Please complete company overview first.');
       }
@@ -1208,8 +1208,8 @@ export class OnboardingService {
       };
 
       const updatedOrg = await this.organizationService.updateOrganization((userOrg._id as any).toString(), updateData as any);
-      
-      return { 
+
+      return {
         success: true,
         entityId: (updatedOrg._id as any).toString(),
         canProceed: true,
@@ -1227,7 +1227,7 @@ export class OnboardingService {
       // Find existing organization for this user
       const organizations = await this.organizationService.getAllOrganizations();
       const userOrg = organizations.find(org => org.ownerId?.toString() === userId);
-      
+
       if (!userOrg) {
         throw new BadRequestException('Organization not found for user. Please complete previous steps first.');
       }
@@ -1241,11 +1241,11 @@ export class OnboardingService {
       };
 
       const updatedOrg = await this.organizationService.updateOrganization((userOrg._id as any).toString(), updateData);
-      
+
       // Determine next step based on subscription plan
       const subscription = await this.subscriptionService.getSubscriptionByUser(userId);
       let nextStep = 'complete';
-      
+
       if (subscription) {
         // Get plan details to determine type
         const plan = await this.subscriptionPlanModel.findById((subscription as any).planId);
@@ -1256,7 +1256,7 @@ export class OnboardingService {
         // For other plans, organization setup is complete
       }
 
-      return { 
+      return {
         success: true,
         entityId: (updatedOrg._id as any).toString(),
         canProceed: true,
@@ -1274,7 +1274,7 @@ export class OnboardingService {
       // Find the user's organization
       const organizations = await this.organizationService.getAllOrganizations();
       const userOrg = organizations.find(org => org.ownerId?.toString() === userId);
-      
+
       if (!userOrg) {
         throw new BadRequestException('Organization not found for user');
       }
@@ -1283,8 +1283,8 @@ export class OnboardingService {
       const subscription = await this.subscriptionService.getSubscriptionByUser(userId);
       const planType = (subscription?.planId as any)?.name?.toLowerCase() || 'company';
 
-      return { 
-        completed: true, 
+      return {
+        completed: true,
         planType,
         organizationId: (userOrg._id as any).toString()
       };
@@ -1302,22 +1302,22 @@ export class OnboardingService {
       if (inheritanceSettings?.fieldsToOverride?.includes(field)) {
         return false;
       }
-      
+
       // If inheritance settings specify only certain fields to inherit, check if this field is included
       if (inheritanceSettings?.fieldsToInherit && !inheritanceSettings.fieldsToInherit.includes(field)) {
         return false;
       }
-      
+
       // If current value is explicitly set to empty string, respect user's choice
       if (currentValue === '') {
         return false;
       }
-      
+
       // If current value is null, undefined, or missing, inherit from parent
       if (currentValue === null || currentValue === undefined) {
         return !!parentValue;
       }
-      
+
       // If current value exists and is not empty, keep it
       return false;
     };
@@ -1326,18 +1326,18 @@ export class OnboardingService {
     const inheritField = (field: string, defaultValue?: any): any => {
       const currentValue = entityData[field];
       const parentValue = organization[field];
-      
+
       if (shouldInherit(field, currentValue, parentValue)) {
         return parentValue;
       }
-      
+
       return currentValue !== undefined ? currentValue : defaultValue;
     };
 
     const result = {
       // Keep all existing entity data as base
       ...entityData,
-      
+
       // Apply intelligent inheritance for specific fields
       logoUrl: inheritField('logoUrl'),
       yearEstablished: inheritField('yearEstablished'),
@@ -1347,36 +1347,36 @@ export class OnboardingService {
       goals: inheritField('goals'),
       website: inheritField('website'),
       ceoName: inheritField('ceoName'),
-      
+
       // Contact information inheritance (if not provided)
       email: inheritField('email'),
-      phoneNumbers: entityData.phoneNumbers && entityData.phoneNumbers.length > 0 
-        ? entityData.phoneNumbers 
+      phoneNumbers: entityData.phoneNumbers && entityData.phoneNumbers.length > 0
+        ? entityData.phoneNumbers
         : organization.phoneNumbers || [],
-        
+
       // Address inheritance with more sophisticated logic
       address: entityData.address && (
-        entityData.address.street || 
-        entityData.address.city || 
-        entityData.address.state || 
+        entityData.address.street ||
+        entityData.address.city ||
+        entityData.address.state ||
         entityData.address.postalCode
       ) ? entityData.address : organization.address,
-      
+
       // Emergency contact inheritance
       emergencyContact: entityData.emergencyContact && (
-        entityData.emergencyContact.name || 
+        entityData.emergencyContact.name ||
         entityData.emergencyContact.phone
       ) ? entityData.emergencyContact : organization.emergencyContact,
-      
+
       // Social media links inheritance
       socialMediaLinks: entityData.socialMediaLinks && Object.values(entityData.socialMediaLinks).some(val => val)
-        ? entityData.socialMediaLinks 
+        ? entityData.socialMediaLinks
         : organization.socialMediaLinks,
-      
+
       // Legal information inheritance
       vatNumber: inheritField('vatNumber'),
       crNumber: inheritField('crNumber'),
-      
+
       // Fields that should never be inherited (must be unique per entity)
       name: entityData.name, // Always use entity's own name
     };
@@ -1388,7 +1388,7 @@ export class OnboardingService {
         inheritedFields.push(field);
       }
     });
-    
+
     if (inheritedFields.length > 0) {
       console.log(`🔗 Inherited fields from parent: ${inheritedFields.join(', ')}`);
     }
@@ -1501,10 +1501,10 @@ export class OnboardingService {
 
       const complexId = (complex._id as any)?.toString();
       console.log('✅ Complex saved with ID:', complexId);
-      
+
       // Link existing departments to complex
       const allDepartments = await this.departmentService.getAllDepartments();
-      
+
       // Create new departments and link to complex
       const createdDepartments: any[] = [];
       if (dto.newDepartmentNames && dto.newDepartmentNames.length > 0) {
@@ -1525,13 +1525,13 @@ export class OnboardingService {
           }
         }
       }
-      
+
       // Link existing departments to complex if provided
       if (dto.departmentIds && dto.departmentIds.length > 0) {
         await this.createDepartmentsForComplex(complexId, dto.departmentIds);
       }
-      
-      return { 
+
+      return {
         success: true,
         entityId: complexId,
         canProceed: true,
@@ -1541,7 +1541,7 @@ export class OnboardingService {
             id: complexId,
             ...complexData
           },
-        departments: createdDepartments
+          departments: createdDepartments
         }
       };
     } catch (error) {
@@ -1553,10 +1553,10 @@ export class OnboardingService {
   async saveComplexContact(userId: string, dto: ComplexContactDto): Promise<StepSaveResponseDto> {
     try {
       console.log('🔍 Looking for complex for user:', userId);
-      
+
       // Use the robust helper method to find user's complex
       let userComplex: any = await this.findUserComplex(userId);
-      
+
       if (!userComplex) {
         console.error('❌ Complex not found for user:', userId);
         throw new BadRequestException('Complex not found for user. Please complete complex overview first.');
@@ -1586,8 +1586,8 @@ export class OnboardingService {
 
       console.log('📞 Updating complex contact data:', updateData);
       const updatedComplex = await this.complexService.updateComplex((userComplex._id as any).toString(), updateData as any);
-      
-      return { 
+
+      return {
         success: true,
         entityId: (updatedComplex._id as any).toString(),
         canProceed: true,
@@ -1606,10 +1606,10 @@ export class OnboardingService {
   async saveComplexLegal(userId: string, dto: ComplexLegalInfoDto): Promise<StepSaveResponseDto> {
     try {
       console.log('🔍 Looking for complex for legal info update, user:', userId);
-      
+
       // Use the robust helper method to find user's complex
       let userComplex: any = await this.findUserComplex(userId);
-      
+
       if (!userComplex) {
         console.error('❌ Complex not found for legal info update, user:', userId);
         throw new BadRequestException('Complex not found for user. Please complete complex overview first.');
@@ -1627,11 +1627,11 @@ export class OnboardingService {
 
       console.log('📝 Updating complex legal data:', updateData);
       const updatedComplex = await this.complexService.updateComplex((userComplex._id as any).toString(), updateData as any);
-      
+
       // Determine next step based on subscription plan
       const subscription = await this.subscriptionService.getSubscriptionByUser(userId);
       let nextStep = 'complete';
-      
+
       if (subscription) {
         const plan = await this.subscriptionPlanModel.findById((subscription as any).planId);
         const planType = plan?.name?.toLowerCase() || 'complex';
@@ -1641,7 +1641,7 @@ export class OnboardingService {
         // For complex-only plans, this completes the setup
       }
 
-      return { 
+      return {
         success: true,
         entityId: (updatedComplex._id as any).toString(),
         canProceed: true,
@@ -1660,7 +1660,7 @@ export class OnboardingService {
   async saveComplexSchedule(userId: string, workingHours: ComplexWorkingHoursDto[]): Promise<{ updated: boolean; complexId: string; workingHours: any }> {
     try {
       console.log('🔍 Looking for complex for schedule update, user:', userId);
-      
+
       // Use the robust helper method to find user's complex
       let userComplex: any = await this.findUserComplex(userId);
 
@@ -1692,7 +1692,7 @@ export class OnboardingService {
         entityId: complexId,
         schedule: scheduleData
       };
-      
+
       await this.workingHoursService.updateWorkingHours('complex', complexId, workingHoursDto as any);
 
       return {
@@ -1709,7 +1709,7 @@ export class OnboardingService {
   async completeComplexSetup(userId: string): Promise<any> {
     try {
       console.log('🏁 Completing complex setup for user:', userId);
-      
+
       // Use the robust helper method to find user's complex
       let userComplex: any = await this.findUserComplex(userId);
 
@@ -1723,7 +1723,7 @@ export class OnboardingService {
 
       // Get associated departments
       const departments = await this.departmentService.getDepartmentsByComplex(complexId);
-      
+
       // Get working hours for the complex
       const workingHours = await this.workingHoursService.getWorkingHours('complex', complexId);
 
@@ -1770,10 +1770,10 @@ export class OnboardingService {
       // Get related entities (may be null for clinic-only plans)
       const organizations = await this.organizationService.getAllOrganizations();
       const userOrg = organizations.find(org => org.ownerId?.toString() === userId);
-      
+
       // Use robust helper method to find user's complex
       const userComplex = await this.findUserComplex(userId);
-      
+
       if (userComplex) {
         console.log('✅ Found complex for clinic linking:', userComplex._id, 'Name:', userComplex.name);
       } else {
@@ -1782,11 +1782,11 @@ export class OnboardingService {
 
       // Enhanced logo inheritance and validation logic
       let logoUrl = dto.logoUrl;
-      
+
       // Helper function to validate logo URL accessibility
       const isValidLogoUrl = async (url: string): Promise<boolean> => {
         if (!url || url.trim() === '') return false;
-        
+
         // For relative paths, check if file exists
         if (url.startsWith('/uploads/')) {
           try {
@@ -1799,36 +1799,36 @@ export class OnboardingService {
             return false;
           }
         }
-        
+
         // For external URLs, assume valid (could add HTTP check in production)
         if (url.startsWith('http://') || url.startsWith('https://')) {
           return true;
         }
-        
+
         return false;
       };
 
       // Normalize logo URL format
       const normalizeLogoUrl = (url: string): string => {
         if (!url || url.trim() === '') return url;
-        
+
         // If it's already a relative path, keep it
         if (url.startsWith('/uploads/')) {
           return url;
         }
-        
+
         // If it's a full URL with our domain, convert to relative
         const baseUrl = process.env.BASE_URL || 'http://localhost:3000';
         if (url.startsWith(baseUrl)) {
           return url.replace(baseUrl, '');
         }
-        
+
         return url; // Keep external URLs as-is
       };
 
       if (!logoUrl || logoUrl.trim() === '') {
         // No custom logo provided, inherit from parent entities with validation
-        
+
         // Prioritize complex logo first, then organization logo
         if (userComplex?.logoUrl) {
           const complexLogoUrl = normalizeLogoUrl(userComplex.logoUrl);
@@ -1840,7 +1840,7 @@ export class OnboardingService {
             console.warn('⚠️  Invalid logo URL from complex, skipping:', complexLogoUrl);
           }
         }
-        
+
         // If complex logo not available or invalid, try organization logo
         if (!logoUrl && userOrg?.logoUrl) {
           const orgLogoUrl = normalizeLogoUrl(userOrg.logoUrl);
@@ -1852,7 +1852,7 @@ export class OnboardingService {
             console.warn('⚠️  Invalid logo URL from organization, skipping:', orgLogoUrl);
           }
         }
-        
+
         // If no valid inherited logo found, use default placeholder
         if (!logoUrl) {
           logoUrl = '/uploads/logos/default-clinic-logo.png';
@@ -1862,10 +1862,10 @@ export class OnboardingService {
         // Custom logo provided - validate and normalize
         logoUrl = normalizeLogoUrl(logoUrl);
         const isValid = await isValidLogoUrl(logoUrl);
-        
+
         if (!isValid) {
           console.warn('⚠️  Custom logo URL is invalid, attempting inheritance fallback:', logoUrl);
-          
+
           // Fallback to parent logo if custom logo is invalid
           if (userComplex?.logoUrl && await isValidLogoUrl(normalizeLogoUrl(userComplex.logoUrl))) {
             logoUrl = normalizeLogoUrl(userComplex.logoUrl);
@@ -1881,7 +1881,7 @@ export class OnboardingService {
           // Check for sharing with parent entities
           const normalizedComplexLogo = userComplex?.logoUrl ? normalizeLogoUrl(userComplex.logoUrl) : null;
           const normalizedOrgLogo = userOrg?.logoUrl ? normalizeLogoUrl(userOrg.logoUrl) : null;
-          
+
           if (normalizedComplexLogo && logoUrl === normalizedComplexLogo) {
             console.log('🔗 Clinic using same logo as complex, maintaining shared reference');
           } else if (normalizedOrgLogo && logoUrl === normalizedOrgLogo) {
@@ -1938,7 +1938,7 @@ export class OnboardingService {
       if (existingClinic) {
         console.log('🔄 Updating existing clinic:', existingClinic._id);
         clinic = await this.clinicService.updateClinic(
-          (existingClinic._id as any).toString(), 
+          (existingClinic._id as any).toString(),
           clinicData
         );
       } else {
@@ -1951,7 +1951,7 @@ export class OnboardingService {
       if (dto.services && Array.isArray(dto.services) && dto.services.length > 0) {
         console.log('🔄 Processing services for clinic:', clinic._id, 'Services count:', dto.services.length);
         console.log('📋 Services data:', JSON.stringify(dto.services, null, 2));
-        
+
         for (const serviceData of dto.services) {
           console.log('🔄 Processing service:', serviceData);
           if (serviceData.name && serviceData.name.trim()) {
@@ -1967,10 +1967,10 @@ export class OnboardingService {
                 clinicId: (clinic._id as any).toString(), // Link service directly to this clinic
                 complexDepartmentId: clinic.complexDepartmentId ? (clinic.complexDepartmentId as any).toString() : undefined
               });
-              
+
               console.log('✅ Created service:', newService._id);
               createdServiceIds.push((newService._id as any).toString());
-              
+
               console.log('🔗 Linking service to clinic...');
               // Link service to clinic via ClinicService
               await this.serviceService.assignServicesToClinic((clinic._id as any).toString(), {
@@ -1981,7 +1981,7 @@ export class OnboardingService {
                 }]
               });
               console.log('✅ Service linked to clinic successfully');
-              
+
             } catch (serviceError) {
               console.error('Error creating service:', serviceError);
               // Continue with other services
@@ -1990,12 +1990,12 @@ export class OnboardingService {
             console.log('⚠️ Skipping empty service:', serviceData);
           }
         }
-        
+
         // Services are now managed through ClinicService junction table only
         console.log('✅ Services created and linked via ClinicService junction table:', createdServiceIds.length);
       }
-      
-      return { 
+
+      return {
         success: true,
         entityId: (clinic._id as any)?.toString(),
         canProceed: true,
@@ -2017,26 +2017,26 @@ export class OnboardingService {
   async saveClinicContact(userId: string, dto: ClinicContactDto): Promise<StepSaveResponseDto> {
     try {
       console.log('🔍 saveClinicContact called with:', { userId, dto });
-      
+
       // Find clinic by user
       const userClinic = await this.clinicService.findClinicByUser(userId);
-      
+
       if (!userClinic) {
         console.error('❌ Clinic not found for user:', userId);
         throw new BadRequestException('Clinic not found for user. Please complete clinic overview first.');
       }
 
       console.log('✅ Found clinic:', userClinic._id, 'for user:', userId);
-      
+
       // Get related entities for inheritance (may be null for clinic-only plans)
       const organizations = await this.organizationService.getAllOrganizations();
       const userOrg = organizations.find(org => org.ownerId?.toString() === userId);
-      
+
       // Use robust helper method to find user's complex
       const userComplex = await this.findUserComplex(userId);
 
       console.log('📋 Inheritance sources:', { userOrg: !!userOrg, userComplex: !!userComplex });
-      
+
       // Apply inheritance from complex if exists, else from organization
       let contactData = dto;
       if (userComplex) {
@@ -2048,7 +2048,7 @@ export class OnboardingService {
       }
 
       console.log('📞 Final contact data:', JSON.stringify(contactData, null, 2));
-      
+
       // Update clinic with new standardized contact structure
       const updateData = {
         phoneNumbers: contactData.phoneNumbers,
@@ -2061,8 +2061,8 @@ export class OnboardingService {
       console.log('🔄 Updating clinic contact for clinic:', userClinic._id, updateData);
       const updatedClinic = await this.clinicService.updateClinic((userClinic._id as any).toString(), updateData as any);
       console.log('✅ Clinic contact updated successfully:', updatedClinic._id);
-      
-      return { 
+
+      return {
         success: true,
         entityId: (updatedClinic._id as any).toString(),
         canProceed: true,
@@ -2078,10 +2078,10 @@ export class OnboardingService {
   async saveClinicServicesCapacity(userId: string, dto: any): Promise<{ updated: boolean; data: any; servicesCreated: number; }> {
     try {
       console.log('🔍 saveClinicServicesCapacity called with:', { userId, dto });
-      
+
       // Find clinic by user
       const userClinic = await this.clinicService.findClinicByUser(userId);
-      
+
       if (!userClinic) {
         console.error('❌ Clinic not found for user:', userId);
         throw new BadRequestException('Clinic not found for user. Please complete clinic overview first.');
@@ -2095,14 +2095,14 @@ export class OnboardingService {
       if (dto.services && Array.isArray(dto.services) && dto.services.length > 0) {
         console.log('🔄 Creating services for clinic:', userClinic._id, 'Services count:', dto.services.length);
         console.log('📋 Services data:', JSON.stringify(dto.services, null, 2));
-        
+
         // Process all services in batch for better consistency
         const servicePromises = dto.services.map(async (serviceData, index) => {
           console.log(`🔄 Processing service ${index + 1}/${dto.services.length}:`, serviceData);
           if (serviceData.name && serviceData.name.trim()) {
             try {
               console.log('🏗️ Creating service:', serviceData.name);
-              
+
               // Create the service in the services collection
               // Each clinic gets its own separate services, even with duplicate names
               const newService = await this.serviceService.createService({
@@ -2113,9 +2113,9 @@ export class OnboardingService {
                 clinicId: (userClinic._id as any).toString(), // Link service directly to this clinic
                 complexDepartmentId: userClinic.complexDepartmentId ? (userClinic.complexDepartmentId as any).toString() : undefined
               });
-              
+
               console.log('✅ Created service:', newService._id);
-              
+
               // Link service to clinic via ClinicService
               console.log('🔗 Linking service to clinic...');
               await this.serviceService.assignServicesToClinic((userClinic._id as any).toString(), {
@@ -2126,9 +2126,9 @@ export class OnboardingService {
                 }]
               });
               console.log('✅ Service linked to clinic successfully');
-              
+
               return (newService._id as any).toString();
-              
+
             } catch (serviceError) {
               console.error(`Error creating service "${serviceData.name}":`, serviceError);
               return null;
@@ -2138,18 +2138,18 @@ export class OnboardingService {
             return null;
           }
         });
-        
+
         // Wait for all service creations to complete
         const serviceResults = await Promise.all(servicePromises);
         const successfulServiceIds = serviceResults.filter(id => id !== null);
         createdServiceIds.push(...successfulServiceIds);
-        
-        console.log('📊 Batch service creation completed:', { 
-          total: dto.services.length, 
+
+        console.log('📊 Batch service creation completed:', {
+          total: dto.services.length,
           successful: successfulServiceIds.length,
           failed: serviceResults.length - successfulServiceIds.length
         });
-        
+
         // Services are managed through ClinicService junction table only
         console.log('✅ Services linked via ClinicService junction table:', createdServiceIds.length);
       } else {
@@ -2170,9 +2170,9 @@ export class OnboardingService {
       console.log('🔄 Updating clinic with services and capacity:', updateData);
       const updatedClinic = await this.clinicService.updateClinic((userClinic._id as any).toString(), updateData as any);
       console.log('✅ Clinic updated successfully:', updatedClinic._id);
-      
-      return { 
-        updated: true, 
+
+      return {
+        updated: true,
         data: updatedClinic,
         servicesCreated: createdServiceIds.length
       };
@@ -2186,7 +2186,7 @@ export class OnboardingService {
     try {
       // Find clinic by user
       const userClinic = await this.clinicService.findClinicByUser(userId);
-      
+
       if (!userClinic) {
         throw new BadRequestException('Clinic not found for user. Please complete clinic overview first.');
       }
@@ -2201,8 +2201,8 @@ export class OnboardingService {
 
       console.log('🔄 Updating clinic legal information for clinic:', userClinic._id);
       const updatedClinic = await this.clinicService.updateClinic((userClinic._id as any).toString(), updateData as any);
-      
-      return { 
+
+      return {
         success: true,
         entityId: (updatedClinic._id as any).toString(),
         canProceed: true,
@@ -2219,7 +2219,7 @@ export class OnboardingService {
     try {
       // Find clinic by user
       const userClinic = await this.clinicService.findClinicByUser(userId);
-      
+
       if (!userClinic) {
         throw new BadRequestException('Clinic not found for user. Please complete clinic overview first.');
       }
@@ -2238,7 +2238,7 @@ export class OnboardingService {
       if (planType === 'clinic') {
         // Independent clinic plan - save schedule directly to clinic
         console.log('📅 Saving independent clinic schedule');
-        
+
         // Save working hours to clinic-specific schedule
         // For now, store in a simple format - can be enhanced with proper WorkingHours entity
         const scheduleData = {
@@ -2248,12 +2248,12 @@ export class OnboardingService {
         };
 
         const updatedClinic = await this.clinicService.updateClinic(
-          (userClinic._id as any).toString(), 
+          (userClinic._id as any).toString(),
           { scheduleData } as any
         );
 
-        return { 
-          updated: true, 
+        return {
+          updated: true,
           workingHours: workingHours,
           scheduleType: 'clinic-independent',
           clinicId: (updatedClinic._id as any).toString()
@@ -2281,12 +2281,12 @@ export class OnboardingService {
         };
 
         const updatedClinic = await this.clinicService.updateClinic(
-          (userClinic._id as any).toString(), 
+          (userClinic._id as any).toString(),
           { scheduleData } as any
         );
 
-        return { 
-          updated: true, 
+        return {
+          updated: true,
           workingHours: workingHours,
           scheduleType: 'clinic-override',
           parentComplexId: (parentComplexId as any)?.toString(),
@@ -2303,10 +2303,10 @@ export class OnboardingService {
   async completeClinicSetup(userId: string): Promise<{ completed: boolean; message: string; clinic?: any }> {
     try {
       console.log('🏁 Starting clinic setup completion for user:', userId);
-      
+
       // Find the user's clinic
       const userClinic = await this.clinicService.findClinicByUser(userId);
-      
+
       if (!userClinic) {
         throw new NotFoundException('No clinic found for user');
       }
@@ -2330,7 +2330,7 @@ export class OnboardingService {
         servicesLinked: true
       });
 
-      return { 
+      return {
         completed: true,
         message: `Clinic setup completed successfully! ${clinicServices.length} services linked.`,
         clinic: userClinic
@@ -2345,7 +2345,7 @@ export class OnboardingService {
 
   private mapToProgressDto(progress: StepProgress): OnboardingStepProgressDto {
     const stepCounts = this.getStepCounts(progress.planType);
-    
+
     return {
       currentStep: progress.currentStep as any,
       completedSteps: progress.completedSteps as any[],
@@ -2372,21 +2372,21 @@ export class OnboardingService {
     // Check what entities exist for this user by getting organizations and finding user's org
     const organizations = await this.organizationService.getAllOrganizations();
     const existingOrg = organizations.find(org => org.ownerId?.toString() === userId);
-    
+
     if (existingOrg) {
       progress.entityIds.organizationId = (existingOrg._id as any).toString();
       progress.completedSteps.push('organization-overview', 'organization-contact', 'organization-legal');
-      
+
       if (planType === 'company') {
         progress.currentStep = 'complex-overview';
-        
+
         const complexes = await this.complexService.getComplexesByOrganization((existingOrg._id as any).toString());
         const existingComplex = complexes[0];
         if (existingComplex) {
           progress.entityIds.complexId = (existingComplex._id as any).toString();
           progress.completedSteps.push('complex-overview', 'complex-contact', 'complex-schedule');
           progress.currentStep = 'clinic-overview';
-          
+
           const clinics = await this.clinicService.getClinicsByComplex((existingComplex._id as any).toString());
           const existingClinic = clinics[0];
           if (existingClinic) {
@@ -2417,7 +2417,7 @@ export class OnboardingService {
 
     const progress = await this.calculateCurrentProgress(userId, planType);
     this.stepProgressCache.set(userId, progress);
-    
+
     return progress;
   }
 
@@ -2440,7 +2440,7 @@ export class OnboardingService {
     try {
       // Check what entities the user already has
       const entitiesStatus = await this.userService.checkUserEntities(userId);
-      
+
       if (entitiesStatus.needsSetup) {
         console.log(`⚠️ User ${userId} still needs setup: ${entitiesStatus.nextStep}`);
         // Mark as skipped but still incomplete
@@ -2463,10 +2463,10 @@ export class OnboardingService {
           }
         });
       }
-      
+
       // Clear progress cache
       this.stepProgressCache.delete(userId);
-      
+
       console.log(`✅ User ${userId} skipped remaining onboarding steps`);
     } catch (error) {
       console.error('Error skipping remaining steps:', error);
@@ -2478,7 +2478,7 @@ export class OnboardingService {
     try {
       // Check what entities the user already has
       const entitiesStatus = await this.userService.checkUserEntities(userId);
-      
+
       // If user has completed required setup, redirect to dashboard
       if (!entitiesStatus.needsSetup) {
         await this.skipRemainingSteps(userId);
@@ -2487,11 +2487,11 @@ export class OnboardingService {
           nextStep: 'dashboard'
         };
       }
-      
+
       // If user needs setup, determine next logical step
       const progress = await this.getOrCreateProgress(userId);
       const user = await this.userModel.findById(userId).exec();
-      
+
       if (!user) {
         throw new Error('User not found');
       }
@@ -2574,7 +2574,7 @@ export class OnboardingService {
           // Continue if organization has no complexes
         }
       }
-      
+
       // If this is the same logo as organization, reference it
       const orgWithSameLogo = organizations.find(org => org.logoUrl === logoUrl);
       if (orgWithSameLogo && entityType !== 'organization') {
