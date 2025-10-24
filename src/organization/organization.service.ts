@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, InternalServerErrorException, ForbiddenException } from '@nestjs/common';
 import { InjectModel, InjectConnection } from '@nestjs/mongoose';
 import { Model, Types, Connection } from 'mongoose';
 import { Organization } from '../database/schemas/organization.schema';
@@ -15,7 +15,7 @@ export class OrganizationService {
     @InjectModel('User') private readonly userModel: Model<User>,
     @InjectConnection() private readonly connection: Connection,
     private readonly subscriptionService: SubscriptionService,
-  ) {}
+  ) { }
 
   async createOrganization(createOrganizationDto: CreateOrganizationDto, userId: string): Promise<Organization> {
     // Validate user exists
@@ -96,7 +96,7 @@ export class OrganizationService {
 
     // Use MongoDB transaction to ensure data consistency
     const session = await this.connection.startSession();
-    
+
     try {
       session.startTransaction();
 
@@ -118,7 +118,7 @@ export class OrganizationService {
       // Update user with organization reference and set as owner
       await this.userModel.findByIdAndUpdate(
         userId,
-        { 
+        {
           organizationId: savedOrganization._id,
           subscriptionId: new Types.ObjectId(createOrganizationDto.subscriptionId),
           role: UserRole.OWNER, // Set user as owner
@@ -133,7 +133,7 @@ export class OrganizationService {
 
     } catch (error) {
       await session.abortTransaction();
-      
+
       // Handle duplicate key errors and other database errors with user-friendly messages
       if (error.code === 11000) {
         if (error.keyPattern?.name) {
@@ -146,7 +146,7 @@ export class OrganizationService {
           throw new BadRequestException('A company with this information already exists.');
         }
       }
-      
+
       throw new InternalServerErrorException(`Failed to create organization: ${error.message}`);
     } finally {
       await session.endSession();
@@ -165,20 +165,20 @@ export class OrganizationService {
     const organization = await this.organizationModel
       .findOne({ subscriptionId: new Types.ObjectId(subscriptionId) })
       .exec();
-    
+
     return organization ? this.formatOrganizationResponse(organization) : null;
   }
 
   async getOrganizationByName(name: string): Promise<Organization | null> {
     const organization = await this.organizationModel
-      .findOne({ 
+      .findOne({
         $or: [
           { name: { $regex: new RegExp(`^${name.trim()}$`, 'i') } },
           { legalName: { $regex: new RegExp(`^${name.trim()}$`, 'i') } }
         ]
       })
       .exec();
-    
+
     return organization ? this.formatOrganizationResponse(organization) : null;
   }
 
@@ -195,6 +195,37 @@ export class OrganizationService {
     const existingOrg = await this.organizationModel.findById(organizationId);
     if (!existingOrg) {
       throw new NotFoundException('Organization not found');
+    }
+
+    // ========== معالجة البيانات قبل الحفظ ==========
+
+    // 1. معالجة phone القديم -> phoneNumbers الجديد
+    if (updateOrganizationDto.phone && !updateOrganizationDto.phoneNumbers) {
+      updateOrganizationDto.phoneNumbers = [{
+        number: updateOrganizationDto.phone,
+        type: 'primary',
+        label: 'Main Phone'
+      }];
+      delete updateOrganizationDto.phone; // احذف الحقل القديم
+    }
+
+    // 2. معالجة address القديم -> address object الجديد
+    if (updateOrganizationDto.address && typeof updateOrganizationDto.address === 'string') {
+      const oldAddress = updateOrganizationDto.address;
+      updateOrganizationDto.address = {
+        street: oldAddress,
+        city: '',
+        state: '',
+        postalCode: '',
+        country: '',
+        googleLocation: updateOrganizationDto.googleLocation || ''
+      } as any;
+    }
+
+    // 3. معالجة googleLocation إذا كان موجود بشكل منفصل
+    if (updateOrganizationDto.googleLocation && updateOrganizationDto.address) {
+      (updateOrganizationDto.address as any).googleLocation = updateOrganizationDto.googleLocation;
+      delete updateOrganizationDto.googleLocation;
     }
 
     // Validate business profile data if provided
@@ -216,14 +247,6 @@ export class OrganizationService {
     // Validate contact information if provided
     if (updateOrganizationDto.email && !ValidationUtil.validateEmail(updateOrganizationDto.email)) {
       throw new BadRequestException('Invalid email format');
-    }
-
-    if (updateOrganizationDto.phone && !ValidationUtil.validatePhone(updateOrganizationDto.phone)) {
-      throw new BadRequestException('Invalid phone number format');
-    }
-
-    if (updateOrganizationDto.googleLocation && !ValidationUtil.validateGoogleLocation(updateOrganizationDto.googleLocation)) {
-      throw new BadRequestException('Invalid Google location format');
     }
 
     // Handle logo URL - ensure it's stored as relative path
@@ -280,7 +303,7 @@ export class OrganizationService {
 
   async deleteOrganization(organizationId: string): Promise<void> {
     const organization = await this.getOrganization(organizationId);
-    
+
     // Check if organization has associated complexes
     // Note: This should be implemented with proper cascade delete logic
     // For now, we'll just delete the organization
@@ -329,7 +352,7 @@ export class OrganizationService {
   }
 
   // ======== VALIDATION METHODS ========
-  
+
   async isNameAvailable(name: string, userId?: string): Promise<boolean> {
     try {
       const trimmedName = name.trim().toLowerCase();
@@ -405,54 +428,54 @@ export class OrganizationService {
   }
 
   // ======== HELPER METHODS ========
-  
+
   /**
    * Normalize logo path to relative format
    */
   private normalizeLogoPath(logoUrl: string): string {
     if (!logoUrl) return logoUrl;
-    
+
     // If it's a blob URL, extract filename and create relative path
     if (logoUrl.startsWith('blob:')) {
       // Extract filename from blob URL if possible, otherwise generate one
       const filename = logoUrl.split('/').pop() || `logo-${Date.now()}.jpg`;
       return `/uploads/logos/${filename}`;
     }
-    
+
     // If it's already a relative path, keep it
     if (logoUrl.startsWith('/uploads/')) {
       return logoUrl;
     }
-    
+
     // If it's a full URL with our domain, convert to relative
     const baseUrl = process.env.BASE_URL || 'http://localhost:3000';
     if (logoUrl.startsWith(baseUrl)) {
       return logoUrl.replace(baseUrl, '');
     }
-    
+
     // Otherwise, assume it's a filename and create proper relative path
     const filename = logoUrl.split('/').pop() || logoUrl;
     return `/uploads/logos/${filename}`;
   }
-  
+
   private constructLogoUrl(relativePath: string | null | undefined): string | undefined {
     if (!relativePath) return undefined;
-    
+
     // If it's already a full URL (backward compatibility), return as is
     if (relativePath.startsWith('http://') || relativePath.startsWith('https://')) {
       return relativePath;
     }
-    
+
     const baseUrl = process.env.BASE_URL || 'http://localhost:3000';
     return `${baseUrl}${relativePath}`;
   }
 
   private formatOrganizationResponse(org: any): any {
     if (!org) return org;
-    
+
     // Convert to plain object if it's a Mongoose document
     const plainOrg = org.toObject ? org.toObject() : org;
-    
+
     // Construct full logo URL if logo exists
     if (plainOrg.logo || plainOrg.logoUrl) {
       const logoPath = plainOrg.logo || plainOrg.logoUrl;
@@ -460,7 +483,182 @@ export class OrganizationService {
       // Keep both for backward compatibility
       if (plainOrg.logo) plainOrg.logo = this.constructLogoUrl(logoPath);
     }
-    
+
     return plainOrg;
   }
+  async canAccessOrganization(userId: string, organizationId: string): Promise<{
+    hasAccess: boolean;
+    reason?: string;
+    user?: User;
+    organization?: Organization;
+  }> {
+    try {
+      // احصل على معلومات المستخدم
+      const user = await this.userModel.findById(userId).select('organizationId role').exec();
+
+      if (!user) {
+        return {
+          hasAccess: false,
+          reason: 'User not found'
+        };
+      }
+
+      // احصل على المنظمة
+      const organization = await this.organizationModel.findById(organizationId).exec();
+
+      if (!organization) {
+        return {
+          hasAccess: false,
+          reason: 'Organization not found'
+        };
+      }
+
+      // تحقق من الصلاحيات
+      const userOrgId = user.organizationId?.toString();
+      const requestedOrgId = organizationId;
+      const orgOwnerId = organization.ownerId?.toString();
+
+      // السماح بالوصول إذا:
+      const belongsToOrganization = userOrgId === requestedOrgId;
+      const isOwner = userId === orgOwnerId;
+
+
+      const hasAccess = belongsToOrganization || isOwner;
+
+      if (!hasAccess) {
+        let reason = 'You do not have permission to access this organization';
+
+        if (!belongsToOrganization && !isOwner) {
+          reason = 'You are not a member or owner of this organization';
+        }
+
+        return {
+          hasAccess: false,
+          reason,
+          user,
+          organization
+        };
+      }
+
+      return {
+        hasAccess: true,
+        user,
+        organization
+      };
+
+    } catch (error) {
+      console.error('Error checking organization access:', error);
+      return {
+        hasAccess: false,
+        reason: 'Error checking permissions'
+      };
+    }
+  }
+
+  /**
+   * تحقق من أن المستخدم يملك المنظمة أو 
+   */
+  async canModifyOrganization(userId: string, organizationId: string): Promise<{
+    canModify: boolean;
+    reason?: string;
+    user?: User;
+    organization?: Organization;
+  }> {
+    try {
+      // احصل على معلومات المستخدم
+      const user = await this.userModel.findById(userId).select('role').exec();
+
+      if (!user) {
+        return {
+          canModify: false,
+          reason: 'User not found'
+        };
+      }
+
+      // احصل على المنظمة
+      const organization = await this.organizationModel.findById(organizationId).exec();
+
+      if (!organization) {
+        return {
+          canModify: false,
+          reason: 'Organization not found'
+        };
+      }
+
+      // تحقق من الصلاحيات
+      const orgOwnerId = organization.ownerId?.toString();
+      const isOwner = userId === orgOwnerId;
+
+
+      const canModify = isOwner;
+
+      if (!canModify) {
+        return {
+          canModify: false,
+          reason: 'Only the organization owner can modify it',
+          user,
+          organization
+        };
+      }
+
+      return {
+        canModify: true,
+        user,
+        organization
+      };
+
+    } catch (error) {
+      console.error('Error checking organization modify permission:', error);
+      return {
+        canModify: false,
+        reason: 'Error checking permissions'
+      };
+    }
+  }
+
+  /**
+   * تحقق من صلاحية الوصول وارمي استثناء إذا لم يكن مسموح
+   * (Helper للاستخدام المباشر في endpoints)
+   */
+  async verifyAccessOrThrow(userId: string, organizationId: string): Promise<{
+    user: User;
+    organization: Organization;
+  }> {
+    const accessCheck = await this.canAccessOrganization(userId, organizationId);
+
+    if (!accessCheck.hasAccess) {
+      if (accessCheck.reason === 'Organization not found') {
+        throw new NotFoundException('Organization not found');
+      }
+      throw new ForbiddenException(accessCheck.reason || 'Access denied');
+    }
+
+    return {
+      user: accessCheck.user!,
+      organization: accessCheck.organization!
+    };
+  }
+
+  /**
+   * تحقق من صلاحية التعديل وارمي استثناء إذا لم يكن مسموح
+   */
+  async verifyModifyPermissionOrThrow(userId: string, organizationId: string): Promise<{
+    user: User;
+    organization: Organization;
+  }> {
+    const modifyCheck = await this.canModifyOrganization(userId, organizationId);
+
+    if (!modifyCheck.canModify) {
+      if (modifyCheck.reason === 'Organization not found') {
+        throw new NotFoundException('Organization not found');
+      }
+      throw new ForbiddenException(modifyCheck.reason || 'Access denied');
+    }
+
+    return {
+      user: modifyCheck.user!,
+      organization: modifyCheck.organization!
+    };
+  }
+
 }

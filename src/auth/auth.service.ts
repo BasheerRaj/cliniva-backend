@@ -507,13 +507,9 @@ export class AuthService {
   async resetPassword(resetPasswordDto: ResetPasswordDto): Promise<{
     message: string;
   }> {
-    const { token, newPassword, confirmPassword } = resetPasswordDto;
+    const { token, newPassword} = resetPasswordDto;
 
     try {
-      // التحقق من تطابق كلمات المرور
-      if (newPassword !== confirmPassword) {
-        throw new BadRequestException('Passwords do not match');
-      }
 
       // Hash الـ token للمقارنة
       const hashedToken = crypto
@@ -583,13 +579,10 @@ export class AuthService {
   ): Promise<{
     message: string;
   }> {
-    const { currentPassword, newPassword, confirmPassword } = changePasswordDto;
+    const { currentPassword, newPassword} = changePasswordDto;
 
     try {
-      // التحقق من تطابق كلمات المرور الجديدة
-      if (newPassword !== confirmPassword) {
-        throw new BadRequestException('New passwords do not match');
-      }
+   
 
       // البحث عن المستخدم
       const user = await this.userModel.findById(userId);

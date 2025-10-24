@@ -1,12 +1,13 @@
-import { 
-  IsString, 
-  IsOptional, 
-  IsNumber, 
-  IsUrl, 
-  IsEmail, 
-  IsArray, 
-  ValidateNested, 
-  IsEnum 
+import {
+  IsString,
+  IsOptional,
+  IsNumber,
+  IsUrl,
+  IsEmail,
+  IsArray,
+  ValidateNested,
+  IsEnum,
+  IsNotEmpty
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
@@ -17,10 +18,10 @@ export class PhoneNumberDto {
   @IsString()
   number: string;
 
-  @ApiProperty({ 
-    description: 'Type of phone number', 
-    enum: ['primary', 'secondary', 'emergency', 'fax', 'mobile'], 
-    example: 'primary' 
+  @ApiProperty({
+    description: 'Type of phone number',
+    enum: ['primary', 'secondary', 'emergency', 'fax', 'mobile'],
+    example: 'primary'
   })
   @IsEnum(['primary', 'secondary', 'emergency', 'fax', 'mobile'])
   type: 'primary' | 'secondary' | 'emergency' | 'fax' | 'mobile';
@@ -38,21 +39,6 @@ export class AddressDto {
   @IsOptional()
   street?: string;
 
-  @ApiProperty({ description: 'City name', example: 'Berlin', required: false })
-  @IsString()
-  @IsOptional()
-  city?: string;
-
-  @ApiProperty({ description: 'State or region', example: 'Berlin', required: false })
-  @IsString()
-  @IsOptional()
-  state?: string;
-
-  @ApiProperty({ description: 'Postal code', example: '10115', required: false })
-  @IsString()
-  @IsOptional()
-  postalCode?: string;
-
   @ApiProperty({ description: 'Country name', example: 'Germany', required: false })
   @IsString()
   @IsOptional()
@@ -62,6 +48,16 @@ export class AddressDto {
   @IsString()
   @IsOptional()
   googleLocation?: string;
+
+  @IsString()
+  @IsOptional()
+  region?: string;
+  @IsString()
+  @IsOptional()
+  nation?: string;
+  @IsNumber()
+  @IsOptional()
+  buildingNumber?: number;
 }
 
 // Shared emergency contact DTO
@@ -108,21 +104,6 @@ export class SocialMediaLinksDto {
   @IsUrl()
   @IsOptional()
   linkedin?: string;
-
-  @ApiProperty({ description: 'WhatsApp URL', example: 'https://wa.me/123456789', required: false })
-  @IsUrl()
-  @IsOptional()
-  whatsapp?: string;
-
-  @ApiProperty({ description: 'YouTube channel URL', example: 'https://youtube.com/example', required: false })
-  @IsUrl()
-  @IsOptional()
-  youtube?: string;
-
-  @ApiProperty({ description: 'Secondary website URL', example: 'https://example.com', required: false })
-  @IsUrl()
-  @IsOptional()
-  website?: string;
 }
 
 // Shared contact information DTO
@@ -139,17 +120,14 @@ export class ContactInfoDto {
   @IsOptional()
   email?: string;
 
+  @IsString()
+  @IsOptional()
+  website?: string;
   @ApiProperty({ type: AddressDto, required: false })
   @ValidateNested()
   @Type(() => AddressDto)
   @IsOptional()
   address?: AddressDto;
-
-  @ApiProperty({ type: EmergencyContactDto, required: false })
-  @ValidateNested()
-  @Type(() => EmergencyContactDto)
-  @IsOptional()
-  emergencyContact?: EmergencyContactDto;
 
   @ApiProperty({ type: SocialMediaLinksDto, required: false })
   @ValidateNested()
@@ -191,6 +169,15 @@ export class BusinessProfileDto {
   ceoName?: string;
 }
 
+export class LegalDocumentDto {
+  @IsString()
+  @IsNotEmpty()
+  title: string;
+
+  @IsString()
+  @IsNotEmpty()
+  content: string;
+}
 // Shared legal information DTO
 export class LegalInfoDto {
   @ApiProperty({ description: 'VAT number', example: 'DE123456789', required: false })
@@ -203,13 +190,16 @@ export class LegalInfoDto {
   @IsOptional()
   crNumber?: string;
 
-  @ApiProperty({ description: 'Terms & Conditions URL', example: 'https://example.com/terms', required: false })
-  @IsUrl()
-  @IsOptional()
-  termsConditionsUrl?: string;
 
-  @ApiProperty({ description: 'Privacy Policy URL', example: 'https://example.com/privacy', required: false })
-  @IsUrl()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => LegalDocumentDto)
   @IsOptional()
-  privacyPolicyUrl?: string;
+  termsAndConditions?: LegalDocumentDto[];
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => LegalDocumentDto)
+  @IsOptional()
+  privacyPolicies?: LegalDocumentDto[];
 }

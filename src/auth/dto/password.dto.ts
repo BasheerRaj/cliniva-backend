@@ -45,14 +45,6 @@ export class ResetPasswordDto {
     { message: 'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character' }
   )
   newPassword: string;
-
-  @ApiProperty({
-    description: 'Confirm new password',
-    example: 'NewPassword123!',
-  })
-  @IsString({ message: 'Confirm password must be a string' })
-  @IsNotEmpty({ message: 'Password confirmation is required' })
-  confirmPassword: string;
 }
 
 /**
@@ -80,14 +72,7 @@ export class ChangePasswordDto {
     { message: 'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character' }
   )
   newPassword: string;
-
-  @ApiProperty({
-    description: 'Confirm new password',
-    example: 'NewPassword123!',
-  })
-  @IsString({ message: 'Confirm password must be a string' })
-  @IsNotEmpty({ message: 'Password confirmation is required' })
-  confirmPassword: string;
+ 
 }
 
 /**

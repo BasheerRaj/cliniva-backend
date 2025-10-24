@@ -35,14 +35,6 @@ export class OrganizationOverviewDto {
   @IsOptional()
   logoUrl?: string;
 
-  @ApiProperty({
-    description: 'Official website URL',
-    example: 'https://healthcare-group.com',
-    required: false,
-  })
-  @IsUrl()
-  @IsOptional()
-  website?: string;
 
   @ApiProperty({
     description: 'Year the organization was established',
@@ -53,14 +45,6 @@ export class OrganizationOverviewDto {
   @IsOptional()
   yearEstablished?: number;
 
-  @ApiProperty({
-    description: 'Organization mission statement',
-    example: 'Providing quality healthcare services for all',
-    required: false,
-  })
-  @IsString()
-  @IsOptional()
-  mission?: string;
 
   @ApiProperty({
     description: 'Organization vision statement',

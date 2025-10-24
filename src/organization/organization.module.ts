@@ -8,7 +8,7 @@ import { SubscriptionSchema } from '../database/schemas/subscription.schema';
 import { SubscriptionPlanSchema } from '../database/schemas/subscription-plan.schema';
 import { SubscriptionModule } from '../subscription/subscription.module';
 import { CommonModule } from '../common/common.module';
-
+import { RolesGuard } from '../auth/guards/roles.guard';
 @Module({
   imports: [
     MongooseModule.forFeature([
@@ -21,7 +21,7 @@ import { CommonModule } from '../common/common.module';
     CommonModule,
   ],
   controllers: [OrganizationController],
-  providers: [OrganizationService],
+  providers: [OrganizationService, RolesGuard],
   exports: [OrganizationService],
 })
-export class OrganizationModule {}
+export class OrganizationModule { }

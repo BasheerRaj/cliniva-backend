@@ -1118,10 +1118,8 @@ export class OnboardingService {
           name: dto.name,
           legalName: dto.legalName,
           logoUrl: dto.logoUrl,
-          website: dto.website,
           // Business profile fields (flattened from DTO)
           yearEstablished: dto.yearEstablished,
-          mission: dto.mission,
           vision: dto.vision,
           overview: dto.overview, // Use overview field correctly
           goals: dto.goals,
@@ -1153,10 +1151,8 @@ export class OnboardingService {
           name: dto.name,
           legalName: dto.legalName,
           logoUrl: dto.logoUrl,
-          website: dto.website,
           // Business profile fields (flattened from DTO)
           yearEstablished: dto.yearEstablished,
-          mission: dto.mission,
           vision: dto.vision,
           overview: dto.overview, // Use overview field correctly
           goals: dto.goals,
@@ -1203,7 +1199,7 @@ export class OnboardingService {
         phoneNumbers: dto.phoneNumbers,
         email: dto.email,
         address: dto.address,
-        emergencyContact: dto.emergencyContact,
+        website: dto.website,
         socialMediaLinks: dto.socialMediaLinks
       };
 
@@ -1222,51 +1218,7 @@ export class OnboardingService {
     }
   }
 
-  async saveOrganizationLegal(userId: string, dto: OrganizationLegalDto) {
-    try {
-      // Find existing organization for this user
-      const organizations = await this.organizationService.getAllOrganizations();
-      const userOrg = organizations.find(org => org.ownerId?.toString() === userId);
-
-      if (!userOrg) {
-        throw new BadRequestException('Organization not found for user. Please complete previous steps first.');
-      }
-
-      // Update organization with legal information (same structure as DTO)
-      const updateData = {
-        vatNumber: dto.vatNumber,
-        crNumber: dto.crNumber,
-        termsConditionsUrl: dto.termsConditionsUrl,
-        privacyPolicyUrl: dto.privacyPolicyUrl
-      };
-
-      const updatedOrg = await this.organizationService.updateOrganization((userOrg._id as any).toString(), updateData);
-
-      // Determine next step based on subscription plan
-      const subscription = await this.subscriptionService.getSubscriptionByUser(userId);
-      let nextStep = 'complete';
-
-      if (subscription) {
-        // Get plan details to determine type
-        const plan = await this.subscriptionPlanModel.findById((subscription as any).planId);
-        const planType = plan?.name?.toLowerCase() || 'company';
-        if (planType === 'company') {
-          nextStep = 'complex_overview'; // Company plan continues to complex
-        }
-        // For other plans, organization setup is complete
-      }
-
-      return {
-        success: true,
-        entityId: (updatedOrg._id as any).toString(),
-        canProceed: true,
-        nextStep,
-        data: updatedOrg
-      };
-    } catch (error) {
-      console.error('Error saving organization legal info:', error);
-      throw new InternalServerErrorException('Failed to save organization legal information');
-    }
+   async saveOrganizationLegal(userId: string, dto: OrganizationLegalDto) {
   }
 
   async completeOrganizationSetup(userId: string) {
@@ -1580,7 +1532,6 @@ export class OnboardingService {
         phoneNumbers: contactData.phoneNumbers,
         email: contactData.email,
         address: contactData.address,
-        emergencyContact: contactData.emergencyContact,
         socialMediaLinks: contactData.socialMediaLinks
       };
 
@@ -1621,8 +1572,6 @@ export class OnboardingService {
       const updateData = {
         vatNumber: dto.vatNumber,
         crNumber: dto.crNumber,
-        termsConditionsUrl: dto.termsConditionsUrl,
-        privacyPolicyUrl: dto.privacyPolicyUrl
       };
 
       console.log('📝 Updating complex legal data:', updateData);
@@ -2054,7 +2003,6 @@ export class OnboardingService {
         phoneNumbers: contactData.phoneNumbers,
         email: contactData.email,
         address: contactData.address,
-        emergencyContact: contactData.emergencyContact,
         socialMediaLinks: contactData.socialMediaLinks
       };
 
@@ -2195,8 +2143,6 @@ export class OnboardingService {
       const updateData = {
         vatNumber: dto.vatNumber,
         crNumber: dto.crNumber,
-        termsConditionsUrl: dto.termsConditionsUrl,
-        privacyPolicyUrl: dto.privacyPolicyUrl
       };
 
       console.log('🔄 Updating clinic legal information for clinic:', userClinic._id);

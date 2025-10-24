@@ -98,6 +98,4 @@ UserSchema.index({ role: 1 });
 UserSchema.index({ isActive: 1 });
 UserSchema.index({ emailVerified: 1 });
 UserSchema.index({ phone: 1 });
-UserSchema.index({ username: 1 }); // ✨ Index للبحث السريع
 UserSchema.index({ email: 1, username: 1 }); // ✨ Compound index
-
