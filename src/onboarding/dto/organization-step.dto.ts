@@ -1,9 +1,9 @@
 import { IsString, IsOptional, IsNumber, IsUrl, IsBoolean, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
-import { 
-  ContactInfoDto, 
-  BusinessProfileDto, 
-  LegalInfoDto 
+import {
+  ContactInfoDto,
+  BusinessProfileDto,
+  LegalInfoDto
 } from './shared-base.dto';
 
 // Organization overview form - basic entity information
@@ -16,6 +16,8 @@ export class OrganizationOverviewDto {
   })
   @IsString()
   name: string;
+  @IsString()
+  managerName: string;
 
   @ApiProperty({
     description: 'Legal registered name of the organization',

@@ -99,7 +99,8 @@ export class Organization extends Document {
   // Basic information
   @Prop({ required: true })
   name: string;
-
+  @Prop()
+  managerName?: string;
   @Prop()
   legalName?: string;
 

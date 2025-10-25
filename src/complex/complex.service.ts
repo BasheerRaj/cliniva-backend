@@ -10,6 +10,7 @@ import { User } from 'src/database/schemas/user.schema';
 import { Organization } from 'src/database/schemas/organization.schema';
 import { PaginateComplexesDto } from './dto/paginate-complexes.dto';
 import { ComplexListItemDto } from './dto/complex-response.dto';
+import { da } from '@faker-js/faker';
 
 @Injectable()
 export class ComplexService {
@@ -41,7 +42,6 @@ export class ComplexService {
     if (!createComplexDto.organizationId) {
       const businessProfileValidation = ValidationUtil.validateBusinessProfile({
         yearEstablished: createComplexDto.yearEstablished,
-        mission: createComplexDto.mission,
         vision: createComplexDto.vision,
         ceoName: createComplexDto.ceoName,
         vatNumber: createComplexDto.vatNumber,
@@ -99,11 +99,10 @@ export class ComplexService {
     if (this.hasBusinessProfileData(updateComplexDto)) {
       const businessProfileValidation = ValidationUtil.validateBusinessProfile({
         yearEstablished: updateComplexDto.yearEstablished,
-        mission: updateComplexDto.mission,
         vision: updateComplexDto.vision,
         ceoName: updateComplexDto.ceoName,
         vatNumber: updateComplexDto.vatNumber,
-        crNumber: updateComplexDto.crNumber
+        crNumber: updateComplexDto.crNumber,
       });
 
       if (!businessProfileValidation.isValid) {
@@ -135,7 +134,8 @@ export class ComplexService {
       data.vision ||
       data.ceoName ||
       data.vatNumber ||
-      data.crNumber
+      data.crNumber ||
+      data.description
     );
   }
 

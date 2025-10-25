@@ -1,4 +1,6 @@
-import { IsString, IsNotEmpty, IsOptional, IsEmail, IsUrl, IsNumber } from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsString, IsNotEmpty, IsOptional, IsEmail, IsUrl, IsNumber, IsArray, ValidateNested } from 'class-validator';
+import { LegalDocumentDto } from 'src/onboarding/dto/shared-base.dto';
 
 export class CreateComplexDto {
   @IsString()
@@ -33,10 +35,6 @@ export class CreateComplexDto {
   @IsOptional()
   logoUrl?: string;
 
-  @IsUrl()
-  @IsOptional()
-  website?: string;
-
   @IsString()
   @IsOptional()
   managerName?: string;
@@ -44,10 +42,6 @@ export class CreateComplexDto {
   @IsNumber()
   @IsOptional()
   yearEstablished?: number;
-
-  @IsString()
-  @IsOptional()
-  mission?: string;
 
   @IsString()
   @IsOptional()
@@ -91,9 +85,6 @@ export class UpdateComplexDto {
   @IsOptional()
   logoUrl?: string;
 
-  @IsUrl()
-  @IsOptional()
-  website?: string;
 
   @IsString()
   @IsOptional()
@@ -103,13 +94,14 @@ export class UpdateComplexDto {
   @IsOptional()
   yearEstablished?: number;
 
-  @IsString()
-  @IsOptional()
-  mission?: string;
 
   @IsString()
   @IsOptional()
   vision?: string;
+
+  @IsString()
+  @IsOptional()
+  description?: string;
 
   @IsString()
   @IsOptional()
@@ -122,7 +114,20 @@ export class UpdateComplexDto {
   @IsString()
   @IsOptional()
   crNumber?: string;
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => LegalDocumentDto)
+  @IsOptional()
+  termsAndConditions?: LegalDocumentDto[];
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => LegalDocumentDto)
+  @IsOptional()
+  privacyPolicies?: LegalDocumentDto[];
 }
+
 
 export class SetupBusinessProfileDto {
   @IsNumber()
