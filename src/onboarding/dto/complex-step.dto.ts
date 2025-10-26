@@ -1,10 +1,20 @@
-import { IsString, IsOptional, IsNumber, IsUrl, IsBoolean, IsArray, ValidateNested, IsEnum } from 'class-validator';
+import { IsString, IsOptional, IsNumber, IsUrl, IsBoolean, IsArray, ValidateNested, IsEnum, IsNotEmpty } from 'class-validator';
 import { Type } from 'class-transformer';
-import { 
-  ContactInfoDto, 
-  LegalInfoDto 
+import {
+  ContactInfoDto,
+  LegalInfoDto
 } from './shared-base.dto';
 import { InheritanceSettingsDto } from './step-progress.dto';
+
+export class DepartmentInputDto {
+  @IsString()
+  @IsNotEmpty()
+  name: string;
+
+  @IsString()
+  @IsOptional()
+  description?: string;
+}
 
 // Complex overview form - basic entity information
 export class ComplexOverviewDto {
@@ -19,18 +29,11 @@ export class ComplexOverviewDto {
   @IsOptional()
   logoUrl?: string;
 
-  @IsUrl()
-  @IsOptional()
-  website?: string;
 
   // Business information - flattened for easier form handling
   @IsNumber()
   @IsOptional()
   yearEstablished?: number;
-
-  @IsString()
-  @IsOptional()
-  mission?: string;
 
   @IsString()
   @IsOptional()
@@ -42,22 +45,28 @@ export class ComplexOverviewDto {
 
   @IsString()
   @IsOptional()
+  description?: string; // Complex overview/description
+
+  @IsString()
+  @IsOptional()
   goals?: string; // Complex goals
 
   @IsString()
   @IsOptional()
   ceoName?: string; // Complex director or CEO name
 
-  // Department management
-  @IsArray()
-  @IsString({ each: true })
-  @IsOptional()
-  departmentIds?: string[]; // Pre-existing department IDs to assign
 
-  @IsArray()
-  @IsString({ each: true })
+  // New department names to create  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => DepartmentInputDto)
   @IsOptional()
-  newDepartmentNames?: string[]; // New department names to create
+  departments?: DepartmentInputDto[];
+
+  // keep backwards compatibility
+  @IsArray()
+  @IsOptional()
+  newDepartmentNames?: string[];
+
 
   // Inheritance settings to control data inheritance from parent entities
   @ValidateNested()

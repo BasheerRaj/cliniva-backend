@@ -22,7 +22,7 @@ import { UserService } from '../user/user.service';
 import { User } from '../database/schemas/user.schema';
 import { SubscriptionPlan } from '../database/schemas/subscription-plan.schema';
 
-// Utilities
+// Utilitiescomplex
 import { ValidationUtil } from '../common/utils/validation.util';
 import { EntityRelationshipUtil } from '../common/utils/entity-relationship.util';
 import { PlanConfigUtil } from '../common/utils/plan-config.util';
@@ -1116,6 +1116,7 @@ export class OnboardingService {
         // Update existing organization with new standardized structure
         const updateData = {
           name: dto.name,
+          managerName: dto.managerName,
           legalName: dto.legalName,
           logoUrl: dto.logoUrl,
           // Business profile fields (flattened from DTO)
@@ -1218,7 +1219,52 @@ export class OnboardingService {
     }
   }
 
-   async saveOrganizationLegal(userId: string, dto: OrganizationLegalDto) {
+  async saveOrganizationLegal(userId: string, dto: OrganizationLegalDto) {
+    try {
+      // Find existing organization for this user
+      const organizations = await this.organizationService.getAllOrganizations();
+      const userOrg = organizations.find(org => org.ownerId?.toString() === userId);
+
+      if (!userOrg) {
+        throw new BadRequestException('Organization not found for user. Please complete previous steps first.');
+      }
+
+      // Update organization with legal information (same structure as DTO)
+      const updateData = {
+        vatNumber: dto.vatNumber,
+        crNumber: dto.crNumber,
+        termsAndConditions: dto.termsAndConditions,
+        privacyPolicies: dto.privacyPolicies
+      };
+
+      const updatedOrg = await this.organizationService.updateOrganization((userOrg._id as any).toString(), updateData);
+
+      // Determine next step based on subscription plan
+      const subscription = await this.subscriptionService.getSubscriptionByUser(userId);
+      let nextStep = 'complete';
+
+      if (subscription) {
+        // Get plan details to determine type
+        const plan = await this.subscriptionPlanModel.findById((subscription as any).planId);
+        const planType = plan?.name?.toLowerCase() || 'company';
+        if (planType === 'company') {
+          nextStep = 'complex_overview'; // Company plan continues to complex
+        }
+        // For other plans, organization setup is complete
+      }
+
+      return {
+        success: true,
+        entityId: (updatedOrg._id as any).toString(),
+        canProceed: true,
+        nextStep,
+        data: updatedOrg
+      };
+    } catch (error) {
+      console.error('Error saving organization legal info:', error);
+      throw new InternalServerErrorException('Failed to save organization legal information');
+    }
+
   }
 
   async completeOrganizationSetup(userId: string) {
@@ -1328,6 +1374,13 @@ export class OnboardingService {
       // Legal information inheritance
       vatNumber: inheritField('vatNumber'),
       crNumber: inheritField('crNumber'),
+      termsAndConditions: entityData.termsAndConditions?.length
+        ? entityData.termsAndConditions
+        : organization.termsAndConditions || [],
+      privacyPolicies: entityData.privacyPolicies?.length
+        ? entityData.privacyPolicies
+        : organization.privacyPolicies || [],
+
 
       // Fields that should never be inherited (must be unique per entity)
       name: entityData.name, // Always use entity's own name
@@ -1421,10 +1474,9 @@ export class OnboardingService {
         name: dto.name,
         managerName: dto.managerName,
         logoUrl: logoUrl,
-        website: dto.website,
         // Business information
         yearEstablished: dto.yearEstablished,
-        mission: dto.mission,
+        description: dto.description,
         vision: dto.vision,
         overview: dto.overview,
         goals: dto.goals,
@@ -1459,29 +1511,50 @@ export class OnboardingService {
 
       // Create new departments and link to complex
       const createdDepartments: any[] = [];
-      if (dto.newDepartmentNames && dto.newDepartmentNames.length > 0) {
-        for (const deptName of dto.newDepartmentNames) {
-          const nameTrimmed = deptName.trim();
-          if (nameTrimmed) {
-            // Check for existing department
-            let department = allDepartments.find(d => d.name.toLowerCase() === nameTrimmed.toLowerCase());
-            if (!department) {
-              department = await this.departmentService.createDepartment({
-                name: nameTrimmed,
-                description: `Department for ${dto.name}`
-              });
-            }
-            // Link department to complex
-            await this.departmentService.createComplexDepartment(complexId, (department._id as any)?.toString());
-            createdDepartments.push(department);
+
+      // Normalize input: support dto.departments [{name,description}] and legacy dto.newDepartmentNames [string]
+      const deptEntries: Array<{ name: string; description?: string }> = [];
+
+      if (Array.isArray((dto as any).departments) && (dto as any).departments.length > 0) {
+        for (const d of (dto as any).departments) {
+          const name = d?.name?.toString().trim();
+          if (name) {
+            deptEntries.push({ name, description: d?.description?.toString()?.trim() });
           }
         }
       }
 
-      // Link existing departments to complex if provided
-      if (dto.departmentIds && dto.departmentIds.length > 0) {
-        await this.createDepartmentsForComplex(complexId, dto.departmentIds);
+      if (Array.isArray(dto.newDepartmentNames) && dto.newDepartmentNames.length > 0) {
+        for (const n of dto.newDepartmentNames) {
+          const name = n?.toString().trim();
+          if (name) {
+            deptEntries.push({ name, description: `Department for ${dto.name}` });
+          }
+        }
       }
+
+      if (deptEntries.length > 0) {
+        for (const entry of deptEntries) {
+          const nameTrimmed = (entry.name || '').trim();
+          if (!nameTrimmed) continue;
+
+          // Case-insensitive lookup in existing departments
+          let department = allDepartments.find(d => (d.name || '').toLowerCase() === nameTrimmed.toLowerCase());
+
+          if (!department) {
+            department = await this.departmentService.createDepartment({
+              name: nameTrimmed,
+              description: (entry.description && entry.description.trim()) || `Department for ${dto.name}`
+            });
+          }
+
+          // Link department to complex
+          await this.departmentService.createComplexDepartment(complexId, (department._id as any)?.toString());
+          createdDepartments.push(department);
+        }
+      }
+      // Link existing departments to complex if provided
+
 
       return {
         success: true,
@@ -1532,17 +1605,29 @@ export class OnboardingService {
         phoneNumbers: contactData.phoneNumbers,
         email: contactData.email,
         address: contactData.address,
+        website: contactData.website,
         socialMediaLinks: contactData.socialMediaLinks
       };
 
       console.log('📞 Updating complex contact data:', updateData);
       const updatedComplex = await this.complexService.updateComplex((userComplex._id as any).toString(), updateData as any);
+      const subscription = await this.subscriptionService.getSubscriptionByUser(userId);
+      let nextStep = 'complex-legal';
+      if (subscription) {
+        const plan = await this.subscriptionPlanModel.findById((subscription as any).planId);
+        const planType = plan?.name?.toLowerCase();
 
+        if (planType === 'company') {
+          nextStep = 'complex-schedule';
+        } else {
+          nextStep = 'complex-legal';
+        }
+      }
       return {
         success: true,
         entityId: (updatedComplex._id as any).toString(),
         canProceed: true,
-        nextStep: 'complex_legal',
+        nextStep,
         data: updatedComplex
       };
     } catch (error) {
@@ -1553,7 +1638,6 @@ export class OnboardingService {
       throw new InternalServerErrorException('Failed to save complex contact');
     }
   }
-
   async saveComplexLegal(userId: string, dto: ComplexLegalInfoDto): Promise<StepSaveResponseDto> {
     try {
       console.log('🔍 Looking for complex for legal info update, user:', userId);
@@ -1568,14 +1652,29 @@ export class OnboardingService {
 
       console.log('✅ Found complex for legal update:', userComplex._id);
 
-      // Update complex with legal information
-      const updateData = {
+      // Get organization for inheritance
+      const organizations = await this.organizationService.getAllOrganizations();
+      const userOrg = organizations.find(org => org.ownerId?.toString() === userId);
+
+      // Prepare legal data
+      let legalData = {
         vatNumber: dto.vatNumber,
         crNumber: dto.crNumber,
+        termsAndConditions: dto.termsAndConditions,
+        privacyPolicies: dto.privacyPolicies,
       };
 
-      console.log('📝 Updating complex legal data:', updateData);
-      const updatedComplex = await this.complexService.updateComplex((userComplex._id as any).toString(), updateData as any);
+      // Apply inheritance from organization if exists
+      if (userOrg) {
+        console.log('📋 Applying legal info inheritance from organization');
+        legalData = this.inheritDataFromOrganization(userOrg, legalData) as any;
+      }
+
+      console.log('📝 Updating complex legal data:', legalData);
+      const updatedComplex = await this.complexService.updateComplex(
+        (userComplex._id as any).toString(),
+        legalData as any
+      );
 
       // Determine next step based on subscription plan
       const subscription = await this.subscriptionService.getSubscriptionByUser(userId);
@@ -1854,18 +1953,22 @@ export class OnboardingService {
       let clinicData = {
         name: dto.name,
         headDoctorName: dto.headDoctorName,
-        specialization: dto.specialization,
-        licenseNumber: dto.licenseNumber,
-        pin: dto.pin,
+        description: dto.description,
         logoUrl: logoUrl,
         website: dto.website,
         // Business information
         yearEstablished: dto.yearEstablished,
-        mission: dto.mission,
         vision: dto.vision,
         overview: dto.overview,
         goals: dto.goals,
         ceoName: dto.ceoName,
+        // Capacity
+        maxStaff: dto.capacity?.maxStaff ?? 50,
+        maxDoctors: dto.capacity?.maxDoctors ?? 10,
+        maxPatients: dto.capacity?.maxPatients ?? 2000,
+        sessionDuration: dto.capacity?.sessionDuration ?? 30,
+        phoneNumbers: dto.phoneNumbers,
+        email: dto.email,
         // Ownership and relationships
         ownerId: userId,
         subscriptionId: (subscription._id as any).toString(),
@@ -2143,6 +2246,8 @@ export class OnboardingService {
       const updateData = {
         vatNumber: dto.vatNumber,
         crNumber: dto.crNumber,
+        termsAndConditions: dto.termsAndConditions,
+        privacyPolicies: dto.privacyPolicies,
       };
 
       console.log('🔄 Updating clinic legal information for clinic:', userClinic._id);
@@ -2181,22 +2286,30 @@ export class OnboardingService {
 
       console.log('🔄 Saving clinic schedule for plan type:', planType, 'clinic:', userClinic._id);
 
+      // Prepare schedule data and parent complex id explicitly
+      const scheduleData: { workingHours: ClinicWorkingHoursDto[] } = { workingHours };
+      const parentComplexId = userClinic?.complexId ? (userClinic.complexId as any).toString() : null;
+
       if (planType === 'clinic') {
-        // Independent clinic plan - save schedule directly to clinic
-        console.log('📅 Saving independent clinic schedule');
-
-        // Save working hours to clinic-specific schedule
-        // For now, store in a simple format - can be enhanced with proper WorkingHours entity
-        const scheduleData = {
-          workingHours: workingHours,
-          scheduleType: 'clinic-independent',
-          lastUpdated: new Date()
-        };
-
         const updatedClinic = await this.clinicService.updateClinic(
           (userClinic._id as any).toString(),
-          { scheduleData } as any
+          { scheduleData }
         );
+
+        // Persist working hours into the working hours service as well
+        const workingHoursDto = {
+          entityType: 'clinic',
+          entityId: (updatedClinic._id as any).toString(),
+          schedule: scheduleData.workingHours.map(wh => ({
+            dayOfWeek: wh.dayOfWeek,
+            isWorkingDay: wh.isWorkingDay,
+            openingTime: wh.openingTime,
+            closingTime: wh.closingTime,
+            breakStartTime: wh.breakStartTime,
+            breakEndTime: wh.breakEndTime
+          }))
+        };
+        await this.workingHoursService.updateWorkingHours('clinic', (updatedClinic._id as any).toString(), workingHoursDto as any);
 
         return {
           updated: true,
@@ -2204,38 +2317,33 @@ export class OnboardingService {
           scheduleType: 'clinic-independent',
           clinicId: (updatedClinic._id as any).toString()
         };
-
       } else {
-        // Complex/Company plan - clinic inherits from complex but can override
-        console.log('📅 Saving clinic schedule with complex inheritance');
-
-        // Find parent complex
-        let parentComplexId = userClinic.complexId;
-        if (!parentComplexId && userClinic.complexDepartmentId) {
-          // Get complex ID from complex department
-          const complexDepartment = await this.departmentService.getComplexDepartmentById(
-            (userClinic.complexDepartmentId as any).toString()
-          );
-          parentComplexId = complexDepartment?.complexId;
-        }
-
-        const scheduleData = {
-          workingHours: workingHours,
-          scheduleType: 'clinic-override',
-          parentComplexId: parentComplexId,
-          lastUpdated: new Date()
-        };
-
+        // after updatedClinic created in override branch — قم بنفس الإجراء
         const updatedClinic = await this.clinicService.updateClinic(
           (userClinic._id as any).toString(),
-          { scheduleData } as any
+          { scheduleData }
         );
+
+        // save in working hours table too
+        const workingHoursDto = {
+          entityType: 'clinic',
+          entityId: (updatedClinic._id as any).toString(),
+          schedule: scheduleData.workingHours.map(wh => ({
+            dayOfWeek: wh.dayOfWeek,
+            isWorkingDay: wh.isWorkingDay,
+            openingTime: wh.openingTime,
+            closingTime: wh.closingTime,
+            breakStartTime: wh.breakStartTime,
+            breakEndTime: wh.breakEndTime
+          }))
+        };
+        await this.workingHoursService.updateWorkingHours('clinic', (updatedClinic._id as any).toString(), workingHoursDto as any);
 
         return {
           updated: true,
           workingHours: workingHours,
           scheduleType: 'clinic-override',
-          parentComplexId: (parentComplexId as any)?.toString(),
+          parentComplexId: parentComplexId,
           clinicId: (updatedClinic._id as any).toString()
         };
       }

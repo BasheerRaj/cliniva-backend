@@ -1,6 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
-import { PhoneNumber, Address, OrganizationEmergencyContact, SocialMediaLinks } from './organization.schema';
+import { PhoneNumber, Address, OrganizationEmergencyContact, SocialMediaLinks, LegalDocument } from './organization.schema';
 
 @Schema({
   timestamps: true,
@@ -45,6 +45,9 @@ export class Clinic extends Document {
   @Prop()
   website?: string;
 
+  @Prop()
+  description?: string;
+
   // Business information - STANDARDIZED
   @Prop()
   yearEstablished?: number;
@@ -65,17 +68,17 @@ export class Clinic extends Document {
   ceoName?: string; // or Clinic Director
 
   // Contact information - SAME AS ORGANIZATION
-  @Prop({ 
-    type: [{ 
-      number: { type: String, required: true }, 
-      type: { 
-        type: String, 
-        enum: ['primary', 'secondary', 'emergency', 'fax', 'mobile'], 
-        default: 'primary' 
-      }, 
-      label: String 
-    }], 
-    default: [] 
+  @Prop({
+    type: [{
+      number: { type: String, required: true },
+      type: {
+        type: String,
+        enum: ['primary', 'secondary', 'emergency', 'fax', 'mobile'],
+        default: 'primary'
+      },
+      label: String
+    }],
+    default: []
   })
   phoneNumbers?: PhoneNumber[];
 
@@ -86,11 +89,11 @@ export class Clinic extends Document {
   @Prop({
     type: {
       street: String,
-      city: String,
-      state: String,
-      postalCode: String,
       country: String,
-      googleLocation: String
+      googleLocation: String,
+      region: String,
+      nation: String,
+      buildingNumber: Number
     }
   })
   address?: Address;
@@ -113,9 +116,6 @@ export class Clinic extends Document {
       instagram: String,
       twitter: String,
       linkedin: String,
-      whatsapp: String,
-      youtube: String,
-      website: String
     }
   })
   socialMediaLinks?: SocialMediaLinks;
@@ -127,11 +127,25 @@ export class Clinic extends Document {
   @Prop()
   crNumber?: string; // Commercial registration number
 
-  @Prop()
-  termsConditionsUrl?: string;
+@Prop({
+    type: [{
+      title: { type: String, required: true },
+      content: { type: String, required: true },
+    }],
+    default: []
+  })
+  termsAndConditions?: LegalDocument[];
 
-  @Prop()
-  privacyPolicyUrl?: string;
+  // 🆕 Privacy Policies - Array من المستندات
+  @Prop({
+    type: [{
+      title: { type: String, required: true },
+      content: { type: String, required: true },
+    }],
+    default: []
+  })
+  privacyPolicies?: LegalDocument[];
+
 
   // Clinic-specific fields
   // Services are managed through ClinicService junction table only

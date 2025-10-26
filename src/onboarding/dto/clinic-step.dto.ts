@@ -1,9 +1,10 @@
-import { 
-  IsString, IsOptional, IsNumber, IsUrl, IsBoolean, IsArray, ValidateNested, IsEnum 
+import {
+  IsString, IsOptional, IsNumber, IsUrl, IsBoolean, IsArray, ValidateNested, IsEnum,
+  IsEmail
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { ContactInfoDto, LegalInfoDto } from './shared-base.dto';
+import { ContactInfoDto, LegalInfoDto, PhoneNumberDto } from './shared-base.dto';
 import { InheritanceSettingsDto } from './step-progress.dto';
 
 export class ClinicCapacityDto {
@@ -64,21 +65,6 @@ export class ClinicOverviewDto {
   @IsOptional()
   headDoctorName?: string;
 
-  @ApiPropertyOptional({ example: 'Cardiology', description: 'Clinic specialization' })
-  @IsString()
-  @IsOptional()
-  specialization?: string;
-
-  @ApiPropertyOptional({ example: 'LIC12345', description: 'Clinic license number' })
-  @IsString()
-  @IsOptional()
-  licenseNumber?: string;
-
-  @ApiPropertyOptional({ example: 'PIN123', description: 'Clinic PIN/identifier' })
-  @IsString()
-  @IsOptional()
-  pin?: string;
-
   @ApiPropertyOptional({ example: 'https://cliniclogo.com/logo.png', description: 'Logo URL' })
   @IsUrl()
   @IsOptional()
@@ -88,6 +74,22 @@ export class ClinicOverviewDto {
   @IsUrl()
   @IsOptional()
   website?: string;
+  @IsString()
+  @IsOptional()
+  description?: string;
+
+  @ApiProperty({ type: [PhoneNumberDto], required: false })
+  @ValidateNested({ each: true })
+  @Type(() => PhoneNumberDto)
+  @IsArray()
+  @IsOptional()
+  phoneNumbers?: PhoneNumberDto[];
+
+  @ApiProperty({ description: 'Email address', example: 'info@example.com', required: false })
+  @IsEmail()
+  @IsOptional()
+  email?: string;
+
 
   @ApiPropertyOptional({ example: 'dep123', description: 'Complex department ID' })
   @IsString()
@@ -99,10 +101,6 @@ export class ClinicOverviewDto {
   @IsOptional()
   yearEstablished?: number;
 
-  @ApiPropertyOptional({ example: 'To provide the best healthcare', description: 'Clinic mission' })
-  @IsString()
-  @IsOptional()
-  mission?: string;
 
   @ApiPropertyOptional({ example: 'To be a leading clinic in the region', description: 'Clinic vision' })
   @IsString()
@@ -130,6 +128,12 @@ export class ClinicOverviewDto {
   @Type(() => ClinicServiceDto)
   @IsOptional()
   services?: ClinicServiceDto[];
+
+  @ApiPropertyOptional({ type: ClinicCapacityDto, description: 'Clinic capacity details' })
+  @ValidateNested()
+  @Type(() => ClinicCapacityDto)
+  @IsOptional()
+  capacity?: ClinicCapacityDto;
 
   @ApiPropertyOptional({ type: InheritanceSettingsDto, description: 'Data inheritance settings' })
   @ValidateNested()

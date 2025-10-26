@@ -43,12 +43,7 @@ export class AddressDto {
   @IsString()
   @IsOptional()
   country?: string;
-
-  @ApiProperty({ description: 'Google location URL or coordinates', example: 'https://goo.gl/maps/xyz', required: false })
-  @IsString()
-  @IsOptional()
-  googleLocation?: string;
-
+  
   @IsString()
   @IsOptional()
   region?: string;
@@ -58,6 +53,12 @@ export class AddressDto {
   @IsNumber()
   @IsOptional()
   buildingNumber?: number;
+
+  @ApiProperty({ description: 'Google location URL or coordinates', example: 'https://goo.gl/maps/xyz', required: false })
+  @IsString()
+  @IsOptional()
+  googleLocation?: string;
+
 }
 
 // Shared emergency contact DTO
@@ -120,9 +121,10 @@ export class ContactInfoDto {
   @IsOptional()
   email?: string;
 
-  @IsString()
+  @IsUrl()
   @IsOptional()
   website?: string;
+
   @ApiProperty({ type: AddressDto, required: false })
   @ValidateNested()
   @Type(() => AddressDto)
