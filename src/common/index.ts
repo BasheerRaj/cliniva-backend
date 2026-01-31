@@ -1,6 +1,7 @@
 // Enums
 export * from './enums/permissions.enum';
 export * from './enums/user-role.enum';
+export * from './enums/audit-event-type.enum';
 
 // Types
 export * from './types/permission.types';

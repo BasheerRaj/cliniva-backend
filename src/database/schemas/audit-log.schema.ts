@@ -1,42 +1,63 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
+import { AuditEventType } from '../../common/enums/audit-event-type.enum';
 
 @Schema({
-  timestamps: { createdAt: true, updatedAt: false },
+  timestamps: { createdAt: 'timestamp', updatedAt: false },
   collection: 'audit_logs'
 })
 export class AuditLog extends Document {
-  @Prop({ required: true })
-  tableName: string;
-
-  @Prop({ type: Types.ObjectId, required: true })
-  recordId: Types.ObjectId;
-
   @Prop({ 
     required: true,
-    enum: ['create', 'update', 'delete'] 
+    type: String,
+    enum: Object.values(AuditEventType)
   })
-  action: string;
-
-  @Prop({ type: Object })
-  oldValues?: Record<string, any>;
-
-  @Prop({ type: Object })
-  newValues?: Record<string, any>;
+  eventType: AuditEventType;
 
   @Prop({ type: Types.ObjectId, ref: 'User' })
   userId?: Types.ObjectId;
 
   @Prop()
-  ipAddress?: string;
+  email?: string;
+
+  @Prop({ required: true })
+  ipAddress: string;
 
   @Prop()
   userAgent?: string;
+
+  @Prop({ required: true })
+  timestamp: Date;
+
+  @Prop({ type: Object, default: {} })
+  details: Record<string, any>;
+
+  @Prop({ type: Types.ObjectId, ref: 'User' })
+  adminId?: Types.ObjectId;
+
+  @Prop({ required: true, default: true })
+  success: boolean;
+
+  @Prop()
+  errorCode?: string;
 }
 
 export const AuditLogSchema = SchemaFactory.createForClass(AuditLog);
 
-// Indexes
-AuditLogSchema.index({ tableName: 1, recordId: 1 });
+// Descending index on timestamp for efficient querying of recent logs
+AuditLogSchema.index({ timestamp: -1 });
+
+// Index on userId for user-specific audit queries
 AuditLogSchema.index({ userId: 1 });
-AuditLogSchema.index({ createdAt: 1 });
+
+// Index on eventType for filtering by event type
+AuditLogSchema.index({ eventType: 1 });
+
+// Index on ipAddress for IP-based analysis and security monitoring
+AuditLogSchema.index({ ipAddress: 1 });
+
+// Compound index for common query patterns (user + event type)
+AuditLogSchema.index({ userId: 1, eventType: 1 });
+
+// Compound index for time-based queries with event type
+AuditLogSchema.index({ timestamp: -1, eventType: 1 });
