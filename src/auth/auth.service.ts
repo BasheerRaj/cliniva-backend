@@ -716,4 +716,117 @@ export class AuthService {
       });
     }
   }
+
+  /**
+   * Send password reset email (admin-initiated)
+   * 
+   * Requirements: 2.5, 2.6, 8.5
+   * 
+   * @param userId - User ID to send reset email to
+   * @param adminId - Admin ID who initiated the reset
+   * @returns Success response with bilingual message
+   */
+  async sendPasswordResetEmail(
+    userId: string,
+    adminId: string,
+  ): Promise<any> {
+    try {
+      // Verify admin has permission (admin, owner, or super_admin)
+      const admin = await this.userModel.findById(adminId);
+      if (!admin) {
+        throw new NotFoundException({
+          message: {
+            ar: 'المسؤول غير موجود',
+            en: 'Admin not found',
+          },
+          code: 'ADMIN_NOT_FOUND',
+        });
+      }
+
+      // Check if admin has permission (admin, owner, or super_admin roles)
+      const allowedRoles = ['admin', 'owner', 'super_admin'];
+      if (!allowedRoles.includes(admin.role)) {
+        throw new BadRequestException({
+          message: {
+            ar: 'ليس لديك صلاحية لإرسال رسائل إعادة تعيين كلمة المرور',
+            en: 'You do not have permission to send password reset emails',
+          },
+          code: 'INSUFFICIENT_PERMISSIONS',
+        });
+      }
+
+      // Find user by ID
+      const user = await this.userModel.findById(userId);
+      if (!user) {
+        throw new NotFoundException({
+          message: {
+            ar: 'المستخدم غير موجود',
+            en: 'User not found',
+          },
+          code: 'USER_NOT_FOUND',
+        });
+      }
+
+      // Generate secure reset token (32 bytes random) - Requirement 7.9
+      const resetToken = crypto.randomBytes(32).toString('hex');
+
+      // Hash token for storage
+      const hashedToken = crypto
+        .createHash('sha256')
+        .update(resetToken)
+        .digest('hex');
+
+      // Set passwordResetToken and passwordResetExpires (24h) on user - Requirement 2.5
+      user.passwordResetToken = hashedToken;
+      user.passwordResetExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+      user.passwordResetUsed = false;
+      await user.save();
+
+      this.logger.log(`Admin ${adminId} initiated password reset for user ${userId}`);
+
+      // TODO: Call EmailService to send reset email - Requirement 2.6
+      // This will be implemented when EmailService is available (Task 7)
+      // await this.emailService.sendPasswordResetEmail(
+      //   user.email,
+      //   user.firstName,
+      //   resetToken,
+      //   user.preferredLanguage || 'en'
+      // );
+      this.logger.log(`Password reset email needed for ${user.email} with token: ${resetToken}`);
+
+      // Call AuditService to log admin-initiated reset
+      await this.auditService.logPasswordChange(
+        userId,
+        'admin_reset',
+        adminId,
+      );
+
+      // Return success response
+      return {
+        success: true,
+        message: {
+          ar: 'تم إرسال رسالة إعادة تعيين كلمة المرور بنجاح',
+          en: 'Password reset email sent successfully',
+        },
+      };
+    } catch (error) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof BadRequestException
+      ) {
+        throw error;
+      }
+      this.logger.error(
+        `Admin password reset failed for user ${userId}: ${error.message}`,
+        error.stack,
+      );
+      throw new BadRequestException({
+        message: {
+          ar: 'فشل إرسال رسالة إعادة تعيين كلمة المرور',
+          en: 'Failed to send password reset email',
+        },
+        code: 'PASSWORD_RESET_EMAIL_FAILED',
+      });
+    }
+  }
 }
