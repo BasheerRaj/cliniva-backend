@@ -10,9 +10,13 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
+import * as crypto from 'crypto';
 import { User } from '../database/schemas/user.schema';
 import { LoginDto, RegisterDto, AuthResponseDto, UserProfileDto } from './dto';
 import { SubscriptionService } from '../subscription/subscription.service';
+import { RateLimitService } from './rate-limit.service';
+import { AuditService } from './audit.service';
+import { SessionService } from './session.service';
 
 @Injectable()
 export class AuthService {
@@ -23,6 +27,9 @@ export class AuthService {
     @InjectModel(User.name) private userModel: Model<User>,
     private jwtService: JwtService,
     private readonly subscriptionService: SubscriptionService,
+    private readonly rateLimitService: RateLimitService,
+    private readonly auditService: AuditService,
+    private readonly sessionService: SessionService,
   ) {}
 
   /**
@@ -363,6 +370,350 @@ export class AuthService {
       };
     } catch (error) {
       throw new BadRequestException(`Failed to get user debug info: ${error.message}`);
+    }
+  }
+
+  /**
+   * Change password for authenticated user
+   * 
+   * Requirements: 2.1-2.4, 9.3
+   * 
+   * @param userId - User ID requesting password change
+   * @param currentPassword - Current password for verification
+   * @param newPassword - New password to set
+   * @returns Success response with bilingual message
+   */
+  async changePassword(
+    userId: string,
+    currentPassword: string,
+    newPassword: string,
+  ): Promise<any> {
+    try {
+      // Check rate limit for user (3 per hour) - Requirement 9.3
+      const isAllowed = await this.rateLimitService.checkPasswordChangeLimit(userId);
+      if (!isAllowed) {
+        throw new BadRequestException({
+          message: {
+            ar: 'تم تجاوز الحد المسموح من المحاولات',
+            en: 'Rate limit exceeded',
+          },
+          code: 'RATE_LIMIT_EXCEEDED',
+        });
+      }
+
+      // Find user
+      const user = await this.userModel.findById(userId);
+      if (!user) {
+        throw new NotFoundException({
+          message: {
+            ar: 'المستخدم غير موجود',
+            en: 'User not found',
+          },
+          code: 'USER_NOT_FOUND',
+        });
+      }
+
+      // Validate current password matches (Requirement 2.1)
+      const isCurrentPasswordValid = await this.validatePassword(
+        currentPassword,
+        user.passwordHash,
+      );
+
+      if (!isCurrentPasswordValid) {
+        throw new BadRequestException({
+          message: {
+            ar: 'كلمة المرور الحالية غير صحيحة',
+            en: 'Current password is incorrect',
+          },
+          code: 'INVALID_CURRENT_PASSWORD',
+        });
+      }
+
+      // Validate new password differs from current (Requirement 2.1)
+      const isSamePassword = await this.validatePassword(
+        newPassword,
+        user.passwordHash,
+      );
+
+      if (isSamePassword) {
+        throw new BadRequestException({
+          message: {
+            ar: 'كلمة المرور الجديدة يجب أن تختلف عن الحالية',
+            en: 'New password must differ from current password',
+          },
+          code: 'NEW_PASSWORD_SAME_AS_CURRENT',
+        });
+      }
+
+      // Note: Password complexity validation is handled by DTO validators (Requirement 2.2)
+
+      // Hash new password with bcrypt (12 rounds)
+      const hashedPassword = await this.hashPassword(newPassword);
+
+      // Update user: password, lastPasswordChange=now (Requirement 2.3)
+      user.passwordHash = hashedPassword;
+      user.lastPasswordChange = new Date();
+      await user.save();
+
+      this.logger.log(`Password changed for user ${userId}`);
+
+      // Call SessionService to invalidate all user sessions (Requirement 2.4)
+      // Note: In a stateless JWT system, we mark the invalidation event
+      // The actual token blacklisting will happen when tokens are presented
+      await this.sessionService.invalidateUserSessions(
+        userId,
+        'password_change',
+      );
+
+      // Call AuditService to log password change
+      await this.auditService.logPasswordChange(
+        userId,
+        'user_initiated',
+      );
+
+      // TODO: Call EmailService to send confirmation (Requirement 4.4)
+      // This will be implemented when EmailService is available (Task 7)
+      this.logger.log(`Email confirmation needed for password change by user ${userId}`);
+
+      // Return success response
+      return {
+        success: true,
+        message: {
+          ar: 'تم تغيير كلمة المرور بنجاح',
+          en: 'Password changed successfully',
+        },
+      };
+    } catch (error) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof BadRequestException
+      ) {
+        throw error;
+      }
+      this.logger.error(
+        `Password change failed for user ${userId}: ${error.message}`,
+        error.stack,
+      );
+      throw new BadRequestException({
+        message: {
+          ar: 'فشل تغيير كلمة المرور',
+          en: 'Password change failed',
+        },
+        code: 'PASSWORD_CHANGE_FAILED',
+      });
+    }
+  }
+
+  /**
+   * Request password reset
+   * 
+   * Requirements: 2.5, 2.6, 2.10, 7.9
+   * 
+   * @param email - User email address
+   * @param ipAddress - Request IP address for rate limiting
+   * @returns Success response (doesn't reveal if email exists)
+   */
+  async forgotPassword(
+    email: string,
+    ipAddress: string,
+  ): Promise<any> {
+    try {
+      // Check rate limit for IP address (5 per hour) - Requirement 2.10
+      const isAllowed = await this.rateLimitService.checkPasswordResetLimit(ipAddress);
+      if (!isAllowed) {
+        throw new BadRequestException({
+          message: {
+            ar: 'تم تجاوز الحد المسموح من المحاولات. يرجى المحاولة لاحقاً',
+            en: 'Rate limit exceeded. Please try again later',
+          },
+          code: 'RATE_LIMIT_EXCEEDED',
+        });
+      }
+
+      // Find user by email
+      const user = await this.userModel.findOne({ 
+        email: email.toLowerCase() 
+      });
+
+      // If user exists, generate and send reset token
+      if (user) {
+        // Generate secure reset token (32 bytes random) - Requirement 7.9
+        const resetToken = crypto.randomBytes(32).toString('hex');
+
+        // Hash token for storage
+        const hashedToken = crypto
+          .createHash('sha256')
+          .update(resetToken)
+          .digest('hex');
+
+        // Set passwordResetToken and passwordResetExpires (24h) on user - Requirement 2.5
+        user.passwordResetToken = hashedToken;
+        user.passwordResetExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+        user.passwordResetUsed = false;
+        await user.save();
+
+        this.logger.log(`Password reset requested for user ${user.email}`);
+
+        // TODO: Call EmailService to send reset email with token - Requirement 2.6
+        // This will be implemented when EmailService is available (Task 7)
+        // await this.emailService.sendPasswordResetEmail(
+        //   user.email,
+        //   user.firstName,
+        //   resetToken,
+        //   user.preferredLanguage || 'en'
+        // );
+        this.logger.log(`Password reset email needed for ${user.email} with token: ${resetToken}`);
+
+        // Call AuditService to log reset request
+        await this.auditService.logPasswordResetRequest(email, ipAddress);
+      } else {
+        // User doesn't exist, but we still log the attempt
+        this.logger.log(`Password reset requested for non-existent email: ${email}`);
+        await this.auditService.logPasswordResetRequest(email, ipAddress);
+      }
+
+      // Return success response (don't reveal if email exists) - Requirement 2.10
+      return {
+        success: true,
+        message: {
+          ar: 'إذا كان البريد الإلكتروني موجوداً في نظامنا، ستتلقى رسالة لإعادة تعيين كلمة المرور',
+          en: 'If the email exists in our system, you will receive a password reset email',
+        },
+      };
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      this.logger.error(
+        `Password reset request failed for ${email}: ${error.message}`,
+        error.stack,
+      );
+      // Return generic success message even on error to avoid revealing information
+      return {
+        success: true,
+        message: {
+          ar: 'إذا كان البريد الإلكتروني موجوداً في نظامنا، ستتلقى رسالة لإعادة تعيين كلمة المرور',
+          en: 'If the email exists in our system, you will receive a password reset email',
+        },
+      };
+    }
+  }
+
+  /**
+   * Reset password using reset token
+   * 
+   * Requirements: 2.7-2.9
+   * 
+   * @param token - Password reset token from email
+   * @param newPassword - New password to set
+   * @returns Success response with bilingual message
+   */
+  async resetPassword(
+    token: string,
+    newPassword: string,
+  ): Promise<any> {
+    try {
+      // Hash provided token to match stored hash
+      const hashedToken = crypto
+        .createHash('sha256')
+        .update(token)
+        .digest('hex');
+
+      // Find user by hashed token
+      const user = await this.userModel.findOne({
+        passwordResetToken: hashedToken,
+      });
+
+      // Validate token exists - Requirement 2.7
+      if (!user) {
+        throw new BadRequestException({
+          message: {
+            ar: 'رمز إعادة تعيين كلمة المرور غير صالح',
+            en: 'Password reset token is invalid',
+          },
+          code: 'PASSWORD_RESET_TOKEN_INVALID',
+        });
+      }
+
+      // Validate token not expired - Requirement 2.8
+      if (!user.passwordResetExpires || user.passwordResetExpires < new Date()) {
+        throw new BadRequestException({
+          message: {
+            ar: 'انتهت صلاحية رمز إعادة تعيين كلمة المرور',
+            en: 'Password reset token has expired',
+          },
+          code: 'PASSWORD_RESET_TOKEN_EXPIRED',
+        });
+      }
+
+      // Validate token not already used - Requirement 2.9
+      if (user.passwordResetUsed) {
+        throw new BadRequestException({
+          message: {
+            ar: 'تم استخدام رمز إعادة تعيين كلمة المرور بالفعل',
+            en: 'Password reset token has already been used',
+          },
+          code: 'PASSWORD_RESET_TOKEN_USED',
+        });
+      }
+
+      // Note: Password complexity validation is handled by DTO validators (Requirement 2.2)
+
+      // Hash new password with bcrypt (12 rounds)
+      const hashedPassword = await this.hashPassword(newPassword);
+
+      // Update user: password, clear reset token fields, set passwordResetUsed=true
+      user.passwordHash = hashedPassword;
+      user.passwordResetToken = undefined;
+      user.passwordResetExpires = undefined;
+      user.passwordResetUsed = true;
+      user.lastPasswordChange = new Date();
+      await user.save();
+
+      const userId = (user._id as any).toString();
+      this.logger.log(`Password reset completed for user ${userId}`);
+
+      // Call SessionService to invalidate all user sessions - Requirement 2.4
+      await this.sessionService.invalidateUserSessions(
+        userId,
+        'password_reset',
+      );
+
+      // Call AuditService to log password reset completion
+      await this.auditService.logPasswordResetComplete(userId, hashedToken);
+
+      // TODO: Call EmailService to send confirmation - Requirement 4.4
+      // This will be implemented when EmailService is available (Task 7)
+      // await this.emailService.sendPasswordChangedNotification(
+      //   user.email,
+      //   user.firstName,
+      //   user.preferredLanguage || 'en'
+      // );
+      this.logger.log(`Password reset confirmation email needed for ${user.email}`);
+
+      // Return success response
+      return {
+        success: true,
+        message: {
+          ar: 'تم إعادة تعيين كلمة المرور بنجاح',
+          en: 'Password has been reset successfully',
+        },
+      };
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      this.logger.error(
+        `Password reset failed: ${error.message}`,
+        error.stack,
+      );
+      throw new BadRequestException({
+        message: {
+          ar: 'فشل إعادة تعيين كلمة المرور',
+          en: 'Password reset failed',
+        },
+        code: 'PASSWORD_RESET_FAILED',
+      });
     }
   }
 }
