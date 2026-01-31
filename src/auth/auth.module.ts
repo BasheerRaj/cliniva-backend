@@ -8,9 +8,11 @@ import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { TokenService } from './token.service';
+import { SessionService } from './session.service';
 import { User, UserSchema } from '../database/schemas/user.schema';
 import { Subscription, SubscriptionSchema } from '../database/schemas/subscription.schema';
 import { SubscriptionPlan, SubscriptionPlanSchema } from '../database/schemas/subscription-plan.schema';
+import { TokenBlacklist, TokenBlacklistSchema } from '../database/schemas/token-blacklist.schema';
 import { SubscriptionModule } from '../subscription/subscription.module';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
@@ -20,7 +22,8 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
     MongooseModule.forFeature([
       { name: User.name, schema: UserSchema },
       { name: Subscription.name, schema: SubscriptionSchema },
-      { name: SubscriptionPlan.name, schema: SubscriptionPlanSchema }
+      { name: SubscriptionPlan.name, schema: SubscriptionPlanSchema },
+      { name: TokenBlacklist.name, schema: TokenBlacklistSchema },
     ]),
     
     // Import SubscriptionModule for SubscriptionService
@@ -42,8 +45,8 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, JwtAuthGuard, TokenService],
-  exports: [AuthService, JwtStrategy, PassportModule, JwtAuthGuard, TokenService],
+  providers: [AuthService, JwtStrategy, JwtAuthGuard, TokenService, SessionService],
+  exports: [AuthService, JwtStrategy, PassportModule, JwtAuthGuard, TokenService, SessionService],
 })
 export class AuthModule {}
 
