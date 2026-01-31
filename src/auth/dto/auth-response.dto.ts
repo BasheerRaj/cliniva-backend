@@ -12,6 +12,10 @@ export class AuthResponseDto {
     role: string;
     isActive: boolean;
     emailVerified: boolean;
+    // Authentication fields
+    isFirstLogin?: boolean;
+    passwordChangeRequired?: boolean;
+    preferredLanguage?: 'ar' | 'en';
     // Onboarding-related fields
     setupComplete?: boolean;
     subscriptionId?: string | null;
@@ -42,6 +46,12 @@ export class UserProfileDto {
   createdAt: Date;
   updatedAt: Date;
   
+  // Authentication fields
+  isFirstLogin?: boolean;
+  lastPasswordChange?: Date;
+  passwordChangeRequired?: boolean;
+  preferredLanguage?: 'ar' | 'en';
+  
   // Onboarding-related fields
   setupComplete?: boolean;
   subscriptionId?: string | null;
@@ -68,6 +78,12 @@ export class UserProfileDto {
     this.lastLogin = user.lastLogin;
     this.createdAt = (user as any).createdAt;
     this.updatedAt = (user as any).updatedAt;
+    
+    // Include authentication fields
+    this.isFirstLogin = user.isFirstLogin;
+    this.lastPasswordChange = user.lastPasswordChange;
+    this.passwordChangeRequired = user.passwordChangeRequired;
+    this.preferredLanguage = user.preferredLanguage;
     
     // Include onboarding fields
     this.setupComplete = user.setupComplete;

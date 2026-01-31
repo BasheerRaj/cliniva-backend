@@ -49,6 +49,11 @@ export class AuthService {
         passwordHash: hashedPassword,
         isActive: true,
         emailVerified: false,
+        // Authentication fields
+        isFirstLogin: true,
+        lastPasswordChange: new Date(),
+        passwordChangeRequired: false,
+        passwordResetUsed: false,
       });
 
       const savedUser = await newUser.save();
@@ -70,6 +75,10 @@ export class AuthService {
           role: savedUser.role,
           isActive: savedUser.isActive,
           emailVerified: savedUser.emailVerified,
+          // Authentication fields
+          isFirstLogin: savedUser.isFirstLogin,
+          passwordChangeRequired: savedUser.passwordChangeRequired,
+          preferredLanguage: savedUser.preferredLanguage,
           isOwner: savedUser.role === 'owner',
         },
       };
@@ -145,6 +154,10 @@ export class AuthService {
           role: user.role,
           isActive: user.isActive,
           emailVerified: user.emailVerified,
+          // Authentication fields
+          isFirstLogin: user.isFirstLogin,
+          passwordChangeRequired: user.passwordChangeRequired,
+          preferredLanguage: user.preferredLanguage,
           // Add onboarding-related fields
           setupComplete: user.setupComplete || false,
           subscriptionId: user.subscriptionId?.toString() || null,

@@ -43,6 +43,11 @@ async function migrateSuperAdminRole() {
         isActive: true,
         emailVerified: true,
         twoFactorEnabled: false,
+        // Authentication fields
+        isFirstLogin: true,
+        lastPasswordChange: new Date(),
+        passwordChangeRequired: true, // Force password change on first login
+        passwordResetUsed: false,
       });
 
       await superAdminUser.save();

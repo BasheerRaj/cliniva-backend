@@ -51,11 +51,27 @@ export class User extends Document {
   @Prop()
   lastLogin?: Date;
 
+  // Authentication fields
+  @Prop({ default: true })
+  isFirstLogin: boolean;
+
+  @Prop()
+  lastPasswordChange?: Date;
+
+  @Prop({ default: false })
+  passwordChangeRequired: boolean;
+
   @Prop()
   passwordResetToken?: string;
 
   @Prop()
   passwordResetExpires?: Date;
+
+  @Prop({ default: false })
+  passwordResetUsed: boolean;
+
+  @Prop({ enum: ['ar', 'en'] })
+  preferredLanguage?: 'ar' | 'en';
 
   // Onboarding and setup fields
   @Prop({ default: false })
