@@ -41,6 +41,7 @@ import {
   EmployeeShift, EmployeeShiftSchema,
   AuditLog, AuditLogSchema,
   TokenBlacklist, TokenBlacklistSchema,
+  RateLimitCounter, RateLimitCounterSchema,
 } from './schemas';
 
 @Module({
@@ -123,6 +124,7 @@ import {
       
       // Authentication & Session Management
       { name: TokenBlacklist.name, schema: TokenBlacklistSchema },
+      { name: RateLimitCounter.name, schema: RateLimitCounterSchema },
     ]),
   ],
   controllers: [DatabaseController],
