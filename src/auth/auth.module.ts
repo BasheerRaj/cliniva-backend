@@ -9,10 +9,12 @@ import { AuthController } from './auth.controller';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { TokenService } from './token.service';
 import { SessionService } from './session.service';
+import { AuditService } from './audit.service';
 import { User, UserSchema } from '../database/schemas/user.schema';
 import { Subscription, SubscriptionSchema } from '../database/schemas/subscription.schema';
 import { SubscriptionPlan, SubscriptionPlanSchema } from '../database/schemas/subscription-plan.schema';
 import { TokenBlacklist, TokenBlacklistSchema } from '../database/schemas/token-blacklist.schema';
+import { AuditLog, AuditLogSchema } from '../database/schemas/audit-log.schema';
 import { SubscriptionModule } from '../subscription/subscription.module';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
@@ -24,6 +26,7 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
       { name: Subscription.name, schema: SubscriptionSchema },
       { name: SubscriptionPlan.name, schema: SubscriptionPlanSchema },
       { name: TokenBlacklist.name, schema: TokenBlacklistSchema },
+      { name: AuditLog.name, schema: AuditLogSchema },
     ]),
     
     // Import SubscriptionModule for SubscriptionService
@@ -45,8 +48,8 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, JwtAuthGuard, TokenService, SessionService],
-  exports: [AuthService, JwtStrategy, PassportModule, JwtAuthGuard, TokenService, SessionService],
+  providers: [AuthService, JwtStrategy, JwtAuthGuard, TokenService, SessionService, AuditService],
+  exports: [AuthService, JwtStrategy, PassportModule, JwtAuthGuard, TokenService, SessionService, AuditService],
 })
 export class AuthModule {}
 
