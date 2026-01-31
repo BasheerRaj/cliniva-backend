@@ -40,6 +40,7 @@ import {
   WorkingHours, WorkingHoursSchema,
   EmployeeShift, EmployeeShiftSchema,
   AuditLog, AuditLogSchema,
+  TokenBlacklist, TokenBlacklistSchema,
 } from './schemas';
 
 @Module({
@@ -119,6 +120,9 @@ import {
       
       // Audit Trail
       { name: AuditLog.name, schema: AuditLogSchema },
+      
+      // Authentication & Session Management
+      { name: TokenBlacklist.name, schema: TokenBlacklistSchema },
     ]),
   ],
   controllers: [DatabaseController],

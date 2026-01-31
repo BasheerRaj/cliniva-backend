@@ -58,3 +58,6 @@ export * from './emergency-contact.schema';
 // Audit Trail
 export * from './audit-log.schema';
 export * from './access-log.schema';
+
+// Authentication & Session Management
+export * from './token-blacklist.schema';
