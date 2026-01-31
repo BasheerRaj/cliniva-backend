@@ -3,6 +3,8 @@ export * from './auth.service';
 export * from './auth.controller';
 export * from './token.service';
 export * from './session.service';
+export * from './audit.service';
+export * from './rate-limit.service';
 export * from './guards/jwt-auth.guard';
 export * from './strategies/jwt.strategy';
 export * from './dto';
