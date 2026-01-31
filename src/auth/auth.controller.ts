@@ -38,14 +38,23 @@ export class AuthController {
 
   /**
    * Login user
+   * 
+   * Task 12.1: Extract IP address and user agent for audit logging
    */
   @Post('login')
   @HttpCode(HttpStatus.OK)
   async login(
     @Body(new ValidationPipe({ transform: true, whitelist: true }))
     loginDto: LoginDto,
+    @Request() req,
   ): Promise<AuthResponseDto> {
-    return this.authService.login(loginDto);
+    // Extract IP address from request
+    const ipAddress = req.ip || req.connection?.remoteAddress || 'unknown';
+    
+    // Extract user agent from request headers
+    const userAgent = req.headers['user-agent'] || 'unknown';
+    
+    return this.authService.login(loginDto, ipAddress, userAgent);
   }
 
   /**

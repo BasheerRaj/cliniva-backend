@@ -186,13 +186,21 @@ describe('AuthService', () => {
       email: 'test@example.com',
       password: 'SecurePass123!',
     };
+    const ipAddress = '192.168.1.1';
+    const userAgent = 'Mozilla/5.0';
+
+    beforeEach(() => {
+      // Reset mocks before each test
+      mockAuditService.logLoginSuccess = jest.fn();
+      mockAuditService.logLoginFailure = jest.fn();
+    });
 
     it('should successfully login with valid credentials', async () => {
       mockUserModel.findOne.mockResolvedValue(mockUser);
       mockUserModel.findByIdAndUpdate.mockResolvedValue(mockUser);
       (bcrypt.compare as jest.Mock).mockResolvedValue(true);
 
-      const result = await service.login(loginDto);
+      const result = await service.login(loginDto, ipAddress, userAgent);
 
       expect(mockUserModel.findOne).toHaveBeenCalledWith({ 
         email: loginDto.email.toLowerCase() 
@@ -200,13 +208,39 @@ describe('AuthService', () => {
       expect(result).toHaveProperty('access_token');
       expect(result).toHaveProperty('user');
       expect(result.user.email).toBe(mockUser.email);
+      
+      // Verify audit logging for successful login
+      expect(mockAuditService.logLoginSuccess).toHaveBeenCalledWith(
+        mockUser._id.toString(),
+        ipAddress,
+        userAgent,
+      );
+    });
+
+    it('should include isFirstLogin and passwordChangeRequired in response', async () => {
+      const firstLoginUser = { ...mockUser, isFirstLogin: true };
+      mockUserModel.findOne.mockResolvedValue(firstLoginUser);
+      mockUserModel.findByIdAndUpdate.mockResolvedValue(firstLoginUser);
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+
+      const result = await service.login(loginDto, ipAddress, userAgent);
+
+      expect(result.user.isFirstLogin).toBe(true);
+      expect(result.user.passwordChangeRequired).toBe(true);
     });
 
     it('should throw UnauthorizedException for invalid email', async () => {
       mockUserModel.findOne.mockResolvedValue(null);
 
-      await expect(service.login(loginDto)).rejects.toThrow(
+      await expect(service.login(loginDto, ipAddress, userAgent)).rejects.toThrow(
         UnauthorizedException,
+      );
+      
+      // Verify audit logging for failed login
+      expect(mockAuditService.logLoginFailure).toHaveBeenCalledWith(
+        loginDto.email,
+        ipAddress,
+        'invalid_credentials',
       );
     });
 
@@ -214,8 +248,15 @@ describe('AuthService', () => {
       mockUserModel.findOne.mockResolvedValue(mockUser);
       (bcrypt.compare as jest.Mock).mockResolvedValue(false);
 
-      await expect(service.login(loginDto)).rejects.toThrow(
+      await expect(service.login(loginDto, ipAddress, userAgent)).rejects.toThrow(
         UnauthorizedException,
+      );
+      
+      // Verify audit logging for failed login
+      expect(mockAuditService.logLoginFailure).toHaveBeenCalledWith(
+        loginDto.email,
+        ipAddress,
+        'invalid_credentials',
       );
     });
 
@@ -223,9 +264,29 @@ describe('AuthService', () => {
       const inactiveUser = { ...mockUser, isActive: false };
       mockUserModel.findOne.mockResolvedValue(inactiveUser);
 
-      await expect(service.login(loginDto)).rejects.toThrow(
+      await expect(service.login(loginDto, ipAddress, userAgent)).rejects.toThrow(
         UnauthorizedException,
       );
+      
+      // Verify audit logging for failed login
+      expect(mockAuditService.logLoginFailure).toHaveBeenCalledWith(
+        loginDto.email,
+        ipAddress,
+        'account_inactive',
+      );
+    });
+
+    it('should work without ipAddress and userAgent (backward compatibility)', async () => {
+      mockUserModel.findOne.mockResolvedValue(mockUser);
+      mockUserModel.findByIdAndUpdate.mockResolvedValue(mockUser);
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+
+      const result = await service.login(loginDto);
+
+      expect(result).toHaveProperty('access_token');
+      expect(result).toHaveProperty('user');
+      // Should not call audit service if no ipAddress provided
+      expect(mockAuditService.logLoginSuccess).not.toHaveBeenCalled();
     });
   });
 

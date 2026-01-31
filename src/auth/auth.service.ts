@@ -100,8 +100,11 @@ export class AuthService {
 
   /**
    * Login user
+   * 
+   * Requirements: 1.1, 5.1
+   * Task: 12.1 - Handle first login flag and audit logging
    */
-  async login(loginDto: LoginDto): Promise<AuthResponseDto> {
+  async login(loginDto: LoginDto, ipAddress?: string, userAgent?: string): Promise<AuthResponseDto> {
     try {
       // Find user by email
       const user = await this.userModel.findOne({ 
@@ -109,11 +112,27 @@ export class AuthService {
       });
 
       if (!user) {
+        // Log failed login attempt - Requirement 5.1
+        if (ipAddress) {
+          await this.auditService.logLoginFailure(
+            loginDto.email,
+            ipAddress,
+            'invalid_credentials',
+          );
+        }
         throw new UnauthorizedException('Invalid credentials');
       }
 
       // Check if user is active
       if (!user.isActive) {
+        // Log failed login attempt - Requirement 5.1
+        if (ipAddress) {
+          await this.auditService.logLoginFailure(
+            loginDto.email,
+            ipAddress,
+            'account_inactive',
+          );
+        }
         throw new UnauthorizedException('Account is inactive');
       }
 
@@ -124,22 +143,39 @@ export class AuthService {
       );
 
       if (!isPasswordValid) {
+        // Log failed login attempt - Requirement 5.1
+        if (ipAddress) {
+          await this.auditService.logLoginFailure(
+            loginDto.email,
+            ipAddress,
+            'invalid_credentials',
+          );
+        }
         throw new UnauthorizedException('Invalid credentials');
       }
 
+      const userId = (user._id as any).toString();
       this.logger.log(`User logged in: ${user.email}`);
 
       // Generate tokens
       const tokens = await this.generateTokens(user);
 
-      // Update last login
-      await this.updateLastLogin((user._id as any).toString());
+      // Update last login timestamp - Requirement 1.1
+      await this.updateLastLogin(userId);
+
+      // Log successful login - Requirement 5.1
+      if (ipAddress) {
+        await this.auditService.logLoginSuccess(
+          userId,
+          ipAddress,
+          userAgent || 'unknown',
+        );
+      }
 
       // Get planType from subscription if user has one
       let planType: string | null = null;
       if (user.subscriptionId) {
         try {
-          // Note: You'll need to inject SubscriptionService
           const subscription = await this.subscriptionService.getSubscriptionById(user.subscriptionId.toString());
           if (subscription) {
             // The planId is populated with the full SubscriptionPlan object
@@ -151,19 +187,22 @@ export class AuthService {
         }
       }
 
+      // Check isFirstLogin flag and include passwordChangeRequired in response - Requirement 1.1
+      const passwordChangeRequired = user.isFirstLogin || user.passwordChangeRequired || false;
+
       return {
         ...tokens,
         user: {
-          id: (user._id as any).toString(),
+          id: userId,
           email: user.email,
           firstName: user.firstName,
           lastName: user.lastName,
           role: user.role,
           isActive: user.isActive,
           emailVerified: user.emailVerified,
-          // Authentication fields
+          // Authentication fields - Requirement 1.1
           isFirstLogin: user.isFirstLogin,
-          passwordChangeRequired: user.passwordChangeRequired,
+          passwordChangeRequired: passwordChangeRequired,
           preferredLanguage: user.preferredLanguage,
           // Add onboarding-related fields
           setupComplete: user.setupComplete || false,

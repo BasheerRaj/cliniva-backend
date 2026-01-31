@@ -63,9 +63,35 @@ describe('AuthController', () => {
     };
 
     it('should login user with valid credentials', async () => {
-      const result = await controller.login(loginDto);
+      const mockRequest = {
+        ip: '192.168.1.1',
+        headers: {
+          'user-agent': 'Mozilla/5.0',
+        },
+      };
+
+      const result = await controller.login(loginDto, mockRequest);
       
-      expect(authService.login).toHaveBeenCalledWith(loginDto);
+      expect(authService.login).toHaveBeenCalledWith(
+        loginDto,
+        '192.168.1.1',
+        'Mozilla/5.0',
+      );
+      expect(result).toEqual(mockAuthResponse);
+    });
+
+    it('should handle missing IP address and user agent', async () => {
+      const mockRequest = {
+        headers: {},
+      };
+
+      const result = await controller.login(loginDto, mockRequest);
+      
+      expect(authService.login).toHaveBeenCalledWith(
+        loginDto,
+        'unknown',
+        'unknown',
+      );
       expect(result).toEqual(mockAuthResponse);
     });
   });
