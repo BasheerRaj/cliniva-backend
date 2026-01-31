@@ -7,6 +7,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { JwtStrategy } from './strategies/jwt.strategy';
+import { TokenService } from './token.service';
 import { User, UserSchema } from '../database/schemas/user.schema';
 import { Subscription, SubscriptionSchema } from '../database/schemas/subscription.schema';
 import { SubscriptionPlan, SubscriptionPlanSchema } from '../database/schemas/subscription-plan.schema';
@@ -41,8 +42,8 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, JwtAuthGuard],
-  exports: [AuthService, JwtStrategy, PassportModule, JwtAuthGuard],
+  providers: [AuthService, JwtStrategy, JwtAuthGuard, TokenService],
+  exports: [AuthService, JwtStrategy, PassportModule, JwtAuthGuard, TokenService],
 })
 export class AuthModule {}
 
