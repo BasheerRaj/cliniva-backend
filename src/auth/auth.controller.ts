@@ -10,7 +10,10 @@ import {
   ValidationPipe,
   Param,
   BadRequestException,
+  UnauthorizedException,
   Logger,
+  Headers,
+  Ip,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
@@ -327,15 +330,41 @@ export class AuthController {
   }
 
   /**
-   * Logout user (optional endpoint for client-side token removal)
+   * Logout user and blacklist tokens
+   * 
+   * Requirements: 3.5
+   * Task: 18.1
    */
   @Post('logout')
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
-  async logout(): Promise<{ message: string }> {
-    // Since we're using stateless JWT, we don't need to do anything server-side
-    // The client should remove the token from storage
-    return { message: 'Successfully logged out' };
+  async logout(
+    @Request() req,
+    @Headers('authorization') authHeader?: string,
+    @Headers('x-refresh-token') refreshToken?: string,
+    @Ip() ipAddress?: string,
+    @Headers('user-agent') userAgent?: string,
+  ): Promise<any> {
+    // Extract access token from Authorization header
+    const accessToken = authHeader?.replace('Bearer ', '');
+    
+    if (!accessToken) {
+      throw new UnauthorizedException({
+        message: {
+          ar: 'رمز الوصول مطلوب',
+          en: 'Access token required',
+        },
+        code: 'ACCESS_TOKEN_REQUIRED',
+      });
+    }
+
+    return this.authService.logout(
+      req.user.id,
+      accessToken,
+      refreshToken,
+      ipAddress,
+      userAgent,
+    );
   }
 
   @Get('debug/user/:userId')

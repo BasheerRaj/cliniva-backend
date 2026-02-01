@@ -7,11 +7,12 @@ import {
   Logger,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import { User } from '../database/schemas/user.schema';
+import { AuditLog } from '../database/schemas/audit-log.schema';
 import { LoginDto, RegisterDto, AuthResponseDto, UserProfileDto } from './dto';
 import { SubscriptionService } from '../subscription/subscription.service';
 import { RateLimitService } from './rate-limit.service';
@@ -25,6 +26,7 @@ export class AuthService {
 
   constructor(
     @InjectModel(User.name) private userModel: Model<User>,
+    @InjectModel(AuditLog.name) private auditLogModel: Model<AuditLog>,
     private jwtService: JwtService,
     private readonly subscriptionService: SubscriptionService,
     private readonly rateLimitService: RateLimitService,
@@ -880,6 +882,112 @@ export class AuthService {
           en: 'Password reset failed',
         },
         code: 'PASSWORD_RESET_FAILED',
+      });
+    }
+  }
+
+  /**
+   * Logout user and blacklist tokens
+   * 
+   * Requirements: 3.5
+   * Task: 18.1
+   * 
+   * @param userId - User ID logging out
+   * @param accessToken - Access token to blacklist
+   * @param refreshToken - Refresh token to blacklist (optional)
+   * @param ipAddress - IP address of the request (optional)
+   * @param userAgent - User agent string (optional)
+   * @returns Success response with bilingual message
+   */
+  async logout(
+    userId: string,
+    accessToken: string,
+    refreshToken?: string,
+    ipAddress?: string,
+    userAgent?: string,
+  ): Promise<any> {
+    try {
+      // Verify and decode access token to get expiration
+      let accessTokenExpiry: Date;
+      try {
+        const accessPayload = await this.jwtService.verifyAsync(accessToken, {
+          secret: process.env.JWT_SECRET,
+        });
+        accessTokenExpiry = new Date(accessPayload.exp * 1000);
+      } catch (error) {
+        // If token is already expired or invalid, use a default expiry
+        // This ensures we still blacklist it
+        accessTokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours from now
+      }
+
+      // Call SessionService.addTokenToBlacklist for access token
+      await this.sessionService.addTokenToBlacklist(
+        accessToken,
+        userId,
+        accessTokenExpiry,
+        'logout',
+      );
+
+      this.logger.log(`Access token blacklisted for user ${userId} on logout`);
+
+      // If refresh token provided, blacklist it too
+      if (refreshToken) {
+        let refreshTokenExpiry: Date;
+        try {
+          const refreshPayload = await this.jwtService.verifyAsync(refreshToken, {
+            secret: process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET + '_refresh',
+          });
+          refreshTokenExpiry = new Date(refreshPayload.exp * 1000);
+        } catch (error) {
+          // If token is already expired or invalid, use a default expiry
+          refreshTokenExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days from now
+        }
+
+        await this.sessionService.addTokenToBlacklist(
+          refreshToken,
+          userId,
+          refreshTokenExpiry,
+          'logout',
+        );
+
+        this.logger.log(`Refresh token blacklisted for user ${userId} on logout`);
+      }
+
+      // Call AuditService to log logout
+      await this.auditLogModel.create({
+        eventType: 'logout',
+        userId: new Types.ObjectId(userId),
+        ipAddress: ipAddress || '0.0.0.0',
+        userAgent: userAgent || 'unknown',
+        timestamp: new Date(),
+        success: true,
+        details: {
+          action: 'User logged out',
+          tokensBlacklisted: refreshToken ? 2 : 1,
+        },
+      });
+
+      this.logger.log(`User ${userId} logged out successfully`);
+
+      // Return success response
+      return {
+        success: true,
+        message: {
+          ar: 'تم تسجيل الخروج بنجاح',
+          en: 'Logout successful',
+        },
+      };
+    } catch (error) {
+      this.logger.error(
+        `Logout failed for user ${userId}: ${error.message}`,
+        error.stack,
+      );
+      throw new BadRequestException({
+        message: {
+          ar: 'فشل تسجيل الخروج',
+          en: 'Logout failed',
+        },
+        code: 'LOGOUT_FAILED',
       });
     }
   }

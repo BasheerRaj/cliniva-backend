@@ -246,7 +246,10 @@ describe('Authentication (e2e)', () => {
         .set('Authorization', `Bearer ${accessToken}`)
         .expect(200)
         .expect((res) => {
-          expect(res.body.message).toBe('Successfully logged out');
+          expect(res.body.success).toBe(true);
+          expect(res.body.message).toHaveProperty('ar');
+          expect(res.body.message).toHaveProperty('en');
+          expect(res.body.message.en).toBe('Logout successful');
         });
     });
 

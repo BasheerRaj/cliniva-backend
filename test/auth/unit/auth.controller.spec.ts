@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { ValidationPipe } from '@nestjs/common';
+import { ValidationPipe, UnauthorizedException } from '@nestjs/common';
 
 import { AuthController } from '../../../src/auth/auth.controller';
 import { AuthService } from '../../../src/auth/auth.service';
@@ -126,10 +126,47 @@ describe('AuthController', () => {
   });
 
   describe('logout', () => {
-    it('should return success message', async () => {
-      const result = await controller.logout();
+    it('should logout user and blacklist tokens', async () => {
+      const mockRequest = { user: { id: 'user123' } };
+      const mockAccessToken = 'Bearer mock-access-token';
+      const mockRefreshToken = 'mock-refresh-token';
+      const mockIpAddress = '127.0.0.1';
+      const mockUserAgent = 'Mozilla/5.0';
       
-      expect(result).toEqual({ message: 'Successfully logged out' });
+      const mockLogoutResponse = {
+        success: true,
+        message: {
+          ar: 'تم تسجيل الخروج بنجاح',
+          en: 'Logout successful',
+        },
+      };
+
+      jest.spyOn(authService, 'logout').mockResolvedValue(mockLogoutResponse);
+
+      const result = await controller.logout(
+        mockRequest,
+        mockAccessToken,
+        mockRefreshToken,
+        mockIpAddress,
+        mockUserAgent,
+      );
+      
+      expect(authService.logout).toHaveBeenCalledWith(
+        'user123',
+        'mock-access-token',
+        mockRefreshToken,
+        mockIpAddress,
+        mockUserAgent,
+      );
+      expect(result).toEqual(mockLogoutResponse);
+    });
+
+    it('should throw error if no access token provided', async () => {
+      const mockRequest = { user: { id: 'user123' } };
+      
+      await expect(
+        controller.logout(mockRequest, undefined, undefined, undefined, undefined),
+      ).rejects.toThrow(UnauthorizedException);
     });
   });
 

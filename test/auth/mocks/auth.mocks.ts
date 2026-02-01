@@ -94,6 +94,13 @@ export const mockAuthService = {
   refreshToken: jest.fn().mockResolvedValue(mockAuthResponse),
   getProfile: jest.fn().mockResolvedValue(mockUserProfile),
   validateUserById: jest.fn().mockResolvedValue(mockUser),
+  logout: jest.fn().mockResolvedValue({
+    success: true,
+    message: {
+      ar: 'تم تسجيل الخروج بنجاح',
+      en: 'Logout successful',
+    },
+  }),
 };
 
 // Mock JWT Strategy User
