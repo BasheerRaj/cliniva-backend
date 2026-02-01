@@ -14,11 +14,23 @@ import { AuditService } from './audit.service';
 import { EmailService } from './email.service';
 import { TokenCleanupTask } from './token-cleanup.task';
 import { User, UserSchema } from '../database/schemas/user.schema';
-import { Subscription, SubscriptionSchema } from '../database/schemas/subscription.schema';
-import { SubscriptionPlan, SubscriptionPlanSchema } from '../database/schemas/subscription-plan.schema';
-import { TokenBlacklist, TokenBlacklistSchema } from '../database/schemas/token-blacklist.schema';
+import {
+  Subscription,
+  SubscriptionSchema,
+} from '../database/schemas/subscription.schema';
+import {
+  SubscriptionPlan,
+  SubscriptionPlanSchema,
+} from '../database/schemas/subscription-plan.schema';
+import {
+  TokenBlacklist,
+  TokenBlacklistSchema,
+} from '../database/schemas/token-blacklist.schema';
 import { AuditLog, AuditLogSchema } from '../database/schemas/audit-log.schema';
-import { RateLimitCounter, RateLimitCounterSchema } from '../database/schemas/rate-limit-counter.schema';
+import {
+  RateLimitCounter,
+  RateLimitCounterSchema,
+} from '../database/schemas/rate-limit-counter.schema';
 import { SubscriptionModule } from '../subscription/subscription.module';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { FirstLoginGuard } from './guards/first-login.guard';
@@ -36,16 +48,16 @@ import { RateLimitService } from './rate-limit.service';
       { name: AuditLog.name, schema: AuditLogSchema },
       { name: RateLimitCounter.name, schema: RateLimitCounterSchema },
     ]),
-    
+
     // Import SubscriptionModule for SubscriptionService
     SubscriptionModule,
-    
+
     // Import NestJS Schedule Module for cron jobs
     NestScheduleModule.forRoot(),
-    
+
     // Passport module
     PassportModule.register({ defaultStrategy: 'jwt' }),
-    
+
     // JWT module with async configuration
     JwtModule.registerAsync({
       imports: [ConfigModule],
@@ -87,7 +99,3 @@ import { RateLimitService } from './rate-limit.service';
   ],
 })
 export class AuthModule {}
-
-
-
-

@@ -41,23 +41,23 @@ export class AppointmentController {
   @Post()
   async createAppointment(
     @Body(new ValidationPipe()) createAppointmentDto: CreateAppointmentDto,
-    @Request() req: any
+    @Request() req: any,
   ) {
     try {
       const appointment = await this.appointmentService.createAppointment(
         createAppointmentDto,
-        req.user?.userId
+        req.user?.userId,
       );
       return {
         success: true,
         message: 'Appointment created successfully',
-        data: appointment
+        data: appointment,
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to create appointment',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -67,7 +67,9 @@ export class AppointmentController {
    * GET /appointments
    */
   @Get()
-  async getAppointments(@Query(new ValidationPipe()) query: AppointmentSearchQueryDto) {
+  async getAppointments(
+    @Query(new ValidationPipe()) query: AppointmentSearchQueryDto,
+  ) {
     try {
       const result = await this.appointmentService.getAppointments(query);
       return {
@@ -78,14 +80,14 @@ export class AppointmentController {
           total: result.total,
           page: result.page,
           totalPages: result.totalPages,
-          limit: parseInt(query.limit || '10')
-        }
+          limit: parseInt(query.limit || '10'),
+        },
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to retrieve appointments',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -101,13 +103,13 @@ export class AppointmentController {
       return {
         success: true,
         message: 'Appointment retrieved successfully',
-        data: appointment
+        data: appointment,
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to retrieve appointment',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -120,24 +122,24 @@ export class AppointmentController {
   async updateAppointment(
     @Param('id') id: string,
     @Body(new ValidationPipe()) updateAppointmentDto: UpdateAppointmentDto,
-    @Request() req: any
+    @Request() req: any,
   ) {
     try {
       const appointment = await this.appointmentService.updateAppointment(
         id,
         updateAppointmentDto,
-        req.user?.userId
+        req.user?.userId,
       );
       return {
         success: true,
         message: 'Appointment updated successfully',
-        data: appointment
+        data: appointment,
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to update appointment',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -153,13 +155,13 @@ export class AppointmentController {
       await this.appointmentService.deleteAppointment(id, req.user?.userId);
       return {
         success: true,
-        message: 'Appointment deleted successfully'
+        message: 'Appointment deleted successfully',
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to delete appointment',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -172,24 +174,24 @@ export class AppointmentController {
   async rescheduleAppointment(
     @Param('id') id: string,
     @Body(new ValidationPipe()) rescheduleDto: RescheduleAppointmentDto,
-    @Request() req: any
+    @Request() req: any,
   ) {
     try {
       const appointment = await this.appointmentService.rescheduleAppointment(
         id,
         rescheduleDto,
-        req.user?.userId
+        req.user?.userId,
       );
       return {
         success: true,
         message: 'Appointment rescheduled successfully',
-        data: appointment
+        data: appointment,
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to reschedule appointment',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -202,24 +204,24 @@ export class AppointmentController {
   async cancelAppointment(
     @Param('id') id: string,
     @Body(new ValidationPipe()) cancelDto: CancelAppointmentDto,
-    @Request() req: any
+    @Request() req: any,
   ) {
     try {
       const appointment = await this.appointmentService.cancelAppointment(
         id,
         cancelDto,
-        req.user?.userId
+        req.user?.userId,
       );
       return {
         success: true,
         message: 'Appointment cancelled successfully',
-        data: appointment
+        data: appointment,
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to cancel appointment',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -232,24 +234,24 @@ export class AppointmentController {
   async confirmAppointment(
     @Param('id') id: string,
     @Body(new ValidationPipe()) confirmDto: ConfirmAppointmentDto,
-    @Request() req: any
+    @Request() req: any,
   ) {
     try {
       const appointment = await this.appointmentService.confirmAppointment(
         id,
         confirmDto,
-        req.user?.userId
+        req.user?.userId,
       );
       return {
         success: true,
         message: 'Appointment confirmed successfully',
-        data: appointment
+        data: appointment,
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to confirm appointment',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -263,7 +265,8 @@ export class AppointmentController {
     @Param('doctorId') doctorId: string,
     @Query('date') date: string,
     @Query('clinicId') clinicId?: string,
-    @Query('durationMinutes', new ParseIntPipe({ optional: true })) durationMinutes?: number
+    @Query('durationMinutes', new ParseIntPipe({ optional: true }))
+    durationMinutes?: number,
   ) {
     try {
       if (!date) {
@@ -274,20 +277,21 @@ export class AppointmentController {
         doctorId,
         date,
         clinicId,
-        durationMinutes
+        durationMinutes,
       };
 
-      const availability = await this.appointmentService.getDoctorAvailability(availabilityQuery);
+      const availability =
+        await this.appointmentService.getDoctorAvailability(availabilityQuery);
       return {
         success: true,
         message: 'Doctor availability retrieved successfully',
-        data: availability
+        data: availability,
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to retrieve doctor availability',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -304,13 +308,13 @@ export class AppointmentController {
         success: true,
         message: "Today's appointments retrieved successfully",
         data: appointments,
-        count: appointments.length
+        count: appointments.length,
       };
     } catch (error) {
       return {
         success: false,
         message: "Failed to retrieve today's appointments",
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -321,21 +325,22 @@ export class AppointmentController {
    */
   @Get('schedule/upcoming')
   async getUpcomingAppointments(
-    @Query('limit', new ParseIntPipe({ optional: true })) limit?: number
+    @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
   ) {
     try {
-      const appointments = await this.appointmentService.getUpcomingAppointments(limit || 20);
+      const appointments =
+        await this.appointmentService.getUpcomingAppointments(limit || 20);
       return {
         success: true,
         message: 'Upcoming appointments retrieved successfully',
         data: appointments,
-        count: appointments.length
+        count: appointments.length,
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to retrieve upcoming appointments',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -347,18 +352,19 @@ export class AppointmentController {
   @Get('patient/:patientId')
   async getPatientAppointments(@Param('patientId') patientId: string) {
     try {
-      const appointments = await this.appointmentService.getPatientAppointments(patientId);
+      const appointments =
+        await this.appointmentService.getPatientAppointments(patientId);
       return {
         success: true,
         message: 'Patient appointments retrieved successfully',
         data: appointments,
-        count: appointments.length
+        count: appointments.length,
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to retrieve patient appointments',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -370,21 +376,24 @@ export class AppointmentController {
   @Get('doctor/:doctorId')
   async getDoctorAppointments(
     @Param('doctorId') doctorId: string,
-    @Query('date') date?: string
+    @Query('date') date?: string,
   ) {
     try {
-      const appointments = await this.appointmentService.getDoctorAppointments(doctorId, date);
+      const appointments = await this.appointmentService.getDoctorAppointments(
+        doctorId,
+        date,
+      );
       return {
         success: true,
         message: 'Doctor appointments retrieved successfully',
         data: appointments,
-        count: appointments.length
+        count: appointments.length,
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to retrieve doctor appointments',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -398,14 +407,14 @@ export class AppointmentController {
     @Param('clinicId') clinicId: string,
     @Query('date') date?: string,
     @Query('page') page?: string,
-    @Query('limit') limit?: string
+    @Query('limit') limit?: string,
   ) {
     try {
       const query: AppointmentSearchQueryDto = {
         clinicId,
         appointmentDate: date,
         page: page || '1',
-        limit: limit || '10'
+        limit: limit || '10',
       };
 
       const result = await this.appointmentService.getAppointments(query);
@@ -417,14 +426,14 @@ export class AppointmentController {
           total: result.total,
           page: result.page,
           totalPages: result.totalPages,
-          limit: parseInt(limit || '10')
-        }
+          limit: parseInt(limit || '10'),
+        },
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to retrieve clinic appointments',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -440,13 +449,13 @@ export class AppointmentController {
       return {
         success: true,
         message: 'Appointment statistics retrieved successfully',
-        data: stats
+        data: stats,
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to retrieve appointment statistics',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -459,7 +468,7 @@ export class AppointmentController {
   async searchAppointments(
     @Query('q') searchTerm: string,
     @Query('page') page?: string,
-    @Query('limit') limit?: string
+    @Query('limit') limit?: string,
   ) {
     try {
       if (!searchTerm || searchTerm.trim().length === 0) {
@@ -469,7 +478,7 @@ export class AppointmentController {
       const query: AppointmentSearchQueryDto = {
         search: searchTerm,
         page: page || '1',
-        limit: limit || '20'
+        limit: limit || '20',
       };
 
       const result = await this.appointmentService.getAppointments(query);
@@ -480,14 +489,14 @@ export class AppointmentController {
         pagination: {
           total: result.total,
           page: result.page,
-          totalPages: result.totalPages
-        }
+          totalPages: result.totalPages,
+        },
       };
     } catch (error) {
       return {
         success: false,
         message: 'Search failed',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -498,14 +507,15 @@ export class AppointmentController {
    */
   @Post('check-conflicts')
   async checkConflicts(
-    @Body() conflictQuery: {
+    @Body()
+    conflictQuery: {
       patientId: string;
       doctorId: string;
       appointmentDate: string;
       appointmentTime: string;
       durationMinutes?: number;
       excludeAppointmentId?: string;
-    }
+    },
   ) {
     try {
       const conflicts = await this.appointmentService.checkAppointmentConflicts(
@@ -514,7 +524,7 @@ export class AppointmentController {
         conflictQuery.appointmentDate,
         conflictQuery.appointmentTime,
         conflictQuery.durationMinutes || 30,
-        conflictQuery.excludeAppointmentId
+        conflictQuery.excludeAppointmentId,
       );
 
       return {
@@ -523,14 +533,14 @@ export class AppointmentController {
         data: {
           hasConflicts: conflicts.length > 0,
           conflicts: conflicts,
-          conflictCount: conflicts.length
-        }
+          conflictCount: conflicts.length,
+        },
       };
     } catch (error) {
       return {
         success: false,
         message: 'Conflict check failed',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -543,18 +553,27 @@ export class AppointmentController {
   async getAppointmentsByStatus(
     @Param('status') status: string,
     @Query('page') page?: string,
-    @Query('limit') limit?: string
+    @Query('limit') limit?: string,
   ) {
     try {
-      const validStatuses = ['scheduled', 'confirmed', 'in_progress', 'completed', 'cancelled', 'no_show'];
+      const validStatuses = [
+        'scheduled',
+        'confirmed',
+        'in_progress',
+        'completed',
+        'cancelled',
+        'no_show',
+      ];
       if (!validStatuses.includes(status)) {
-        throw new BadRequestException(`Invalid status. Must be one of: ${validStatuses.join(', ')}`);
+        throw new BadRequestException(
+          `Invalid status. Must be one of: ${validStatuses.join(', ')}`,
+        );
       }
 
       const query: AppointmentSearchQueryDto = {
         status,
         page: page || '1',
-        limit: limit || '10'
+        limit: limit || '10',
       };
 
       const result = await this.appointmentService.getAppointments(query);
@@ -565,14 +584,14 @@ export class AppointmentController {
         pagination: {
           total: result.total,
           page: result.page,
-          totalPages: result.totalPages
-        }
+          totalPages: result.totalPages,
+        },
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to retrieve appointments by status',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -586,18 +605,20 @@ export class AppointmentController {
     @Query('from') dateFrom: string,
     @Query('to') dateTo: string,
     @Query('page') page?: string,
-    @Query('limit') limit?: string
+    @Query('limit') limit?: string,
   ) {
     try {
       if (!dateFrom || !dateTo) {
-        throw new BadRequestException('Both from and to date parameters are required');
+        throw new BadRequestException(
+          'Both from and to date parameters are required',
+        );
       }
 
       const query: AppointmentSearchQueryDto = {
         dateFrom,
         dateTo,
         page: page || '1',
-        limit: limit || '20'
+        limit: limit || '20',
       };
 
       const result = await this.appointmentService.getAppointments(query);
@@ -608,18 +629,18 @@ export class AppointmentController {
         pagination: {
           total: result.total,
           page: result.page,
-          totalPages: result.totalPages
+          totalPages: result.totalPages,
         },
         dateRange: {
           from: dateFrom,
-          to: dateTo
-        }
+          to: dateTo,
+        },
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to retrieve appointments by date range',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -632,18 +653,20 @@ export class AppointmentController {
   async getAppointmentsByUrgency(
     @Param('urgencyLevel') urgencyLevel: string,
     @Query('page') page?: string,
-    @Query('limit') limit?: string
+    @Query('limit') limit?: string,
   ) {
     try {
       const validUrgencyLevels = ['low', 'medium', 'high', 'urgent'];
       if (!validUrgencyLevels.includes(urgencyLevel)) {
-        throw new BadRequestException(`Invalid urgency level. Must be one of: ${validUrgencyLevels.join(', ')}`);
+        throw new BadRequestException(
+          `Invalid urgency level. Must be one of: ${validUrgencyLevels.join(', ')}`,
+        );
       }
 
       const query: AppointmentSearchQueryDto = {
         urgencyLevel,
         page: page || '1',
-        limit: limit || '10'
+        limit: limit || '10',
       };
 
       const result = await this.appointmentService.getAppointments(query);
@@ -654,15 +677,15 @@ export class AppointmentController {
         pagination: {
           total: result.total,
           page: result.page,
-          totalPages: result.totalPages
-        }
+          totalPages: result.totalPages,
+        },
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to retrieve appointments by urgency',
-        error: error.message
+        error: error.message,
       };
     }
   }
-} 
+}

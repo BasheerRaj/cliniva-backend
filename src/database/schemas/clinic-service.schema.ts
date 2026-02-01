@@ -3,7 +3,7 @@ import { Document, Types } from 'mongoose';
 
 @Schema({
   timestamps: true,
-  collection: 'clinic_services'
+  collection: 'clinic_services',
 })
 export class ClinicService extends Document {
   @Prop({ type: Types.ObjectId, ref: 'Clinic', required: true })

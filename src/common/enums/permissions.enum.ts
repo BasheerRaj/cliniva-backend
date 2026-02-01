@@ -9,38 +9,38 @@ export enum PermissionsEnum {
   USER_UPDATE = 'user:update',
   USER_DELETE = 'user:delete',
   USER_LIST = 'user:list',
-  
-  // User Management Extended Permissions  
+
+  // User Management Extended Permissions
   USER_ACTIVATE = 'user:activate',
   USER_DEACTIVATE = 'user:deactivate',
   USER_RESET_PASSWORD = 'user:reset-password',
   USER_CHANGE_ROLE = 'user:change-role',
   USER_VIEW_PROFILE = 'user:view-profile',
   USER_EDIT_PROFILE = 'user:edit-profile',
-  
+
   // Group Management Permissions
   GROUP_CREATE = 'group:create',
-  GROUP_READ = 'group:read', 
+  GROUP_READ = 'group:read',
   GROUP_UPDATE = 'group:update',
   GROUP_DELETE = 'group:delete',
   GROUP_LIST = 'group:list',
   GROUP_ASSIGN_USERS = 'group:assign-users',
   GROUP_REMOVE_USERS = 'group:remove-users',
-  
+
   // Role Management Permissions
   ROLE_CREATE = 'role:create',
   ROLE_READ = 'role:read',
-  ROLE_UPDATE = 'role:update', 
+  ROLE_UPDATE = 'role:update',
   ROLE_DELETE = 'role:delete',
   ROLE_LIST = 'role:list',
   ROLE_ASSIGN_PERMISSIONS = 'role:assign-permissions',
-  
+
   // System Administration Permissions
   ADMIN_ACCESS = 'admin:access',
   ADMIN_VIEW_LOGS = 'admin:view-logs',
   ADMIN_MANAGE_SETTINGS = 'admin:manage-settings',
   ADMIN_VIEW_ANALYTICS = 'admin:view-analytics',
-  
+
   // Database Management Permissions
   DATABASE_READ = 'database:read',
   DATABASE_BACKUP = 'database:backup',
@@ -64,13 +64,13 @@ export const PermissionGroups = {
     PermissionsEnum.USER_RESET_PASSWORD,
     PermissionsEnum.USER_CHANGE_ROLE,
   ],
-  
+
   USER_READ_ONLY: [
     PermissionsEnum.USER_READ,
     PermissionsEnum.USER_LIST,
     PermissionsEnum.USER_VIEW_PROFILE,
   ],
-  
+
   USER_MANAGEMENT: [
     PermissionsEnum.USER_CREATE,
     PermissionsEnum.USER_READ,
@@ -79,7 +79,7 @@ export const PermissionGroups = {
     PermissionsEnum.USER_ACTIVATE,
     PermissionsEnum.USER_DEACTIVATE,
   ],
-  
+
   GROUP_FULL_ACCESS: [
     PermissionsEnum.GROUP_CREATE,
     PermissionsEnum.GROUP_READ,
@@ -89,7 +89,7 @@ export const PermissionGroups = {
     PermissionsEnum.GROUP_ASSIGN_USERS,
     PermissionsEnum.GROUP_REMOVE_USERS,
   ],
-  
+
   ROLE_FULL_ACCESS: [
     PermissionsEnum.ROLE_CREATE,
     PermissionsEnum.ROLE_READ,
@@ -98,7 +98,7 @@ export const PermissionGroups = {
     PermissionsEnum.ROLE_LIST,
     PermissionsEnum.ROLE_ASSIGN_PERMISSIONS,
   ],
-  
+
   ADMIN_PERMISSIONS: [
     PermissionsEnum.ADMIN_ACCESS,
     PermissionsEnum.ADMIN_VIEW_LOGS,
@@ -107,7 +107,7 @@ export const PermissionGroups = {
     PermissionsEnum.DATABASE_READ,
     PermissionsEnum.DATABASE_HEALTH_CHECK,
   ],
-  
+
   SUPER_ADMIN: Object.values(PermissionsEnum),
 } as const;
 

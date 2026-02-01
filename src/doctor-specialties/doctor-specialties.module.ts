@@ -24,4 +24,4 @@ import { CommonModule } from '../common/common.module';
   providers: [DoctorSpecialtiesService],
   exports: [DoctorSpecialtiesService],
 })
-export class DoctorSpecialtiesModule {} 
+export class DoctorSpecialtiesModule {}

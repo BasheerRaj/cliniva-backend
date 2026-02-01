@@ -117,7 +117,7 @@ describe('ClinicService', () => {
       expect(ValidationUtil.validateEntityExists).toHaveBeenCalledWith(
         complexModel,
         complexId,
-        ERROR_MESSAGES.COMPLEX_NOT_FOUND
+        ERROR_MESSAGES.COMPLEX_NOT_FOUND,
       );
 
       // Verify query was built correctly
@@ -139,19 +139,19 @@ describe('ClinicService', () => {
           message: ERROR_MESSAGES.COMPLEX_NOT_FOUND,
           code: 'ENTITY_NOT_FOUND',
           details: { id: nonExistentComplexId },
-        })
+        }),
       );
 
       // Should throw NotFoundException
       await expect(
-        service.getClinicsByComplex(nonExistentComplexId)
+        service.getClinicsByComplex(nonExistentComplexId),
       ).rejects.toThrow(NotFoundException);
 
       // Verify validation was called
       expect(ValidationUtil.validateEntityExists).toHaveBeenCalledWith(
         complexModel,
         nonExistentComplexId,
-        ERROR_MESSAGES.COMPLEX_NOT_FOUND
+        ERROR_MESSAGES.COMPLEX_NOT_FOUND,
       );
 
       // Verify query was not executed

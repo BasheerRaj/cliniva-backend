@@ -7,6 +7,7 @@ import { UserSchema } from '../database/schemas/user.schema';
 import { SubscriptionSchema } from '../database/schemas/subscription.schema';
 import { SubscriptionPlanSchema } from '../database/schemas/subscription-plan.schema';
 import { SubscriptionModule } from '../subscription/subscription.module';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
   imports: [
@@ -17,9 +18,10 @@ import { SubscriptionModule } from '../subscription/subscription.module';
       { name: 'SubscriptionPlan', schema: SubscriptionPlanSchema },
     ]),
     SubscriptionModule,
+    AuthModule,
   ],
   controllers: [PatientController],
   providers: [PatientService],
   exports: [PatientService],
 })
-export class PatientModule {} 
+export class PatientModule {}

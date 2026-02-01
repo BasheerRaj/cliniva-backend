@@ -3,7 +3,10 @@ import { ExecutionContext, ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { getModelToken } from '@nestjs/mongoose';
 
-import { FirstLoginGuard, SKIP_FIRST_LOGIN_CHECK } from '../../../src/auth/guards/first-login.guard';
+import {
+  FirstLoginGuard,
+  SKIP_FIRST_LOGIN_CHECK,
+} from '../../../src/auth/guards/first-login.guard';
 import { User } from '../../../src/database/schemas/user.schema';
 import { AuthErrorCode } from '../../../src/common/enums/auth-error-code.enum';
 
@@ -59,7 +62,9 @@ describe('FirstLoginGuard', () => {
       // Mock reflector to return true for skip check
       jest.spyOn(reflector, 'get').mockReturnValue(true);
 
-      const result = await guard.canActivate(mockExecutionContext as ExecutionContext);
+      const result = await guard.canActivate(
+        mockExecutionContext as ExecutionContext,
+      );
 
       expect(result).toBe(true);
       expect(reflector.get).toHaveBeenCalledWith(
@@ -83,7 +88,9 @@ describe('FirstLoginGuard', () => {
         exec: jest.fn().mockResolvedValue(mockUser),
       });
 
-      const result = await guard.canActivate(mockExecutionContext as ExecutionContext);
+      const result = await guard.canActivate(
+        mockExecutionContext as ExecutionContext,
+      );
 
       expect(result).toBe(true);
       expect(mockUserModel.findById).toHaveBeenCalledWith('user-123');
@@ -104,11 +111,11 @@ describe('FirstLoginGuard', () => {
       });
 
       await expect(
-        guard.canActivate(mockExecutionContext as ExecutionContext)
+        guard.canActivate(mockExecutionContext as ExecutionContext),
       ).rejects.toThrow(ForbiddenException);
 
       await expect(
-        guard.canActivate(mockExecutionContext as ExecutionContext)
+        guard.canActivate(mockExecutionContext as ExecutionContext),
       ).rejects.toMatchObject({
         response: {
           code: AuthErrorCode.PASSWORD_CHANGE_REQUIRED,
@@ -134,7 +141,7 @@ describe('FirstLoginGuard', () => {
       };
 
       await expect(
-        guard.canActivate(contextWithoutUser as ExecutionContext)
+        guard.canActivate(contextWithoutUser as ExecutionContext),
       ).rejects.toThrow(ForbiddenException);
 
       expect(mockUserModel.findById).not.toHaveBeenCalled();
@@ -150,11 +157,11 @@ describe('FirstLoginGuard', () => {
       });
 
       await expect(
-        guard.canActivate(mockExecutionContext as ExecutionContext)
+        guard.canActivate(mockExecutionContext as ExecutionContext),
       ).rejects.toThrow(ForbiddenException);
 
       await expect(
-        guard.canActivate(mockExecutionContext as ExecutionContext)
+        guard.canActivate(mockExecutionContext as ExecutionContext),
       ).rejects.toMatchObject({
         response: {
           code: AuthErrorCode.USER_NOT_FOUND,
@@ -174,7 +181,7 @@ describe('FirstLoginGuard', () => {
       });
 
       await expect(
-        guard.canActivate(mockExecutionContext as ExecutionContext)
+        guard.canActivate(mockExecutionContext as ExecutionContext),
       ).rejects.toThrow(ForbiddenException);
 
       expect(mockUserModel.findById).toHaveBeenCalledWith('user-123');
@@ -194,7 +201,9 @@ describe('FirstLoginGuard', () => {
         exec: jest.fn().mockResolvedValue(mockUserNotFirstLogin),
       });
 
-      const result1 = await guard.canActivate(mockExecutionContext as ExecutionContext);
+      const result1 = await guard.canActivate(
+        mockExecutionContext as ExecutionContext,
+      );
       expect(result1).toBe(true);
 
       // Test with isFirstLogin = true
@@ -208,7 +217,7 @@ describe('FirstLoginGuard', () => {
       });
 
       await expect(
-        guard.canActivate(mockExecutionContext as ExecutionContext)
+        guard.canActivate(mockExecutionContext as ExecutionContext),
       ).rejects.toThrow(ForbiddenException);
     });
   });

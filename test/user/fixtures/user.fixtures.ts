@@ -158,5 +158,6 @@ export const testEnvironment = {
   JWT_REFRESH_SECRET: 'test-refresh-secret-for-user-management',
   JWT_REFRESH_EXPIRES_IN: '7d',
   NODE_ENV: 'test',
-  MONGODB_URI: process.env.MONGODB_TEST_URI || 'mongodb://localhost:27017/cliniva_test',
+  MONGODB_URI:
+    process.env.MONGODB_TEST_URI || 'mongodb://localhost:27017/cliniva_test',
 };

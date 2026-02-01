@@ -3,7 +3,7 @@ import { Document, Types } from 'mongoose';
 
 @Schema({
   timestamps: true,
-  collection: 'sms_templates'
+  collection: 'sms_templates',
 })
 export class SmsTemplate extends Document {
   @Prop({ required: true, unique: true })

@@ -1,10 +1,15 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
-import { PhoneNumber, Address, OrganizationEmergencyContact, SocialMediaLinks } from './organization.schema';
+import {
+  PhoneNumber,
+  Address,
+  OrganizationEmergencyContact,
+  SocialMediaLinks,
+} from './organization.schema';
 
 @Schema({
   timestamps: true,
-  collection: 'clinics'
+  collection: 'clinics',
 })
 export class Clinic extends Document {
   // Relationships
@@ -65,17 +70,19 @@ export class Clinic extends Document {
   ceoName?: string; // or Clinic Director
 
   // Contact information - SAME AS ORGANIZATION
-  @Prop({ 
-    type: [{ 
-      number: { type: String, required: true }, 
-      type: { 
-        type: String, 
-        enum: ['primary', 'secondary', 'emergency', 'fax', 'mobile'], 
-        default: 'primary' 
-      }, 
-      label: String 
-    }], 
-    default: [] 
+  @Prop({
+    type: [
+      {
+        number: { type: String, required: true },
+        type: {
+          type: String,
+          enum: ['primary', 'secondary', 'emergency', 'fax', 'mobile'],
+          default: 'primary',
+        },
+        label: String,
+      },
+    ],
+    default: [],
   })
   phoneNumbers?: PhoneNumber[];
 
@@ -90,8 +97,8 @@ export class Clinic extends Document {
       state: String,
       postalCode: String,
       country: String,
-      googleLocation: String
-    }
+      googleLocation: String,
+    },
   })
   address?: Address;
 
@@ -101,8 +108,8 @@ export class Clinic extends Document {
       name: String,
       phone: String,
       email: String,
-      relationship: String
-    }
+      relationship: String,
+    },
   })
   emergencyContact?: OrganizationEmergencyContact;
 
@@ -115,8 +122,8 @@ export class Clinic extends Document {
       linkedin: String,
       whatsapp: String,
       youtube: String,
-      website: String
-    }
+      website: String,
+    },
   })
   socialMediaLinks?: SocialMediaLinks;
 

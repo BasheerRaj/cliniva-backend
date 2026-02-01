@@ -44,23 +44,23 @@ export class EmployeeController {
   @Post()
   async createEmployee(
     @Body(new ValidationPipe()) createEmployeeDto: CreateEmployeeDto,
-    @Request() req: any
+    @Request() req: any,
   ) {
     try {
       const employee = await this.employeeService.createEmployee(
         createEmployeeDto,
-        req.user?.userId
+        req.user?.userId,
       );
       return {
         success: true,
         message: 'Employee created successfully',
-        data: employee
+        data: employee,
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to create employee',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -70,7 +70,9 @@ export class EmployeeController {
    * GET /employees
    */
   @Get()
-  async getEmployees(@Query(new ValidationPipe()) query: EmployeeSearchQueryDto) {
+  async getEmployees(
+    @Query(new ValidationPipe()) query: EmployeeSearchQueryDto,
+  ) {
     try {
       const result = await this.employeeService.getEmployees(query);
       return {
@@ -81,14 +83,14 @@ export class EmployeeController {
           total: result.total,
           page: result.page,
           totalPages: result.totalPages,
-          limit: parseInt(query.limit || '10')
-        }
+          limit: parseInt(query.limit || '10'),
+        },
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to retrieve employees',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -104,13 +106,13 @@ export class EmployeeController {
       return {
         success: true,
         message: 'Employee retrieved successfully',
-        data: employee
+        data: employee,
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to retrieve employee',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -123,24 +125,24 @@ export class EmployeeController {
   async updateEmployee(
     @Param('id') id: string,
     @Body(new ValidationPipe()) updateEmployeeDto: UpdateEmployeeDto,
-    @Request() req: any
+    @Request() req: any,
   ) {
     try {
       const employee = await this.employeeService.updateEmployee(
         id,
         updateEmployeeDto,
-        req.user?.userId
+        req.user?.userId,
       );
       return {
         success: true,
         message: 'Employee updated successfully',
-        data: employee
+        data: employee,
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to update employee',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -153,13 +155,16 @@ export class EmployeeController {
   @HttpCode(HttpStatus.OK)
   async deleteEmployee(@Param('id') id: string, @Request() req: any) {
     try {
-      const result = await this.employeeService.deleteEmployee(id, req.user?.userId);
+      const result = await this.employeeService.deleteEmployee(
+        id,
+        req.user?.userId,
+      );
       return result;
     } catch (error) {
       return {
         success: false,
         message: 'Failed to delete employee',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -172,24 +177,24 @@ export class EmployeeController {
   async terminateEmployee(
     @Param('id') id: string,
     @Body(new ValidationPipe()) terminateDto: TerminateEmployeeDto,
-    @Request() req: any
+    @Request() req: any,
   ) {
     try {
       const employee = await this.employeeService.terminateEmployee(
         id,
         terminateDto,
-        req.user?.userId
+        req.user?.userId,
       );
       return {
         success: true,
         message: 'Employee terminated successfully',
-        data: employee
+        data: employee,
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to terminate employee',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -201,17 +206,18 @@ export class EmployeeController {
   @Get('number/:employeeNumber')
   async getEmployeeByNumber(@Param('employeeNumber') employeeNumber: string) {
     try {
-      const employee = await this.employeeService.getEmployeeByNumber(employeeNumber);
+      const employee =
+        await this.employeeService.getEmployeeByNumber(employeeNumber);
       return {
         success: true,
         message: 'Employee retrieved successfully',
-        data: employee
+        data: employee,
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to retrieve employee',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -223,7 +229,7 @@ export class EmployeeController {
   @Get('search/query')
   async searchEmployees(
     @Query('q') searchTerm: string,
-    @Query('limit', new ParseIntPipe({ optional: true })) limit?: number
+    @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
   ) {
     try {
       if (!searchTerm || searchTerm.trim().length === 0) {
@@ -232,20 +238,20 @@ export class EmployeeController {
 
       const employees = await this.employeeService.searchEmployees(
         searchTerm,
-        limit || 20
+        limit || 20,
       );
 
       return {
         success: true,
         message: 'Search completed successfully',
         data: employees,
-        count: employees.length
+        count: employees.length,
       };
     } catch (error) {
       return {
         success: false,
         message: 'Search failed',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -261,13 +267,13 @@ export class EmployeeController {
       return {
         success: true,
         message: 'Employee statistics retrieved successfully',
-        data: stats
+        data: stats,
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to retrieve employee statistics',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -280,13 +286,13 @@ export class EmployeeController {
   async getEmployeesByRole(
     @Param('role') role: string,
     @Query('page') page?: string,
-    @Query('limit') limit?: string
+    @Query('limit') limit?: string,
   ) {
     try {
       const query: EmployeeSearchQueryDto = {
         role,
         page: page || '1',
-        limit: limit || '10'
+        limit: limit || '10',
       };
 
       const result = await this.employeeService.getEmployees(query);
@@ -297,14 +303,14 @@ export class EmployeeController {
         pagination: {
           total: result.total,
           page: result.page,
-          totalPages: result.totalPages
-        }
+          totalPages: result.totalPages,
+        },
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to retrieve employees by role',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -316,13 +322,13 @@ export class EmployeeController {
   @Get('status/active')
   async getActiveEmployees(
     @Query('page') page?: string,
-    @Query('limit') limit?: string
+    @Query('limit') limit?: string,
   ) {
     try {
       const query: EmployeeSearchQueryDto = {
         isActive: true,
         page: page || '1',
-        limit: limit || '10'
+        limit: limit || '10',
       };
 
       const result = await this.employeeService.getEmployees(query);
@@ -333,14 +339,14 @@ export class EmployeeController {
         pagination: {
           total: result.total,
           page: result.page,
-          totalPages: result.totalPages
-        }
+          totalPages: result.totalPages,
+        },
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to retrieve active employees',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -352,13 +358,13 @@ export class EmployeeController {
   @Get('status/inactive')
   async getInactiveEmployees(
     @Query('page') page?: string,
-    @Query('limit') limit?: string
+    @Query('limit') limit?: string,
   ) {
     try {
       const query: EmployeeSearchQueryDto = {
         isActive: false,
         page: page || '1',
-        limit: limit || '10'
+        limit: limit || '10',
       };
 
       const result = await this.employeeService.getEmployees(query);
@@ -369,14 +375,14 @@ export class EmployeeController {
         pagination: {
           total: result.total,
           page: result.page,
-          totalPages: result.totalPages
-        }
+          totalPages: result.totalPages,
+        },
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to retrieve inactive employees',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -390,18 +396,20 @@ export class EmployeeController {
     @Query('from') dateFrom: string,
     @Query('to') dateTo: string,
     @Query('page') page?: string,
-    @Query('limit') limit?: string
+    @Query('limit') limit?: string,
   ) {
     try {
       if (!dateFrom || !dateTo) {
-        throw new BadRequestException('Both from and to date parameters are required');
+        throw new BadRequestException(
+          'Both from and to date parameters are required',
+        );
       }
 
       const query: EmployeeSearchQueryDto = {
         dateHiredFrom: dateFrom,
         dateHiredTo: dateTo,
         page: page || '1',
-        limit: limit || '20'
+        limit: limit || '20',
       };
 
       const result = await this.employeeService.getEmployees(query);
@@ -412,18 +420,18 @@ export class EmployeeController {
         pagination: {
           total: result.total,
           page: result.page,
-          totalPages: result.totalPages
+          totalPages: result.totalPages,
         },
         dateRange: {
           from: dateFrom,
-          to: dateTo
-        }
+          to: dateTo,
+        },
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to retrieve employees by hiring date range',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -435,23 +443,23 @@ export class EmployeeController {
   @Post('bulk-action')
   async bulkEmployeeAction(
     @Body(new ValidationPipe()) bulkActionDto: BulkEmployeeActionDto,
-    @Request() req: any
+    @Request() req: any,
   ) {
     try {
       const result = await this.employeeService.bulkEmployeeAction(
         bulkActionDto,
-        req.user?.userId
+        req.user?.userId,
       );
       return {
         success: true,
         message: 'Bulk action completed',
-        data: result
+        data: result,
       };
     } catch (error) {
       return {
         success: false,
         message: 'Bulk action failed',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -466,7 +474,7 @@ export class EmployeeController {
   async createEmployeeDocument(
     @Param('id') employeeId: string,
     @Body(new ValidationPipe()) createDocumentDto: CreateEmployeeDocumentDto,
-    @Request() req: any
+    @Request() req: any,
   ) {
     try {
       // Ensure the document is for the correct employee
@@ -474,18 +482,18 @@ export class EmployeeController {
 
       const document = await this.employeeService.createEmployeeDocument(
         createDocumentDto,
-        req.user?.userId
+        req.user?.userId,
       );
       return {
         success: true,
         message: 'Employee document created successfully',
-        data: document
+        data: document,
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to create employee document',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -497,18 +505,19 @@ export class EmployeeController {
   @Get(':id/documents')
   async getEmployeeDocuments(@Param('id') employeeId: string) {
     try {
-      const documents = await this.employeeService.getEmployeeDocuments(employeeId);
+      const documents =
+        await this.employeeService.getEmployeeDocuments(employeeId);
       return {
         success: true,
         message: 'Employee documents retrieved successfully',
         data: documents,
-        count: documents.length
+        count: documents.length,
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to retrieve employee documents',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -521,24 +530,24 @@ export class EmployeeController {
   async updateEmployeeDocument(
     @Param('documentId') documentId: string,
     @Body(new ValidationPipe()) updateDocumentDto: UpdateEmployeeDocumentDto,
-    @Request() req: any
+    @Request() req: any,
   ) {
     try {
       const document = await this.employeeService.updateEmployeeDocument(
         documentId,
         updateDocumentDto,
-        req.user?.userId
+        req.user?.userId,
       );
       return {
         success: true,
         message: 'Employee document updated successfully',
-        data: document
+        data: document,
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to update employee document',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -552,23 +561,24 @@ export class EmployeeController {
   @Post(':id/shifts')
   async createEmployeeShift(
     @Param('id') employeeId: string,
-    @Body(new ValidationPipe()) createShiftDto: CreateEmployeeShiftDto
+    @Body(new ValidationPipe()) createShiftDto: CreateEmployeeShiftDto,
   ) {
     try {
       // Ensure the shift is for the correct employee
       createShiftDto.userId = employeeId;
 
-      const shift = await this.employeeService.createEmployeeShift(createShiftDto);
+      const shift =
+        await this.employeeService.createEmployeeShift(createShiftDto);
       return {
         success: true,
         message: 'Employee shift created successfully',
-        data: shift
+        data: shift,
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to create employee shift',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -585,13 +595,13 @@ export class EmployeeController {
         success: true,
         message: 'Employee shifts retrieved successfully',
         data: shifts,
-        count: shifts.length
+        count: shifts.length,
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to retrieve employee shifts',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -604,13 +614,13 @@ export class EmployeeController {
   async getEmployeesByOrganization(
     @Param('organizationId') organizationId: string,
     @Query('page') page?: string,
-    @Query('limit') limit?: string
+    @Query('limit') limit?: string,
   ) {
     try {
       const query: EmployeeSearchQueryDto = {
         organizationId,
         page: page || '1',
-        limit: limit || '10'
+        limit: limit || '10',
       };
 
       const result = await this.employeeService.getEmployees(query);
@@ -621,14 +631,14 @@ export class EmployeeController {
         pagination: {
           total: result.total,
           page: result.page,
-          totalPages: result.totalPages
-        }
+          totalPages: result.totalPages,
+        },
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to retrieve organization employees',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -641,13 +651,13 @@ export class EmployeeController {
   async getEmployeesByComplex(
     @Param('complexId') complexId: string,
     @Query('page') page?: string,
-    @Query('limit') limit?: string
+    @Query('limit') limit?: string,
   ) {
     try {
       const query: EmployeeSearchQueryDto = {
         complexId,
         page: page || '1',
-        limit: limit || '10'
+        limit: limit || '10',
       };
 
       const result = await this.employeeService.getEmployees(query);
@@ -658,14 +668,14 @@ export class EmployeeController {
         pagination: {
           total: result.total,
           page: result.page,
-          totalPages: result.totalPages
-        }
+          totalPages: result.totalPages,
+        },
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to retrieve complex employees',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -678,13 +688,13 @@ export class EmployeeController {
   async getEmployeesByClinic(
     @Param('clinicId') clinicId: string,
     @Query('page') page?: string,
-    @Query('limit') limit?: string
+    @Query('limit') limit?: string,
   ) {
     try {
       const query: EmployeeSearchQueryDto = {
         clinicId,
         page: page || '1',
-        limit: limit || '10'
+        limit: limit || '10',
       };
 
       const result = await this.employeeService.getEmployees(query);
@@ -695,14 +705,14 @@ export class EmployeeController {
         pagination: {
           total: result.total,
           page: result.page,
-          totalPages: result.totalPages
-        }
+          totalPages: result.totalPages,
+        },
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to retrieve clinic employees',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -715,21 +725,21 @@ export class EmployeeController {
   async getEmployeeRoleAnalytics() {
     try {
       const stats = await this.employeeService.getEmployeeStats();
-      
+
       return {
         success: true,
         message: 'Employee role analytics retrieved successfully',
         data: {
           employeesByRole: stats.employeesByRole,
           totalEmployees: stats.totalEmployees,
-          analysisDate: new Date()
-        }
+          analysisDate: new Date(),
+        },
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to retrieve role analytics',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -742,20 +752,20 @@ export class EmployeeController {
   async getEmployeeSalaryAnalytics() {
     try {
       const stats = await this.employeeService.getEmployeeStats();
-      
+
       return {
         success: true,
         message: 'Employee salary analytics retrieved successfully',
         data: {
           salaryStatistics: stats.salaryStatistics,
-          analysisDate: new Date()
-        }
+          analysisDate: new Date(),
+        },
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to retrieve salary analytics',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -768,7 +778,7 @@ export class EmployeeController {
   async getHiringTrends() {
     try {
       const stats = await this.employeeService.getEmployeeStats();
-      
+
       return {
         success: true,
         message: 'Hiring trends retrieved successfully',
@@ -776,14 +786,14 @@ export class EmployeeController {
           monthlyHiringTrend: stats.monthlyHiringTrend,
           newHiresThisMonth: stats.newHiresThisMonth,
           newHiresThisYear: stats.newHiresThisYear,
-          analysisDate: new Date()
-        }
+          analysisDate: new Date(),
+        },
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to retrieve hiring trends',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -794,25 +804,25 @@ export class EmployeeController {
    */
   @Get('documents/expiring')
   async getUpcomingDocumentExpirations(
-    @Query('days', new ParseIntPipe({ optional: true })) days?: number
+    @Query('days', new ParseIntPipe({ optional: true })) days?: number,
   ) {
     try {
       const stats = await this.employeeService.getEmployeeStats();
-      
+
       return {
         success: true,
         message: 'Upcoming document expirations retrieved successfully',
         data: {
           upcomingExpirations: stats.upcomingDocumentExpirations,
           count: stats.upcomingDocumentExpirations.length,
-          daysAhead: days || 30
-        }
+          daysAhead: days || 30,
+        },
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to retrieve document expirations',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -823,7 +833,7 @@ export class EmployeeController {
    */
   @Get('birthdays/upcoming')
   async getUpcomingBirthdays(
-    @Query('days', new ParseIntPipe({ optional: true })) days?: number
+    @Query('days', new ParseIntPipe({ optional: true })) days?: number,
   ) {
     try {
       // This would be implemented similar to the patient birthdays functionality
@@ -833,13 +843,14 @@ export class EmployeeController {
         message: 'Upcoming employee birthdays retrieved successfully',
         data: [],
         count: 0,
-        message_note: 'Birthday tracking functionality would be implemented here'
+        message_note:
+          'Birthday tracking functionality would be implemented here',
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to retrieve upcoming birthdays',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -851,15 +862,15 @@ export class EmployeeController {
   @Get('export/data')
   async exportEmployeesData(
     @Query('format') format?: string,
-    @Query() filters?: EmployeeSearchQueryDto
+    @Query() filters?: EmployeeSearchQueryDto,
   ) {
     try {
       // This would implement actual CSV/Excel export
       const result = await this.employeeService.getEmployees({
         ...filters,
-        limit: '1000' // Export more records
+        limit: '1000', // Export more records
       });
-      
+
       return {
         success: true,
         message: 'Employee export prepared successfully',
@@ -868,15 +879,15 @@ export class EmployeeController {
           totalExported: result.total,
           format: format || 'json',
           exportDate: new Date(),
-          message: 'Export functionality would generate CSV/Excel file here'
-        }
+          message: 'Export functionality would generate CSV/Excel file here',
+        },
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to export employees data',
-        error: error.message
+        error: error.message,
       };
     }
   }
-} 
+}

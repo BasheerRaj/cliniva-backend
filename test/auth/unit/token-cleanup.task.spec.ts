@@ -31,7 +31,9 @@ describe('TokenCleanupTask', () => {
     it('should call SessionService.cleanupExpiredTokens', async () => {
       // Arrange
       const deletedCount = 5;
-      jest.spyOn(sessionService, 'cleanupExpiredTokens').mockResolvedValue(deletedCount);
+      jest
+        .spyOn(sessionService, 'cleanupExpiredTokens')
+        .mockResolvedValue(deletedCount);
 
       // Act
       await task.handleTokenCleanup();
@@ -43,14 +45,18 @@ describe('TokenCleanupTask', () => {
     it('should log the number of tokens removed', async () => {
       // Arrange
       const deletedCount = 10;
-      jest.spyOn(sessionService, 'cleanupExpiredTokens').mockResolvedValue(deletedCount);
+      jest
+        .spyOn(sessionService, 'cleanupExpiredTokens')
+        .mockResolvedValue(deletedCount);
       const loggerSpy = jest.spyOn(task['logger'], 'log');
 
       // Act
       await task.handleTokenCleanup();
 
       // Assert
-      expect(loggerSpy).toHaveBeenCalledWith('Starting scheduled token blacklist cleanup');
+      expect(loggerSpy).toHaveBeenCalledWith(
+        'Starting scheduled token blacklist cleanup',
+      );
       expect(loggerSpy).toHaveBeenCalledWith(
         `Token cleanup completed successfully. Removed ${deletedCount} expired token(s) from blacklist`,
       );
@@ -59,7 +65,9 @@ describe('TokenCleanupTask', () => {
     it('should log warning when high number of tokens are cleaned up', async () => {
       // Arrange
       const deletedCount = 1500;
-      jest.spyOn(sessionService, 'cleanupExpiredTokens').mockResolvedValue(deletedCount);
+      jest
+        .spyOn(sessionService, 'cleanupExpiredTokens')
+        .mockResolvedValue(deletedCount);
       const warnSpy = jest.spyOn(task['logger'], 'warn');
 
       // Act
@@ -74,7 +82,9 @@ describe('TokenCleanupTask', () => {
     it('should handle errors gracefully without throwing', async () => {
       // Arrange
       const error = new Error('Database connection failed');
-      jest.spyOn(sessionService, 'cleanupExpiredTokens').mockRejectedValue(error);
+      jest
+        .spyOn(sessionService, 'cleanupExpiredTokens')
+        .mockRejectedValue(error);
       const errorSpy = jest.spyOn(task['logger'], 'error');
 
       // Act & Assert - should not throw
@@ -90,7 +100,9 @@ describe('TokenCleanupTask', () => {
     it('should call SessionService.cleanupExpiredTokens', async () => {
       // Arrange
       const deletedCount = 3;
-      jest.spyOn(sessionService, 'cleanupExpiredTokens').mockResolvedValue(deletedCount);
+      jest
+        .spyOn(sessionService, 'cleanupExpiredTokens')
+        .mockResolvedValue(deletedCount);
 
       // Act
       const result = await task.triggerManualCleanup();
@@ -103,7 +115,9 @@ describe('TokenCleanupTask', () => {
     it('should log manual cleanup trigger', async () => {
       // Arrange
       const deletedCount = 7;
-      jest.spyOn(sessionService, 'cleanupExpiredTokens').mockResolvedValue(deletedCount);
+      jest
+        .spyOn(sessionService, 'cleanupExpiredTokens')
+        .mockResolvedValue(deletedCount);
       const loggerSpy = jest.spyOn(task['logger'], 'log');
 
       // Act
@@ -119,10 +133,14 @@ describe('TokenCleanupTask', () => {
     it('should throw error when cleanup fails', async () => {
       // Arrange
       const error = new Error('Cleanup failed');
-      jest.spyOn(sessionService, 'cleanupExpiredTokens').mockRejectedValue(error);
+      jest
+        .spyOn(sessionService, 'cleanupExpiredTokens')
+        .mockRejectedValue(error);
 
       // Act & Assert
-      await expect(task.triggerManualCleanup()).rejects.toThrow('Cleanup failed');
+      await expect(task.triggerManualCleanup()).rejects.toThrow(
+        'Cleanup failed',
+      );
     });
   });
 });

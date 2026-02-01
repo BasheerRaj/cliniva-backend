@@ -1,10 +1,10 @@
-import { 
-  IsString, 
-  IsNotEmpty, 
-  IsOptional, 
+import {
+  IsString,
+  IsNotEmpty,
+  IsOptional,
   IsEmail,
   IsDateString,
-  IsEnum, 
+  IsEnum,
   IsNumber,
   IsBoolean,
   MinLength,
@@ -16,7 +16,7 @@ import {
   ValidateNested,
   IsMongoId,
   Matches,
-  IsUrl
+  IsUrl,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 
@@ -51,7 +51,16 @@ export class CreateEmployeeDto {
   @MaxLength(20)
   phone: string;
 
-  @IsEnum(['doctor', 'nurse', 'technician', 'admin', 'receptionist', 'pharmacist', 'therapist', 'other'])
+  @IsEnum([
+    'doctor',
+    'nurse',
+    'technician',
+    'admin',
+    'receptionist',
+    'pharmacist',
+    'therapist',
+    'other',
+  ])
   @IsNotEmpty()
   role: string;
 
@@ -250,7 +259,17 @@ export class CreateEmployeeDocumentDto {
   @IsNotEmpty()
   userId: string;
 
-  @IsEnum(['contract', 'certificate', 'work_permit', 'cv', 'id_copy', 'diploma', 'license', 'insurance', 'other'])
+  @IsEnum([
+    'contract',
+    'certificate',
+    'work_permit',
+    'cv',
+    'id_copy',
+    'diploma',
+    'license',
+    'insurance',
+    'other',
+  ])
   @IsNotEmpty()
   documentType: string;
 
@@ -363,21 +382,29 @@ export class CreateEmployeeShiftDto {
   @MaxLength(50)
   shiftName: string;
 
-  @IsEnum(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'])
+  @IsEnum([
+    'monday',
+    'tuesday',
+    'wednesday',
+    'thursday',
+    'friday',
+    'saturday',
+    'sunday',
+  ])
   @IsNotEmpty()
   dayOfWeek: string;
 
   @IsString()
   @IsNotEmpty()
   @Matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, {
-    message: 'Start time must be in HH:mm format (e.g., 08:00)'
+    message: 'Start time must be in HH:mm format (e.g., 08:00)',
   })
   startTime: string;
 
   @IsString()
   @IsNotEmpty()
   @Matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, {
-    message: 'End time must be in HH:mm format (e.g., 17:00)'
+    message: 'End time must be in HH:mm format (e.g., 17:00)',
   })
   endTime: string;
 
@@ -439,7 +466,16 @@ export class EmployeeSearchQueryDto {
   @IsOptional()
   employeeNumber?: string;
 
-  @IsEnum(['doctor', 'nurse', 'technician', 'admin', 'receptionist', 'pharmacist', 'therapist', 'other'])
+  @IsEnum([
+    'doctor',
+    'nurse',
+    'technician',
+    'admin',
+    'receptionist',
+    'pharmacist',
+    'therapist',
+    'other',
+  ])
   @IsOptional()
   role?: string;
 
@@ -614,7 +650,7 @@ export class EmployeeResponseDto {
   dateOfBirth: Date;
   address?: string;
   isActive: boolean;
-  
+
   // Employee Profile
   employeeNumber?: string;
   cardNumber?: string;
@@ -629,10 +665,10 @@ export class EmployeeResponseDto {
   taxId?: string;
   notes?: string;
   terminationDate?: Date;
-  
+
   createdAt: Date;
   updatedAt: Date;
-  
+
   // Populated fields (optional)
   organization?: {
     _id: string;
@@ -750,4 +786,4 @@ export class TerminateEmployeeDto {
   @IsOptional()
   @MaxLength(500)
   finalNotes?: string;
-} 
+}

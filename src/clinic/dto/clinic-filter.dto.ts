@@ -3,7 +3,7 @@ import { Transform } from 'class-transformer';
 
 /**
  * DTO for filtering clinics by complex
- * 
+ *
  * Business Rule: BZR-g3e5c9a0 - Complex-based clinic filtering
  */
 export class ClinicFilterDto {

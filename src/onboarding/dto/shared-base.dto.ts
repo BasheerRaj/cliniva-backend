@@ -1,4 +1,13 @@
-import { IsString, IsOptional, IsNumber, IsUrl, IsEmail, IsArray, ValidateNested, IsEnum } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsNumber,
+  IsUrl,
+  IsEmail,
+  IsArray,
+  ValidateNested,
+  IsEnum,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 // Shared phone number DTO

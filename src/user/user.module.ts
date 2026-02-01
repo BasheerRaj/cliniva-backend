@@ -3,12 +3,24 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { UserController } from './user.controller';
 import { UserService } from './user.service';
 import { User, UserSchema } from '../database/schemas/user.schema';
-import { Organization, OrganizationSchema } from '../database/schemas/organization.schema';
+import {
+  Organization,
+  OrganizationSchema,
+} from '../database/schemas/organization.schema';
 import { Complex, ComplexSchema } from '../database/schemas/complex.schema';
 import { Clinic, ClinicSchema } from '../database/schemas/clinic.schema';
-import { Subscription, SubscriptionSchema } from '../database/schemas/subscription.schema';
-import { SubscriptionPlan, SubscriptionPlanSchema } from '../database/schemas/subscription-plan.schema';
-import { Appointment, AppointmentSchema } from '../database/schemas/appointment.schema';
+import {
+  Subscription,
+  SubscriptionSchema,
+} from '../database/schemas/subscription.schema';
+import {
+  SubscriptionPlan,
+  SubscriptionPlanSchema,
+} from '../database/schemas/subscription-plan.schema';
+import {
+  Appointment,
+  AppointmentSchema,
+} from '../database/schemas/appointment.schema';
 import { AuthModule } from '../auth/auth.module';
 
 @Module({

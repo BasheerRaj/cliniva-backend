@@ -9,10 +9,10 @@ export const PERMISSIONS_KEY = 'permissions';
 
 /**
  * Permissions decorator to protect routes and methods
- * 
+ *
  * @param permissions - Array of required permissions
  * @param options - Additional options for permission checking
- * 
+ *
  * Usage examples:
  * @Permissions([PermissionsEnum.USER_READ])
  * @Permissions([PermissionsEnum.USER_CREATE, PermissionsEnum.USER_UPDATE], { requireAll: true })
@@ -20,7 +20,7 @@ export const PERMISSIONS_KEY = 'permissions';
  */
 export const Permissions = (
   permissions: PermissionsEnum[],
-  options: Partial<Omit<PermissionMetadata, 'permissions'>> = {}
+  options: Partial<Omit<PermissionMetadata, 'permissions'>> = {},
 ) => {
   const metadata: PermissionMetadata = {
     permissions,
@@ -28,7 +28,7 @@ export const Permissions = (
     allowSelf: options.allowSelf ?? false,
     selfParam: options.selfParam ?? 'id',
   };
-  
+
   return SetMetadata(PERMISSIONS_KEY, metadata);
 };
 
@@ -87,15 +87,22 @@ export const CanListRoles = () => Permissions([PermissionsEnum.ROLE_LIST]);
 /**
  * Admin decorators
  */
-export const RequireAdminAccess = () => Permissions([PermissionsEnum.ADMIN_ACCESS]);
+export const RequireAdminAccess = () =>
+  Permissions([PermissionsEnum.ADMIN_ACCESS]);
 export const CanViewLogs = () => Permissions([PermissionsEnum.ADMIN_VIEW_LOGS]);
-export const CanManageSettings = () => Permissions([PermissionsEnum.ADMIN_MANAGE_SETTINGS]);
-export const CanViewAnalytics = () => Permissions([PermissionsEnum.ADMIN_VIEW_ANALYTICS]);
+export const CanManageSettings = () =>
+  Permissions([PermissionsEnum.ADMIN_MANAGE_SETTINGS]);
+export const CanViewAnalytics = () =>
+  Permissions([PermissionsEnum.ADMIN_VIEW_ANALYTICS]);
 
 /**
  * Database management decorators
  */
-export const CanReadDatabase = () => Permissions([PermissionsEnum.DATABASE_READ]);
-export const CanBackupDatabase = () => Permissions([PermissionsEnum.DATABASE_BACKUP]);
-export const CanRestoreDatabase = () => Permissions([PermissionsEnum.DATABASE_RESTORE]);
-export const CanCheckDatabaseHealth = () => Permissions([PermissionsEnum.DATABASE_HEALTH_CHECK]);
+export const CanReadDatabase = () =>
+  Permissions([PermissionsEnum.DATABASE_READ]);
+export const CanBackupDatabase = () =>
+  Permissions([PermissionsEnum.DATABASE_BACKUP]);
+export const CanRestoreDatabase = () =>
+  Permissions([PermissionsEnum.DATABASE_RESTORE]);
+export const CanCheckDatabaseHealth = () =>
+  Permissions([PermissionsEnum.DATABASE_HEALTH_CHECK]);

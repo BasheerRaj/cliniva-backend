@@ -3,7 +3,7 @@ import { Document } from 'mongoose';
 
 @Schema({
   timestamps: false,
-  collection: 'rate_limit_counters'
+  collection: 'rate_limit_counters',
 })
 export class RateLimitCounter extends Document {
   @Prop({ required: true, unique: true })
@@ -19,7 +19,8 @@ export class RateLimitCounter extends Document {
   expiresAt: Date;
 }
 
-export const RateLimitCounterSchema = SchemaFactory.createForClass(RateLimitCounter);
+export const RateLimitCounterSchema =
+  SchemaFactory.createForClass(RateLimitCounter);
 
 // Unique index on key for fast lookup and prevent duplicates
 RateLimitCounterSchema.index({ key: 1 }, { unique: true });

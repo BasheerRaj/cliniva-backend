@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getConnectionToken } from '@nestjs/mongoose';
 import { OnboardingService } from '../../../src/onboarding/onboarding.service';
-import { 
+import {
   mockSubscriptionService,
   mockOrganizationService,
   mockComplexService,
@@ -13,7 +13,7 @@ import {
   mockDynamicInfoService,
   mockUserAccessService,
   mockConnection,
-  resetAllMocks
+  resetAllMocks,
 } from '../mocks/service.mocks';
 import { validComplexPlanData } from '../fixtures/onboarding-data.fixture';
 import { SubscriptionService } from '../../../src/subscription/subscription.service';
@@ -37,48 +37,48 @@ describe('Complex Plan Tests', () => {
         OnboardingService,
         {
           provide: getConnectionToken(),
-          useValue: mockConnection
+          useValue: mockConnection,
         },
         {
           provide: SubscriptionService,
-          useValue: mockSubscriptionService
+          useValue: mockSubscriptionService,
         },
         {
           provide: OrganizationService,
-          useValue: mockOrganizationService
+          useValue: mockOrganizationService,
         },
         {
           provide: ComplexService,
-          useValue: mockComplexService
+          useValue: mockComplexService,
         },
         {
           provide: ClinicService,
-          useValue: mockClinicService
+          useValue: mockClinicService,
         },
         {
           provide: DepartmentService,
-          useValue: mockDepartmentService
+          useValue: mockDepartmentService,
         },
         {
           provide: ServiceService,
-          useValue: mockServiceService
+          useValue: mockServiceService,
         },
         {
           provide: WorkingHoursService,
-          useValue: mockWorkingHoursService
+          useValue: mockWorkingHoursService,
         },
         {
           provide: ContactService,
-          useValue: mockContactService
+          useValue: mockContactService,
         },
         {
           provide: DynamicInfoService,
-          useValue: mockDynamicInfoService
+          useValue: mockDynamicInfoService,
         },
         {
           provide: UserAccessService,
-          useValue: mockUserAccessService
-        }
+          useValue: mockUserAccessService,
+        },
       ],
     }).compile();
 
@@ -94,7 +94,7 @@ describe('Complex Plan Tests', () => {
     it('should validate basic complex plan with single complex and departments', async () => {
       const basicComplexData = {
         ...validComplexPlanData,
-        clinics: undefined
+        clinics: undefined,
       };
 
       const result = await service.validateOnboardingData(basicComplexData);
@@ -112,12 +112,12 @@ describe('Complex Plan Tests', () => {
             departmentIds: ['obstetrics', 'gynecology'],
             businessProfile: {
               yearEstablished: 2015,
-              mission: 'Women\'s healthcare excellence'
+              mission: "Women's healthcare excellence",
             },
             legalInfo: {
               vatNumber: '300987654321002',
-              crNumber: '2050987654'
-            }
+              crNumber: '2050987654',
+            },
           },
           {
             name: 'Al-Noor Medical Complex',
@@ -125,20 +125,20 @@ describe('Complex Plan Tests', () => {
             departmentIds: ['pediatrics', 'family_medicine'],
             businessProfile: {
               yearEstablished: 2018,
-              mission: 'Family healthcare services'
+              mission: 'Family healthcare services',
             },
             legalInfo: {
               vatNumber: '300987654321003',
-              crNumber: '2050987655'
-            }
-          }
+              crNumber: '2050987655',
+            },
+          },
         ],
         departments: [
           { name: 'Obstetrics', description: 'Pregnancy and childbirth' },
-          { name: 'Gynecology', description: 'Women\'s health' },
-          { name: 'Pediatrics', description: 'Children\'s healthcare' },
-          { name: 'Family Medicine', description: 'General family care' }
-        ]
+          { name: 'Gynecology', description: "Women's health" },
+          { name: 'Pediatrics', description: "Children's healthcare" },
+          { name: 'Family Medicine', description: 'General family care' },
+        ],
       };
 
       const result = await service.validateOnboardingData(multiComplexData);
@@ -151,33 +151,33 @@ describe('Complex Plan Tests', () => {
         ...validComplexPlanData,
         complexes: [
           {
-            name: 'Women\'s Health Complex',
+            name: "Women's Health Complex",
             departmentIds: ['obstetrics', 'gynecology', 'fertility'],
             businessProfile: { yearEstablished: 2015 },
-            legalInfo: { vatNumber: '300987654321002' }
-          }
+            legalInfo: { vatNumber: '300987654321002' },
+          },
         ],
         departments: [
           { name: 'Obstetrics' },
           { name: 'Gynecology' },
-          { name: 'Fertility' }
+          { name: 'Fertility' },
         ],
         clinics: [
           {
             name: 'Maternity Center',
             complexDepartmentId: 'complex_dept_obstetrics',
-            capacity: { maxPatients: 80, sessionDuration: 60 }
+            capacity: { maxPatients: 80, sessionDuration: 60 },
           },
           {
             name: 'Gynecology Clinic',
             complexDepartmentId: 'complex_dept_gynecology',
-            capacity: { maxPatients: 60, sessionDuration: 30 }
+            capacity: { maxPatients: 60, sessionDuration: 30 },
           },
           {
             name: 'Fertility Center',
             complexDepartmentId: 'complex_dept_fertility',
-            capacity: { maxPatients: 40, sessionDuration: 45 }
-          }
+            capacity: { maxPatients: 40, sessionDuration: 45 },
+          },
         ],
         services: [
           {
@@ -185,16 +185,16 @@ describe('Complex Plan Tests', () => {
             description: 'Regular pregnancy monitoring',
             durationMinutes: 45,
             price: 200,
-            complexDepartmentId: 'complex_dept_obstetrics'
+            complexDepartmentId: 'complex_dept_obstetrics',
           },
           {
             name: 'IVF Consultation',
             description: 'In-vitro fertilization consultation',
             durationMinutes: 60,
             price: 500,
-            complexDepartmentId: 'complex_dept_fertility'
-          }
-        ]
+            complexDepartmentId: 'complex_dept_fertility',
+          },
+        ],
       };
 
       const result = await service.validateOnboardingData(fullComplexData);
@@ -205,45 +205,61 @@ describe('Complex Plan Tests', () => {
     it('should reject complex plan without complexes', async () => {
       const complexWithoutComplexes = {
         ...validComplexPlanData,
-        complexes: undefined
+        complexes: undefined,
       };
 
-      const result = await service.validateOnboardingData(complexWithoutComplexes);
+      const result = await service.validateOnboardingData(
+        complexWithoutComplexes,
+      );
       expect(result.isValid).toBe(false);
-      expect(result.errors).toContain('Complex plan requires at least one complex');
+      expect(result.errors).toContain(
+        'Complex plan requires at least one complex',
+      );
     });
 
     it('should reject complex plan with empty complexes array', async () => {
       const complexWithEmptyArray = {
         ...validComplexPlanData,
-        complexes: []
+        complexes: [],
       };
 
-      const result = await service.validateOnboardingData(complexWithEmptyArray);
+      const result = await service.validateOnboardingData(
+        complexWithEmptyArray,
+      );
       expect(result.isValid).toBe(false);
-      expect(result.errors).toContain('Complex plan requires at least one complex');
+      expect(result.errors).toContain(
+        'Complex plan requires at least one complex',
+      );
     });
 
     it('should reject complex plan without departments', async () => {
       const complexWithoutDepartments = {
         ...validComplexPlanData,
-        departments: undefined
+        departments: undefined,
       };
 
-      const result = await service.validateOnboardingData(complexWithoutDepartments);
+      const result = await service.validateOnboardingData(
+        complexWithoutDepartments,
+      );
       expect(result.isValid).toBe(false);
-      expect(result.errors).toContain('Complex plan requires at least one department');
+      expect(result.errors).toContain(
+        'Complex plan requires at least one department',
+      );
     });
 
     it('should reject complex plan with empty departments array', async () => {
       const complexWithEmptyDepts = {
         ...validComplexPlanData,
-        departments: []
+        departments: [],
       };
 
-      const result = await service.validateOnboardingData(complexWithEmptyDepts);
+      const result = await service.validateOnboardingData(
+        complexWithEmptyDepts,
+      );
       expect(result.isValid).toBe(false);
-      expect(result.errors).toContain('Complex plan requires at least one department');
+      expect(result.errors).toContain(
+        'Complex plan requires at least one department',
+      );
     });
 
     it('should reject complex plan with organization (not allowed)', async () => {
@@ -251,16 +267,20 @@ describe('Complex Plan Tests', () => {
         ...validComplexPlanData,
         organization: {
           name: 'Should not be allowed',
-          legalName: 'Organization for complex plan'
-        }
+          legalName: 'Organization for complex plan',
+        },
       };
 
       // This would be caught by plan limits validation
-      const result = await service.validateOnboardingData(complexWithOrganization);
+      const result = await service.validateOnboardingData(
+        complexWithOrganization,
+      );
       expect(result.isValid).toBe(false);
-      expect(result.errors.some(error => 
-        error.includes('Maximum 0 organization(s) allowed')
-      )).toBe(true);
+      expect(
+        result.errors.some((error) =>
+          error.includes('Maximum 0 organization(s) allowed'),
+        ),
+      ).toBe(true);
     });
   });
 
@@ -268,25 +288,33 @@ describe('Complex Plan Tests', () => {
     it('should accept maximum allowed entities', async () => {
       const maxEntitiesData = {
         ...validComplexPlanData,
-        complexes: Array(5).fill(0).map((_, i) => ({
-          name: `Complex ${i + 1}`,
-          departmentIds: ['dept1', 'dept2'],
-          businessProfile: { yearEstablished: 2015 },
-          legalInfo: { vatNumber: `30098765432100${i}` }
-        })),
-        departments: Array(50).fill(0).map((_, i) => ({
-          name: `Department ${i + 1}`,
-          description: `Department ${i + 1} description`
-        })),
-        clinics: Array(20).fill(0).map((_, i) => ({
-          name: `Clinic ${i + 1}`,
-          capacity: { maxPatients: 50, sessionDuration: 30 }
-        })),
-        services: Array(100).fill(0).map((_, i) => ({
-          name: `Service ${i + 1}`,
-          durationMinutes: 30,
-          price: 150
-        }))
+        complexes: Array(5)
+          .fill(0)
+          .map((_, i) => ({
+            name: `Complex ${i + 1}`,
+            departmentIds: ['dept1', 'dept2'],
+            businessProfile: { yearEstablished: 2015 },
+            legalInfo: { vatNumber: `30098765432100${i}` },
+          })),
+        departments: Array(50)
+          .fill(0)
+          .map((_, i) => ({
+            name: `Department ${i + 1}`,
+            description: `Department ${i + 1} description`,
+          })),
+        clinics: Array(20)
+          .fill(0)
+          .map((_, i) => ({
+            name: `Clinic ${i + 1}`,
+            capacity: { maxPatients: 50, sessionDuration: 30 },
+          })),
+        services: Array(100)
+          .fill(0)
+          .map((_, i) => ({
+            name: `Service ${i + 1}`,
+            durationMinutes: 30,
+            price: 150,
+          })),
       };
 
       const result = await service.validateOnboardingData(maxEntitiesData);
@@ -297,64 +325,94 @@ describe('Complex Plan Tests', () => {
     it('should reject exceeding complex limit', async () => {
       const exceedComplexData = {
         ...validComplexPlanData,
-        complexes: Array(6).fill(0).map((_, i) => ({ // Exceeds limit of 5
-          name: `Complex ${i + 1}`,
-          departmentIds: ['dept1'],
-          businessProfile: { yearEstablished: 2015 }
-        })),
-        departments: [{ name: 'Department 1' }]
+        complexes: Array(6)
+          .fill(0)
+          .map((_, i) => ({
+            // Exceeds limit of 5
+            name: `Complex ${i + 1}`,
+            departmentIds: ['dept1'],
+            businessProfile: { yearEstablished: 2015 },
+          })),
+        departments: [{ name: 'Department 1' }],
       };
 
       const result = await service.validateOnboardingData(exceedComplexData);
       expect(result.isValid).toBe(false);
-      expect(result.errors.some(error => error.includes('Maximum 5 complex(es) allowed'))).toBe(true);
+      expect(
+        result.errors.some((error) =>
+          error.includes('Maximum 5 complex(es) allowed'),
+        ),
+      ).toBe(true);
     });
 
     it('should reject exceeding clinic limit', async () => {
       const exceedClinicData = {
         ...validComplexPlanData,
-        clinics: Array(21).fill(0).map((_, i) => ({ // Exceeds limit of 20
-          name: `Clinic ${i + 1}`,
-          capacity: { maxPatients: 50, sessionDuration: 30 }
-        }))
+        clinics: Array(21)
+          .fill(0)
+          .map((_, i) => ({
+            // Exceeds limit of 20
+            name: `Clinic ${i + 1}`,
+            capacity: { maxPatients: 50, sessionDuration: 30 },
+          })),
       };
 
       const result = await service.validateOnboardingData(exceedClinicData);
       expect(result.isValid).toBe(false);
-      expect(result.errors.some(error => error.includes('Maximum 20 clinic(s) allowed'))).toBe(true);
+      expect(
+        result.errors.some((error) =>
+          error.includes('Maximum 20 clinic(s) allowed'),
+        ),
+      ).toBe(true);
     });
 
     it('should reject exceeding department limit', async () => {
       const exceedDeptData = {
         ...validComplexPlanData,
-        complexes: [{ 
-          name: 'Complex 1', 
-          departmentIds: ['dept1'],
-          businessProfile: { yearEstablished: 2015 }
-        }],
-        departments: Array(51).fill(0).map((_, i) => ({ // Exceeds limit of 50
-          name: `Department ${i + 1}`
-        }))
+        complexes: [
+          {
+            name: 'Complex 1',
+            departmentIds: ['dept1'],
+            businessProfile: { yearEstablished: 2015 },
+          },
+        ],
+        departments: Array(51)
+          .fill(0)
+          .map((_, i) => ({
+            // Exceeds limit of 50
+            name: `Department ${i + 1}`,
+          })),
       };
 
       const result = await service.validateOnboardingData(exceedDeptData);
       expect(result.isValid).toBe(false);
-      expect(result.errors.some(error => error.includes('Maximum 50 department(s) allowed'))).toBe(true);
+      expect(
+        result.errors.some((error) =>
+          error.includes('Maximum 50 department(s) allowed'),
+        ),
+      ).toBe(true);
     });
 
     it('should reject exceeding service limit', async () => {
       const exceedServiceData = {
         ...validComplexPlanData,
-        services: Array(101).fill(0).map((_, i) => ({ // Exceeds limit of 100
-          name: `Service ${i + 1}`,
-          durationMinutes: 30,
-          price: 150
-        }))
+        services: Array(101)
+          .fill(0)
+          .map((_, i) => ({
+            // Exceeds limit of 100
+            name: `Service ${i + 1}`,
+            durationMinutes: 30,
+            price: 150,
+          })),
       };
 
       const result = await service.validateOnboardingData(exceedServiceData);
       expect(result.isValid).toBe(false);
-      expect(result.errors.some(error => error.includes('Maximum 100 service(s) allowed'))).toBe(true);
+      expect(
+        result.errors.some((error) =>
+          error.includes('Maximum 100 service(s) allowed'),
+        ),
+      ).toBe(true);
     });
   });
 
@@ -373,7 +431,7 @@ describe('Complex Plan Tests', () => {
         managerName: 'Dr. Fatima Al-Harbi',
         departmentIds: ['obstetrics', 'gynecology', 'pediatrics'],
         businessProfile: expect.any(Object),
-        legalInfo: expect.any(Object)
+        legalInfo: expect.any(Object),
       });
 
       // Should not create organization
@@ -388,32 +446,35 @@ describe('Complex Plan Tests', () => {
             name: 'Complex 1',
             departmentIds: ['dept1'],
             businessProfile: { yearEstablished: 2015 },
-            legalInfo: { vatNumber: '300987654321002' }
+            legalInfo: { vatNumber: '300987654321002' },
           },
           {
             name: 'Complex 2',
             departmentIds: ['dept2'],
             businessProfile: { yearEstablished: 2016 },
-            legalInfo: { vatNumber: '300987654321003' }
-          }
+            legalInfo: { vatNumber: '300987654321003' },
+          },
         ],
-        departments: [
-          { name: 'Department 1' },
-          { name: 'Department 2' }
-        ]
+        departments: [{ name: 'Department 1' }, { name: 'Department 2' }],
       };
 
       await service.completeOnboarding(multiComplexData);
 
       expect(mockComplexService.createComplex).toHaveBeenCalledTimes(2);
-      expect(mockComplexService.createComplex).toHaveBeenNthCalledWith(1, expect.objectContaining({
-        name: 'Complex 1',
-        subscriptionId: expect.any(String)
-      }));
-      expect(mockComplexService.createComplex).toHaveBeenNthCalledWith(2, expect.objectContaining({
-        name: 'Complex 2',
-        subscriptionId: expect.any(String)
-      }));
+      expect(mockComplexService.createComplex).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({
+          name: 'Complex 1',
+          subscriptionId: expect.any(String),
+        }),
+      );
+      expect(mockComplexService.createComplex).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          name: 'Complex 2',
+          subscriptionId: expect.any(String),
+        }),
+      );
     });
 
     it('should create complex-department relationships', async () => {
@@ -423,31 +484,30 @@ describe('Complex Plan Tests', () => {
           {
             name: 'Test Complex',
             departmentIds: ['obstetrics', 'gynecology', 'pediatrics'],
-            businessProfile: { yearEstablished: 2015 }
-          }
+            businessProfile: { yearEstablished: 2015 },
+          },
         ],
         departments: [
           { name: 'Obstetrics' },
           { name: 'Gynecology' },
-          { name: 'Pediatrics' }
-        ]
+          { name: 'Pediatrics' },
+        ],
       };
 
       await service.completeOnboarding(complexWithDepts);
 
-      expect(mockDepartmentService.createComplexDepartment).toHaveBeenCalledTimes(3);
-      expect(mockDepartmentService.createComplexDepartment).toHaveBeenCalledWith(
-        expect.any(String),
-        'obstetrics'
-      );
-      expect(mockDepartmentService.createComplexDepartment).toHaveBeenCalledWith(
-        expect.any(String),
-        'gynecology'
-      );
-      expect(mockDepartmentService.createComplexDepartment).toHaveBeenCalledWith(
-        expect.any(String),
-        'pediatrics'
-      );
+      expect(
+        mockDepartmentService.createComplexDepartment,
+      ).toHaveBeenCalledTimes(3);
+      expect(
+        mockDepartmentService.createComplexDepartment,
+      ).toHaveBeenCalledWith(expect.any(String), 'obstetrics');
+      expect(
+        mockDepartmentService.createComplexDepartment,
+      ).toHaveBeenCalledWith(expect.any(String), 'gynecology');
+      expect(
+        mockDepartmentService.createComplexDepartment,
+      ).toHaveBeenCalledWith(expect.any(String), 'pediatrics');
     });
 
     it('should create clinics linked to complex departments', async () => {
@@ -457,14 +517,14 @@ describe('Complex Plan Tests', () => {
           {
             name: 'Maternity Center',
             complexDepartmentId: 'complex_dept_obstetrics',
-            capacity: { maxPatients: 80, sessionDuration: 60 }
+            capacity: { maxPatients: 80, sessionDuration: 60 },
           },
           {
-            name: 'Women\'s Health Clinic',
+            name: "Women's Health Clinic",
             complexDepartmentId: 'complex_dept_gynecology',
-            capacity: { maxPatients: 60, sessionDuration: 30 }
-          }
-        ]
+            capacity: { maxPatients: 60, sessionDuration: 30 },
+          },
+        ],
       };
 
       await service.completeOnboarding(complexWithClinics);
@@ -474,13 +534,13 @@ describe('Complex Plan Tests', () => {
         complexDepartmentId: 'complex_dept_obstetrics',
         subscriptionId: expect.any(String),
         name: 'Maternity Center',
-        capacity: { maxPatients: 80, sessionDuration: 60 }
+        capacity: { maxPatients: 80, sessionDuration: 60 },
       });
       expect(mockClinicService.createClinic).toHaveBeenCalledWith({
         complexDepartmentId: 'complex_dept_gynecology',
         subscriptionId: expect.any(String),
-        name: 'Women\'s Health Clinic',
-        capacity: { maxPatients: 60, sessionDuration: 30 }
+        name: "Women's Health Clinic",
+        capacity: { maxPatients: 60, sessionDuration: 30 },
       });
     });
 
@@ -489,9 +549,9 @@ describe('Complex Plan Tests', () => {
 
       expect(mockUserAccessService.createUserAccess).toHaveBeenCalledWith(
         expect.any(String), // userId
-        'complex',          // entityType
+        'complex', // entityType
         expect.any(String), // entityId
-        'owner'             // role
+        'owner', // role
       );
     });
   });
@@ -510,7 +570,7 @@ describe('Complex Plan Tests', () => {
             openingTime: '08:00',
             closingTime: '18:00',
             breakStartTime: '12:00',
-            breakEndTime: '13:00'
+            breakEndTime: '13:00',
           },
           {
             entityType: 'complex',
@@ -518,31 +578,33 @@ describe('Complex Plan Tests', () => {
             dayOfWeek: 'monday',
             isWorkingDay: true,
             openingTime: '08:00',
-            closingTime: '18:00'
+            closingTime: '18:00',
           },
           // Clinic level (within complex hours)
           {
             entityType: 'clinic',
-            entityName: 'Women\'s Wellness Center',
+            entityName: "Women's Wellness Center",
             dayOfWeek: 'tuesday',
             isWorkingDay: true,
             openingTime: '09:00',
             closingTime: '17:00',
             breakStartTime: '12:30',
-            breakEndTime: '13:30'
+            breakEndTime: '13:30',
           },
           {
             entityType: 'clinic',
-            entityName: 'Women\'s Wellness Center',
+            entityName: "Women's Wellness Center",
             dayOfWeek: 'wednesday',
             isWorkingDay: true,
             openingTime: '09:00',
-            closingTime: '17:00'
-          }
-        ]
+            closingTime: '17:00',
+          },
+        ],
       };
 
-      const result = await service.validateOnboardingData(complexWithWorkingHours);
+      const result = await service.validateOnboardingData(
+        complexWithWorkingHours,
+      );
       expect(result.isValid).toBe(true);
       expect(result.errors).toHaveLength(0);
     });
@@ -556,25 +618,27 @@ describe('Complex Plan Tests', () => {
             entityType: 'complex',
             entityName: 'Al-Zahra Medical Complex',
             dayOfWeek: 'friday',
-            isWorkingDay: false
+            isWorkingDay: false,
           },
           // But clinic open on friday
           {
             entityType: 'clinic',
-            entityName: 'Women\'s Wellness Center',
+            entityName: "Women's Wellness Center",
             dayOfWeek: 'friday',
             isWorkingDay: true,
             openingTime: '09:00',
-            closingTime: '17:00'
-          }
-        ]
+            closingTime: '17:00',
+          },
+        ],
       };
 
       const result = await service.validateOnboardingData(invalidWorkingHours);
       expect(result.isValid).toBe(false);
-      expect(result.errors.some(error => 
-        error.includes('cannot be open on friday when')
-      )).toBe(true);
+      expect(
+        result.errors.some((error) =>
+          error.includes('cannot be open on friday when'),
+        ),
+      ).toBe(true);
     });
 
     it('should validate complex working hours without clinics', async () => {
@@ -588,7 +652,7 @@ describe('Complex Plan Tests', () => {
             dayOfWeek: 'sunday',
             isWorkingDay: true,
             openingTime: '08:00',
-            closingTime: '18:00'
+            closingTime: '18:00',
           },
           {
             entityType: 'complex',
@@ -596,12 +660,14 @@ describe('Complex Plan Tests', () => {
             dayOfWeek: 'monday',
             isWorkingDay: true,
             openingTime: '08:00',
-            closingTime: '18:00'
-          }
-        ]
+            closingTime: '18:00',
+          },
+        ],
       };
 
-      const result = await service.validateOnboardingData(complexOnlyWorkingHours);
+      const result = await service.validateOnboardingData(
+        complexOnlyWorkingHours,
+      );
       expect(result.isValid).toBe(true);
       expect(result.errors).toHaveLength(0);
     });
@@ -610,8 +676,14 @@ describe('Complex Plan Tests', () => {
       const multiClinicWorkingHours = {
         ...validComplexPlanData,
         clinics: [
-          { name: 'Clinic A', capacity: { maxPatients: 50, sessionDuration: 30 } },
-          { name: 'Clinic B', capacity: { maxPatients: 40, sessionDuration: 45 } }
+          {
+            name: 'Clinic A',
+            capacity: { maxPatients: 50, sessionDuration: 30 },
+          },
+          {
+            name: 'Clinic B',
+            capacity: { maxPatients: 40, sessionDuration: 45 },
+          },
         ],
         workingHours: [
           // Complex hours
@@ -621,7 +693,7 @@ describe('Complex Plan Tests', () => {
             dayOfWeek: 'sunday',
             isWorkingDay: true,
             openingTime: '08:00',
-            closingTime: '18:00'
+            closingTime: '18:00',
           },
           // Clinic A hours
           {
@@ -630,7 +702,7 @@ describe('Complex Plan Tests', () => {
             dayOfWeek: 'monday',
             isWorkingDay: true,
             openingTime: '09:00',
-            closingTime: '17:00'
+            closingTime: '17:00',
           },
           // Clinic B hours
           {
@@ -639,12 +711,14 @@ describe('Complex Plan Tests', () => {
             dayOfWeek: 'tuesday',
             isWorkingDay: true,
             openingTime: '10:00',
-            closingTime: '16:00'
-          }
-        ]
+            closingTime: '16:00',
+          },
+        ],
       };
 
-      const result = await service.validateOnboardingData(multiClinicWorkingHours);
+      const result = await service.validateOnboardingData(
+        multiClinicWorkingHours,
+      );
       expect(result.isValid).toBe(true);
       expect(result.errors).toHaveLength(0);
     });
@@ -659,17 +733,17 @@ describe('Complex Plan Tests', () => {
             name: 'Al-Zahra Medical Complex',
             businessProfile: {
               yearEstablished: 2015,
-              mission: 'Exceptional women\'s and children\'s healthcare services',
-              vision: 'Premier women\'s medical complex in Western Region',
-              ceoName: 'Dr. Fatima Al-Harbi'
+              mission: "Exceptional women's and children's healthcare services",
+              vision: "Premier women's medical complex in Western Region",
+              ceoName: 'Dr. Fatima Al-Harbi',
             },
             legalInfo: {
               vatNumber: '300987654321002',
-              crNumber: '2050987654'
+              crNumber: '2050987654',
             },
-            departmentIds: ['obstetrics', 'gynecology']
-          }
-        ]
+            departmentIds: ['obstetrics', 'gynecology'],
+          },
+        ],
       };
 
       const result = await service.validateOnboardingData(complexWithProfile);
@@ -686,18 +760,20 @@ describe('Complex Plan Tests', () => {
             businessProfile: {
               yearEstablished: 1800, // Too early
               mission: 'A'.repeat(1001), // Too long
-              ceoName: 'B'.repeat(256) // Too long
+              ceoName: 'B'.repeat(256), // Too long
             },
             legalInfo: {
               vatNumber: 'invalid_vat',
-              crNumber: 'invalid_cr'
+              crNumber: 'invalid_cr',
             },
-            departmentIds: ['dept1']
-          }
-        ]
+            departmentIds: ['dept1'],
+          },
+        ],
       };
 
-      const result = await service.validateOnboardingData(complexWithInvalidProfile);
+      const result = await service.validateOnboardingData(
+        complexWithInvalidProfile,
+      );
       // Note: Complex business profile validation is not currently implemented
       expect(result.isValid).toBe(true);
       expect(result.errors).toHaveLength(0);
@@ -709,13 +785,15 @@ describe('Complex Plan Tests', () => {
         complexes: [
           {
             name: 'Minimal Complex',
-            departmentIds: ['dept1']
+            departmentIds: ['dept1'],
             // No business profile or legal info
-          }
-        ]
+          },
+        ],
       };
 
-      const result = await service.validateOnboardingData(complexWithoutProfile);
+      const result = await service.validateOnboardingData(
+        complexWithoutProfile,
+      );
       expect(result.isValid).toBe(true);
       expect(result.errors).toHaveLength(0);
     });
@@ -728,16 +806,14 @@ describe('Complex Plan Tests', () => {
         complexes: [
           {
             name: 'Minimal Complex',
-            departmentIds: ['basic_dept']
-          }
+            departmentIds: ['basic_dept'],
+          },
         ],
-        departments: [
-          { name: 'Basic Department' }
-        ],
+        departments: [{ name: 'Basic Department' }],
         clinics: undefined,
         services: undefined,
         workingHours: undefined,
-        contacts: undefined
+        contacts: undefined,
       };
 
       const result = await service.validateOnboardingData(minimalComplex);
@@ -751,12 +827,14 @@ describe('Complex Plan Tests', () => {
         complexes: [
           {
             name: 'Complex With No Departments',
-            departmentIds: [] // Empty array
-          }
-        ]
+            departmentIds: [], // Empty array
+          },
+        ],
       };
 
-      const result = await service.validateOnboardingData(complexWithEmptyDeptIds);
+      const result = await service.validateOnboardingData(
+        complexWithEmptyDeptIds,
+      );
       expect(result.isValid).toBe(true); // The validation is on departments array, not departmentIds
     });
 
@@ -766,12 +844,14 @@ describe('Complex Plan Tests', () => {
         complexes: [
           {
             name: 'Complex With Undefined Dept IDs',
-            departmentIds: undefined
-          }
-        ]
+            departmentIds: undefined,
+          },
+        ],
       };
 
-      const result = await service.validateOnboardingData(complexWithUndefinedDeptIds);
+      const result = await service.validateOnboardingData(
+        complexWithUndefinedDeptIds,
+      );
       expect(result.isValid).toBe(true);
     });
 
@@ -787,14 +867,14 @@ describe('Complex Plan Tests', () => {
             businessProfile: {
               yearEstablished: 2015,
               mission: 'تقديم أفضل الخدمات الطبية للنساء والأطفال',
-              vision: 'الريادة في الرعاية الطبية المتخصصة'
-            }
-          }
+              vision: 'الريادة في الرعاية الطبية المتخصصة',
+            },
+          },
         ],
         departments: [
           { name: 'نساء وولادة', description: 'قسم النساء والولادة' },
-          { name: 'أطفال', description: 'قسم الأطفال' }
-        ]
+          { name: 'أطفال', description: 'قسم الأطفال' },
+        ],
       };
 
       const result = await service.validateOnboardingData(arabicComplexData);
@@ -809,9 +889,9 @@ describe('Complex Plan Tests', () => {
           {
             name: 'A'.repeat(500), // Very long name
             address: 'B'.repeat(1000), // Very long address
-            departmentIds: ['dept1']
-          }
-        ]
+            departmentIds: ['dept1'],
+          },
+        ],
       };
 
       const result = await service.validateOnboardingData(longNameComplex);
@@ -825,15 +905,16 @@ describe('Complex Plan Tests', () => {
           {
             name: 'Al-Zahra Medical Complex ™ © ®',
             email: 'info+tag@alzahra-medical.co.uk',
-            website: 'https://alzahra-medical.com/?ref=test&utm_source=onboarding',
-            departmentIds: ['dept-1', 'dept_2', 'dept.3']
-          }
+            website:
+              'https://alzahra-medical.com/?ref=test&utm_source=onboarding',
+            departmentIds: ['dept-1', 'dept_2', 'dept.3'],
+          },
         ],
         departments: [
           { name: 'Department-1 (Special)' },
           { name: 'Department_2 [Advanced]' },
-          { name: 'Department.3 {Premium}' }
-        ]
+          { name: 'Department.3 {Premium}' },
+        ],
       };
 
       const result = await service.validateOnboardingData(specialCharsComplex);
@@ -845,10 +926,10 @@ describe('Complex Plan Tests', () => {
         ...validComplexPlanData,
         complexes: [
           {
-            name: 'Standalone Complex'
+            name: 'Standalone Complex',
             // No departmentIds
-          }
-        ]
+          },
+        ],
       };
 
       await service.completeOnboarding(complexWithoutDeptIds);
@@ -856,13 +937,14 @@ describe('Complex Plan Tests', () => {
       expect(mockComplexService.createComplex).toHaveBeenCalledWith(
         expect.objectContaining({
           name: 'Standalone Complex',
-          subscriptionId: expect.any(String)
-        })
+          subscriptionId: expect.any(String),
+        }),
       );
 
       // Should not try to create complex-department relationships
-      expect(mockDepartmentService.createComplexDepartment).not.toHaveBeenCalled();
+      expect(
+        mockDepartmentService.createComplexDepartment,
+      ).not.toHaveBeenCalled();
     });
   });
 });
-

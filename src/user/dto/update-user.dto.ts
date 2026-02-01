@@ -1,9 +1,15 @@
-import { IsEmail, IsEnum, IsOptional, IsString, MinLength } from 'class-validator';
+import {
+  IsEmail,
+  IsEnum,
+  IsOptional,
+  IsString,
+  MinLength,
+} from 'class-validator';
 import { UserRole } from '../../common/enums/user-role.enum';
 
 /**
  * DTO for updating user information
- * 
+ *
  * Used for admin-initiated user updates that may trigger session invalidation
  */
 export class UpdateUserDto {

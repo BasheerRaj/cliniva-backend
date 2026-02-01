@@ -61,7 +61,8 @@ describe('JwtAuthGuard', () => {
     tokenService = module.get<TokenService>(TokenService);
 
     // Mock super.canActivate to return true
-    jest.spyOn(Object.getPrototypeOf(Object.getPrototypeOf(guard)), 'canActivate')
+    jest
+      .spyOn(Object.getPrototypeOf(Object.getPrototypeOf(guard)), 'canActivate')
       .mockResolvedValue(true);
 
     mockExecutionContext = {
@@ -101,27 +102,35 @@ describe('JwtAuthGuard', () => {
       mockTokenService.hashToken.mockReturnValue('hashed-token');
       mockSessionService.isTokenBlacklisted.mockResolvedValue(false);
 
-      const result = await guard.canActivate(mockExecutionContext as ExecutionContext);
-      
+      const result = await guard.canActivate(
+        mockExecutionContext as ExecutionContext,
+      );
+
       expect(result).toBe(true);
       expect(tokenService.extractTokenFromHeader).toHaveBeenCalled();
       expect(tokenService.hashToken).toHaveBeenCalledWith('valid-token');
-      expect(sessionService.isTokenBlacklisted).toHaveBeenCalledWith('hashed-token');
+      expect(sessionService.isTokenBlacklisted).toHaveBeenCalledWith(
+        'hashed-token',
+      );
     });
 
     it('should reject blacklisted token', async () => {
       // Setup mocks
-      mockTokenService.extractTokenFromHeader.mockReturnValue('blacklisted-token');
+      mockTokenService.extractTokenFromHeader.mockReturnValue(
+        'blacklisted-token',
+      );
       mockTokenService.hashToken.mockReturnValue('hashed-blacklisted-token');
       mockSessionService.isTokenBlacklisted.mockResolvedValue(true);
 
       await expect(
-        guard.canActivate(mockExecutionContext as ExecutionContext)
+        guard.canActivate(mockExecutionContext as ExecutionContext),
       ).rejects.toThrow(UnauthorizedException);
 
       expect(tokenService.extractTokenFromHeader).toHaveBeenCalled();
       expect(tokenService.hashToken).toHaveBeenCalled();
-      expect(sessionService.isTokenBlacklisted).toHaveBeenCalledWith('hashed-blacklisted-token');
+      expect(sessionService.isTokenBlacklisted).toHaveBeenCalledWith(
+        'hashed-blacklisted-token',
+      );
     });
 
     it('should reject request without token', async () => {
@@ -129,7 +138,7 @@ describe('JwtAuthGuard', () => {
       mockTokenService.extractTokenFromHeader.mockReturnValue(null);
 
       await expect(
-        guard.canActivate(mockExecutionContext as ExecutionContext)
+        guard.canActivate(mockExecutionContext as ExecutionContext),
       ).rejects.toThrow(UnauthorizedException);
 
       expect(tokenService.extractTokenFromHeader).toHaveBeenCalled();
@@ -141,8 +150,10 @@ describe('JwtAuthGuard', () => {
       mockTokenService.hashToken.mockReturnValue('hashed-token');
       mockSessionService.isTokenBlacklisted.mockResolvedValue(false);
 
-      const result = await guard.canActivate(mockExecutionContext as ExecutionContext);
-      
+      const result = await guard.canActivate(
+        mockExecutionContext as ExecutionContext,
+      );
+
       expect(mockExecutionContext.switchToHttp).toHaveBeenCalled();
       expect(result).toBeDefined();
     });
@@ -161,6 +172,3 @@ describe('JwtAuthGuard', () => {
     });
   });
 });
-
-
-

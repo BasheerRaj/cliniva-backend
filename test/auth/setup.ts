@@ -4,7 +4,7 @@ import { setupTestEnvironment, resetTestEnvironment } from './utils/test.utils';
 beforeAll(async () => {
   // Setup test environment variables
   setupTestEnvironment();
-  
+
   // Set longer timeout for database operations
   jest.setTimeout(30000);
 });
@@ -33,7 +33,3 @@ console.log = (...args) => {
     originalLog(...args);
   }
 };
-
-
-
-

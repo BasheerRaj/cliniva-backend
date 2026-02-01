@@ -1,7 +1,7 @@
-import { 
-  IsString, 
-  IsNotEmpty, 
-  IsOptional, 
+import {
+  IsString,
+  IsNotEmpty,
+  IsOptional,
   IsBoolean,
   IsMongoId,
   IsDateString,
@@ -13,13 +13,22 @@ import {
   Max,
   Matches,
   Length,
-  IsHexColor
+  IsHexColor,
 } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
 
 // Base Schedule DTOs
 export class CreateScheduleDto {
-  @IsEnum(['doctor_availability', 'room_booking', 'equipment_schedule', 'facility_hours', 'maintenance', 'recurring_template', 'block_time', 'holiday'])
+  @IsEnum([
+    'doctor_availability',
+    'room_booking',
+    'equipment_schedule',
+    'facility_hours',
+    'maintenance',
+    'recurring_template',
+    'block_time',
+    'holiday',
+  ])
   @IsNotEmpty()
   scheduleType: string;
 
@@ -72,14 +81,14 @@ export class CreateScheduleDto {
   @IsString()
   @IsNotEmpty()
   @Matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, {
-    message: 'Start time must be in HH:mm format (e.g., 09:00)'
+    message: 'Start time must be in HH:mm format (e.g., 09:00)',
   })
   startTime: string;
 
   @IsString()
   @IsNotEmpty()
   @Matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, {
-    message: 'End time must be in HH:mm format (e.g., 17:00)'
+    message: 'End time must be in HH:mm format (e.g., 17:00)',
   })
   endTime: string;
 
@@ -480,7 +489,16 @@ export class ScheduleSearchQueryDto {
   @IsOptional()
   search?: string; // Search title and description
 
-  @IsEnum(['doctor_availability', 'room_booking', 'equipment_schedule', 'facility_hours', 'maintenance', 'recurring_template', 'block_time', 'holiday'])
+  @IsEnum([
+    'doctor_availability',
+    'room_booking',
+    'equipment_schedule',
+    'facility_hours',
+    'maintenance',
+    'recurring_template',
+    'block_time',
+    'holiday',
+  ])
   @IsOptional()
   scheduleType?: string;
 
@@ -563,7 +581,16 @@ export class ScheduleSearchQueryDto {
 
 // Conflict Detection DTOs
 export class CheckScheduleConflictDto {
-  @IsEnum(['doctor_availability', 'room_booking', 'equipment_schedule', 'facility_hours', 'maintenance', 'recurring_template', 'block_time', 'holiday'])
+  @IsEnum([
+    'doctor_availability',
+    'room_booking',
+    'equipment_schedule',
+    'facility_hours',
+    'maintenance',
+    'recurring_template',
+    'block_time',
+    'holiday',
+  ])
   @IsNotEmpty()
   scheduleType: string;
 
@@ -667,7 +694,19 @@ export class CalendarViewDto {
   endDate: string;
 
   @IsArray()
-  @IsEnum(['doctor_availability', 'room_booking', 'equipment_schedule', 'facility_hours', 'maintenance', 'recurring_template', 'block_time', 'holiday'], { each: true })
+  @IsEnum(
+    [
+      'doctor_availability',
+      'room_booking',
+      'equipment_schedule',
+      'facility_hours',
+      'maintenance',
+      'recurring_template',
+      'block_time',
+      'holiday',
+    ],
+    { each: true },
+  )
   @IsOptional()
   scheduleTypes?: string[];
 
@@ -699,7 +738,12 @@ export class CreateScheduleTemplateDto {
   @Length(0, 500)
   description?: string;
 
-  @IsEnum(['doctor_availability', 'room_booking', 'equipment_schedule', 'facility_hours'])
+  @IsEnum([
+    'doctor_availability',
+    'room_booking',
+    'equipment_schedule',
+    'facility_hours',
+  ])
   @IsNotEmpty()
   scheduleType: string;
 
@@ -748,7 +792,7 @@ export class ScheduleStatsDto {
   schedulesToday: number;
   schedulesThisWeek: number;
   schedulesThisMonth: number;
-  
+
   schedulesByType: Array<{
     type: string;
     count: number;
@@ -773,12 +817,12 @@ export class ScheduleStatsDto {
 
   conflictingSchedules: number;
   pendingApprovals: number;
-  
+
   recurringSchedules: number;
   oneTimeSchedules: number;
-  
+
   averageSlotDuration: number;
-  
+
   upcomingSchedules: Array<{
     scheduleId: string;
     title: string;
@@ -791,4 +835,4 @@ export class ScheduleStatsDto {
     month: string;
     count: number;
   }>;
-} 
+}

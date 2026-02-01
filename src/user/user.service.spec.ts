@@ -144,11 +144,7 @@ describe('UserService - Session Invalidation Hooks', () => {
       });
 
       // Act
-      await service.updateUser(
-        userId,
-        { email: newEmail },
-        adminId,
-      );
+      await service.updateUser(userId, { email: newEmail }, adminId);
 
       // Assert - Requirement 3.1: Email change invalidates sessions
       expect(mockSessionService.invalidateUserSessions).toHaveBeenCalledWith(
@@ -158,7 +154,9 @@ describe('UserService - Session Invalidation Hooks', () => {
       );
 
       // Assert - Requirement 3.8: Notification sent
-      expect(mockEmailService.sendUsernameChangedNotification).toHaveBeenCalledWith(
+      expect(
+        mockEmailService.sendUsernameChangedNotification,
+      ).toHaveBeenCalledWith(
         newEmail,
         mockUser.email,
         mockUser.firstName,
@@ -192,11 +190,7 @@ describe('UserService - Session Invalidation Hooks', () => {
       });
 
       // Act
-      await service.updateUser(
-        userId,
-        { role: newRole },
-        adminId,
-      );
+      await service.updateUser(userId, { role: newRole }, adminId);
 
       // Assert - Requirement 3.2: Role change invalidates sessions
       expect(mockSessionService.invalidateUserSessions).toHaveBeenCalledWith(
@@ -240,16 +234,16 @@ describe('UserService - Session Invalidation Hooks', () => {
       });
 
       // Act
-      await service.updateUser(
-        userId,
-        { firstName: 'Updated' },
-        adminId,
-      );
+      await service.updateUser(userId, { firstName: 'Updated' }, adminId);
 
       // Assert - No session invalidation for non-critical fields
       expect(mockSessionService.invalidateUserSessions).not.toHaveBeenCalled();
-      expect(mockEmailService.sendUsernameChangedNotification).not.toHaveBeenCalled();
-      expect(mockEmailService.sendRoleChangedNotification).not.toHaveBeenCalled();
+      expect(
+        mockEmailService.sendUsernameChangedNotification,
+      ).not.toHaveBeenCalled();
+      expect(
+        mockEmailService.sendRoleChangedNotification,
+      ).not.toHaveBeenCalled();
       expect(mockAuditService.logSessionInvalidation).not.toHaveBeenCalled();
     });
 
@@ -280,7 +274,9 @@ describe('UserService - Session Invalidation Hooks', () => {
       );
 
       // Assert - Both invalidations should occur
-      expect(mockSessionService.invalidateUserSessions).toHaveBeenCalledTimes(2);
+      expect(mockSessionService.invalidateUserSessions).toHaveBeenCalledTimes(
+        2,
+      );
       expect(mockSessionService.invalidateUserSessions).toHaveBeenCalledWith(
         userId,
         'email_change',
@@ -354,7 +350,9 @@ describe('UserService - Session Invalidation Hooks', () => {
       });
 
       // Act
-      const result = await service.getUsersForDropdown({ role: UserRole.DOCTOR });
+      const result = await service.getUsersForDropdown({
+        role: UserRole.DOCTOR,
+      });
 
       // Assert
       expect(mockUserModel.find).toHaveBeenCalledWith({
@@ -505,7 +503,10 @@ describe('UserService - Session Invalidation Hooks', () => {
       await service.getUsersForDropdown();
 
       // Assert - Verify sort is called with correct parameters
-      expect(mockChain.sort).toHaveBeenCalledWith({ firstName: 1, lastName: 1 });
+      expect(mockChain.sort).toHaveBeenCalledWith({
+        firstName: 1,
+        lastName: 1,
+      });
     });
 
     it('should return empty array when no active users match filters', async () => {
@@ -518,7 +519,9 @@ describe('UserService - Session Invalidation Hooks', () => {
       });
 
       // Act
-      const result = await service.getUsersForDropdown({ role: 'NON_EXISTENT_ROLE' });
+      const result = await service.getUsersForDropdown({
+        role: 'NON_EXISTENT_ROLE',
+      });
 
       // Assert
       expect(result.success).toBe(true);
@@ -685,8 +688,16 @@ describe('UserService - Session Invalidation Hooks', () => {
       };
 
       const activeAppointments = [
-        { _id: new Types.ObjectId(), doctorId: new Types.ObjectId(doctorId), status: 'scheduled' },
-        { _id: new Types.ObjectId(), doctorId: new Types.ObjectId(doctorId), status: 'confirmed' },
+        {
+          _id: new Types.ObjectId(),
+          doctorId: new Types.ObjectId(doctorId),
+          status: 'scheduled',
+        },
+        {
+          _id: new Types.ObjectId(),
+          doctorId: new Types.ObjectId(doctorId),
+          status: 'confirmed',
+        },
       ];
 
       mockUserModel.findById = jest
@@ -744,7 +755,11 @@ describe('UserService - Session Invalidation Hooks', () => {
       };
 
       const activeAppointments = [
-        { _id: new Types.ObjectId(), doctorId: new Types.ObjectId(doctorId), status: 'scheduled' },
+        {
+          _id: new Types.ObjectId(),
+          doctorId: new Types.ObjectId(doctorId),
+          status: 'scheduled',
+        },
       ];
 
       mockUserModel.findById = jest.fn().mockResolvedValue(doctorToDeactivate);
@@ -792,7 +807,11 @@ describe('UserService - Session Invalidation Hooks', () => {
       };
 
       const activeAppointments = [
-        { _id: new Types.ObjectId(), doctorId: new Types.ObjectId(doctorId), status: 'scheduled' },
+        {
+          _id: new Types.ObjectId(),
+          doctorId: new Types.ObjectId(doctorId),
+          status: 'scheduled',
+        },
       ];
 
       mockUserModel.findById = jest.fn().mockResolvedValue(doctorToDeactivate);
@@ -863,7 +882,11 @@ describe('UserService - Session Invalidation Hooks', () => {
       };
 
       const activeAppointments = [
-        { _id: new Types.ObjectId(), doctorId: new Types.ObjectId(doctorId), status: 'scheduled' },
+        {
+          _id: new Types.ObjectId(),
+          doctorId: new Types.ObjectId(doctorId),
+          status: 'scheduled',
+        },
       ];
 
       mockUserModel.findById = jest

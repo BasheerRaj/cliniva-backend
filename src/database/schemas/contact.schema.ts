@@ -3,12 +3,12 @@ import { Document, Types } from 'mongoose';
 
 @Schema({
   timestamps: true,
-  collection: 'contacts'
+  collection: 'contacts',
 })
 export class Contact extends Document {
-  @Prop({ 
+  @Prop({
     required: true,
-    enum: ['organization', 'complex', 'clinic', 'user'] 
+    enum: ['organization', 'complex', 'clinic', 'user'],
   })
   entityType: string;
 

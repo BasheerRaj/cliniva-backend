@@ -3,7 +3,7 @@ import { Document, Types } from 'mongoose';
 
 @Schema({
   timestamps: true,
-  collection: 'services'
+  collection: 'services',
 })
 export class Service extends Document {
   @Prop({ type: Types.ObjectId, ref: 'ComplexDepartment', required: false })
@@ -32,5 +32,8 @@ ServiceSchema.index({ complexDepartmentId: 1 });
 ServiceSchema.index({ clinicId: 1 });
 ServiceSchema.index({ name: 1 });
 // Allow same service names across different clinics and complex departments
-ServiceSchema.index({ complexDepartmentId: 1, name: 1 }, { unique: true, sparse: true });
+ServiceSchema.index(
+  { complexDepartmentId: 1, name: 1 },
+  { unique: true, sparse: true },
+);
 ServiceSchema.index({ clinicId: 1, name: 1 }, { unique: true, sparse: true });

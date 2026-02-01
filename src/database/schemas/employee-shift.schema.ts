@@ -3,15 +3,15 @@ import { Document, Types } from 'mongoose';
 
 @Schema({
   timestamps: true,
-  collection: 'employee_shifts'
+  collection: 'employee_shifts',
 })
 export class EmployeeShift extends Document {
   @Prop({ type: Types.ObjectId, ref: 'User', required: true })
   userId: Types.ObjectId;
 
-  @Prop({ 
+  @Prop({
     required: true,
-    enum: ['organization', 'complex', 'clinic'] 
+    enum: ['organization', 'complex', 'clinic'],
   })
   entityType: string;
 
@@ -21,9 +21,17 @@ export class EmployeeShift extends Document {
   @Prop({ required: true })
   shiftName: string; // 'Morning Shift', 'Night Shift', 'Emergency', etc.
 
-  @Prop({ 
+  @Prop({
     required: true,
-    enum: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] 
+    enum: [
+      'monday',
+      'tuesday',
+      'wednesday',
+      'thursday',
+      'friday',
+      'saturday',
+      'sunday',
+    ],
   })
   dayOfWeek: string;
 

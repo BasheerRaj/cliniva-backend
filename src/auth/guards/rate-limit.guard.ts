@@ -19,17 +19,17 @@ import { AUTH_ERROR_MESSAGES } from '../../common/constants/auth-error-messages.
 
 /**
  * RateLimitGuard - Implements rate limiting for protected endpoints
- * 
+ *
  * This guard checks if the request exceeds the configured rate limit.
  * If the limit is exceeded, it:
  * 1. Throws TooManyRequestsException with AUTH_011 code
  * 2. Logs the violation to the audit log
- * 
+ *
  * The guard uses the @RateLimit decorator metadata to determine:
  * - Type of rate limit (password_reset, login_attempt, password_change)
  * - Maximum allowed requests
  * - Time window in seconds
- * 
+ *
  * Requirements: 9.1-9.4, 9.6
  */
 @Injectable()
@@ -58,7 +58,8 @@ export class RateLimitGuard implements CanActivate {
     const { type, limit, windowSeconds } = rateLimitConfig;
 
     // Extract IP address from request
-    const ipAddress = request.ip || request.connection?.remoteAddress || 'unknown';
+    const ipAddress =
+      request.ip || request.connection?.remoteAddress || 'unknown';
 
     // Extract user ID from JWT payload (if authenticated)
     const userId = request.user?.userId || request.user?.sub;
@@ -70,12 +71,14 @@ export class RateLimitGuard implements CanActivate {
       switch (type) {
         case RateLimitType.PASSWORD_RESET:
           // Rate limit by IP address
-          allowed = await this.rateLimitService.checkPasswordResetLimit(ipAddress);
+          allowed =
+            await this.rateLimitService.checkPasswordResetLimit(ipAddress);
           break;
 
         case RateLimitType.LOGIN_ATTEMPT:
           // Rate limit by IP address
-          allowed = await this.rateLimitService.checkLoginAttemptLimit(ipAddress);
+          allowed =
+            await this.rateLimitService.checkLoginAttemptLimit(ipAddress);
           break;
 
         case RateLimitType.PASSWORD_CHANGE:
@@ -84,7 +87,8 @@ export class RateLimitGuard implements CanActivate {
             // If no user ID, allow the request (authentication will fail later)
             return true;
           }
-          allowed = await this.rateLimitService.checkPasswordChangeLimit(userId);
+          allowed =
+            await this.rateLimitService.checkPasswordChangeLimit(userId);
           break;
 
         default:

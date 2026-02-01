@@ -1,4 +1,8 @@
-import { BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common';
+import {
+  BadRequestException,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { Types, Model } from 'mongoose';
 import { ValidationUtil } from './validation.util';
 import { ERROR_MESSAGES } from './error-messages.constant';
@@ -10,7 +14,7 @@ describe('ValidationUtil', () => {
   describe('validateObjectId', () => {
     it('should pass validation for valid ObjectId', () => {
       const validId = '507f1f77bcf86cd799439011';
-      
+
       expect(() => {
         ValidationUtil.validateObjectId(validId, ERROR_MESSAGES.USER_NOT_FOUND);
       }).not.toThrow();
@@ -18,17 +22,23 @@ describe('ValidationUtil', () => {
 
     it('should throw BadRequestException for invalid ObjectId format', () => {
       const invalidId = 'invalid-id-format';
-      
+
       expect(() => {
-        ValidationUtil.validateObjectId(invalidId, ERROR_MESSAGES.USER_NOT_FOUND);
+        ValidationUtil.validateObjectId(
+          invalidId,
+          ERROR_MESSAGES.USER_NOT_FOUND,
+        );
       }).toThrow(BadRequestException);
     });
 
     it('should throw BadRequestException with correct error structure', () => {
       const invalidId = 'invalid-id';
-      
+
       try {
-        ValidationUtil.validateObjectId(invalidId, ERROR_MESSAGES.USER_NOT_FOUND);
+        ValidationUtil.validateObjectId(
+          invalidId,
+          ERROR_MESSAGES.USER_NOT_FOUND,
+        );
         fail('Should have thrown BadRequestException');
       } catch (error) {
         expect(error).toBeInstanceOf(BadRequestException);
@@ -37,8 +47,8 @@ describe('ValidationUtil', () => {
           code: 'INVALID_ID_FORMAT',
           details: {
             entityName: ERROR_MESSAGES.USER_NOT_FOUND,
-            providedId: invalidId
-          }
+            providedId: invalidId,
+          },
         });
       }
     });
@@ -51,11 +61,17 @@ describe('ValidationUtil', () => {
 
     it('should throw for null or undefined', () => {
       expect(() => {
-        ValidationUtil.validateObjectId(null as any, ERROR_MESSAGES.USER_NOT_FOUND);
+        ValidationUtil.validateObjectId(
+          null as any,
+          ERROR_MESSAGES.USER_NOT_FOUND,
+        );
       }).toThrow(BadRequestException);
-      
+
       expect(() => {
-        ValidationUtil.validateObjectId(undefined as any, ERROR_MESSAGES.USER_NOT_FOUND);
+        ValidationUtil.validateObjectId(
+          undefined as any,
+          ERROR_MESSAGES.USER_NOT_FOUND,
+        );
       }).toThrow(BadRequestException);
     });
   });
@@ -75,13 +91,13 @@ describe('ValidationUtil', () => {
     it('should return entity when found', async () => {
       const validId = '507f1f77bcf86cd799439011';
       const mockEntity = { _id: validId, name: 'Test Entity' };
-      
+
       mockModel.findById.mockResolvedValue(mockEntity);
 
       const result = await ValidationUtil.validateEntityExists(
         mockModel,
         validId,
-        ERROR_MESSAGES.USER_NOT_FOUND
+        ERROR_MESSAGES.USER_NOT_FOUND,
       );
 
       expect(result).toEqual(mockEntity);
@@ -90,28 +106,28 @@ describe('ValidationUtil', () => {
 
     it('should throw NotFoundException when entity not found', async () => {
       const validId = '507f1f77bcf86cd799439011';
-      
+
       mockModel.findById.mockResolvedValue(null);
 
       await expect(
         ValidationUtil.validateEntityExists(
           mockModel,
           validId,
-          ERROR_MESSAGES.USER_NOT_FOUND
-        )
+          ERROR_MESSAGES.USER_NOT_FOUND,
+        ),
       ).rejects.toThrow(NotFoundException);
     });
 
     it('should throw NotFoundException with correct error structure', async () => {
       const validId = '507f1f77bcf86cd799439011';
-      
+
       mockModel.findById.mockResolvedValue(null);
 
       try {
         await ValidationUtil.validateEntityExists(
           mockModel,
           validId,
-          ERROR_MESSAGES.USER_NOT_FOUND
+          ERROR_MESSAGES.USER_NOT_FOUND,
         );
         fail('Should have thrown NotFoundException');
       } catch (error) {
@@ -119,7 +135,7 @@ describe('ValidationUtil', () => {
         expect(error.response).toEqual({
           message: ERROR_MESSAGES.USER_NOT_FOUND,
           code: 'ENTITY_NOT_FOUND',
-          details: { id: validId }
+          details: { id: validId },
         });
       }
     });
@@ -131,8 +147,8 @@ describe('ValidationUtil', () => {
         ValidationUtil.validateEntityExists(
           mockModel,
           invalidId,
-          ERROR_MESSAGES.USER_NOT_FOUND
-        )
+          ERROR_MESSAGES.USER_NOT_FOUND,
+        ),
       ).rejects.toThrow(BadRequestException);
 
       // Should not call findById for invalid ID
@@ -152,7 +168,7 @@ describe('ValidationUtil', () => {
         ValidationUtil.validateNotSelfModification(
           targetUserId,
           currentUserId,
-          'deactivate'
+          'deactivate',
         );
       }).not.toThrow();
     });
@@ -164,7 +180,7 @@ describe('ValidationUtil', () => {
         ValidationUtil.validateNotSelfModification(
           userId,
           userId,
-          'deactivate'
+          'deactivate',
         );
       }).toThrow(ForbiddenException);
     });
@@ -173,11 +189,7 @@ describe('ValidationUtil', () => {
       const userId = '507f1f77bcf86cd799439011';
 
       expect(() => {
-        ValidationUtil.validateNotSelfModification(
-          userId,
-          userId,
-          'delete'
-        );
+        ValidationUtil.validateNotSelfModification(userId, userId, 'delete');
       }).toThrow(ForbiddenException);
     });
 
@@ -188,7 +200,7 @@ describe('ValidationUtil', () => {
         ValidationUtil.validateNotSelfModification(
           userId,
           userId,
-          'deactivate'
+          'deactivate',
         );
         fail('Should have thrown ForbiddenException');
       } catch (error) {
@@ -196,7 +208,7 @@ describe('ValidationUtil', () => {
         expect(error.response).toEqual({
           message: ERROR_MESSAGES.CANNOT_DEACTIVATE_SELF,
           code: 'SELF_MODIFICATION_FORBIDDEN',
-          details: { action: 'deactivate', userId }
+          details: { action: 'deactivate', userId },
         });
       }
     });
@@ -205,18 +217,14 @@ describe('ValidationUtil', () => {
       const userId = '507f1f77bcf86cd799439011';
 
       try {
-        ValidationUtil.validateNotSelfModification(
-          userId,
-          userId,
-          'delete'
-        );
+        ValidationUtil.validateNotSelfModification(userId, userId, 'delete');
         fail('Should have thrown ForbiddenException');
       } catch (error) {
         expect(error).toBeInstanceOf(ForbiddenException);
         expect(error.response).toEqual({
           message: ERROR_MESSAGES.CANNOT_DELETE_SELF,
           code: 'SELF_MODIFICATION_FORBIDDEN',
-          details: { action: 'delete', userId }
+          details: { action: 'delete', userId },
         });
       }
     });
@@ -253,7 +261,7 @@ describe('ValidationUtil', () => {
         expect(error.response).toEqual({
           message: ERROR_MESSAGES.DEACTIVATED_USER_ASSIGNMENT,
           code: 'USER_INACTIVE',
-          details: { userId: inactiveUser._id }
+          details: { userId: inactiveUser._id },
         });
       }
     });
@@ -277,8 +285,8 @@ describe('ValidationUtil', () => {
         ValidationUtil.validateSingleComplexAssignment(
           [],
           '507f1f77bcf86cd799439011',
-          mockClinicModel
-        )
+          mockClinicModel,
+        ),
       ).resolves.not.toThrow();
 
       expect(mockClinicModel.find).not.toHaveBeenCalled();
@@ -286,68 +294,83 @@ describe('ValidationUtil', () => {
 
     it('should pass validation when all clinics belong to same complex', async () => {
       const complexId = '507f1f77bcf86cd799439011';
-      const clinicIds = ['507f1f77bcf86cd799439012', '507f1f77bcf86cd799439013'];
-      
+      const clinicIds = [
+        '507f1f77bcf86cd799439012',
+        '507f1f77bcf86cd799439013',
+      ];
+
       const mockClinics = [
         { _id: clinicIds[0], complexId: new Types.ObjectId(complexId) },
-        { _id: clinicIds[1], complexId: new Types.ObjectId(complexId) }
+        { _id: clinicIds[1], complexId: new Types.ObjectId(complexId) },
       ];
 
       mockClinicModel.find.mockReturnValue({
-        select: jest.fn().mockResolvedValue(mockClinics)
+        select: jest.fn().mockResolvedValue(mockClinics),
       } as any);
 
       await expect(
         ValidationUtil.validateSingleComplexAssignment(
           clinicIds,
           complexId,
-          mockClinicModel
-        )
+          mockClinicModel,
+        ),
       ).resolves.not.toThrow();
     });
 
     it('should throw BadRequestException when clinics belong to different complexes', async () => {
       const complexId = '507f1f77bcf86cd799439011';
       const differentComplexId = '507f1f77bcf86cd799439014';
-      const clinicIds = ['507f1f77bcf86cd799439012', '507f1f77bcf86cd799439013'];
-      
+      const clinicIds = [
+        '507f1f77bcf86cd799439012',
+        '507f1f77bcf86cd799439013',
+      ];
+
       const mockClinics = [
         { _id: clinicIds[0], complexId: new Types.ObjectId(complexId) },
-        { _id: clinicIds[1], complexId: new Types.ObjectId(differentComplexId) }
+        {
+          _id: clinicIds[1],
+          complexId: new Types.ObjectId(differentComplexId),
+        },
       ];
 
       mockClinicModel.find.mockReturnValue({
-        select: jest.fn().mockResolvedValue(mockClinics)
+        select: jest.fn().mockResolvedValue(mockClinics),
       } as any);
 
       await expect(
         ValidationUtil.validateSingleComplexAssignment(
           clinicIds,
           complexId,
-          mockClinicModel
-        )
+          mockClinicModel,
+        ),
       ).rejects.toThrow(BadRequestException);
     });
 
     it('should throw with correct error structure', async () => {
       const complexId = '507f1f77bcf86cd799439011';
       const differentComplexId = '507f1f77bcf86cd799439014';
-      const clinicIds = ['507f1f77bcf86cd799439012', '507f1f77bcf86cd799439013'];
-      
+      const clinicIds = [
+        '507f1f77bcf86cd799439012',
+        '507f1f77bcf86cd799439013',
+      ];
+
       const mockClinics = [
         { _id: clinicIds[0], complexId: new Types.ObjectId(complexId) },
-        { _id: clinicIds[1], complexId: new Types.ObjectId(differentComplexId) }
+        {
+          _id: clinicIds[1],
+          complexId: new Types.ObjectId(differentComplexId),
+        },
       ];
 
       mockClinicModel.find.mockReturnValue({
-        select: jest.fn().mockResolvedValue(mockClinics)
+        select: jest.fn().mockResolvedValue(mockClinics),
       } as any);
 
       try {
         await ValidationUtil.validateSingleComplexAssignment(
           clinicIds,
           complexId,
-          mockClinicModel
+          mockClinicModel,
         );
         fail('Should have thrown BadRequestException');
       } catch (error) {
@@ -355,32 +378,35 @@ describe('ValidationUtil', () => {
         expect(error.response).toEqual({
           message: ERROR_MESSAGES.CLINICS_DIFFERENT_COMPLEXES,
           code: 'CLINICS_DIFFERENT_COMPLEXES',
-          details: { complexId, clinicIds }
+          details: { complexId, clinicIds },
         });
       }
     });
 
     it('should query clinics with correct parameters', async () => {
       const complexId = '507f1f77bcf86cd799439011';
-      const clinicIds = ['507f1f77bcf86cd799439012', '507f1f77bcf86cd799439013'];
-      
+      const clinicIds = [
+        '507f1f77bcf86cd799439012',
+        '507f1f77bcf86cd799439013',
+      ];
+
       const mockClinics = [
         { _id: clinicIds[0], complexId: new Types.ObjectId(complexId) },
-        { _id: clinicIds[1], complexId: new Types.ObjectId(complexId) }
+        { _id: clinicIds[1], complexId: new Types.ObjectId(complexId) },
       ];
 
       mockClinicModel.find.mockReturnValue({
-        select: jest.fn().mockResolvedValue(mockClinics)
+        select: jest.fn().mockResolvedValue(mockClinics),
       } as any);
 
       await ValidationUtil.validateSingleComplexAssignment(
         clinicIds,
         complexId,
-        mockClinicModel
+        mockClinicModel,
       );
 
       expect(mockClinicModel.find).toHaveBeenCalledWith({
-        _id: { $in: clinicIds }
+        _id: { $in: clinicIds },
       });
     });
   });
@@ -407,13 +433,19 @@ describe('ValidationUtil', () => {
 
     it('should throw BadRequestException for null', () => {
       expect(() => {
-        ValidationUtil.validateNotEmpty(null as any, ERROR_MESSAGES.EMPTY_ARRAY);
+        ValidationUtil.validateNotEmpty(
+          null as any,
+          ERROR_MESSAGES.EMPTY_ARRAY,
+        );
       }).toThrow(BadRequestException);
     });
 
     it('should throw BadRequestException for undefined', () => {
       expect(() => {
-        ValidationUtil.validateNotEmpty(undefined as any, ERROR_MESSAGES.EMPTY_ARRAY);
+        ValidationUtil.validateNotEmpty(
+          undefined as any,
+          ERROR_MESSAGES.EMPTY_ARRAY,
+        );
       }).toThrow(BadRequestException);
     });
 
@@ -427,7 +459,7 @@ describe('ValidationUtil', () => {
         expect(error).toBeInstanceOf(BadRequestException);
         expect(error.response).toEqual({
           message: ERROR_MESSAGES.EMPTY_ARRAY,
-          code: 'EMPTY_ARRAY'
+          code: 'EMPTY_ARRAY',
         });
       }
     });
@@ -437,11 +469,17 @@ describe('ValidationUtil', () => {
       const objectArray = [{ id: 1 }, { id: 2 }];
 
       expect(() => {
-        ValidationUtil.validateNotEmpty(numberArray, ERROR_MESSAGES.EMPTY_ARRAY);
+        ValidationUtil.validateNotEmpty(
+          numberArray,
+          ERROR_MESSAGES.EMPTY_ARRAY,
+        );
       }).not.toThrow();
 
       expect(() => {
-        ValidationUtil.validateNotEmpty(objectArray, ERROR_MESSAGES.EMPTY_ARRAY);
+        ValidationUtil.validateNotEmpty(
+          objectArray,
+          ERROR_MESSAGES.EMPTY_ARRAY,
+        );
       }).not.toThrow();
     });
   });

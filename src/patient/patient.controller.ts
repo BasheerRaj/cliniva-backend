@@ -39,23 +39,23 @@ export class PatientController {
   @Post()
   async createPatient(
     @Body(new ValidationPipe()) createPatientDto: CreatePatientDto,
-    @Request() req: any
+    @Request() req: any,
   ) {
     try {
       const patient = await this.patientService.createPatient(
         createPatientDto,
-        req.user?.userId
+        req.user?.userId,
       );
       return {
         success: true,
         message: 'Patient created successfully',
-        data: patient
+        data: patient,
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to create patient',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -76,14 +76,14 @@ export class PatientController {
           total: result.total,
           page: result.page,
           totalPages: result.totalPages,
-          limit: parseInt(query.limit || '10')
-        }
+          limit: parseInt(query.limit || '10'),
+        },
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to retrieve patients',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -99,13 +99,13 @@ export class PatientController {
       return {
         success: true,
         message: 'Patient retrieved successfully',
-        data: patient
+        data: patient,
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to retrieve patient',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -118,24 +118,24 @@ export class PatientController {
   async updatePatient(
     @Param('id') id: string,
     @Body(new ValidationPipe()) updatePatientDto: UpdatePatientDto,
-    @Request() req: any
+    @Request() req: any,
   ) {
     try {
       const patient = await this.patientService.updatePatient(
         id,
         updatePatientDto,
-        req.user?.userId
+        req.user?.userId,
       );
       return {
         success: true,
         message: 'Patient updated successfully',
-        data: patient
+        data: patient,
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to update patient',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -151,13 +151,13 @@ export class PatientController {
       await this.patientService.deletePatient(id, req.user?.userId);
       return {
         success: true,
-        message: 'Patient deleted successfully'
+        message: 'Patient deleted successfully',
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to delete patient',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -169,7 +169,7 @@ export class PatientController {
   @Get('search/query')
   async searchPatients(
     @Query('q') searchTerm: string,
-    @Query('limit', new ParseIntPipe({ optional: true })) limit?: number
+    @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
   ) {
     try {
       if (!searchTerm || searchTerm.trim().length === 0) {
@@ -178,19 +178,19 @@ export class PatientController {
 
       const patients = await this.patientService.searchPatients(
         searchTerm,
-        limit || 20
+        limit || 20,
       );
       return {
         success: true,
         message: 'Search completed successfully',
         data: patients,
-        count: patients.length
+        count: patients.length,
       };
     } catch (error) {
       return {
         success: false,
         message: 'Search failed',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -202,17 +202,18 @@ export class PatientController {
   @Get('number/:patientNumber')
   async getPatientByNumber(@Param('patientNumber') patientNumber: string) {
     try {
-      const patient = await this.patientService.getPatientByNumber(patientNumber);
+      const patient =
+        await this.patientService.getPatientByNumber(patientNumber);
       return {
         success: true,
         message: 'Patient retrieved successfully',
-        data: patient
+        data: patient,
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to retrieve patient',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -224,25 +225,26 @@ export class PatientController {
   @Put(':id/medical-history')
   async updateMedicalHistory(
     @Param('id') id: string,
-    @Body(new ValidationPipe()) updateMedicalHistoryDto: UpdateMedicalHistoryDto,
-    @Request() req: any
+    @Body(new ValidationPipe())
+    updateMedicalHistoryDto: UpdateMedicalHistoryDto,
+    @Request() req: any,
   ) {
     try {
       const patient = await this.patientService.updateMedicalHistory(
         id,
         updateMedicalHistoryDto,
-        req.user?.userId
+        req.user?.userId,
       );
       return {
         success: true,
         message: 'Medical history updated successfully',
-        data: patient
+        data: patient,
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to update medical history',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -262,19 +264,19 @@ export class PatientController {
         allergies: patient.allergies,
         medicalHistory: patient.medicalHistory,
         insuranceProvider: patient.insuranceProvider,
-        insurancePolicyNumber: patient.insurancePolicyNumber
+        insurancePolicyNumber: patient.insurancePolicyNumber,
       };
-      
+
       return {
         success: true,
         message: 'Medical history retrieved successfully',
-        data: medicalHistory
+        data: medicalHistory,
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to retrieve medical history',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -290,13 +292,13 @@ export class PatientController {
       return {
         success: true,
         message: 'Patient statistics retrieved successfully',
-        data: stats
+        data: stats,
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to retrieve patient statistics',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -307,7 +309,7 @@ export class PatientController {
    */
   @Get('recent/list')
   async getRecentPatients(
-    @Query('limit', new ParseIntPipe({ optional: true })) limit?: number
+    @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
   ) {
     try {
       const patients = await this.patientService.getRecentPatients(limit || 10);
@@ -315,13 +317,13 @@ export class PatientController {
         success: true,
         message: 'Recent patients retrieved successfully',
         data: patients,
-        count: patients.length
+        count: patients.length,
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to retrieve recent patients',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -332,21 +334,23 @@ export class PatientController {
    */
   @Get('birthdays/upcoming')
   async getUpcomingBirthdays(
-    @Query('days', new ParseIntPipe({ optional: true })) days?: number
+    @Query('days', new ParseIntPipe({ optional: true })) days?: number,
   ) {
     try {
-      const patients = await this.patientService.getUpcomingBirthdays(days || 30);
+      const patients = await this.patientService.getUpcomingBirthdays(
+        days || 30,
+      );
       return {
         success: true,
         message: 'Upcoming birthdays retrieved successfully',
         data: patients,
-        count: patients.length
+        count: patients.length,
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to retrieve upcoming birthdays',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -368,14 +372,14 @@ export class PatientController {
         message: 'Email validation completed',
         data: {
           email,
-          exists
-        }
+          exists,
+        },
       };
     } catch (error) {
       return {
         success: false,
         message: 'Email validation failed',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -397,14 +401,14 @@ export class PatientController {
         message: 'Phone validation completed',
         data: {
           phone,
-          exists
-        }
+          exists,
+        },
       };
     } catch (error) {
       return {
         success: false,
         message: 'Phone validation failed',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -423,13 +427,13 @@ export class PatientController {
         relationship: string;
         isPrimary: boolean;
       }> = [];
-      
+
       if (patient.emergencyContactName && patient.emergencyContactPhone) {
         emergencyContacts.push({
           name: patient.emergencyContactName,
           phone: patient.emergencyContactPhone,
           relationship: 'Emergency Contact',
-          isPrimary: true
+          isPrimary: true,
         });
       }
 
@@ -437,13 +441,13 @@ export class PatientController {
         success: true,
         message: 'Emergency contacts retrieved successfully',
         data: emergencyContacts,
-        count: emergencyContacts.length
+        count: emergencyContacts.length,
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to retrieve emergency contacts',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -456,7 +460,7 @@ export class PatientController {
   async addEmergencyContact(
     @Param('id') id: string,
     @Body(new ValidationPipe()) emergencyContactDto: CreateEmergencyContactDto,
-    @Request() req: any
+    @Request() req: any,
   ) {
     try {
       // For now, we'll update the patient record directly
@@ -469,7 +473,7 @@ export class PatientController {
       const patient = await this.patientService.updatePatient(
         id,
         updateDto,
-        req.user?.userId
+        req.user?.userId,
       );
 
       return {
@@ -478,14 +482,14 @@ export class PatientController {
         data: {
           name: patient.emergencyContactName,
           phone: patient.emergencyContactPhone,
-          relationship: emergencyContactDto.relationship || 'Emergency Contact'
-        }
+          relationship: emergencyContactDto.relationship || 'Emergency Contact',
+        },
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to add emergency contact',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -505,16 +509,22 @@ export class PatientController {
           male: stats.malePatients,
           female: stats.femalePatients,
           total: stats.totalPatients,
-          malePercentage: stats.totalPatients > 0 ? Math.round((stats.malePatients / stats.totalPatients) * 100) : 0,
-          femalePercentage: stats.totalPatients > 0 ? Math.round((stats.femalePatients / stats.totalPatients) * 100) : 0
-        }
+          malePercentage:
+            stats.totalPatients > 0
+              ? Math.round((stats.malePatients / stats.totalPatients) * 100)
+              : 0,
+          femalePercentage:
+            stats.totalPatients > 0
+              ? Math.round((stats.femalePatients / stats.totalPatients) * 100)
+              : 0,
+        },
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to retrieve gender distribution',
-        error: error.message
+        error: error.message,
       };
     }
   }
-} 
+}

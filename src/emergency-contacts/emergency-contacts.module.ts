@@ -30,4 +30,4 @@ import { CommonModule } from '../common/common.module';
   providers: [EmergencyContactsService],
   exports: [EmergencyContactsService],
 })
-export class EmergencyContactsModule {} 
+export class EmergencyContactsModule {}

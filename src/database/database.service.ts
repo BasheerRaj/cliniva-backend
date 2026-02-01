@@ -29,9 +29,7 @@ export interface DatabaseInfo {
 export class DatabaseService implements OnModuleInit {
   private readonly logger = new Logger(DatabaseService.name);
 
-  constructor(
-    @InjectConnection() private readonly connection: Connection,
-  ) {}
+  constructor(@InjectConnection() private readonly connection: Connection) {}
 
   async onModuleInit() {
     this.logger.log('🔄 Initializing database connection test...');
@@ -46,15 +44,15 @@ export class DatabaseService implements OnModuleInit {
 
       // Test basic connection with ping
       await this.connection.db.admin().ping();
-      
+
       // Get database name and collection count
       const dbName = this.connection.db.databaseName;
       const collections = await this.connection.db.listCollections().toArray();
-      
+
       this.logger.log(`✅ Database connection test: SUCCESS`);
       this.logger.log(`📊 Connected to database: ${dbName}`);
       this.logger.log(`📁 Collections found: ${collections.length}`);
-      
+
       return true;
     } catch (error) {
       this.logger.error('❌ Database connection test: FAILED', error.message);
@@ -73,7 +71,7 @@ export class DatabaseService implements OnModuleInit {
 
       const state = this.connection.readyState;
       const isConnected = state === 1;
-      
+
       if (!isConnected || !this.connection.db) {
         return {
           status: 'disconnected',
@@ -88,7 +86,7 @@ export class DatabaseService implements OnModuleInit {
       // Test the connection with a ping
       await this.connection.db.admin().ping();
       const collections = await this.connection.db.listCollections().toArray();
-      
+
       return {
         status: 'connected',
         message: 'Database is connected and responsive',
@@ -118,22 +116,26 @@ export class DatabaseService implements OnModuleInit {
 
       const collections = await db.listCollections().toArray();
       const stats = await db.stats();
-      
+
       // Parse connection string to get host and port
       const hostAddress = this.connection.getClient().options?.hosts?.[0];
       let host = 'localhost';
       let port = 27017;
-      
-      if (hostAddress && typeof hostAddress === 'object' && 'host' in hostAddress) {
+
+      if (
+        hostAddress &&
+        typeof hostAddress === 'object' &&
+        'host' in hostAddress
+      ) {
         host = hostAddress.host || 'localhost';
         port = hostAddress.port || 27017;
       }
-      
+
       return {
         name: db.databaseName,
         host,
         port,
-        collections: collections.map(col => col.name),
+        collections: collections.map((col) => col.name),
         stats: {
           collections: stats.collections || 0,
           dataSize: stats.dataSize || 0,
@@ -160,15 +162,15 @@ export class DatabaseService implements OnModuleInit {
       }
 
       const startTime = Date.now();
-      
+
       // Ping test
       await this.connection.db.admin().ping();
       const pingTime = Date.now() - startTime;
-      
+
       // Get basic info
       const health = await this.getHealth();
       const info = await this.getDatabaseInfo();
-      
+
       return {
         success: true,
         message: 'Database connection test completed successfully',

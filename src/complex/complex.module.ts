@@ -8,9 +8,7 @@ import { CommonModule } from '../common/common.module';
 
 @Module({
   imports: [
-    MongooseModule.forFeature([
-      { name: 'Complex', schema: ComplexSchema },
-    ]),
+    MongooseModule.forFeature([{ name: 'Complex', schema: ComplexSchema }]),
     SubscriptionModule,
     CommonModule,
   ],

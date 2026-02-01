@@ -1,9 +1,16 @@
-import { IsString, IsOptional, IsNumber, IsUrl, IsBoolean, ValidateNested } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsNumber,
+  IsUrl,
+  IsBoolean,
+  ValidateNested,
+} from 'class-validator';
 import { Type } from 'class-transformer';
-import { 
-  ContactInfoDto, 
-  BusinessProfileDto, 
-  LegalInfoDto 
+import {
+  ContactInfoDto,
+  BusinessProfileDto,
+  LegalInfoDto,
 } from './shared-base.dto';
 
 // Organization overview form - basic entity information
@@ -82,4 +89,4 @@ export class OrganizationStepDto {
   @IsBoolean()
   @IsOptional()
   completeSetup?: boolean; // If true, finalize organization and continue to complex step
-} 
+}

@@ -1,1 +1,1 @@
-export * from './create-emergency-contact.dto'; 
+export * from './create-emergency-contact.dto';

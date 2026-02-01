@@ -82,10 +82,16 @@ describe('Clinic Management (e2e)', () => {
 
     beforeEach(async () => {
       // Create test complexes
-      const testComplex = await createTestComplex(complexModel, testComplexData);
+      const testComplex = await createTestComplex(
+        complexModel,
+        testComplexData,
+      );
       testComplexId = testComplex._id.toString();
 
-      const anotherComplex = await createTestComplex(complexModel, anotherComplexData);
+      const anotherComplex = await createTestComplex(
+        complexModel,
+        anotherComplexData,
+      );
       anotherComplexId = anotherComplex._id.toString();
 
       // Create clinics for test complex
@@ -371,7 +377,10 @@ describe('Clinic Management (e2e)', () => {
 
     beforeEach(async () => {
       // Create test complex
-      const testComplex = await createTestComplex(complexModel, testComplexData);
+      const testComplex = await createTestComplex(
+        complexModel,
+        testComplexData,
+      );
       testComplexId = testComplex._id.toString();
 
       // Create active clinics
@@ -433,7 +442,10 @@ describe('Clinic Management (e2e)', () => {
 
     it('should filter by complexId', async () => {
       // Create another complex with a clinic
-      const anotherComplex = await createTestComplex(complexModel, anotherComplexData);
+      const anotherComplex = await createTestComplex(
+        complexModel,
+        anotherComplexData,
+      );
       const clinicInAnotherComplex = await createTestClinic(clinicModel, {
         ...testClinicData,
         name: { ar: 'عيادة في مجمع آخر', en: 'Clinic in Another Complex' },
@@ -495,9 +507,12 @@ describe('Clinic Management (e2e)', () => {
       // Verify clinics are sorted by name
       if (response.body.data.length > 1) {
         for (let i = 0; i < response.body.data.length - 1; i++) {
-          const current = response.body.data[i].name.en || response.body.data[i].name;
-          const next = response.body.data[i + 1].name.en || response.body.data[i + 1].name;
-          const currentName = typeof current === 'string' ? current : current.en;
+          const current =
+            response.body.data[i].name.en || response.body.data[i].name;
+          const next =
+            response.body.data[i + 1].name.en || response.body.data[i + 1].name;
+          const currentName =
+            typeof current === 'string' ? current : current.en;
           const nextName = typeof next === 'string' ? next : next.en;
           expect(currentName.localeCompare(nextName)).toBeLessThanOrEqual(0);
         }
@@ -505,9 +520,7 @@ describe('Clinic Management (e2e)', () => {
     });
 
     it('should return 401 when no authentication token provided', async () => {
-      await request(app.getHttpServer())
-        .get('/clinics/dropdown')
-        .expect(401);
+      await request(app.getHttpServer()).get('/clinics/dropdown').expect(401);
     });
 
     it('should return 401 when invalid authentication token provided', async () => {

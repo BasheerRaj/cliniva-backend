@@ -3,7 +3,7 @@ import { Document, Types } from 'mongoose';
 
 @Schema({
   timestamps: true,
-  collection: 'insurance_claims'
+  collection: 'insurance_claims',
 })
 export class InsuranceClaim extends Document {
   @Prop({ required: true, unique: true })
@@ -27,9 +27,9 @@ export class InsuranceClaim extends Document {
   @Prop({ default: 0, type: Number })
   approvedAmount: number;
 
-  @Prop({ 
+  @Prop({
     enum: ['submitted', 'under_review', 'approved', 'rejected', 'paid'],
-    default: 'submitted' 
+    default: 'submitted',
   })
   status: string;
 
@@ -49,7 +49,8 @@ export class InsuranceClaim extends Document {
   updatedBy?: Types.ObjectId;
 }
 
-export const InsuranceClaimSchema = SchemaFactory.createForClass(InsuranceClaim);
+export const InsuranceClaimSchema =
+  SchemaFactory.createForClass(InsuranceClaim);
 
 // Indexes (claimNumber index is already created by unique: true in @Prop)
 InsuranceClaimSchema.index({ patientId: 1 });

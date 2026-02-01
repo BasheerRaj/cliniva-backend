@@ -3,7 +3,7 @@ import { Document, Types } from 'mongoose';
 
 @Schema({
   timestamps: true,
-  collection: 'employee_profiles'
+  collection: 'employee_profiles',
 })
 export class EmployeeProfile extends Document {
   @Prop({ type: Types.ObjectId, ref: 'User', required: true, unique: true })
@@ -15,8 +15,8 @@ export class EmployeeProfile extends Document {
   @Prop()
   cardNumber?: string; // National ID or government-issued ID
 
-  @Prop({ 
-    enum: ['single', 'married', 'divorced', 'widowed', 'separated', 'other'] 
+  @Prop({
+    enum: ['single', 'married', 'divorced', 'widowed', 'separated', 'other'],
   })
   maritalStatus?: string;
 
@@ -54,10 +54,14 @@ export class EmployeeProfile extends Document {
   notes?: string; // Additional notes about the employee
 }
 
-export const EmployeeProfileSchema = SchemaFactory.createForClass(EmployeeProfile);
+export const EmployeeProfileSchema =
+  SchemaFactory.createForClass(EmployeeProfile);
 
 // Indexes (userId index is already created by unique: true in @Prop)
-EmployeeProfileSchema.index({ employeeNumber: 1 }, { unique: true, sparse: true });
+EmployeeProfileSchema.index(
+  { employeeNumber: 1 },
+  { unique: true, sparse: true },
+);
 EmployeeProfileSchema.index({ cardNumber: 1 }, { sparse: true });
 EmployeeProfileSchema.index({ dateOfHiring: 1 });
 EmployeeProfileSchema.index({ isActive: 1 });

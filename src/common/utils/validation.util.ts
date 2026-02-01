@@ -1,4 +1,9 @@
-import { Injectable, BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { Model, Types } from 'mongoose';
 import { ERROR_MESSAGES } from './error-messages.constant';
 import { BilingualMessage } from '../types/bilingual-message.type';
@@ -34,11 +39,14 @@ export interface BusinessProfileData {
 
 @Injectable()
 export class ValidationUtil {
-  static validatePlanLimits(planType: string, entityCounts: EntityCounts): boolean {
+  static validatePlanLimits(
+    planType: string,
+    entityCounts: EntityCounts,
+  ): boolean {
     const limits = {
       company: { organizations: 1, complexes: 50, clinics: 500 },
       complex: { organizations: 0, complexes: 1, clinics: 50 },
-      clinic: { organizations: 0, complexes: 0, clinics: 1 }
+      clinic: { organizations: 0, complexes: 0, clinics: 1 },
     };
 
     const planLimits = limits[planType.toLowerCase()];
@@ -72,15 +80,25 @@ export class ValidationUtil {
 
   static validateWorkingHours(schedule: WorkingHoursData[]): ValidationResult {
     const errors: string[] = [];
-    const validDays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+    const validDays = [
+      'monday',
+      'tuesday',
+      'wednesday',
+      'thursday',
+      'friday',
+      'saturday',
+      'sunday',
+    ];
 
     if (!schedule || schedule.length === 0) {
       return { isValid: true, errors: [] }; // Optional
     }
 
     // Check for duplicate days
-    const days = schedule.map(s => s.dayOfWeek.toLowerCase());
-    const duplicateDays = days.filter((day, index) => days.indexOf(day) !== index);
+    const days = schedule.map((s) => s.dayOfWeek.toLowerCase());
+    const duplicateDays = days.filter(
+      (day, index) => days.indexOf(day) !== index,
+    );
     if (duplicateDays.length > 0) {
       errors.push(`Duplicate days found: ${duplicateDays.join(', ')}`);
     }
@@ -94,23 +112,39 @@ export class ValidationUtil {
 
       if (daySchedule.isWorkingDay) {
         if (!daySchedule.openingTime || !daySchedule.closingTime) {
-          errors.push(`Opening and closing times required for working day: ${daySchedule.dayOfWeek}`);
+          errors.push(
+            `Opening and closing times required for working day: ${daySchedule.dayOfWeek}`,
+          );
         } else {
           // Validate time format (HH:mm)
           const timeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
           if (!timeRegex.test(daySchedule.openingTime)) {
-            errors.push(`Invalid opening time format for ${daySchedule.dayOfWeek}: ${daySchedule.openingTime}`);
+            errors.push(
+              `Invalid opening time format for ${daySchedule.dayOfWeek}: ${daySchedule.openingTime}`,
+            );
           }
           if (!timeRegex.test(daySchedule.closingTime)) {
-            errors.push(`Invalid closing time format for ${daySchedule.dayOfWeek}: ${daySchedule.closingTime}`);
+            errors.push(
+              `Invalid closing time format for ${daySchedule.dayOfWeek}: ${daySchedule.closingTime}`,
+            );
           }
 
           // Validate break times if provided
-          if (daySchedule.breakStartTime && !timeRegex.test(daySchedule.breakStartTime)) {
-            errors.push(`Invalid break start time format for ${daySchedule.dayOfWeek}: ${daySchedule.breakStartTime}`);
+          if (
+            daySchedule.breakStartTime &&
+            !timeRegex.test(daySchedule.breakStartTime)
+          ) {
+            errors.push(
+              `Invalid break start time format for ${daySchedule.dayOfWeek}: ${daySchedule.breakStartTime}`,
+            );
           }
-          if (daySchedule.breakEndTime && !timeRegex.test(daySchedule.breakEndTime)) {
-            errors.push(`Invalid break end time format for ${daySchedule.dayOfWeek}: ${daySchedule.breakEndTime}`);
+          if (
+            daySchedule.breakEndTime &&
+            !timeRegex.test(daySchedule.breakEndTime)
+          ) {
+            errors.push(
+              `Invalid break end time format for ${daySchedule.dayOfWeek}: ${daySchedule.breakEndTime}`,
+            );
           }
         }
       }
@@ -128,19 +162,25 @@ export class ValidationUtil {
       twitter: /^https?:\/\/(www\.)?twitter\.com\/[\w.-]+\/?$/,
       linkedin: /^https?:\/\/(www\.)?linkedin\.com\/(in|company)\/[\w.-]+\/?$/,
       whatsapp: /^https?:\/\/(wa\.me|whatsapp\.com)\/[\d+]+$/,
-      youtube: /^https?:\/\/(www\.)?youtube\.com\/(channel\/|c\/|user\/)?[\w.-]+\/?$/
+      youtube:
+        /^https?:\/\/(www\.)?youtube\.com\/(channel\/|c\/|user\/)?[\w.-]+\/?$/,
     };
 
     const pattern = patterns[platform.toLowerCase()];
     return pattern ? pattern.test(url) : /^https?:\/\/[\w.-]+/.test(url); // Generic URL validation
   }
 
-  static validateBusinessProfile(profileData: BusinessProfileData): ValidationResult {
+  static validateBusinessProfile(
+    profileData: BusinessProfileData,
+  ): ValidationResult {
     const errors: string[] = [];
 
     if (profileData.yearEstablished) {
       const currentYear = new Date().getFullYear();
-      if (profileData.yearEstablished < 1900 || profileData.yearEstablished > currentYear) {
+      if (
+        profileData.yearEstablished < 1900 ||
+        profileData.yearEstablished > currentYear
+      ) {
         errors.push(`Year established must be between 1900 and ${currentYear}`);
       }
     }
@@ -157,7 +197,10 @@ export class ValidationUtil {
       errors.push('CEO name cannot exceed 255 characters');
     }
 
-    if (profileData.vatNumber && !this.validateVATNumber(profileData.vatNumber)) {
+    if (
+      profileData.vatNumber &&
+      !this.validateVATNumber(profileData.vatNumber)
+    ) {
       errors.push('Invalid VAT number format');
     }
 
@@ -181,22 +224,24 @@ export class ValidationUtil {
 
   static validateGoogleLocation(location: string): boolean {
     if (!location) return true; // Optional field
-    
+
     // Basic validation for Google Maps location format
     // Can be coordinates, place ID, or formatted address
     const coordinatesRegex = /^-?\d+\.?\d*,-?\d+\.?\d*$/;
     const placeIdRegex = /^ChIJ[\w-]+$/;
-    
-    return coordinatesRegex.test(location) || 
-           placeIdRegex.test(location) || 
-           location.length > 10; // Minimum address length
+
+    return (
+      coordinatesRegex.test(location) ||
+      placeIdRegex.test(location) ||
+      location.length > 10
+    ); // Minimum address length
   }
 
   static validateHierarchicalWorkingHours(
     parentSchedule: WorkingHoursData[],
     childSchedule: WorkingHoursData[],
     parentEntityName = 'parent',
-    childEntityName = 'child'
+    childEntityName = 'child',
   ): ValidationResult {
     const errors: string[] = [];
 
@@ -205,11 +250,15 @@ export class ValidationUtil {
     const childValidation = this.validateWorkingHours(childSchedule);
 
     if (!parentValidation.isValid) {
-      errors.push(...parentValidation.errors.map(e => `${parentEntityName}: ${e}`));
+      errors.push(
+        ...parentValidation.errors.map((e) => `${parentEntityName}: ${e}`),
+      );
     }
 
     if (!childValidation.isValid) {
-      errors.push(...childValidation.errors.map(e => `${childEntityName}: ${e}`));
+      errors.push(
+        ...childValidation.errors.map((e) => `${childEntityName}: ${e}`),
+      );
     }
 
     if (errors.length > 0) {
@@ -220,11 +269,11 @@ export class ValidationUtil {
     const parentMap = new Map<string, WorkingHoursData>();
     const childMap = new Map<string, WorkingHoursData>();
 
-    parentSchedule.forEach(schedule => {
+    parentSchedule.forEach((schedule) => {
       parentMap.set(schedule.dayOfWeek.toLowerCase(), schedule);
     });
 
-    childSchedule.forEach(schedule => {
+    childSchedule.forEach((schedule) => {
       childMap.set(schedule.dayOfWeek.toLowerCase(), schedule);
     });
 
@@ -234,7 +283,9 @@ export class ValidationUtil {
 
       // If child is working but parent is not, that's invalid
       if (childDay.isWorkingDay && parentDay && !parentDay.isWorkingDay) {
-        errors.push(`${childEntityName} cannot be open on ${day} when ${parentEntityName} is closed`);
+        errors.push(
+          `${childEntityName} cannot be open on ${day} when ${parentEntityName} is closed`,
+        );
         continue;
       }
 
@@ -245,7 +296,7 @@ export class ValidationUtil {
           childDay,
           day,
           parentEntityName,
-          childEntityName
+          childEntityName,
         );
         errors.push(...validation.errors);
       }
@@ -259,11 +310,16 @@ export class ValidationUtil {
     childDay: WorkingHoursData,
     dayName: string,
     parentEntityName: string,
-    childEntityName: string
+    childEntityName: string,
   ): ValidationResult {
     const errors: string[] = [];
 
-    if (!parentDay.openingTime || !parentDay.closingTime || !childDay.openingTime || !childDay.closingTime) {
+    if (
+      !parentDay.openingTime ||
+      !parentDay.closingTime ||
+      !childDay.openingTime ||
+      !childDay.closingTime
+    ) {
       return { isValid: true, errors }; // Skip if times are missing (handled by basic validation)
     }
 
@@ -275,14 +331,14 @@ export class ValidationUtil {
     // Child opening time must be >= parent opening time
     if (childOpen < parentOpen) {
       errors.push(
-        `${childEntityName} opening time (${childDay.openingTime}) on ${dayName} must be at or after ${parentEntityName} opening time (${parentDay.openingTime})`
+        `${childEntityName} opening time (${childDay.openingTime}) on ${dayName} must be at or after ${parentEntityName} opening time (${parentDay.openingTime})`,
       );
     }
 
     // Child closing time must be <= parent closing time
     if (childClose > parentClose) {
       errors.push(
-        `${childEntityName} closing time (${childDay.closingTime}) on ${dayName} must be at or before ${parentEntityName} closing time (${parentDay.closingTime})`
+        `${childEntityName} closing time (${childDay.closingTime}) on ${dayName} must be at or before ${parentEntityName} closing time (${parentDay.closingTime})`,
       );
     }
 
@@ -293,7 +349,9 @@ export class ValidationUtil {
 
       // Break must be within child working hours
       if (childBreakStart < childOpen || childBreakEnd > childClose) {
-        errors.push(`${childEntityName} break time on ${dayName} must be within working hours`);
+        errors.push(
+          `${childEntityName} break time on ${dayName} must be within working hours`,
+        );
       }
 
       // If parent has break times, child break should ideally align
@@ -302,7 +360,10 @@ export class ValidationUtil {
         const parentBreakEnd = this.parseTime(parentDay.breakEndTime);
 
         // Child break should overlap with parent break (optional constraint)
-        if (childBreakEnd < parentBreakStart || childBreakStart > parentBreakEnd) {
+        if (
+          childBreakEnd < parentBreakStart ||
+          childBreakStart > parentBreakEnd
+        ) {
           // This is a warning, not an error - clinic might have different break schedule
           // errors.push(`${childEntityName} break time on ${dayName} should overlap with ${parentEntityName} break time for operational efficiency`);
         }
@@ -326,12 +387,12 @@ export class ValidationUtil {
   static isTimeWithinRange(
     checkTime: string,
     startTime: string,
-    endTime: string
+    endTime: string,
   ): boolean {
     const check = this.parseTime(checkTime);
     const start = this.parseTime(startTime);
     const end = this.parseTime(endTime);
-    
+
     return check >= start && check <= end;
   }
 
@@ -342,16 +403,16 @@ export class ValidationUtil {
   /**
    * Validates that a string is a valid MongoDB ObjectId format.
    * Throws BadRequestException if the ID format is invalid.
-   * 
+   *
    * @static
    * @param {string} id - The ID string to validate
    * @param {BilingualMessage} entityName - The entity name for error message context
    * @throws {BadRequestException} When ID format is invalid
-   * 
+   *
    * @example
    * ValidationUtil.validateObjectId('507f1f77bcf86cd799439011', ERROR_MESSAGES.USER_NOT_FOUND);
    * // Passes validation
-   * 
+   *
    * @example
    * ValidationUtil.validateObjectId('invalid-id', ERROR_MESSAGES.USER_NOT_FOUND);
    * // Throws BadRequestException with bilingual error message
@@ -361,7 +422,7 @@ export class ValidationUtil {
       throw new BadRequestException({
         message: ERROR_MESSAGES.INVALID_ID_FORMAT,
         code: 'INVALID_ID_FORMAT',
-        details: { entityName, providedId: id }
+        details: { entityName, providedId: id },
       });
     }
   }
@@ -370,7 +431,7 @@ export class ValidationUtil {
    * Validates that an entity exists in the database.
    * First validates the ID format, then queries the database.
    * Throws NotFoundException if the entity doesn't exist.
-   * 
+   *
    * @static
    * @template T - The type of the entity document
    * @param {Model<T>} model - Mongoose model to query
@@ -379,7 +440,7 @@ export class ValidationUtil {
    * @returns {Promise<T>} The found entity document
    * @throws {BadRequestException} When ID format is invalid
    * @throws {NotFoundException} When entity is not found
-   * 
+   *
    * @example
    * const user = await ValidationUtil.validateEntityExists(
    *   userModel,
@@ -387,7 +448,7 @@ export class ValidationUtil {
    *   ERROR_MESSAGES.USER_NOT_FOUND
    * );
    * // Returns the user document if found
-   * 
+   *
    * @example
    * await ValidationUtil.validateEntityExists(
    *   userModel,
@@ -399,22 +460,22 @@ export class ValidationUtil {
   static async validateEntityExists<T>(
     model: Model<T>,
     id: string,
-    notFoundMessage: BilingualMessage
+    notFoundMessage: BilingualMessage,
   ): Promise<T> {
     // First validate ID format
     this.validateObjectId(id, notFoundMessage);
-    
+
     // Query database
     const entity = await model.findById(id);
-    
+
     if (!entity) {
       throw new NotFoundException({
         message: notFoundMessage,
         code: 'ENTITY_NOT_FOUND',
-        details: { id }
+        details: { id },
       });
     }
-    
+
     return entity;
   }
 
@@ -422,15 +483,15 @@ export class ValidationUtil {
    * Validates that a user is not attempting to modify their own account.
    * Prevents self-deactivation and self-deletion scenarios.
    * Throws ForbiddenException if user attempts self-modification.
-   * 
+   *
    * Business Rules: BZR-n0c4e9f2 (self-deactivation), BZR-m3d5a8b7 (self-deletion)
-   * 
+   *
    * @static
    * @param {string} targetUserId - The ID of the user being modified
    * @param {string} currentUserId - The ID of the user performing the action
    * @param {'deactivate' | 'delete'} action - The type of modification being attempted
    * @throws {ForbiddenException} When user attempts to modify their own account
-   * 
+   *
    * @example
    * ValidationUtil.validateNotSelfModification(
    *   'user123',
@@ -438,7 +499,7 @@ export class ValidationUtil {
    *   'deactivate'
    * );
    * // Passes validation - different users
-   * 
+   *
    * @example
    * ValidationUtil.validateNotSelfModification(
    *   'user123',
@@ -450,17 +511,18 @@ export class ValidationUtil {
   static validateNotSelfModification(
     targetUserId: string,
     currentUserId: string,
-    action: 'deactivate' | 'delete'
+    action: 'deactivate' | 'delete',
   ): void {
     if (targetUserId === currentUserId) {
-      const message = action === 'deactivate' 
-        ? ERROR_MESSAGES.CANNOT_DEACTIVATE_SELF
-        : ERROR_MESSAGES.CANNOT_DELETE_SELF;
-      
+      const message =
+        action === 'deactivate'
+          ? ERROR_MESSAGES.CANNOT_DEACTIVATE_SELF
+          : ERROR_MESSAGES.CANNOT_DELETE_SELF;
+
       throw new ForbiddenException({
         message,
         code: 'SELF_MODIFICATION_FORBIDDEN',
-        details: { action, userId: targetUserId }
+        details: { action, userId: targetUserId },
       });
     }
   }
@@ -469,18 +531,18 @@ export class ValidationUtil {
    * Validates that a user is active (not deactivated).
    * Prevents assignment of deactivated users to entities.
    * Throws BadRequestException if user is inactive.
-   * 
+   *
    * Business Rule: BZR-q4f3e1b8 (deactivated user restrictions)
-   * 
+   *
    * @static
    * @param {any} user - The user document to validate (must have isActive property)
    * @throws {BadRequestException} When user is inactive
-   * 
+   *
    * @example
    * const user = await userModel.findById(userId);
    * ValidationUtil.validateUserActive(user);
    * // Passes if user.isActive === true
-   * 
+   *
    * @example
    * const inactiveUser = { _id: '123', isActive: false };
    * ValidationUtil.validateUserActive(inactiveUser);
@@ -491,7 +553,7 @@ export class ValidationUtil {
       throw new BadRequestException({
         message: ERROR_MESSAGES.DEACTIVATED_USER_ASSIGNMENT,
         code: 'USER_INACTIVE',
-        details: { userId: user._id }
+        details: { userId: user._id },
       });
     }
   }
@@ -500,16 +562,16 @@ export class ValidationUtil {
    * Validates that all clinics belong to the same complex.
    * Enforces single complex assignment rule for employees.
    * Throws BadRequestException if clinics belong to different complexes.
-   * 
+   *
    * Business Rule: BZR-5e6f7a8b (single complex assignment validation)
-   * 
+   *
    * @static
    * @param {string[]} clinicIds - Array of clinic IDs to validate
    * @param {string} complexId - The expected complex ID
    * @param {Model<any>} clinicModel - Mongoose model for Clinic collection
    * @returns {Promise<void>}
    * @throws {BadRequestException} When clinics belong to different complexes
-   * 
+   *
    * @example
    * await ValidationUtil.validateSingleComplexAssignment(
    *   ['clinic1', 'clinic2'],
@@ -517,7 +579,7 @@ export class ValidationUtil {
    *   clinicModel
    * );
    * // Passes if all clinics belong to complex1
-   * 
+   *
    * @example
    * await ValidationUtil.validateSingleComplexAssignment(
    *   ['clinic1', 'clinic2'],
@@ -529,7 +591,7 @@ export class ValidationUtil {
   static async validateSingleComplexAssignment(
     clinicIds: string[],
     complexId: string,
-    clinicModel: Model<any>
+    clinicModel: Model<any>,
   ): Promise<void> {
     // Skip validation if no clinics provided
     if (!clinicIds || clinicIds.length === 0) {
@@ -537,20 +599,22 @@ export class ValidationUtil {
     }
 
     // Query all clinics and get their complex IDs
-    const clinics = await clinicModel.find({
-      _id: { $in: clinicIds }
-    }).select('complexId');
+    const clinics = await clinicModel
+      .find({
+        _id: { $in: clinicIds },
+      })
+      .select('complexId');
 
     // Check if any clinic belongs to a different complex
     const differentComplexes = clinics.some(
-      clinic => clinic.complexId.toString() !== complexId
+      (clinic) => clinic.complexId.toString() !== complexId,
     );
 
     if (differentComplexes) {
       throw new BadRequestException({
         message: ERROR_MESSAGES.CLINICS_DIFFERENT_COMPLEXES,
         code: 'CLINICS_DIFFERENT_COMPLEXES',
-        details: { complexId, clinicIds }
+        details: { complexId, clinicIds },
       });
     }
   }
@@ -558,20 +622,20 @@ export class ValidationUtil {
   /**
    * Validates that an array is not empty.
    * Throws BadRequestException if array is null, undefined, or has zero length.
-   * 
+   *
    * @static
    * @template T - The type of items in the array
    * @param {T[]} array - The array to validate
    * @param {BilingualMessage} emptyMessage - Error message if array is empty
    * @throws {BadRequestException} When array is empty
-   * 
+   *
    * @example
    * ValidationUtil.validateNotEmpty(
    *   ['item1', 'item2'],
    *   ERROR_MESSAGES.EMPTY_ARRAY
    * );
    * // Passes validation
-   * 
+   *
    * @example
    * ValidationUtil.validateNotEmpty(
    *   [],
@@ -579,10 +643,7 @@ export class ValidationUtil {
    * );
    * // Throws BadRequestException - array is empty
    */
-  static validateNotEmpty<T>(
-    array: T[],
-    emptyMessage: BilingualMessage
-  ): void {
+  static validateNotEmpty<T>(array: T[], emptyMessage: BilingualMessage): void {
     if (!array || array.length === 0) {
       throw new BadRequestException({
         message: emptyMessage,

@@ -3,7 +3,12 @@ import { UnauthorizedException } from '@nestjs/common';
 
 import { JwtStrategy } from '../../../src/auth/strategies/jwt.strategy';
 import { AuthService } from '../../../src/auth/auth.service';
-import { mockAuthService, mockUser, mockJwtPayload, mockJwtUser } from '../mocks/auth.mocks';
+import {
+  mockAuthService,
+  mockUser,
+  mockJwtPayload,
+  mockJwtUser,
+} from '../mocks/auth.mocks';
 
 describe('JwtStrategy', () => {
   let strategy: JwtStrategy;
@@ -34,7 +39,7 @@ describe('JwtStrategy', () => {
   describe('constructor', () => {
     it('should throw error if JWT_SECRET is not configured', () => {
       delete process.env.JWT_SECRET;
-      
+
       expect(() => {
         new JwtStrategy(authService);
       }).toThrow('JWT_SECRET environment variable is not configured');
@@ -42,7 +47,7 @@ describe('JwtStrategy', () => {
 
     it('should initialize with JWT_SECRET', () => {
       process.env.JWT_SECRET = 'test-jwt-secret';
-      
+
       expect(() => {
         new JwtStrategy(authService);
       }).not.toThrow();
@@ -55,7 +60,9 @@ describe('JwtStrategy', () => {
 
       const result = await strategy.validate(mockJwtPayload);
 
-      expect(authService.validateUserById).toHaveBeenCalledWith(mockJwtPayload.sub);
+      expect(authService.validateUserById).toHaveBeenCalledWith(
+        mockJwtPayload.sub,
+      );
       expect(result).toEqual(mockJwtUser);
     });
 
@@ -65,8 +72,10 @@ describe('JwtStrategy', () => {
       await expect(strategy.validate(mockJwtPayload)).rejects.toThrow(
         UnauthorizedException,
       );
-      
-      expect(authService.validateUserById).toHaveBeenCalledWith(mockJwtPayload.sub);
+
+      expect(authService.validateUserById).toHaveBeenCalledWith(
+        mockJwtPayload.sub,
+      );
     });
 
     it('should throw UnauthorizedException if user is inactive', async () => {
@@ -88,7 +97,3 @@ describe('JwtStrategy', () => {
     });
   });
 });
-
-
-
-

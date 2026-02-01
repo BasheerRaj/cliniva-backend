@@ -1,9 +1,9 @@
-import { 
-  Injectable, 
-  NotFoundException, 
-  BadRequestException, 
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
   ConflictException,
-  Logger
+  Logger,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -12,9 +12,9 @@ import { Patient } from '../database/schemas/patient.schema';
 import { User } from '../database/schemas/user.schema';
 import { Clinic } from '../database/schemas/clinic.schema';
 import { Service } from '../database/schemas/service.schema';
-import { 
-  CreateAppointmentDto, 
-  UpdateAppointmentDto, 
+import {
+  CreateAppointmentDto,
+  UpdateAppointmentDto,
   RescheduleAppointmentDto,
   CancelAppointmentDto,
   AppointmentSearchQueryDto,
@@ -24,7 +24,7 @@ import {
   TimeSlotDto,
   DayScheduleDto,
   AppointmentConflictDto,
-  ConfirmAppointmentDto
+  ConfirmAppointmentDto,
 } from './dto';
 
 @Injectable()
@@ -32,7 +32,8 @@ export class AppointmentService {
   private readonly logger = new Logger(AppointmentService.name);
 
   constructor(
-    @InjectModel('Appointment') private readonly appointmentModel: Model<Appointment>,
+    @InjectModel('Appointment')
+    private readonly appointmentModel: Model<Appointment>,
     @InjectModel('Patient') private readonly patientModel: Model<Patient>,
     @InjectModel('User') private readonly userModel: Model<User>,
     @InjectModel('Clinic') private readonly clinicModel: Model<Clinic>,
@@ -44,15 +45,22 @@ export class AppointmentService {
    */
   private async validateAppointmentData(
     appointmentDto: CreateAppointmentDto | UpdateAppointmentDto,
-    excludeAppointmentId?: string
+    excludeAppointmentId?: string,
   ): Promise<void> {
-    const { patientId, doctorId, clinicId, serviceId, appointmentDate, appointmentTime } = appointmentDto;
+    const {
+      patientId,
+      doctorId,
+      clinicId,
+      serviceId,
+      appointmentDate,
+      appointmentTime,
+    } = appointmentDto;
 
     // Validate patient exists
     if (patientId) {
-      const patient = await this.patientModel.findOne({ 
+      const patient = await this.patientModel.findOne({
         _id: new Types.ObjectId(patientId),
-        deletedAt: { $exists: false }
+        deletedAt: { $exists: false },
       });
       if (!patient) {
         throw new NotFoundException('Patient not found');
@@ -61,10 +69,10 @@ export class AppointmentService {
 
     // Validate doctor exists and is active
     if (doctorId) {
-      const doctor = await this.userModel.findOne({ 
+      const doctor = await this.userModel.findOne({
         _id: new Types.ObjectId(doctorId),
         role: { $in: ['doctor', 'admin', 'owner'] },
-        isActive: true
+        isActive: true,
       });
       if (!doctor) {
         throw new NotFoundException('Doctor not found or inactive');
@@ -89,19 +97,25 @@ export class AppointmentService {
 
     // Validate appointment date and time
     if (appointmentDate && appointmentTime) {
-      const appointmentDateTime = new Date(`${appointmentDate}T${appointmentTime}:00`);
+      const appointmentDateTime = new Date(
+        `${appointmentDate}T${appointmentTime}:00`,
+      );
       const now = new Date();
 
       // Check if appointment is in the past
       if (appointmentDateTime < now) {
-        throw new BadRequestException('Cannot schedule appointments in the past');
+        throw new BadRequestException(
+          'Cannot schedule appointments in the past',
+        );
       }
 
       // Check if appointment is too far in the future (1 year)
       const oneYearFromNow = new Date();
       oneYearFromNow.setFullYear(now.getFullYear() + 1);
       if (appointmentDateTime > oneYearFromNow) {
-        throw new BadRequestException('Cannot schedule appointments more than 1 year in advance');
+        throw new BadRequestException(
+          'Cannot schedule appointments more than 1 year in advance',
+        );
       }
 
       // Check for conflicts
@@ -112,11 +126,13 @@ export class AppointmentService {
           appointmentDate,
           appointmentTime,
           (appointmentDto as any).durationMinutes || 30,
-          excludeAppointmentId
+          excludeAppointmentId,
         );
 
         if (conflicts.length > 0) {
-          throw new ConflictException(`Appointment conflicts detected: ${conflicts.map(c => c.message).join(', ')}`);
+          throw new ConflictException(
+            `Appointment conflicts detected: ${conflicts.map((c) => c.message).join(', ')}`,
+          );
         }
       }
     }
@@ -131,56 +147,80 @@ export class AppointmentService {
     appointmentDate: string,
     appointmentTime: string,
     durationMinutes: number = 30,
-    excludeAppointmentId?: string
+    excludeAppointmentId?: string,
   ): Promise<AppointmentConflictDto[]> {
     const conflicts: AppointmentConflictDto[] = [];
-    
-    const appointmentStart = new Date(`${appointmentDate}T${appointmentTime}:00`);
-    const appointmentEnd = new Date(appointmentStart.getTime() + durationMinutes * 60000);
+
+    const appointmentStart = new Date(
+      `${appointmentDate}T${appointmentTime}:00`,
+    );
+    const appointmentEnd = new Date(
+      appointmentStart.getTime() + durationMinutes * 60000,
+    );
 
     // Build query to find overlapping appointments
     const overlapQuery: any = {
       $or: [
         {
           $and: [
-            { 
+            {
               $expr: {
                 $lte: [
-                  { $dateFromString: { 
-                    dateString: { $concat: [
-                      { $dateToString: { format: "%Y-%m-%d", date: "$appointmentDate" } },
-                      "T",
-                      "$appointmentTime",
-                      ":00"
-                    ] }
-                  } },
-                  appointmentStart
-                ]
-              }
+                  {
+                    $dateFromString: {
+                      dateString: {
+                        $concat: [
+                          {
+                            $dateToString: {
+                              format: '%Y-%m-%d',
+                              date: '$appointmentDate',
+                            },
+                          },
+                          'T',
+                          '$appointmentTime',
+                          ':00',
+                        ],
+                      },
+                    },
+                  },
+                  appointmentStart,
+                ],
+              },
             },
             {
               $expr: {
                 $gt: [
-                  { $add: [
-                    { $dateFromString: { 
-                      dateString: { $concat: [
-                        { $dateToString: { format: "%Y-%m-%d", date: "$appointmentDate" } },
-                        "T",
-                        "$appointmentTime",
-                        ":00"
-                      ] }
-                    } },
-                    { $multiply: ["$durationMinutes", 60000] }
-                  ] },
-                  appointmentStart
-                ]
-              }
-            }
-          ]
-        }
+                  {
+                    $add: [
+                      {
+                        $dateFromString: {
+                          dateString: {
+                            $concat: [
+                              {
+                                $dateToString: {
+                                  format: '%Y-%m-%d',
+                                  date: '$appointmentDate',
+                                },
+                              },
+                              'T',
+                              '$appointmentTime',
+                              ':00',
+                            ],
+                          },
+                        },
+                      },
+                      { $multiply: ['$durationMinutes', 60000] },
+                    ],
+                  },
+                  appointmentStart,
+                ],
+              },
+            },
+          ],
+        },
       ],
       status: { $nin: ['cancelled', 'no_show'] },
-      deletedAt: { $exists: false }
+      deletedAt: { $exists: false },
     };
 
     if (excludeAppointmentId) {
@@ -190,28 +230,28 @@ export class AppointmentService {
     // Check doctor conflicts
     const doctorConflicts = await this.appointmentModel.find({
       ...overlapQuery,
-      doctorId: new Types.ObjectId(doctorId)
+      doctorId: new Types.ObjectId(doctorId),
     });
 
     if (doctorConflicts.length > 0) {
       conflicts.push({
         conflictType: 'doctor_busy',
         message: 'Doctor has another appointment at this time',
-        conflictingAppointmentId: (doctorConflicts[0] as any)._id.toString()
+        conflictingAppointmentId: (doctorConflicts[0] as any)._id.toString(),
       });
     }
 
     // Check patient conflicts
     const patientConflicts = await this.appointmentModel.find({
       ...overlapQuery,
-      patientId: new Types.ObjectId(patientId)
+      patientId: new Types.ObjectId(patientId),
     });
 
     if (patientConflicts.length > 0) {
       conflicts.push({
         conflictType: 'patient_busy',
         message: 'Patient has another appointment at this time',
-        conflictingAppointmentId: (patientConflicts[0] as any)._id.toString()
+        conflictingAppointmentId: (patientConflicts[0] as any)._id.toString(),
       });
     }
 
@@ -223,16 +263,20 @@ export class AppointmentService {
    */
   async createAppointment(
     createAppointmentDto: CreateAppointmentDto,
-    createdByUserId?: string
+    createdByUserId?: string,
   ): Promise<Appointment> {
-    this.logger.log(`Creating appointment for patient ${createAppointmentDto.patientId}`);
+    this.logger.log(
+      `Creating appointment for patient ${createAppointmentDto.patientId}`,
+    );
 
     await this.validateAppointmentData(createAppointmentDto);
 
     // Get service details for default duration if not provided
     let durationMinutes = createAppointmentDto.durationMinutes;
     if (!durationMinutes) {
-      const service = await this.serviceModel.findById(createAppointmentDto.serviceId);
+      const service = await this.serviceModel.findById(
+        createAppointmentDto.serviceId,
+      );
       durationMinutes = service?.durationMinutes || 30;
     }
 
@@ -246,13 +290,17 @@ export class AppointmentService {
       durationMinutes,
       status: createAppointmentDto.status || 'scheduled',
       urgencyLevel: createAppointmentDto.urgencyLevel || 'medium',
-      createdBy: createdByUserId ? new Types.ObjectId(createdByUserId) : undefined,
+      createdBy: createdByUserId
+        ? new Types.ObjectId(createdByUserId)
+        : undefined,
     };
 
     const appointment = new this.appointmentModel(appointmentData);
     const savedAppointment = await appointment.save();
-    
-    this.logger.log(`Appointment created successfully with ID: ${savedAppointment._id}`);
+
+    this.logger.log(
+      `Appointment created successfully with ID: ${savedAppointment._id}`,
+    );
     return savedAppointment;
   }
 
@@ -279,12 +327,12 @@ export class AppointmentService {
       page = '1',
       limit = '10',
       sortBy = 'appointmentDate',
-      sortOrder = 'desc'
+      sortOrder = 'desc',
     } = query;
 
     // Build filter object
     const filter: any = {
-      deletedAt: { $exists: false }
+      deletedAt: { $exists: false },
     };
 
     // Individual field filters
@@ -324,7 +372,7 @@ export class AppointmentService {
         .skip(skip)
         .limit(pageSize)
         .exec(),
-      this.appointmentModel.countDocuments(filter)
+      this.appointmentModel.countDocuments(filter),
     ]);
 
     const totalPages = Math.ceil(total / pageSize);
@@ -333,7 +381,7 @@ export class AppointmentService {
       appointments,
       total,
       page: pageNum,
-      totalPages
+      totalPages,
     };
   }
 
@@ -346,9 +394,9 @@ export class AppointmentService {
     }
 
     const appointment = await this.appointmentModel
-      .findOne({ 
+      .findOne({
         _id: new Types.ObjectId(appointmentId),
-        deletedAt: { $exists: false }
+        deletedAt: { $exists: false },
       })
       .populate('patientId', 'firstName lastName phone email dateOfBirth')
       .populate('doctorId', 'firstName lastName email phone')
@@ -369,7 +417,7 @@ export class AppointmentService {
   async updateAppointment(
     appointmentId: string,
     updateAppointmentDto: UpdateAppointmentDto,
-    updatedByUserId?: string
+    updatedByUserId?: string,
   ): Promise<Appointment> {
     if (!Types.ObjectId.isValid(appointmentId)) {
       throw new BadRequestException('Invalid appointment ID format');
@@ -381,7 +429,9 @@ export class AppointmentService {
 
     const updateData: any = {
       ...updateAppointmentDto,
-      updatedBy: updatedByUserId ? new Types.ObjectId(updatedByUserId) : undefined,
+      updatedBy: updatedByUserId
+        ? new Types.ObjectId(updatedByUserId)
+        : undefined,
     };
 
     // Convert IDs to ObjectId if provided
@@ -398,17 +448,19 @@ export class AppointmentService {
       updateData.serviceId = new Types.ObjectId(updateAppointmentDto.serviceId);
     }
     if (updateAppointmentDto.appointmentDate) {
-      updateData.appointmentDate = new Date(updateAppointmentDto.appointmentDate);
+      updateData.appointmentDate = new Date(
+        updateAppointmentDto.appointmentDate,
+      );
     }
 
     const appointment = await this.appointmentModel
       .findOneAndUpdate(
-        { 
+        {
           _id: new Types.ObjectId(appointmentId),
-          deletedAt: { $exists: false }
+          deletedAt: { $exists: false },
         },
         { $set: updateData },
-        { new: true, runValidators: true }
+        { new: true, runValidators: true },
       )
       .exec();
 
@@ -426,7 +478,7 @@ export class AppointmentService {
   async rescheduleAppointment(
     appointmentId: string,
     rescheduleDto: RescheduleAppointmentDto,
-    updatedByUserId?: string
+    updatedByUserId?: string,
   ): Promise<Appointment> {
     if (!Types.ObjectId.isValid(appointmentId)) {
       throw new BadRequestException('Invalid appointment ID format');
@@ -436,7 +488,9 @@ export class AppointmentService {
 
     // Check if appointment can be rescheduled
     if (['completed', 'cancelled', 'no_show'].includes(appointment.status)) {
-      throw new BadRequestException('Cannot reschedule appointment with current status');
+      throw new BadRequestException(
+        'Cannot reschedule appointment with current status',
+      );
     }
 
     // Validate new date/time and check conflicts
@@ -446,20 +500,24 @@ export class AppointmentService {
       rescheduleDto.newAppointmentDate,
       rescheduleDto.newAppointmentTime,
       appointment.durationMinutes,
-      appointmentId
+      appointmentId,
     );
 
     if (conflicts.length > 0) {
-      throw new ConflictException(`Cannot reschedule: ${conflicts.map(c => c.message).join(', ')}`);
+      throw new ConflictException(
+        `Cannot reschedule: ${conflicts.map((c) => c.message).join(', ')}`,
+      );
     }
 
     const updateData: any = {
       appointmentDate: new Date(rescheduleDto.newAppointmentDate),
       appointmentTime: rescheduleDto.newAppointmentTime,
-      notes: rescheduleDto.rescheduleReason ? 
-        `${appointment.notes || ''}\nRescheduled: ${rescheduleDto.rescheduleReason}`.trim() : 
-        appointment.notes,
-      updatedBy: updatedByUserId ? new Types.ObjectId(updatedByUserId) : undefined,
+      notes: rescheduleDto.rescheduleReason
+        ? `${appointment.notes || ''}\nRescheduled: ${rescheduleDto.rescheduleReason}`.trim()
+        : appointment.notes,
+      updatedBy: updatedByUserId
+        ? new Types.ObjectId(updatedByUserId)
+        : undefined,
     };
 
     const updatedAppointment = await this.appointmentModel
@@ -476,7 +534,7 @@ export class AppointmentService {
   async cancelAppointment(
     appointmentId: string,
     cancelDto: CancelAppointmentDto,
-    updatedByUserId?: string
+    updatedByUserId?: string,
   ): Promise<Appointment> {
     if (!Types.ObjectId.isValid(appointmentId)) {
       throw new BadRequestException('Invalid appointment ID format');
@@ -486,13 +544,17 @@ export class AppointmentService {
 
     // Check if appointment can be cancelled
     if (['completed', 'cancelled'].includes(appointment.status)) {
-      throw new BadRequestException('Cannot cancel appointment with current status');
+      throw new BadRequestException(
+        'Cannot cancel appointment with current status',
+      );
     }
 
     const updateData: any = {
       status: 'cancelled',
       cancellationReason: cancelDto.cancellationReason,
-      updatedBy: updatedByUserId ? new Types.ObjectId(updatedByUserId) : undefined,
+      updatedBy: updatedByUserId
+        ? new Types.ObjectId(updatedByUserId)
+        : undefined,
     };
 
     const updatedAppointment = await this.appointmentModel
@@ -509,7 +571,7 @@ export class AppointmentService {
   async confirmAppointment(
     appointmentId: string,
     confirmDto: ConfirmAppointmentDto,
-    updatedByUserId?: string
+    updatedByUserId?: string,
   ): Promise<Appointment> {
     if (!Types.ObjectId.isValid(appointmentId)) {
       throw new BadRequestException('Invalid appointment ID format');
@@ -518,15 +580,19 @@ export class AppointmentService {
     const appointment = await this.getAppointmentById(appointmentId);
 
     if (appointment.status !== 'scheduled') {
-      throw new BadRequestException('Only scheduled appointments can be confirmed');
+      throw new BadRequestException(
+        'Only scheduled appointments can be confirmed',
+      );
     }
 
     const updateData: any = {
       status: 'confirmed',
-      notes: confirmDto.confirmationNotes ? 
-        `${appointment.notes || ''}\nConfirmation: ${confirmDto.confirmationNotes}`.trim() : 
-        appointment.notes,
-      updatedBy: updatedByUserId ? new Types.ObjectId(updatedByUserId) : undefined,
+      notes: confirmDto.confirmationNotes
+        ? `${appointment.notes || ''}\nConfirmation: ${confirmDto.confirmationNotes}`.trim()
+        : appointment.notes,
+      updatedBy: updatedByUserId
+        ? new Types.ObjectId(updatedByUserId)
+        : undefined,
     };
 
     const updatedAppointment = await this.appointmentModel
@@ -540,7 +606,10 @@ export class AppointmentService {
   /**
    * Soft delete appointment
    */
-  async deleteAppointment(appointmentId: string, deletedByUserId?: string): Promise<void> {
+  async deleteAppointment(
+    appointmentId: string,
+    deletedByUserId?: string,
+  ): Promise<void> {
     if (!Types.ObjectId.isValid(appointmentId)) {
       throw new BadRequestException('Invalid appointment ID format');
     }
@@ -549,16 +618,18 @@ export class AppointmentService {
 
     const result = await this.appointmentModel
       .findOneAndUpdate(
-        { 
+        {
           _id: new Types.ObjectId(appointmentId),
-          deletedAt: { $exists: false }
+          deletedAt: { $exists: false },
         },
-        { 
+        {
           $set: {
             deletedAt: new Date(),
-            updatedBy: deletedByUserId ? new Types.ObjectId(deletedByUserId) : undefined,
-          }
-        }
+            updatedBy: deletedByUserId
+              ? new Types.ObjectId(deletedByUserId)
+              : undefined,
+          },
+        },
       )
       .exec();
 
@@ -572,7 +643,9 @@ export class AppointmentService {
   /**
    * Get doctor availability for a specific date
    */
-  async getDoctorAvailability(query: AppointmentAvailabilityQueryDto): Promise<DayScheduleDto> {
+  async getDoctorAvailability(
+    query: AppointmentAvailabilityQueryDto,
+  ): Promise<DayScheduleDto> {
     const { doctorId, date, clinicId, durationMinutes = 30 } = query;
 
     // Get existing appointments for the doctor on this date
@@ -581,7 +654,7 @@ export class AppointmentService {
         doctorId: new Types.ObjectId(doctorId),
         appointmentDate: new Date(date),
         status: { $nin: ['cancelled', 'no_show'] },
-        deletedAt: { $exists: false }
+        deletedAt: { $exists: false },
       })
       .sort({ appointmentTime: 1 })
       .exec();
@@ -592,8 +665,8 @@ export class AppointmentService {
       start: '09:00',
       end: '17:00',
       breaks: [
-        { start: '12:00', end: '13:00' } // Lunch break
-      ]
+        { start: '12:00', end: '13:00' }, // Lunch break
+      ],
     };
 
     // Generate time slots
@@ -605,34 +678,37 @@ export class AppointmentService {
     for (let hour = startHour; hour < endHour; hour++) {
       for (let minute = 0; minute < 60; minute += slotDuration) {
         const timeStr = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
-        
+
         // Skip lunch break
         if (timeStr >= '12:00' && timeStr < '13:00') {
           continue;
         }
 
         // Check if slot is available
-        const isBooked = existingAppointments.some(apt => {
+        const isBooked = existingAppointments.some((apt) => {
           const aptStartTime = apt.appointmentTime;
-          const aptEndTime = this.addMinutesToTime(aptStartTime, apt.durationMinutes);
+          const aptEndTime = this.addMinutesToTime(
+            aptStartTime,
+            apt.durationMinutes,
+          );
           return timeStr >= aptStartTime && timeStr < aptEndTime;
         });
 
-        const existingAppointment = existingAppointments.find(apt => 
-          apt.appointmentTime === timeStr
+        const existingAppointment = existingAppointments.find(
+          (apt) => apt.appointmentTime === timeStr,
         );
 
         timeSlots.push({
           time: timeStr,
           isAvailable: !isBooked,
           reason: isBooked ? 'Already booked' : undefined,
-          existingAppointmentId: (existingAppointment as any)._id.toString()
+          existingAppointmentId: (existingAppointment as any)._id.toString(),
         });
       }
     }
 
     const totalSlots = timeSlots.length;
-    const availableSlots = timeSlots.filter(slot => slot.isAvailable).length;
+    const availableSlots = timeSlots.filter((slot) => slot.isAvailable).length;
     const bookedSlots = totalSlots - availableSlots;
 
     return {
@@ -643,7 +719,7 @@ export class AppointmentService {
       timeSlots,
       totalSlots,
       availableSlots,
-      bookedSlots
+      bookedSlots,
     };
   }
 
@@ -679,76 +755,114 @@ export class AppointmentService {
       avgDurationResult,
       topServicesResult,
       topDoctorsResult,
-      urgencyDistributionResult
+      urgencyDistributionResult,
     ] = await Promise.all([
       // Total appointments
       this.appointmentModel.countDocuments({ deletedAt: { $exists: false } }),
-      
+
       // Status counts
-      this.appointmentModel.countDocuments({ status: 'scheduled', deletedAt: { $exists: false } }),
-      this.appointmentModel.countDocuments({ status: 'confirmed', deletedAt: { $exists: false } }),
-      this.appointmentModel.countDocuments({ status: 'completed', deletedAt: { $exists: false } }),
-      this.appointmentModel.countDocuments({ status: 'cancelled', deletedAt: { $exists: false } }),
-      this.appointmentModel.countDocuments({ status: 'no_show', deletedAt: { $exists: false } }),
-      
+      this.appointmentModel.countDocuments({
+        status: 'scheduled',
+        deletedAt: { $exists: false },
+      }),
+      this.appointmentModel.countDocuments({
+        status: 'confirmed',
+        deletedAt: { $exists: false },
+      }),
+      this.appointmentModel.countDocuments({
+        status: 'completed',
+        deletedAt: { $exists: false },
+      }),
+      this.appointmentModel.countDocuments({
+        status: 'cancelled',
+        deletedAt: { $exists: false },
+      }),
+      this.appointmentModel.countDocuments({
+        status: 'no_show',
+        deletedAt: { $exists: false },
+      }),
+
       // Today's appointments
       this.appointmentModel.countDocuments({
         appointmentDate: { $gte: today, $lt: tomorrow },
-        deletedAt: { $exists: false }
+        deletedAt: { $exists: false },
       }),
-      
+
       // Upcoming appointments
       this.appointmentModel.countDocuments({
         appointmentDate: { $gte: today },
         status: { $in: ['scheduled', 'confirmed'] },
-        deletedAt: { $exists: false }
+        deletedAt: { $exists: false },
       }),
-      
+
       // Average duration
       this.appointmentModel.aggregate([
         { $match: { deletedAt: { $exists: false } } },
-        { $group: { _id: null, avgDuration: { $avg: '$durationMinutes' } } }
+        { $group: { _id: null, avgDuration: { $avg: '$durationMinutes' } } },
       ]),
-      
+
       // Top services
       this.appointmentModel.aggregate([
         { $match: { deletedAt: { $exists: false } } },
         { $group: { _id: '$serviceId', count: { $sum: 1 } } },
-        { $lookup: { from: 'services', localField: '_id', foreignField: '_id', as: 'service' } },
+        {
+          $lookup: {
+            from: 'services',
+            localField: '_id',
+            foreignField: '_id',
+            as: 'service',
+          },
+        },
         { $unwind: '$service' },
-        { $project: { serviceId: '$_id', serviceName: '$service.name', count: 1 } },
+        {
+          $project: {
+            serviceId: '$_id',
+            serviceName: '$service.name',
+            count: 1,
+          },
+        },
         { $sort: { count: -1 } },
-        { $limit: 5 }
+        { $limit: 5 },
       ]),
-      
+
       // Top doctors
       this.appointmentModel.aggregate([
         { $match: { deletedAt: { $exists: false } } },
         { $group: { _id: '$doctorId', count: { $sum: 1 } } },
-        { $lookup: { from: 'users', localField: '_id', foreignField: '_id', as: 'doctor' } },
+        {
+          $lookup: {
+            from: 'users',
+            localField: '_id',
+            foreignField: '_id',
+            as: 'doctor',
+          },
+        },
         { $unwind: '$doctor' },
-        { 
-          $project: { 
-            doctorId: '$_id', 
-            doctorName: { $concat: ['$doctor.firstName', ' ', '$doctor.lastName'] }, 
-            count: 1 
-          } 
+        {
+          $project: {
+            doctorId: '$_id',
+            doctorName: {
+              $concat: ['$doctor.firstName', ' ', '$doctor.lastName'],
+            },
+            count: 1,
+          },
         },
         { $sort: { count: -1 } },
-        { $limit: 5 }
+        { $limit: 5 },
       ]),
-      
+
       // Urgency distribution
       this.appointmentModel.aggregate([
         { $match: { deletedAt: { $exists: false } } },
-        { $group: { _id: '$urgencyLevel', count: { $sum: 1 } } }
-      ])
+        { $group: { _id: '$urgencyLevel', count: { $sum: 1 } } },
+      ]),
     ]);
 
     // Process urgency distribution
     const urgencyDistribution = { low: 0, medium: 0, high: 0, urgent: 0 };
-    urgencyDistributionResult.forEach(item => {
-      urgencyDistribution[item._id as keyof typeof urgencyDistribution] = item.count;
+    urgencyDistributionResult.forEach((item) => {
+      urgencyDistribution[item._id as keyof typeof urgencyDistribution] =
+        item.count;
     });
 
     return {
@@ -762,17 +876,17 @@ export class AppointmentService {
       upcomingAppointments,
       overdueAppointments: 0, // TODO: Implement overdue logic
       averageDuration: avgDurationResult[0]?.avgDuration || 0,
-      topServices: topServicesResult.map(item => ({
+      topServices: topServicesResult.map((item) => ({
         serviceId: item.serviceId.toString(),
         serviceName: item.serviceName,
-        count: item.count
+        count: item.count,
       })),
-      topDoctors: topDoctorsResult.map(item => ({
+      topDoctors: topDoctorsResult.map((item) => ({
         doctorId: item.doctorId.toString(),
         doctorName: item.doctorName,
-        count: item.count
+        count: item.count,
       })),
-      urgencyDistribution
+      urgencyDistribution,
     };
   }
 
@@ -788,7 +902,7 @@ export class AppointmentService {
     return await this.appointmentModel
       .find({
         appointmentDate: { $gte: today, $lt: tomorrow },
-        deletedAt: { $exists: false }
+        deletedAt: { $exists: false },
       })
       .populate('patientId', 'firstName lastName phone')
       .populate('doctorId', 'firstName lastName')
@@ -809,7 +923,7 @@ export class AppointmentService {
     return await this.appointmentModel
       .find({
         patientId: new Types.ObjectId(patientId),
-        deletedAt: { $exists: false }
+        deletedAt: { $exists: false },
       })
       .populate('doctorId', 'firstName lastName')
       .populate('clinicId', 'name address')
@@ -821,14 +935,17 @@ export class AppointmentService {
   /**
    * Get appointments for a specific doctor
    */
-  async getDoctorAppointments(doctorId: string, date?: string): Promise<Appointment[]> {
+  async getDoctorAppointments(
+    doctorId: string,
+    date?: string,
+  ): Promise<Appointment[]> {
     if (!Types.ObjectId.isValid(doctorId)) {
       throw new BadRequestException('Invalid doctor ID format');
     }
 
     const filter: any = {
       doctorId: new Types.ObjectId(doctorId),
-      deletedAt: { $exists: false }
+      deletedAt: { $exists: false },
     };
 
     if (date) {
@@ -856,7 +973,7 @@ export class AppointmentService {
       .find({
         appointmentDate: { $gte: today, $lte: nextWeek },
         status: { $in: ['scheduled', 'confirmed'] },
-        deletedAt: { $exists: false }
+        deletedAt: { $exists: false },
       })
       .populate('patientId', 'firstName lastName phone')
       .populate('doctorId', 'firstName lastName')
@@ -865,4 +982,4 @@ export class AppointmentService {
       .limit(limit)
       .exec();
   }
-} 
+}

@@ -1,4 +1,10 @@
-import { Injectable, CanActivate, ExecutionContext, ForbiddenException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  CanActivate,
+  ExecutionContext,
+  ForbiddenException,
+  BadRequestException,
+} from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -18,9 +24,14 @@ export interface SetupRequirement {
 }
 
 // Decorator to set setup completion requirements
-export const RequireSetupCompletion = (requirements: SetupRequirement = {}) =>
+export const RequireSetupCompletion =
+  (requirements: SetupRequirement = {}) =>
   (target: any, propertyKey?: string, descriptor?: PropertyDescriptor) => {
-    Reflect.defineMetadata('setupRequirements', requirements, descriptor?.value || target);
+    Reflect.defineMetadata(
+      'setupRequirements',
+      requirements,
+      descriptor?.value || target,
+    );
     return descriptor || target;
   };
 
@@ -29,16 +40,23 @@ export class SetupCompletionGuard implements CanActivate {
   constructor(
     private reflector: Reflector,
     @InjectModel('User') private readonly userModel: Model<User>,
-    @InjectModel('Organization') private readonly organizationModel: Model<Organization>,
+    @InjectModel('Organization')
+    private readonly organizationModel: Model<Organization>,
     @InjectModel('Complex') private readonly complexModel: Model<Complex>,
     @InjectModel('Clinic') private readonly clinicModel: Model<Clinic>,
-    @InjectModel('Subscription') private readonly subscriptionModel: Model<Subscription>,
-    @InjectModel('SubscriptionPlan') private readonly subscriptionPlanModel: Model<SubscriptionPlan>,
+    @InjectModel('Subscription')
+    private readonly subscriptionModel: Model<Subscription>,
+    @InjectModel('SubscriptionPlan')
+    private readonly subscriptionPlanModel: Model<SubscriptionPlan>,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const requirements = this.reflector.get<SetupRequirement>('setupRequirements', context.getHandler()) || {};
-    
+    const requirements =
+      this.reflector.get<SetupRequirement>(
+        'setupRequirements',
+        context.getHandler(),
+      ) || {};
+
     // If no requirements are set, allow access
     if (Object.keys(requirements).length === 0) {
       return true;
@@ -70,7 +88,10 @@ export class SetupCompletionGuard implements CanActivate {
       }
 
       // Check onboarding completion requirement
-      if (requirements.requireOnboardingComplete && !userDoc.onboardingComplete) {
+      if (
+        requirements.requireOnboardingComplete &&
+        !userDoc.onboardingComplete
+      ) {
         throw new ForbiddenException({
           message: {
             ar: 'يجب إكمال عملية الإعداد للوصول إلى هذا المورد',
@@ -93,7 +114,8 @@ export class SetupCompletionGuard implements CanActivate {
 
       // Check active subscription requirement
       if (requirements.requireActiveSubscription) {
-        const hasActiveSubscription = await this.verifyActiveSubscription(userDoc);
+        const hasActiveSubscription =
+          await this.verifyActiveSubscription(userDoc);
         if (!hasActiveSubscription) {
           throw new ForbiddenException({
             message: {
@@ -107,7 +129,8 @@ export class SetupCompletionGuard implements CanActivate {
 
       // Check entities requirement based on plan
       if (requirements.requireEntitiesForPlan) {
-        const hasRequiredEntities = await this.verifyRequiredEntitiesExist(userDoc);
+        const hasRequiredEntities =
+          await this.verifyRequiredEntitiesExist(userDoc);
         if (!hasRequiredEntities) {
           throw new ForbiddenException({
             message: {
@@ -123,14 +146,18 @@ export class SetupCompletionGuard implements CanActivate {
       request.setupContext = {
         onboardingComplete: userDoc.onboardingComplete,
         setupComplete: userDoc.setupComplete,
-        hasActiveSubscription: requirements.requireActiveSubscription ? 
-          await this.verifyActiveSubscription(userDoc) : undefined,
-        verified: true
+        hasActiveSubscription: requirements.requireActiveSubscription
+          ? await this.verifyActiveSubscription(userDoc)
+          : undefined,
+        verified: true,
       };
 
       return true;
     } catch (error) {
-      if (error instanceof ForbiddenException || error instanceof BadRequestException) {
+      if (
+        error instanceof ForbiddenException ||
+        error instanceof BadRequestException
+      ) {
         throw error;
       }
       throw new ForbiddenException({
@@ -179,13 +206,13 @@ export class SetupCompletionGuard implements CanActivate {
     switch (planType) {
       case 'company':
         return this.verifyCompanyPlanEntities(user);
-      
+
       case 'complex':
         return this.verifyComplexPlanEntities(user);
-      
+
       case 'clinic':
         return this.verifyClinicPlanEntities(user);
-      
+
       default:
         return false;
     }
@@ -194,26 +221,51 @@ export class SetupCompletionGuard implements CanActivate {
   private async verifyCompanyPlanEntities(user: User): Promise<boolean> {
     // Company plan requires: Organization + at least one Complex + at least one Clinic
     const [orgCount, complexCount, clinicCount] = await Promise.all([
-      this.organizationModel.countDocuments({ ownerId: (user._id as any) }).exec(),
-      this.complexModel.countDocuments().populate('organizationId').exec().then(async () => {
-        const complexes = await this.complexModel.find().populate('organizationId').exec();
-        return complexes.filter(complex => 
-          complex.organizationId && (complex.organizationId as any).ownerId?.toString() === (user._id as any).toString()
-        ).length;
-      }),
-      this.clinicModel.countDocuments().exec().then(async () => {
-        const clinics = await this.clinicModel.find().populate('complexId').exec();
-        let count = 0;
-        for (const clinic of clinics) {
-          if (clinic.complexId) {
-            const complex = await this.complexModel.findById(clinic.complexId).populate('organizationId').exec();
-                         if (complex?.organizationId && (complex.organizationId as any).ownerId?.toString() === (user._id as any).toString()) {
-              count++;
+      this.organizationModel
+        .countDocuments({ ownerId: user._id as any })
+        .exec(),
+      this.complexModel
+        .countDocuments()
+        .populate('organizationId')
+        .exec()
+        .then(async () => {
+          const complexes = await this.complexModel
+            .find()
+            .populate('organizationId')
+            .exec();
+          return complexes.filter(
+            (complex) =>
+              complex.organizationId &&
+              (complex.organizationId as any).ownerId?.toString() ===
+                (user._id as any).toString(),
+          ).length;
+        }),
+      this.clinicModel
+        .countDocuments()
+        .exec()
+        .then(async () => {
+          const clinics = await this.clinicModel
+            .find()
+            .populate('complexId')
+            .exec();
+          let count = 0;
+          for (const clinic of clinics) {
+            if (clinic.complexId) {
+              const complex = await this.complexModel
+                .findById(clinic.complexId)
+                .populate('organizationId')
+                .exec();
+              if (
+                complex?.organizationId &&
+                (complex.organizationId as any).ownerId?.toString() ===
+                  (user._id as any).toString()
+              ) {
+                count++;
+              }
             }
           }
-        }
-        return count;
-      })
+          return count;
+        }),
     ]);
 
     return orgCount > 0 && complexCount > 0 && clinicCount > 0;
@@ -222,23 +274,36 @@ export class SetupCompletionGuard implements CanActivate {
   private async verifyComplexPlanEntities(user: User): Promise<boolean> {
     // Complex plan requires: Organization + at least one Clinic
     const [orgCount, clinicCount] = await Promise.all([
-      this.organizationModel.countDocuments({ ownerId: (user._id as any) }).exec(),
-      this.clinicModel.countDocuments().exec().then(async () => {
-        // For complex plan, clinics might be directly linked to organization
-        let count = 0;
-        const clinics = await this.clinicModel.find().exec();
-        const userOrgs = await this.organizationModel.find({ ownerId: (user._id as any) }).exec();
-        const userOrgIds = userOrgs.map(org => (org._id as any).toString());
-        
-        // Check if clinic belongs to user through subscription
-        for (const clinic of clinics) {
-          const clinicSubscription = await this.subscriptionModel.findById(clinic.subscriptionId).exec();
-          if (clinicSubscription && clinicSubscription.userId.toString() === (user._id as any).toString()) {
-            count++;
+      this.organizationModel
+        .countDocuments({ ownerId: user._id as any })
+        .exec(),
+      this.clinicModel
+        .countDocuments()
+        .exec()
+        .then(async () => {
+          // For complex plan, clinics might be directly linked to organization
+          let count = 0;
+          const clinics = await this.clinicModel.find().exec();
+          const userOrgs = await this.organizationModel
+            .find({ ownerId: user._id as any })
+            .exec();
+          const userOrgIds = userOrgs.map((org) => (org._id as any).toString());
+
+          // Check if clinic belongs to user through subscription
+          for (const clinic of clinics) {
+            const clinicSubscription = await this.subscriptionModel
+              .findById(clinic.subscriptionId)
+              .exec();
+            if (
+              clinicSubscription &&
+              clinicSubscription.userId.toString() ===
+                (user._id as any).toString()
+            ) {
+              count++;
+            }
           }
-        }
-        return count;
-      })
+          return count;
+        }),
     ]);
 
     return orgCount > 0 && clinicCount > 0;
@@ -246,7 +311,9 @@ export class SetupCompletionGuard implements CanActivate {
 
   private async verifyClinicPlanEntities(user: User): Promise<boolean> {
     // Clinic plan requires: Organization (which acts as the clinic)
-    const orgCount = await this.organizationModel.countDocuments({ ownerId: (user._id as any) }).exec();
+    const orgCount = await this.organizationModel
+      .countDocuments({ ownerId: user._id as any })
+      .exec();
     return orgCount > 0;
   }
 
@@ -259,7 +326,7 @@ export class SetupCompletionGuard implements CanActivate {
 
     const [hasActiveSubscription, hasRequiredEntities] = await Promise.all([
       this.verifyActiveSubscription(user),
-      this.verifyRequiredEntitiesExist(user)
+      this.verifyRequiredEntitiesExist(user),
     ]);
 
     return {
@@ -272,7 +339,7 @@ export class SetupCompletionGuard implements CanActivate {
       subscriptionId: user.subscriptionId?.toString(),
       organizationId: user.organizationId?.toString(),
       complexId: user.complexId?.toString(),
-      clinicId: user.clinicId?.toString()
+      clinicId: user.clinicId?.toString(),
     };
   }
 
@@ -289,14 +356,16 @@ export class SetupCompletionGuard implements CanActivate {
         return false;
       }
 
-      await this.userModel.findByIdAndUpdate(userId, {
-        setupComplete: true,
-        onboardingComplete: true
-      }).exec();
+      await this.userModel
+        .findByIdAndUpdate(userId, {
+          setupComplete: true,
+          onboardingComplete: true,
+        })
+        .exec();
 
       return true;
     } catch (error) {
       return false;
     }
   }
-} 
+}

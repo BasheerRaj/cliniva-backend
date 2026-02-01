@@ -133,7 +133,10 @@ export function verifyBilingualMessage(message: any): void {
 /**
  * Verify standardized API response structure
  */
-export function verifyApiResponse(response: any, expectSuccess: boolean = true): void {
+export function verifyApiResponse(
+  response: any,
+  expectSuccess: boolean = true,
+): void {
   expect(response).toHaveProperty('success');
   expect(response.success).toBe(expectSuccess);
 

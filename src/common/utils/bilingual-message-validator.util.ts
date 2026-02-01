@@ -70,7 +70,10 @@ export function validateMessageCollection(
   const results: MessageValidationResult[] = [];
 
   for (const [key, message] of Object.entries(messages)) {
-    const result = validateBilingualMessage(`${collectionName}.${key}`, message);
+    const result = validateBilingualMessage(
+      `${collectionName}.${key}`,
+      message,
+    );
     results.push(result);
   }
 
@@ -95,7 +98,10 @@ export function validateAllMessageCollections(
   const allResults: MessageValidationResult[] = [];
 
   for (const collection of collections) {
-    const report = validateMessageCollection(collection.messages, collection.name);
+    const report = validateMessageCollection(
+      collection.messages,
+      collection.name,
+    );
     allResults.push(...report.results);
   }
 

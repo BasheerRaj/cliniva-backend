@@ -28,7 +28,7 @@ import {
   CheckPermissionDto,
   CheckMultiplePermissionsDto,
   BulkUserAccessDto,
-  SecurityAlertDto
+  SecurityAlertDto,
 } from './dto';
 
 @Controller('user-access')
@@ -43,18 +43,18 @@ export class UserAccessController {
   @Post()
   async createUserAccess(
     @Body(new ValidationPipe()) createUserAccessDto: CreateUserAccessDto,
-    @Request() req: any
+    @Request() req: any,
   ) {
     try {
       const userAccess = await this.userAccessService.createUserAccess(
         createUserAccessDto,
-        req.user?.userId
+        req.user?.userId,
       );
 
       return {
         success: true,
         message: 'User access created successfully',
-        data: userAccess
+        data: userAccess,
       };
     } catch (error) {
       throw new BadRequestException(error.message);
@@ -78,8 +78,8 @@ export class UserAccessController {
           total: result.total,
           page: result.page,
           totalPages: result.totalPages,
-          limit: parseInt(query.limit || '10')
-        }
+          limit: parseInt(query.limit || '10'),
+        },
       };
     } catch (error) {
       throw new BadRequestException(error.message);
@@ -98,7 +98,7 @@ export class UserAccessController {
       return {
         success: true,
         message: 'User access record retrieved successfully',
-        data: userAccess
+        data: userAccess,
       };
     } catch (error) {
       throw new BadRequestException(error.message);
@@ -113,19 +113,19 @@ export class UserAccessController {
   async updateUserAccess(
     @Param('id') id: string,
     @Body(new ValidationPipe()) updateUserAccessDto: UpdateUserAccessDto,
-    @Request() req: any
+    @Request() req: any,
   ) {
     try {
       const userAccess = await this.userAccessService.updateUserAccess(
         id,
         updateUserAccessDto,
-        req.user?.userId
+        req.user?.userId,
       );
 
       return {
         success: true,
         message: 'User access updated successfully',
-        data: userAccess
+        data: userAccess,
       };
     } catch (error) {
       throw new BadRequestException(error.message);
@@ -138,16 +138,13 @@ export class UserAccessController {
    */
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
-  async deleteUserAccess(
-    @Param('id') id: string,
-    @Request() req: any
-  ) {
+  async deleteUserAccess(@Param('id') id: string, @Request() req: any) {
     try {
       await this.userAccessService.deleteUserAccess(id, req.user?.userId);
 
       return {
         success: true,
-        message: 'User access deleted successfully'
+        message: 'User access deleted successfully',
       };
     } catch (error) {
       throw new BadRequestException(error.message);
@@ -167,7 +164,7 @@ export class UserAccessController {
         success: true,
         message: 'User access records retrieved successfully',
         data: userAccess,
-        count: userAccess.length
+        count: userAccess.length,
       };
     } catch (error) {
       throw new BadRequestException(error.message);
@@ -182,11 +179,12 @@ export class UserAccessController {
   async getUserAccessByScope(
     @Param('scopeType') scopeType: string,
     @Param('scopeId') scopeId: string,
-    @Query() query: UserAccessSearchDto
+    @Query() query: UserAccessSearchDto,
   ) {
     try {
       const searchQuery = { ...query, scopeType, scopeId };
-      const result = await this.userAccessService.getUserAccessList(searchQuery);
+      const result =
+        await this.userAccessService.getUserAccessList(searchQuery);
 
       return {
         success: true,
@@ -195,8 +193,8 @@ export class UserAccessController {
         pagination: {
           total: result.total,
           page: result.page,
-          totalPages: result.totalPages
-        }
+          totalPages: result.totalPages,
+        },
       };
     } catch (error) {
       throw new BadRequestException(error.message);
@@ -208,9 +206,12 @@ export class UserAccessController {
    * POST /user-access/check-permission
    */
   @Post('check-permission')
-  async checkPermission(@Body(new ValidationPipe()) checkPermissionDto: CheckPermissionDto) {
+  async checkPermission(
+    @Body(new ValidationPipe()) checkPermissionDto: CheckPermissionDto,
+  ) {
     try {
-      const hasPermission = await this.userAccessService.checkPermission(checkPermissionDto);
+      const hasPermission =
+        await this.userAccessService.checkPermission(checkPermissionDto);
 
       return {
         success: true,
@@ -220,8 +221,8 @@ export class UserAccessController {
           permission: checkPermissionDto.permission,
           scopeType: checkPermissionDto.scopeType,
           scopeId: checkPermissionDto.scopeId,
-          hasPermission
-        }
+          hasPermission,
+        },
       };
     } catch (error) {
       throw new BadRequestException(error.message);
@@ -234,10 +235,14 @@ export class UserAccessController {
    */
   @Post('check-permissions')
   async checkMultiplePermissions(
-    @Body(new ValidationPipe()) checkPermissionsDto: CheckMultiplePermissionsDto
+    @Body(new ValidationPipe())
+    checkPermissionsDto: CheckMultiplePermissionsDto,
   ) {
     try {
-      const result = await this.userAccessService.checkMultiplePermissions(checkPermissionsDto);
+      const result =
+        await this.userAccessService.checkMultiplePermissions(
+          checkPermissionsDto,
+        );
 
       return {
         success: true,
@@ -246,8 +251,8 @@ export class UserAccessController {
           userId: checkPermissionsDto.userId,
           hasAccess: result.hasAccess,
           requirementType: checkPermissionsDto.requirementType || 'all',
-          permissionResults: result.permissionResults
-        }
+          permissionResults: result.permissionResults,
+        },
       };
     } catch (error) {
       throw new BadRequestException(error.message);
@@ -261,10 +266,13 @@ export class UserAccessController {
   @Post('assign-permissions')
   async assignPermissions(
     @Body(new ValidationPipe()) assignPermissionsDto: AssignPermissionsDto,
-    @Request() req: any
+    @Request() req: any,
   ) {
     try {
-      await this.userAccessService.assignPermissions(assignPermissionsDto, req.user?.userId);
+      await this.userAccessService.assignPermissions(
+        assignPermissionsDto,
+        req.user?.userId,
+      );
 
       return {
         success: true,
@@ -273,8 +281,8 @@ export class UserAccessController {
           userId: assignPermissionsDto.userId,
           permissions: assignPermissionsDto.permissions,
           scopeType: assignPermissionsDto.scopeType,
-          scopeId: assignPermissionsDto.scopeId
-        }
+          scopeId: assignPermissionsDto.scopeId,
+        },
       };
     } catch (error) {
       throw new BadRequestException(error.message);
@@ -288,10 +296,13 @@ export class UserAccessController {
   @Post('revoke-permissions')
   async revokePermissions(
     @Body(new ValidationPipe()) revokePermissionsDto: RevokePermissionsDto,
-    @Request() req: any
+    @Request() req: any,
   ) {
     try {
-      await this.userAccessService.revokePermissions(revokePermissionsDto, req.user?.userId);
+      await this.userAccessService.revokePermissions(
+        revokePermissionsDto,
+        req.user?.userId,
+      );
 
       return {
         success: true,
@@ -301,8 +312,8 @@ export class UserAccessController {
           permissions: revokePermissionsDto.permissions,
           scopeType: revokePermissionsDto.scopeType,
           scopeId: revokePermissionsDto.scopeId,
-          reason: revokePermissionsDto.reason
-        }
+          reason: revokePermissionsDto.reason,
+        },
       };
     } catch (error) {
       throw new BadRequestException(error.message);
@@ -317,14 +328,15 @@ export class UserAccessController {
   async validateEntityAccess(
     @Param('userId') userId: string,
     @Param('entityType') entityType: string,
-    @Param('entityId') entityId: string
+    @Param('entityId') entityId: string,
   ) {
     try {
-      const canAccess = await this.userAccessService.validateUserCanAccessEntity(
-        userId,
-        entityType,
-        entityId
-      );
+      const canAccess =
+        await this.userAccessService.validateUserCanAccessEntity(
+          userId,
+          entityType,
+          entityId,
+        );
 
       return {
         success: true,
@@ -333,8 +345,8 @@ export class UserAccessController {
           userId,
           entityType,
           entityId,
-          canAccess
-        }
+          canAccess,
+        },
       };
     } catch (error) {
       throw new BadRequestException(error.message);
@@ -348,12 +360,12 @@ export class UserAccessController {
   @Post('bulk-action')
   async bulkUserAccessAction(
     @Body(new ValidationPipe()) bulkUserAccessDto: BulkUserAccessDto,
-    @Request() req: any
+    @Request() req: any,
   ) {
     try {
       const result = await this.userAccessService.bulkUserAccessAction(
         bulkUserAccessDto,
-        req.user?.userId
+        req.user?.userId,
       );
 
       return {
@@ -364,8 +376,8 @@ export class UserAccessController {
           totalUsers: bulkUserAccessDto.userIds.length,
           successful: result.success,
           failed: result.failed,
-          errors: result.errors
-        }
+          errors: result.errors,
+        },
       };
     } catch (error) {
       throw new BadRequestException(error.message);
@@ -384,7 +396,7 @@ export class UserAccessController {
       return {
         success: true,
         message: 'User access statistics retrieved successfully',
-        data: stats
+        data: stats,
       };
     } catch (error) {
       throw new BadRequestException(error.message);
@@ -403,7 +415,7 @@ export class UserAccessController {
       return {
         success: true,
         message: 'Security statistics retrieved successfully',
-        data: stats
+        data: stats,
       };
     } catch (error) {
       throw new BadRequestException(error.message);
@@ -417,14 +429,17 @@ export class UserAccessController {
    * POST /user-access/logs
    */
   @Post('logs')
-  async createAccessLog(@Body(new ValidationPipe()) createAccessLogDto: CreateAccessLogDto) {
+  async createAccessLog(
+    @Body(new ValidationPipe()) createAccessLogDto: CreateAccessLogDto,
+  ) {
     try {
-      const accessLog = await this.userAccessService.createAccessLog(createAccessLogDto);
+      const accessLog =
+        await this.userAccessService.createAccessLog(createAccessLogDto);
 
       return {
         success: true,
         message: 'Access log created successfully',
-        data: accessLog
+        data: accessLog,
       };
     } catch (error) {
       throw new BadRequestException(error.message);
@@ -448,8 +463,8 @@ export class UserAccessController {
           total: result.total,
           page: result.page,
           totalPages: result.totalPages,
-          limit: parseInt(query.limit || '20')
-        }
+          limit: parseInt(query.limit || '20'),
+        },
       };
     } catch (error) {
       throw new BadRequestException(error.message);
@@ -463,7 +478,7 @@ export class UserAccessController {
   @Get('logs/user/:userId')
   async getUserAccessLogs(
     @Param('userId') userId: string,
-    @Query() query: AccessLogSearchDto
+    @Query() query: AccessLogSearchDto,
   ) {
     try {
       const searchQuery = { ...query, userId };
@@ -476,8 +491,8 @@ export class UserAccessController {
         pagination: {
           total: result.total,
           page: result.page,
-          totalPages: result.totalPages
-        }
+          totalPages: result.totalPages,
+        },
       };
     } catch (error) {
       throw new BadRequestException(error.message);
@@ -498,7 +513,7 @@ export class UserAccessController {
         dateFrom: yesterday.toISOString(),
         dateTo: now.toISOString(),
         limit: limit || '50',
-        sortOrder: 'desc'
+        sortOrder: 'desc',
       };
 
       const result = await this.userAccessService.getAccessLogs(query);
@@ -510,8 +525,8 @@ export class UserAccessController {
         count: result.logs.length,
         timeRange: {
           from: yesterday,
-          to: now
-        }
+          to: now,
+        },
       };
     } catch (error) {
       throw new BadRequestException(error.message);
@@ -525,10 +540,10 @@ export class UserAccessController {
   @Get('logs/failed-logins')
   async getFailedLogins(@Query() query: AccessLogSearchDto) {
     try {
-      const searchQuery = { 
-        ...query, 
+      const searchQuery = {
+        ...query,
         eventTypes: ['failed_login'],
-        sortOrder: 'desc' as 'desc'
+        sortOrder: 'desc' as const,
       };
       const result = await this.userAccessService.getAccessLogs(searchQuery);
 
@@ -539,8 +554,8 @@ export class UserAccessController {
         pagination: {
           total: result.total,
           page: result.page,
-          totalPages: result.totalPages
-        }
+          totalPages: result.totalPages,
+        },
       };
     } catch (error) {
       throw new BadRequestException(error.message);
@@ -554,10 +569,10 @@ export class UserAccessController {
   @Get('logs/suspicious')
   async getSuspiciousActivities(@Query() query: AccessLogSearchDto) {
     try {
-      const searchQuery = { 
-        ...query, 
+      const searchQuery = {
+        ...query,
         eventTypes: ['suspicious_activity'],
-        sortOrder: 'desc' as 'desc'
+        sortOrder: 'desc' as const,
       };
       const result = await this.userAccessService.getAccessLogs(searchQuery);
 
@@ -568,8 +583,8 @@ export class UserAccessController {
         pagination: {
           total: result.total,
           page: result.page,
-          totalPages: result.totalPages
-        }
+          totalPages: result.totalPages,
+        },
       };
     } catch (error) {
       throw new BadRequestException(error.message);
@@ -583,10 +598,10 @@ export class UserAccessController {
   @Get('logs/high-risk')
   async getHighRiskAccess(@Query() query: AccessLogSearchDto) {
     try {
-      const searchQuery = { 
-        ...query, 
+      const searchQuery = {
+        ...query,
         riskLevel: 'high',
-        sortOrder: 'desc' as 'desc'
+        sortOrder: 'desc' as const,
       };
       const result = await this.userAccessService.getAccessLogs(searchQuery);
 
@@ -597,8 +612,8 @@ export class UserAccessController {
         pagination: {
           total: result.total,
           page: result.page,
-          totalPages: result.totalPages
-        }
+          totalPages: result.totalPages,
+        },
       };
     } catch (error) {
       throw new BadRequestException(error.message);
@@ -612,10 +627,10 @@ export class UserAccessController {
   @Get('logs/flagged')
   async getFlaggedAccessLogs(@Query() query: AccessLogSearchDto) {
     try {
-      const searchQuery = { 
-        ...query, 
+      const searchQuery = {
+        ...query,
         flaggedForReview: true,
-        sortOrder: 'desc' as 'desc'
+        sortOrder: 'desc' as const,
       };
       const result = await this.userAccessService.getAccessLogs(searchQuery);
 
@@ -626,8 +641,8 @@ export class UserAccessController {
         pagination: {
           total: result.total,
           page: result.page,
-          totalPages: result.totalPages
-        }
+          totalPages: result.totalPages,
+        },
       };
     } catch (error) {
       throw new BadRequestException(error.message);
@@ -656,9 +671,9 @@ export class UserAccessController {
           dateRange: {
             from: startDate,
             to: new Date(),
-            days: daysCount
-          }
-        }
+            days: daysCount,
+          },
+        },
       };
     } catch (error) {
       throw new BadRequestException(error.message);
@@ -672,7 +687,7 @@ export class UserAccessController {
   @Get('timeline/:userId')
   async getUserActivityTimeline(
     @Param('userId') userId: string,
-    @Query('days') days?: string
+    @Query('days') days?: string,
   ) {
     try {
       const daysCount = parseInt(days || '7');
@@ -684,7 +699,7 @@ export class UserAccessController {
         dateFrom: startDate.toISOString(),
         dateTo: new Date().toISOString(),
         limit: '100',
-        sortOrder: 'desc'
+        sortOrder: 'desc',
       };
 
       const result = await this.userAccessService.getAccessLogs(query);
@@ -698,9 +713,9 @@ export class UserAccessController {
           dateRange: {
             from: startDate,
             to: new Date(),
-            days: daysCount
-          }
-        }
+            days: daysCount,
+          },
+        },
       };
     } catch (error) {
       throw new BadRequestException(error.message);
@@ -714,11 +729,11 @@ export class UserAccessController {
   @Get('export')
   async exportAccessData(
     @Query('format') format?: string,
-    @Query() query?: AccessLogSearchDto
+    @Query() query?: AccessLogSearchDto,
   ) {
     try {
       const exportFormat = format || 'json';
-      
+
       // This would implement data export in various formats
       return {
         success: true,
@@ -726,11 +741,11 @@ export class UserAccessController {
         data: {
           exportNote: 'Data export functionality would be implemented here',
           format: exportFormat,
-          query
-        }
+          query,
+        },
       };
     } catch (error) {
       throw new BadRequestException(error.message);
     }
   }
-} 
+}

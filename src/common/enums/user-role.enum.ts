@@ -29,18 +29,9 @@ export const RoleHierarchy: Record<UserRole, UserRole[]> = {
     UserRole.STAFF,
     UserRole.PATIENT,
   ],
-  [UserRole.ADMIN]: [
-    UserRole.DOCTOR,
-    UserRole.STAFF,
-    UserRole.PATIENT,
-  ],
-  [UserRole.DOCTOR]: [
-    UserRole.STAFF,
-    UserRole.PATIENT,
-  ],
-  [UserRole.STAFF]: [
-    UserRole.PATIENT,
-  ],
+  [UserRole.ADMIN]: [UserRole.DOCTOR, UserRole.STAFF, UserRole.PATIENT],
+  [UserRole.DOCTOR]: [UserRole.STAFF, UserRole.PATIENT],
+  [UserRole.STAFF]: [UserRole.PATIENT],
   [UserRole.PATIENT]: [],
 };
 
@@ -59,7 +50,10 @@ export const RoleDisplayNames = {
 /**
  * Check if a role can manage another role
  */
-export function canManageRole(managerRole: UserRole, targetRole: UserRole): boolean {
+export function canManageRole(
+  managerRole: UserRole,
+  targetRole: UserRole,
+): boolean {
   return RoleHierarchy[managerRole]?.includes(targetRole) ?? false;
 }
 

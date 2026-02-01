@@ -8,7 +8,11 @@ import {
 import { Reflector } from '@nestjs/core';
 import { Request } from 'express';
 import { PERMISSIONS_KEY } from '../decorators/permissions.decorator';
-import { PermissionMetadata, User, PermissionCheckResult } from '../types/permission.types';
+import {
+  PermissionMetadata,
+  User,
+  PermissionCheckResult,
+} from '../types/permission.types';
 import { PermissionsEnum } from '../enums/permissions.enum';
 
 /**
@@ -23,10 +27,11 @@ export class PermissionsGuard implements CanActivate {
    */
   async canActivate(context: ExecutionContext): Promise<boolean> {
     // Get permission metadata from the decorator
-    const permissionMetadata = this.reflector.getAllAndOverride<PermissionMetadata>(
-      PERMISSIONS_KEY,
-      [context.getHandler(), context.getClass()],
-    );
+    const permissionMetadata =
+      this.reflector.getAllAndOverride<PermissionMetadata>(PERMISSIONS_KEY, [
+        context.getHandler(),
+        context.getClass(),
+      ]);
 
     // If no permissions are required, allow access
     if (!permissionMetadata) {
@@ -100,13 +105,13 @@ export class PermissionsGuard implements CanActivate {
 
     // Check permissions based on requireAll flag
     if (requireAll) {
-      const hasAllPermissions = permissions.every(permission =>
+      const hasAllPermissions = permissions.every((permission) =>
         allUserPermissions.includes(permission),
       );
-      
+
       if (!hasAllPermissions) {
         const missingPermissions = permissions.filter(
-          permission => !allUserPermissions.includes(permission),
+          (permission) => !allUserPermissions.includes(permission),
         );
         return {
           hasPermission: false,
@@ -114,10 +119,10 @@ export class PermissionsGuard implements CanActivate {
         };
       }
     } else {
-      const hasAnyPermission = permissions.some(permission =>
+      const hasAnyPermission = permissions.some((permission) =>
         allUserPermissions.includes(permission),
       );
-      
+
       if (!hasAnyPermission) {
         return {
           hasPermission: false,
@@ -135,13 +140,17 @@ export class PermissionsGuard implements CanActivate {
   /**
    * Check if the user is accessing their own resource
    */
-  private checkSelfAccess(user: User, request: Request, selfParam: string): boolean {
+  private checkSelfAccess(
+    user: User,
+    request: Request,
+    selfParam: string,
+  ): boolean {
     const paramValue = request.params[selfParam];
     const queryValue = request.query[selfParam];
-    const bodyValue = (request.body as any)?.[selfParam];
+    const bodyValue = request.body?.[selfParam];
 
     const targetUserId = paramValue || queryValue || bodyValue;
-    
+
     return targetUserId === user.id;
   }
 
@@ -153,13 +162,13 @@ export class PermissionsGuard implements CanActivate {
     const permissions = new Set<PermissionsEnum>();
 
     // Add direct user permissions
-    user.permissions?.forEach(permission => permissions.add(permission));
+    user.permissions?.forEach((permission) => permissions.add(permission));
 
     // Note: In a real implementation, you would:
     // 1. Query the database for role permissions based on user.roles
     // 2. Query the database for group permissions based on user.groups
     // 3. Merge all permissions together
-    
+
     // For now, we'll assume permissions are already resolved and attached to the user
     // This would typically be done in the authentication process
 
@@ -169,7 +178,10 @@ export class PermissionsGuard implements CanActivate {
   /**
    * Determine where the permission was granted from
    */
-  private getPermissionSource(user: User, permission: PermissionsEnum): 'user' | 'role' | 'group' {
+  private getPermissionSource(
+    user: User,
+    permission: PermissionsEnum,
+  ): 'user' | 'role' | 'group' {
     if (user.permissions?.includes(permission)) {
       return 'user';
     }
@@ -204,14 +216,18 @@ export class PermissionService {
    * Check if a user has any of the specified permissions
    */
   hasAnyPermission(user: User, permissions: PermissionsEnum[]): boolean {
-    return permissions.some(permission => this.hasPermission(user, permission));
+    return permissions.some((permission) =>
+      this.hasPermission(user, permission),
+    );
   }
 
   /**
    * Check if a user has all of the specified permissions
    */
   hasAllPermissions(user: User, permissions: PermissionsEnum[]): boolean {
-    return permissions.every(permission => this.hasPermission(user, permission));
+    return permissions.every((permission) =>
+      this.hasPermission(user, permission),
+    );
   }
 
   /**
@@ -223,12 +239,12 @@ export class PermissionService {
     }
 
     const permissions = new Set<PermissionsEnum>();
-    
+
     // Add direct permissions
-    user.permissions?.forEach(permission => permissions.add(permission));
-    
+    user.permissions?.forEach((permission) => permissions.add(permission));
+
     // In a real implementation, add role and group permissions here
-    
+
     return Array.from(permissions);
   }
 }

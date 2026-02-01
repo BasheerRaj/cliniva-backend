@@ -1,15 +1,15 @@
-import { 
-  IsString, 
-  IsNotEmpty, 
-  IsOptional, 
-  IsEmail, 
-  IsDateString, 
-  IsEnum, 
+import {
+  IsString,
+  IsNotEmpty,
+  IsOptional,
+  IsEmail,
+  IsDateString,
+  IsEnum,
   IsBoolean,
   IsPhoneNumber,
   MinLength,
   MaxLength,
-  IsIn
+  IsIn,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
 
@@ -35,7 +35,7 @@ export class CreatePatientDto {
   dateOfBirth: string;
 
   @IsEnum(['male', 'female', 'other'], {
-    message: 'Gender must be one of: male, female, other'
+    message: 'Gender must be one of: male, female, other',
   })
   @IsNotEmpty()
   gender: string;
@@ -70,7 +70,7 @@ export class CreatePatientDto {
   @IsString()
   @IsOptional()
   @IsIn(['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'], {
-    message: 'Blood type must be one of: A+, A-, B+, B-, AB+, AB-, O+, O-'
+    message: 'Blood type must be one of: A+, A-, B+, B-, AB+, AB-, O+, O-',
   })
   bloodType?: string;
 
@@ -128,7 +128,7 @@ export class UpdatePatientDto {
   dateOfBirth?: string;
 
   @IsEnum(['male', 'female', 'other'], {
-    message: 'Gender must be one of: male, female, other'
+    message: 'Gender must be one of: male, female, other',
   })
   @IsOptional()
   gender?: string;
@@ -163,7 +163,7 @@ export class UpdatePatientDto {
   @IsString()
   @IsOptional()
   @IsIn(['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'], {
-    message: 'Blood type must be one of: A+, A-, B+, B-, AB+, AB-, O+, O-'
+    message: 'Blood type must be one of: A+, A-, B+, B-, AB+, AB-, O+, O-',
   })
   bloodType?: string;
 
@@ -345,4 +345,4 @@ export class PatientStatsDto {
   patientsWithInsurance: number;
   patientsWithPortalAccess: number;
   recentPatients: number;
-} 
+}

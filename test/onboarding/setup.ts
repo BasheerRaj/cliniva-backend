@@ -11,14 +11,14 @@ beforeAll(async () => {
     global.__MONGOINSTANCE = await MongoMemoryServer.create();
     global.__MONGO_URI__ = global.__MONGOINSTANCE.getUri();
   }
-  
+
   await mongoose.connect(global.__MONGO_URI__);
 });
 
 afterAll(async () => {
   await mongoose.connection.dropDatabase();
   await mongoose.connection.close();
-  
+
   if (global.__MONGOINSTANCE) {
     await global.__MONGOINSTANCE.stop();
   }
@@ -35,4 +35,3 @@ beforeEach(async () => {
 
 // Increase timeout for database operations
 jest.setTimeout(30000);
-

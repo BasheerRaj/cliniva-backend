@@ -1,9 +1,9 @@
-import { 
-  Injectable, 
-  NotFoundException, 
-  BadRequestException, 
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
   ConflictException,
-  Logger 
+  Logger,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -14,7 +14,7 @@ import {
   CreateDoctorSpecialtyDto,
   UpdateDoctorSpecialtyDto,
   DoctorSpecialtySearchDto,
-  BulkAssignSpecialtiesDto
+  BulkAssignSpecialtiesDto,
 } from './dto';
 
 @Injectable()
@@ -22,7 +22,8 @@ export class DoctorSpecialtiesService {
   private readonly logger = new Logger(DoctorSpecialtiesService.name);
 
   constructor(
-    @InjectModel('DoctorSpecialty') private readonly doctorSpecialtyModel: Model<DoctorSpecialty>,
+    @InjectModel('DoctorSpecialty')
+    private readonly doctorSpecialtyModel: Model<DoctorSpecialty>,
     @InjectModel('User') private readonly userModel: Model<User>,
     @InjectModel('Specialty') private readonly specialtyModel: Model<Specialty>,
   ) {}
@@ -30,8 +31,12 @@ export class DoctorSpecialtiesService {
   /**
    * Assign specialty to doctor
    */
-  async assignSpecialtyToDoctor(createDto: CreateDoctorSpecialtyDto): Promise<DoctorSpecialty> {
-    this.logger.log(`Assigning specialty ${createDto.specialtyId} to doctor ${createDto.doctorId}`);
+  async assignSpecialtyToDoctor(
+    createDto: CreateDoctorSpecialtyDto,
+  ): Promise<DoctorSpecialty> {
+    this.logger.log(
+      `Assigning specialty ${createDto.specialtyId} to doctor ${createDto.doctorId}`,
+    );
 
     // Validate doctor exists and has doctor role
     const doctor = await this.userModel.findById(createDto.doctorId);
@@ -52,18 +57,20 @@ export class DoctorSpecialtiesService {
     // Check if assignment already exists
     const existingAssignment = await this.doctorSpecialtyModel.findOne({
       doctorId: new Types.ObjectId(createDto.doctorId),
-      specialtyId: new Types.ObjectId(createDto.specialtyId)
+      specialtyId: new Types.ObjectId(createDto.specialtyId),
     });
 
     if (existingAssignment) {
-      throw new ConflictException('Doctor is already assigned to this specialty');
+      throw new ConflictException(
+        'Doctor is already assigned to this specialty',
+      );
     }
 
     const assignmentData = {
       doctorId: new Types.ObjectId(createDto.doctorId),
       specialtyId: new Types.ObjectId(createDto.specialtyId),
       yearsOfExperience: createDto.yearsOfExperience || 0,
-      certificationNumber: createDto.certificationNumber
+      certificationNumber: createDto.certificationNumber,
     };
 
     const assignment = new this.doctorSpecialtyModel(assignmentData);
@@ -137,7 +144,7 @@ export class DoctorSpecialtiesService {
    */
   async updateAssignment(
     assignmentId: string,
-    updateDto: UpdateDoctorSpecialtyDto
+    updateDto: UpdateDoctorSpecialtyDto,
   ): Promise<DoctorSpecialty> {
     if (!Types.ObjectId.isValid(assignmentId)) {
       throw new BadRequestException('Invalid assignment ID format');
@@ -146,7 +153,11 @@ export class DoctorSpecialtiesService {
     this.logger.log(`Updating assignment: ${assignmentId}`);
 
     const assignment = await this.doctorSpecialtyModel
-      .findByIdAndUpdate(assignmentId, { $set: updateDto }, { new: true, runValidators: true })
+      .findByIdAndUpdate(
+        assignmentId,
+        { $set: updateDto },
+        { new: true, runValidators: true },
+      )
       .populate('doctorId', 'firstName lastName email')
       .populate('specialtyId', 'name description')
       .exec();
@@ -169,7 +180,8 @@ export class DoctorSpecialtiesService {
 
     this.logger.log(`Removing assignment: ${assignmentId}`);
 
-    const result = await this.doctorSpecialtyModel.findByIdAndDelete(assignmentId);
+    const result =
+      await this.doctorSpecialtyModel.findByIdAndDelete(assignmentId);
     if (!result) {
       throw new NotFoundException('Doctor specialty assignment not found');
     }
@@ -193,7 +205,7 @@ export class DoctorSpecialtiesService {
       page = '1',
       limit = '10',
       sortBy = 'createdAt',
-      sortOrder = 'desc'
+      sortOrder = 'desc',
     } = query;
 
     // Build filter
@@ -223,19 +235,19 @@ export class DoctorSpecialtiesService {
           from: 'users',
           localField: 'doctorId',
           foreignField: '_id',
-          as: 'doctor'
-        }
+          as: 'doctor',
+        },
       },
       {
         $lookup: {
           from: 'specialties',
           localField: 'specialtyId',
           foreignField: '_id',
-          as: 'specialty'
-        }
+          as: 'specialty',
+        },
       },
       { $unwind: { path: '$doctor', preserveNullAndEmptyArrays: true } },
-      { $unwind: { path: '$specialty', preserveNullAndEmptyArrays: true } }
+      { $unwind: { path: '$specialty', preserveNullAndEmptyArrays: true } },
     ];
 
     // Add search filter if provided
@@ -247,23 +259,20 @@ export class DoctorSpecialtiesService {
             { 'doctor.lastName': { $regex: search, $options: 'i' } },
             { 'doctor.email': { $regex: search, $options: 'i' } },
             { 'specialty.name': { $regex: search, $options: 'i' } },
-            { certificationNumber: { $regex: search, $options: 'i' } }
-          ]
-        }
+            { certificationNumber: { $regex: search, $options: 'i' } },
+          ],
+        },
       });
     }
 
     // Get total count
     const countPipeline = [...pipeline, { $count: 'total' }];
-    const countResult = await this.doctorSpecialtyModel.aggregate(countPipeline);
+    const countResult =
+      await this.doctorSpecialtyModel.aggregate(countPipeline);
     const total = countResult.length > 0 ? countResult[0].total : 0;
 
     // Add pagination and sorting
-    pipeline.push(
-      { $sort: sort },
-      { $skip: skip },
-      { $limit: pageSize }
-    );
+    pipeline.push({ $sort: sort }, { $skip: skip }, { $limit: pageSize });
 
     const data = await this.doctorSpecialtyModel.aggregate(pipeline);
     const totalPages = Math.ceil(total / pageSize);
@@ -272,7 +281,7 @@ export class DoctorSpecialtiesService {
       data,
       total,
       page: pageNum,
-      totalPages
+      totalPages,
     };
   }
 
@@ -284,7 +293,9 @@ export class DoctorSpecialtiesService {
     failed: number;
     errors: string[];
   }> {
-    this.logger.log(`Bulk assigning specialties to doctor: ${bulkDto.doctorId}`);
+    this.logger.log(
+      `Bulk assigning specialties to doctor: ${bulkDto.doctorId}`,
+    );
 
     let success = 0;
     let failed = 0;
@@ -295,7 +306,7 @@ export class DoctorSpecialtiesService {
         await this.assignSpecialtyToDoctor({
           doctorId: bulkDto.doctorId,
           specialtyId,
-          yearsOfExperience: bulkDto.yearsOfExperience
+          yearsOfExperience: bulkDto.yearsOfExperience,
         });
         success++;
       } catch (error) {
@@ -322,7 +333,7 @@ export class DoctorSpecialtiesService {
       doctorStats,
       specialtyStats,
       topSpecialtiesResult,
-      experienceStats
+      experienceStats,
     ] = await Promise.all([
       this.doctorSpecialtyModel.countDocuments({}),
       this.doctorSpecialtyModel.distinct('doctorId'),
@@ -333,40 +344,42 @@ export class DoctorSpecialtiesService {
             from: 'specialties',
             localField: 'specialtyId',
             foreignField: '_id',
-            as: 'specialty'
-          }
+            as: 'specialty',
+          },
         },
         { $unwind: '$specialty' },
         {
           $group: {
             _id: '$specialtyId',
             specialtyName: { $first: '$specialty.name' },
-            doctorCount: { $sum: 1 }
-          }
+            doctorCount: { $sum: 1 },
+          },
         },
         { $sort: { doctorCount: -1 } },
-        { $limit: 10 }
+        { $limit: 10 },
       ]),
       this.doctorSpecialtyModel.aggregate([
         {
           $group: {
             _id: null,
-            averageExperience: { $avg: '$yearsOfExperience' }
-          }
-        }
-      ])
+            averageExperience: { $avg: '$yearsOfExperience' },
+          },
+        },
+      ]),
     ]);
 
     return {
       totalAssignments,
       doctorsWithSpecialties: doctorStats.length,
       specialtiesAssigned: specialtyStats.length,
-      topSpecialties: topSpecialtiesResult.map(item => ({
+      topSpecialties: topSpecialtiesResult.map((item) => ({
         specialtyName: item.specialtyName,
-        doctorCount: item.doctorCount
+        doctorCount: item.doctorCount,
       })),
-      averageExperience: experienceStats.length > 0 ? 
-        Math.round(experienceStats[0].averageExperience * 100) / 100 : 0
+      averageExperience:
+        experienceStats.length > 0
+          ? Math.round(experienceStats[0].averageExperience * 100) / 100
+          : 0,
     };
   }
-} 
+}

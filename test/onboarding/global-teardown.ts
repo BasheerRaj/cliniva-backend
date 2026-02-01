@@ -4,4 +4,3 @@ export default async function globalTeardown() {
     await instance.stop();
   }
 }
-

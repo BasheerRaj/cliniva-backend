@@ -75,7 +75,9 @@ export const mockUserModel = {
   // Mock constructor function
   new: jest.fn().mockImplementation((data) => ({
     ...data,
-    save: jest.fn().mockResolvedValue({ ...data, _id: '507f1f77bcf86cd799439011' }),
+    save: jest
+      .fn()
+      .mockResolvedValue({ ...data, _id: '507f1f77bcf86cd799439011' }),
   })),
 } as any;
 
@@ -83,7 +85,10 @@ export const mockUserModel = {
 export const mockJwtService = {
   sign: jest.fn().mockReturnValue('mock-token'),
   signAsync: jest.fn().mockResolvedValue('mock-token'),
-  verify: jest.fn().mockReturnValue({ sub: '507f1f77bcf86cd799439011', email: 'test@example.com' }),
+  verify: jest.fn().mockReturnValue({
+    sub: '507f1f77bcf86cd799439011',
+    email: 'test@example.com',
+  }),
   verifyAsync: jest.fn(),
 };
 
@@ -133,12 +138,15 @@ export const mockJwtPayload = {
 };
 
 // Test Utilities
-export const createMockUser = (overrides: Partial<User> = {}): User => ({
-  ...mockUser,
-  ...overrides,
-} as User);
+export const createMockUser = (overrides: Partial<User> = {}): User =>
+  ({
+    ...mockUser,
+    ...overrides,
+  }) as User;
 
-export const createMockAuthResponse = (overrides: Partial<AuthResponseDto> = {}): AuthResponseDto => ({
+export const createMockAuthResponse = (
+  overrides: Partial<AuthResponseDto> = {},
+): AuthResponseDto => ({
   ...mockAuthResponse,
   ...overrides,
 });
@@ -153,6 +161,3 @@ export const AUTH_ERROR_MESSAGES = {
   REGISTRATION_FAILED: 'Registration failed',
   AUTHENTICATION_FAILED: 'Authentication failed',
 };
-
-
-

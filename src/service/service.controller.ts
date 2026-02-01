@@ -47,21 +47,32 @@ export class ServiceController {
   @HttpCode(HttpStatus.OK)
   async validateServiceNames(
     @Body(new ValidationPipe({ transform: true, whitelist: true }))
-    body: { serviceNames: string[]; complexDepartmentId?: string }
-  ): Promise<{ isValid: boolean; conflicts: string[]; suggestions: string[]; message: string }> {
+    body: {
+      serviceNames: string[];
+      complexDepartmentId?: string;
+    },
+  ): Promise<{
+    isValid: boolean;
+    conflicts: string[];
+    suggestions: string[];
+    message: string;
+  }> {
     const { serviceNames, complexDepartmentId } = body;
-    
+
     if (!serviceNames || serviceNames.length === 0) {
       return {
         isValid: true,
         conflicts: [],
         suggestions: [],
-        message: 'No services to validate'
+        message: 'No services to validate',
       };
     }
 
-    const validation = await this.serviceService.validateServiceNamesForClinic(serviceNames, complexDepartmentId);
-    
+    const validation = await this.serviceService.validateServiceNamesForClinic(
+      serviceNames,
+      complexDepartmentId,
+    );
+
     let message = '';
     if (validation.isValid) {
       message = 'All service names are valid and available';
@@ -71,7 +82,7 @@ export class ServiceController {
 
     return {
       ...validation,
-      message
+      message,
     };
   }
 
@@ -82,7 +93,9 @@ export class ServiceController {
   async getServicesByComplexDepartment(
     @Param('complexDepartmentId') complexDepartmentId: string,
   ): Promise<Service[]> {
-    return this.serviceService.getServicesByComplexDepartment(complexDepartmentId);
+    return this.serviceService.getServicesByComplexDepartment(
+      complexDepartmentId,
+    );
   }
 
   /**
@@ -123,7 +136,7 @@ export class ServiceController {
    */
   @Get('clinic')
   async getServicesForClinic(
-    @Query('complexDepartmentId') complexDepartmentId?: string
+    @Query('complexDepartmentId') complexDepartmentId?: string,
   ): Promise<Service[]> {
     return this.serviceService.getServicesForClinic(complexDepartmentId);
   }
@@ -133,7 +146,7 @@ export class ServiceController {
    */
   @Get('clinic/:complexDepartmentId')
   async getServicesForClinicWithDepartment(
-    @Param('complexDepartmentId') complexDepartmentId: string
+    @Param('complexDepartmentId') complexDepartmentId: string,
   ): Promise<Service[]> {
     return this.serviceService.getServicesForClinic(complexDepartmentId);
   }
@@ -146,7 +159,9 @@ export class ServiceController {
     @Query('complexDepartmentId') complexDepartmentId?: string,
   ): Promise<Service[]> {
     if (complexDepartmentId) {
-      return this.serviceService.getServicesByComplexDepartment(complexDepartmentId);
+      return this.serviceService.getServicesByComplexDepartment(
+        complexDepartmentId,
+      );
     }
     // If no specific filtering is needed, you could implement a general getAll method
     // For now, returning empty array as base service doesn't have getAll

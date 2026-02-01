@@ -6,8 +6,14 @@ import { DynamicInfoSchema } from '../database/schemas/dynamic-info.schema';
 import { CommonModule } from '../common/common.module';
 import { AuthModule } from '../auth/auth.module';
 import { User, UserSchema } from '../database/schemas/user.schema';
-import { Subscription, SubscriptionSchema } from '../database/schemas/subscription.schema';
-import { SubscriptionPlan, SubscriptionPlanSchema } from '../database/schemas/subscription-plan.schema';
+import {
+  Subscription,
+  SubscriptionSchema,
+} from '../database/schemas/subscription.schema';
+import {
+  SubscriptionPlan,
+  SubscriptionPlanSchema,
+} from '../database/schemas/subscription-plan.schema';
 
 @Module({
   imports: [
@@ -15,7 +21,7 @@ import { SubscriptionPlan, SubscriptionPlanSchema } from '../database/schemas/su
       { name: 'DynamicInfo', schema: DynamicInfoSchema },
       { name: 'User', schema: UserSchema },
       { name: 'Subscription', schema: SubscriptionSchema },
-      { name: 'SubscriptionPlan', schema: SubscriptionPlanSchema }
+      { name: 'SubscriptionPlan', schema: SubscriptionPlanSchema },
     ]),
     CommonModule,
     AuthModule,

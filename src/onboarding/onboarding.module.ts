@@ -32,7 +32,7 @@ import { SubscriptionPlanSchema } from '../database/schemas/subscription-plan.sc
       { name: 'Subscription', schema: SubscriptionSchema },
       { name: 'SubscriptionPlan', schema: SubscriptionPlanSchema },
     ]),
-    
+
     // Core entity modules
     SubscriptionModule,
     OrganizationModule,
@@ -40,7 +40,7 @@ import { SubscriptionPlanSchema } from '../database/schemas/subscription-plan.sc
     ClinicModule,
     DepartmentModule,
     ServiceModule,
-    
+
     // Supporting modules
     WorkingHoursModule,
     ContactModule,

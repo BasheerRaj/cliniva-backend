@@ -1,4 +1,13 @@
-import { IsString, IsNotEmpty, IsOptional, IsEmail, IsUrl, IsNumber, IsArray, IsBoolean } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsOptional,
+  IsEmail,
+  IsUrl,
+  IsNumber,
+  IsArray,
+  IsBoolean,
+} from 'class-validator';
 
 export class CreateClinicDto {
   @IsString()
@@ -201,7 +210,7 @@ export class UpdateClinicDto {
   @IsOptional()
   inheritsFromOrganization?: boolean;
 
-  // Contact information fields  
+  // Contact information fields
   @IsString()
   @IsOptional()
   city?: string;

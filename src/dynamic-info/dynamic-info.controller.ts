@@ -9,7 +9,7 @@ import {
   Query,
   UseGuards,
   ValidationPipe,
-  Logger
+  Logger,
 } from '@nestjs/common';
 import { DynamicInfoService } from './dynamic-info.service';
 import {
@@ -17,7 +17,7 @@ import {
   UpdateDynamicInfoDto,
   DynamicInfoSearchDto,
   DynamicInfoResponseDto,
-  InfoTypeDto
+  InfoTypeDto,
 } from './dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
@@ -34,12 +34,15 @@ export class DynamicInfoController {
    */
   @Post()
   async createDynamicInfo(
-    @Body(new ValidationPipe()) createDynamicInfoDto: CreateDynamicInfoDto
+    @Body(new ValidationPipe()) createDynamicInfoDto: CreateDynamicInfoDto,
   ) {
     try {
-      this.logger.log(`Creating dynamic info for entity: ${createDynamicInfoDto.entityType}/${createDynamicInfoDto.entityId}`);
-      
-      const dynamicInfo = await this.dynamicInfoService.createDynamicInfo(createDynamicInfoDto);
+      this.logger.log(
+        `Creating dynamic info for entity: ${createDynamicInfoDto.entityType}/${createDynamicInfoDto.entityId}`,
+      );
+
+      const dynamicInfo =
+        await this.dynamicInfoService.createDynamicInfo(createDynamicInfoDto);
 
       const response: DynamicInfoResponseDto = {
         id: (dynamicInfo as any)._id.toString(),
@@ -49,13 +52,13 @@ export class DynamicInfoController {
         infoValue: dynamicInfo.infoValue,
         isActive: dynamicInfo.isActive,
         createdAt: (dynamicInfo as any).createdAt || new Date(),
-        updatedAt: (dynamicInfo as any).updatedAt || new Date()
+        updatedAt: (dynamicInfo as any).updatedAt || new Date(),
       };
 
       return {
         success: true,
         message: 'Dynamic information created successfully',
-        data: response
+        data: response,
       };
     } catch (error) {
       this.logger.error(`Failed to create dynamic info: ${error.message}`);
@@ -70,14 +73,20 @@ export class DynamicInfoController {
   @Get(':entityType/:entityId')
   async getDynamicInfoByEntity(
     @Param('entityType') entityType: string,
-    @Param('entityId') entityId: string
+    @Param('entityId') entityId: string,
   ) {
     try {
-      this.logger.log(`Fetching dynamic info for entity: ${entityType}/${entityId}`);
-      
-      const dynamicInfoList = await this.dynamicInfoService.getDynamicInfoByEntity(entityType, entityId);
+      this.logger.log(
+        `Fetching dynamic info for entity: ${entityType}/${entityId}`,
+      );
 
-      const data: DynamicInfoResponseDto[] = dynamicInfoList.map(info => ({
+      const dynamicInfoList =
+        await this.dynamicInfoService.getDynamicInfoByEntity(
+          entityType,
+          entityId,
+        );
+
+      const data: DynamicInfoResponseDto[] = dynamicInfoList.map((info) => ({
         id: (info as any)._id.toString(),
         entityType: info.entityType,
         entityId: info.entityId.toString(),
@@ -85,17 +94,19 @@ export class DynamicInfoController {
         infoValue: info.infoValue,
         isActive: info.isActive,
         createdAt: (info as any).createdAt || new Date(),
-        updatedAt: (info as any).updatedAt || new Date()
+        updatedAt: (info as any).updatedAt || new Date(),
       }));
 
       return {
         success: true,
         message: 'Dynamic information retrieved successfully',
         data,
-        count: data.length
+        count: data.length,
       };
     } catch (error) {
-      this.logger.error(`Failed to fetch dynamic info by entity: ${error.message}`);
+      this.logger.error(
+        `Failed to fetch dynamic info by entity: ${error.message}`,
+      );
       throw error;
     }
   }
@@ -108,7 +119,7 @@ export class DynamicInfoController {
   async getDynamicInfoById(@Param('id') id: string) {
     try {
       this.logger.log(`Fetching dynamic info by ID: ${id}`);
-      
+
       const dynamicInfo = await this.dynamicInfoService.getDynamicInfoById(id);
 
       const response: DynamicInfoResponseDto = {
@@ -119,13 +130,13 @@ export class DynamicInfoController {
         infoValue: dynamicInfo.infoValue,
         isActive: dynamicInfo.isActive,
         createdAt: (dynamicInfo as any).createdAt || new Date(),
-        updatedAt: (dynamicInfo as any).updatedAt || new Date()
+        updatedAt: (dynamicInfo as any).updatedAt || new Date(),
       };
 
       return {
         success: true,
         message: 'Dynamic information retrieved successfully',
-        data: response
+        data: response,
       };
     } catch (error) {
       this.logger.error(`Failed to fetch dynamic info by ID: ${error.message}`);
@@ -140,11 +151,13 @@ export class DynamicInfoController {
   @Get()
   async searchDynamicInfo(@Query() query: DynamicInfoSearchDto) {
     try {
-      this.logger.log(`Searching dynamic info with filters: ${JSON.stringify(query)}`);
-      
+      this.logger.log(
+        `Searching dynamic info with filters: ${JSON.stringify(query)}`,
+      );
+
       const result = await this.dynamicInfoService.searchDynamicInfo(query);
 
-      const data: DynamicInfoResponseDto[] = result.data.map(info => ({
+      const data: DynamicInfoResponseDto[] = result.data.map((info) => ({
         id: (info as any)._id.toString(),
         entityType: info.entityType,
         entityId: info.entityId.toString(),
@@ -152,7 +165,7 @@ export class DynamicInfoController {
         infoValue: info.infoValue,
         isActive: info.isActive,
         createdAt: (info as any).createdAt || new Date(),
-        updatedAt: (info as any).updatedAt || new Date()
+        updatedAt: (info as any).updatedAt || new Date(),
       }));
 
       return {
@@ -163,8 +176,8 @@ export class DynamicInfoController {
           total: result.total,
           page: result.page,
           totalPages: result.totalPages,
-          limit: parseInt(query.limit || '10')
-        }
+          limit: parseInt(query.limit || '10'),
+        },
       };
     } catch (error) {
       this.logger.error(`Failed to search dynamic info: ${error.message}`);
@@ -179,12 +192,15 @@ export class DynamicInfoController {
   @Put(':id')
   async updateDynamicInfo(
     @Param('id') id: string,
-    @Body(new ValidationPipe()) updateDynamicInfoDto: UpdateDynamicInfoDto
+    @Body(new ValidationPipe()) updateDynamicInfoDto: UpdateDynamicInfoDto,
   ) {
     try {
       this.logger.log(`Updating dynamic info: ${id}`);
-      
-      const updatedInfo = await this.dynamicInfoService.updateDynamicInfo(id, updateDynamicInfoDto);
+
+      const updatedInfo = await this.dynamicInfoService.updateDynamicInfo(
+        id,
+        updateDynamicInfoDto,
+      );
 
       const response: DynamicInfoResponseDto = {
         id: (updatedInfo as any)._id.toString(),
@@ -194,13 +210,13 @@ export class DynamicInfoController {
         infoValue: updatedInfo.infoValue,
         isActive: updatedInfo.isActive,
         createdAt: (updatedInfo as any).createdAt || new Date(),
-        updatedAt: (updatedInfo as any).updatedAt || new Date()
+        updatedAt: (updatedInfo as any).updatedAt || new Date(),
       };
 
       return {
         success: true,
         message: 'Dynamic information updated successfully',
-        data: response
+        data: response,
       };
     } catch (error) {
       this.logger.error(`Failed to update dynamic info: ${error.message}`);
@@ -216,12 +232,12 @@ export class DynamicInfoController {
   async deleteDynamicInfo(@Param('id') id: string) {
     try {
       this.logger.log(`Deleting dynamic info: ${id}`);
-      
+
       await this.dynamicInfoService.deleteDynamicInfo(id);
 
       return {
         success: true,
-        message: 'Dynamic information deleted successfully'
+        message: 'Dynamic information deleted successfully',
       };
     } catch (error) {
       this.logger.error(`Failed to delete dynamic info: ${error.message}`);
@@ -237,18 +253,18 @@ export class DynamicInfoController {
   async getInfoTypes() {
     try {
       this.logger.log('Fetching available info types');
-      
+
       const infoTypes = await this.dynamicInfoService.getInfoTypes();
 
       return {
         success: true,
         message: 'Info types retrieved successfully',
         data: infoTypes,
-        count: infoTypes.length
+        count: infoTypes.length,
       };
     } catch (error) {
       this.logger.error(`Failed to fetch info types: ${error.message}`);
       throw error;
     }
   }
-} 
+}

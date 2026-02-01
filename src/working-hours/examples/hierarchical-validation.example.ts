@@ -1,7 +1,7 @@
 /**
  * Hierarchical Working Hours Validation Examples
- * 
- * This file demonstrates how clinic working hours can be validated 
+ *
+ * This file demonstrates how clinic working hours can be validated
  * to ensure they fall within the complex's operating hours.
  */
 
@@ -16,7 +16,7 @@ export function example1_ValidClinicHours() {
       openingTime: '09:00',
       closingTime: '17:00',
       breakStartTime: '12:00',
-      breakEndTime: '13:00'
+      breakEndTime: '13:00',
     },
     {
       dayOfWeek: 'tuesday',
@@ -24,29 +24,29 @@ export function example1_ValidClinicHours() {
       openingTime: '09:00',
       closingTime: '17:00',
       breakStartTime: '12:00',
-      breakEndTime: '13:00'
+      breakEndTime: '13:00',
     },
     {
       dayOfWeek: 'friday',
-      isWorkingDay: false
-    }
+      isWorkingDay: false,
+    },
   ];
 
   const clinicSchedule = [
     {
       dayOfWeek: 'monday',
       isWorkingDay: true,
-      openingTime: '10:00',  // Opens 1 hour after complex
-      closingTime: '16:30',  // Closes 30 minutes before complex
+      openingTime: '10:00', // Opens 1 hour after complex
+      closingTime: '16:30', // Closes 30 minutes before complex
       breakStartTime: '12:30',
-      breakEndTime: '13:30'
+      breakEndTime: '13:30',
     },
     {
       dayOfWeek: 'tuesday',
       isWorkingDay: true,
-      openingTime: '09:30',  // Opens 30 minutes after complex
-      closingTime: '16:00',  // Closes 1 hour before complex
-    }
+      openingTime: '09:30', // Opens 30 minutes after complex
+      closingTime: '16:00', // Closes 1 hour before complex
+    },
     // Clinic doesn't work Friday (same as complex)
   ];
 
@@ -54,13 +54,13 @@ export function example1_ValidClinicHours() {
     complexSchedule,
     clinicSchedule,
     'Health Complex',
-    'Cardiology Clinic'
+    'Cardiology Clinic',
   );
 
   console.log('Example 1 - Valid Clinic Hours:');
   console.log('Is Valid:', validation.isValid); // Should be true
-  console.log('Errors:', validation.errors);   // Should be empty
-  
+  console.log('Errors:', validation.errors); // Should be empty
+
   return validation;
 }
 
@@ -71,30 +71,30 @@ export function example2_InvalidEarlyOpening() {
       dayOfWeek: 'monday',
       isWorkingDay: true,
       openingTime: '09:00',
-      closingTime: '17:00'
-    }
+      closingTime: '17:00',
+    },
   ];
 
   const clinicSchedule = [
     {
       dayOfWeek: 'monday',
       isWorkingDay: true,
-      openingTime: '08:30',  // ❌ Opens before complex!
-      closingTime: '16:00'
-    }
+      openingTime: '08:30', // ❌ Opens before complex!
+      closingTime: '16:00',
+    },
   ];
 
   const validation = ValidationUtil.validateHierarchicalWorkingHours(
     complexSchedule,
     clinicSchedule,
     'Health Complex',
-    'Pediatrics Clinic'
+    'Pediatrics Clinic',
   );
 
   console.log('\nExample 2 - Invalid Early Opening:');
   console.log('Is Valid:', validation.isValid); // Should be false
-  console.log('Errors:', validation.errors);   // Should contain error about early opening
-  
+  console.log('Errors:', validation.errors); // Should contain error about early opening
+
   return validation;
 }
 
@@ -105,8 +105,8 @@ export function example3_InvalidLateClosing() {
       dayOfWeek: 'wednesday',
       isWorkingDay: true,
       openingTime: '09:00',
-      closingTime: '17:00'
-    }
+      closingTime: '17:00',
+    },
   ];
 
   const clinicSchedule = [
@@ -114,21 +114,21 @@ export function example3_InvalidLateClosing() {
       dayOfWeek: 'wednesday',
       isWorkingDay: true,
       openingTime: '10:00',
-      closingTime: '18:00'  // ❌ Closes after complex!
-    }
+      closingTime: '18:00', // ❌ Closes after complex!
+    },
   ];
 
   const validation = ValidationUtil.validateHierarchicalWorkingHours(
     complexSchedule,
     clinicSchedule,
     'Medical Center',
-    'Surgery Clinic'
+    'Surgery Clinic',
   );
 
   console.log('\nExample 3 - Invalid Late Closing:');
   console.log('Is Valid:', validation.isValid); // Should be false
-  console.log('Errors:', validation.errors);   // Should contain error about late closing
-  
+  console.log('Errors:', validation.errors); // Should contain error about late closing
+
   return validation;
 }
 
@@ -137,30 +137,30 @@ export function example4_InvalidWorkingWhenComplexClosed() {
   const complexSchedule = [
     {
       dayOfWeek: 'friday',
-      isWorkingDay: false  // Complex is closed on Friday
-    }
+      isWorkingDay: false, // Complex is closed on Friday
+    },
   ];
 
   const clinicSchedule = [
     {
       dayOfWeek: 'friday',
-      isWorkingDay: true,   // ❌ Clinic trying to work when complex is closed!
+      isWorkingDay: true, // ❌ Clinic trying to work when complex is closed!
       openingTime: '09:00',
-      closingTime: '17:00'
-    }
+      closingTime: '17:00',
+    },
   ];
 
   const validation = ValidationUtil.validateHierarchicalWorkingHours(
     complexSchedule,
     clinicSchedule,
     'Weekend Medical Complex',
-    'Emergency Clinic'
+    'Emergency Clinic',
   );
 
   console.log('\nExample 4 - Working When Complex Closed:');
   console.log('Is Valid:', validation.isValid); // Should be false
-  console.log('Errors:', validation.errors);   // Should contain error about working when parent is closed
-  
+  console.log('Errors:', validation.errors); // Should contain error about working when parent is closed
+
   return validation;
 }
 
@@ -173,42 +173,42 @@ export function example5_MultipleValidationErrors() {
       openingTime: '08:00',
       closingTime: '18:00',
       breakStartTime: '12:00',
-      breakEndTime: '13:00'
+      breakEndTime: '13:00',
     },
     {
       dayOfWeek: 'saturday',
-      isWorkingDay: false
-    }
+      isWorkingDay: false,
+    },
   ];
 
   const clinicSchedule = [
     {
       dayOfWeek: 'monday',
       isWorkingDay: true,
-      openingTime: '07:30',  // ❌ Opens before complex
-      closingTime: '19:00',  // ❌ Closes after complex
+      openingTime: '07:30', // ❌ Opens before complex
+      closingTime: '19:00', // ❌ Closes after complex
       breakStartTime: '11:00',
-      breakEndTime: '12:00'
+      breakEndTime: '12:00',
     },
     {
       dayOfWeek: 'saturday',
-      isWorkingDay: true,    // ❌ Working when complex is closed
+      isWorkingDay: true, // ❌ Working when complex is closed
       openingTime: '09:00',
-      closingTime: '15:00'
-    }
+      closingTime: '15:00',
+    },
   ];
 
   const validation = ValidationUtil.validateHierarchicalWorkingHours(
     complexSchedule,
     clinicSchedule,
     'Main Medical Complex',
-    'Multi-Specialty Clinic'
+    'Multi-Specialty Clinic',
   );
 
   console.log('\nExample 5 - Multiple Validation Errors:');
   console.log('Is Valid:', validation.isValid); // Should be false
-  console.log('Errors:', validation.errors);   // Should contain multiple errors
-  
+  console.log('Errors:', validation.errors); // Should contain multiple errors
+
   return validation;
 }
 
@@ -271,16 +271,19 @@ export function runAllExamples() {
 
 // Utility function to format time for display
 export function formatScheduleForDisplay(schedule: any[]): string {
-  return schedule.map(day => {
-    if (!day.isWorkingDay) {
-      return `${day.dayOfWeek}: Closed`;
-    }
-    const times = `${day.openingTime} - ${day.closingTime}`;
-    const breaks = day.breakStartTime && day.breakEndTime 
-      ? ` (Break: ${day.breakStartTime} - ${day.breakEndTime})`
-      : '';
-    return `${day.dayOfWeek}: ${times}${breaks}`;
-  }).join('\n');
+  return schedule
+    .map((day) => {
+      if (!day.isWorkingDay) {
+        return `${day.dayOfWeek}: Closed`;
+      }
+      const times = `${day.openingTime} - ${day.closingTime}`;
+      const breaks =
+        day.breakStartTime && day.breakEndTime
+          ? ` (Break: ${day.breakStartTime} - ${day.breakEndTime})`
+          : '';
+      return `${day.dayOfWeek}: ${times}${breaks}`;
+    })
+    .join('\n');
 }
 
 // Example of how to use in service
@@ -288,17 +291,19 @@ export class ExampleUsageInService {
   async validateClinicWorkingHours(clinicData: any, complexId: string) {
     // Get complex working hours from database
     const complexSchedule = await this.getComplexWorkingHours(complexId);
-    
+
     // Validate clinic schedule against complex
     const validation = ValidationUtil.validateHierarchicalWorkingHours(
       complexSchedule,
       clinicData.workingHours,
       `Complex (${complexId})`,
-      `Clinic (${clinicData.id})`
+      `Clinic (${clinicData.id})`,
     );
 
     if (!validation.isValid) {
-      throw new Error(`Clinic working hours validation failed: ${validation.errors.join(', ')}`);
+      throw new Error(
+        `Clinic working hours validation failed: ${validation.errors.join(', ')}`,
+      );
     }
 
     return validation;

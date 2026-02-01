@@ -3,15 +3,25 @@ import { Document, Types } from 'mongoose';
 
 @Schema({
   timestamps: true,
-  collection: 'employee_documents'
+  collection: 'employee_documents',
 })
 export class EmployeeDocument extends Document {
   @Prop({ type: Types.ObjectId, ref: 'User', required: true })
   userId: Types.ObjectId;
 
-  @Prop({ 
+  @Prop({
     required: true,
-    enum: ['contract', 'certificate', 'work_permit', 'cv', 'id_copy', 'diploma', 'license', 'insurance', 'other']
+    enum: [
+      'contract',
+      'certificate',
+      'work_permit',
+      'cv',
+      'id_copy',
+      'diploma',
+      'license',
+      'insurance',
+      'other',
+    ],
   })
   documentType: string;
 
@@ -42,9 +52,9 @@ export class EmployeeDocument extends Document {
   @Prop()
   documentNumber?: string; // Document reference number
 
-  @Prop({ 
+  @Prop({
     default: 'active',
-    enum: ['active', 'expired', 'revoked', 'pending_renewal', 'archived']
+    enum: ['active', 'expired', 'revoked', 'pending_renewal', 'archived'],
   })
   status: string;
 
@@ -67,7 +77,8 @@ export class EmployeeDocument extends Document {
   isActive: boolean;
 }
 
-export const EmployeeDocumentSchema = SchemaFactory.createForClass(EmployeeDocument);
+export const EmployeeDocumentSchema =
+  SchemaFactory.createForClass(EmployeeDocument);
 
 // Indexes
 EmployeeDocumentSchema.index({ userId: 1 });

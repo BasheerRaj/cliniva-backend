@@ -1,9 +1,9 @@
-import { 
-  Injectable, 
-  NotFoundException, 
-  BadRequestException, 
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
   ConflictException,
-  Logger
+  Logger,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -15,8 +15,8 @@ import { Organization } from '../database/schemas/organization.schema';
 import { Appointment } from '../database/schemas/appointment.schema';
 import { WorkingHours } from '../database/schemas/working-hours.schema';
 import { EmployeeShift } from '../database/schemas/employee-shift.schema';
-import { 
-  CreateScheduleDto, 
+import {
+  CreateScheduleDto,
   UpdateScheduleDto,
   ScheduleSearchQueryDto,
   CreateDoctorAvailabilityDto,
@@ -27,7 +27,7 @@ import {
   BulkScheduleActionDto,
   CalendarViewDto,
   CreateScheduleTemplateDto,
-  ScheduleStatsDto
+  ScheduleStatsDto,
 } from './dto';
 
 @Injectable()
@@ -39,10 +39,14 @@ export class ScheduleService {
     @InjectModel('User') private readonly userModel: Model<User>,
     @InjectModel('Clinic') private readonly clinicModel: Model<Clinic>,
     @InjectModel('Complex') private readonly complexModel: Model<Complex>,
-    @InjectModel('Organization') private readonly organizationModel: Model<Organization>,
-    @InjectModel('Appointment') private readonly appointmentModel: Model<Appointment>,
-    @InjectModel('WorkingHours') private readonly workingHoursModel: Model<WorkingHours>,
-    @InjectModel('EmployeeShift') private readonly employeeShiftModel: Model<EmployeeShift>,
+    @InjectModel('Organization')
+    private readonly organizationModel: Model<Organization>,
+    @InjectModel('Appointment')
+    private readonly appointmentModel: Model<Appointment>,
+    @InjectModel('WorkingHours')
+    private readonly workingHoursModel: Model<WorkingHours>,
+    @InjectModel('EmployeeShift')
+    private readonly employeeShiftModel: Model<EmployeeShift>,
   ) {}
 
   /**
@@ -51,7 +55,7 @@ export class ScheduleService {
   private async validateScheduleData(
     scheduleDto: CreateScheduleDto | UpdateScheduleDto,
     isUpdate = false,
-    scheduleId?: string
+    scheduleId?: string,
   ): Promise<void> {
     const createDto = scheduleDto as CreateScheduleDto;
 
@@ -59,7 +63,7 @@ export class ScheduleService {
     if (createDto.startDate && createDto.endDate) {
       const startDate = new Date(createDto.startDate);
       const endDate = new Date(createDto.endDate);
-      
+
       if (startDate > endDate) {
         throw new BadRequestException('End date must be after start date');
       }
@@ -68,7 +72,7 @@ export class ScheduleService {
     if (createDto.startTime && createDto.endTime) {
       const startTime = this.timeToMinutes(createDto.startTime);
       const endTime = this.timeToMinutes(createDto.endTime);
-      
+
       if (startTime >= endTime) {
         throw new BadRequestException('End time must be after start time');
       }
@@ -97,7 +101,9 @@ export class ScheduleService {
     }
 
     if (createDto.organizationId) {
-      const organization = await this.organizationModel.findById(createDto.organizationId);
+      const organization = await this.organizationModel.findById(
+        createDto.organizationId,
+      );
       if (!organization) {
         throw new NotFoundException('Organization not found');
       }
@@ -119,22 +125,33 @@ export class ScheduleService {
 
       const conflicts = await this.checkScheduleConflicts(conflictDto);
       if (conflicts.hasConflicts) {
-        throw new ConflictException(`Schedule conflicts detected: ${conflicts.conflicts.length} overlapping schedule(s)`);
+        throw new ConflictException(
+          `Schedule conflicts detected: ${conflicts.conflicts.length} overlapping schedule(s)`,
+        );
       }
     }
 
     // Validate recurrence settings
     if (createDto.isRecurring) {
       if (!createDto.recurrenceType) {
-        throw new BadRequestException('Recurrence type is required for recurring schedules');
+        throw new BadRequestException(
+          'Recurrence type is required for recurring schedules',
+        );
       }
-      
-      if (createDto.recurrenceType === 'custom' && (!createDto.recurrenceInterval || createDto.recurrenceInterval < 1)) {
-        throw new BadRequestException('Recurrence interval is required for custom recurrence');
+
+      if (
+        createDto.recurrenceType === 'custom' &&
+        (!createDto.recurrenceInterval || createDto.recurrenceInterval < 1)
+      ) {
+        throw new BadRequestException(
+          'Recurrence interval is required for custom recurrence',
+        );
       }
 
       if (createDto.recurrenceEndDate && createDto.maxOccurrences) {
-        throw new BadRequestException('Cannot specify both recurrence end date and max occurrences');
+        throw new BadRequestException(
+          'Cannot specify both recurrence end date and max occurrences',
+        );
       }
     }
   }
@@ -144,7 +161,7 @@ export class ScheduleService {
    */
   async createSchedule(
     createScheduleDto: CreateScheduleDto,
-    createdByUserId?: string
+    createdByUserId?: string,
   ): Promise<Schedule> {
     this.logger.log(`Creating schedule: ${createScheduleDto.title}`);
 
@@ -152,20 +169,40 @@ export class ScheduleService {
 
     const scheduleData = {
       ...createScheduleDto,
-      userId: createScheduleDto.userId ? new Types.ObjectId(createScheduleDto.userId) : undefined,
-      clinicId: createScheduleDto.clinicId ? new Types.ObjectId(createScheduleDto.clinicId) : undefined,
-      complexId: createScheduleDto.complexId ? new Types.ObjectId(createScheduleDto.complexId) : undefined,
-      organizationId: createScheduleDto.organizationId ? new Types.ObjectId(createScheduleDto.organizationId) : undefined,
+      userId: createScheduleDto.userId
+        ? new Types.ObjectId(createScheduleDto.userId)
+        : undefined,
+      clinicId: createScheduleDto.clinicId
+        ? new Types.ObjectId(createScheduleDto.clinicId)
+        : undefined,
+      complexId: createScheduleDto.complexId
+        ? new Types.ObjectId(createScheduleDto.complexId)
+        : undefined,
+      organizationId: createScheduleDto.organizationId
+        ? new Types.ObjectId(createScheduleDto.organizationId)
+        : undefined,
       startDate: new Date(createScheduleDto.startDate),
       endDate: new Date(createScheduleDto.endDate),
-      recurrenceEndDate: createScheduleDto.recurrenceEndDate ? new Date(createScheduleDto.recurrenceEndDate) : undefined,
-      createdBy: createdByUserId ? new Types.ObjectId(createdByUserId) : undefined,
-      isAvailable: createScheduleDto.isAvailable !== undefined ? createScheduleDto.isAvailable : true,
-      isBlocked: createScheduleDto.isBlocked !== undefined ? createScheduleDto.isBlocked : false,
+      recurrenceEndDate: createScheduleDto.recurrenceEndDate
+        ? new Date(createScheduleDto.recurrenceEndDate)
+        : undefined,
+      createdBy: createdByUserId
+        ? new Types.ObjectId(createdByUserId)
+        : undefined,
+      isAvailable:
+        createScheduleDto.isAvailable !== undefined
+          ? createScheduleDto.isAvailable
+          : true,
+      isBlocked:
+        createScheduleDto.isBlocked !== undefined
+          ? createScheduleDto.isBlocked
+          : false,
       priority: createScheduleDto.priority || 'medium',
       status: createScheduleDto.status || 'active',
       requiresApproval: createScheduleDto.requiresApproval || false,
-      approvalStatus: createScheduleDto.requiresApproval ? 'pending' : 'auto_approved',
+      approvalStatus: createScheduleDto.requiresApproval
+        ? 'pending'
+        : 'auto_approved',
       sendReminders: createScheduleDto.sendReminders || false,
       allowOverlap: createScheduleDto.allowOverlap || false,
       isActive: true,
@@ -179,14 +216,18 @@ export class ScheduleService {
       await this.generateRecurringSchedules(savedSchedule);
     }
 
-    this.logger.log(`Schedule created successfully with ID: ${savedSchedule._id}`);
+    this.logger.log(
+      `Schedule created successfully with ID: ${savedSchedule._id}`,
+    );
     return savedSchedule;
   }
 
   /**
    * Generate recurring schedule instances
    */
-  private async generateRecurringSchedules(masterSchedule: Schedule): Promise<void> {
+  private async generateRecurringSchedules(
+    masterSchedule: Schedule,
+  ): Promise<void> {
     if (!masterSchedule.isRecurring || !masterSchedule.recurrenceType) {
       return;
     }
@@ -197,21 +238,26 @@ export class ScheduleService {
     const duration = endDate.getTime() - startDate.getTime();
 
     let currentDate = new Date(startDate);
-    const endRecurrence = masterSchedule.recurrenceEndDate || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000); // 1 year from now
+    const endRecurrence =
+      masterSchedule.recurrenceEndDate ||
+      new Date(Date.now() + 365 * 24 * 60 * 60 * 1000); // 1 year from now
     const maxOccurrences = masterSchedule.maxOccurrences || 365; // Default max
     let occurrences = 0;
 
     while (currentDate <= endRecurrence && occurrences < maxOccurrences) {
       // Calculate next occurrence based on recurrence type
-      const nextDate = this.calculateNextRecurrence(currentDate, masterSchedule);
-      
+      const nextDate = this.calculateNextRecurrence(
+        currentDate,
+        masterSchedule,
+      );
+
       if (nextDate > endRecurrence) {
         break;
       }
 
       // Create instance data
       const instanceEndDate = new Date(nextDate.getTime() + duration);
-      
+
       const instanceData = {
         ...masterSchedule.toObject(),
         _id: undefined,
@@ -225,8 +271,8 @@ export class ScheduleService {
         maxOccurrences: undefined,
         metadata: new Map([
           ['parentScheduleId', (masterSchedule._id as any).toString()],
-          ['instanceNumber', (occurrences + 1).toString()]
-        ])
+          ['instanceNumber', (occurrences + 1).toString()],
+        ]),
       };
 
       instances.push(instanceData);
@@ -236,7 +282,9 @@ export class ScheduleService {
 
     if (instances.length > 0) {
       await this.scheduleModel.insertMany(instances);
-      this.logger.log(`Generated ${instances.length} recurring schedule instances for ${masterSchedule._id}`);
+      this.logger.log(
+        `Generated ${instances.length} recurring schedule instances for ${masterSchedule._id}`,
+      );
     }
   }
 
@@ -254,11 +302,21 @@ export class ScheduleService {
       case 'weekly':
         if (schedule.recurrenceDays && schedule.recurrenceDays.length > 0) {
           // Find next day in recurrence days
-          const dayMap = { 'sunday': 0, 'monday': 1, 'tuesday': 2, 'wednesday': 3, 'thursday': 4, 'friday': 5, 'saturday': 6 };
-          const recurrenceDayNumbers = schedule.recurrenceDays.map(day => dayMap[day.toLowerCase()]).sort();
+          const dayMap = {
+            sunday: 0,
+            monday: 1,
+            tuesday: 2,
+            wednesday: 3,
+            thursday: 4,
+            friday: 5,
+            saturday: 6,
+          };
+          const recurrenceDayNumbers = schedule.recurrenceDays
+            .map((day) => dayMap[day.toLowerCase()])
+            .sort();
           const currentDay = nextDate.getDay();
-          
-          let nextDay = recurrenceDayNumbers.find(day => day > currentDay);
+
+          let nextDay = recurrenceDayNumbers.find((day) => day > currentDay);
           if (!nextDay) {
             // Go to next week
             nextDay = recurrenceDayNumbers[0];
@@ -267,7 +325,7 @@ export class ScheduleService {
             nextDate.setDate(nextDate.getDate() + (nextDay - currentDay));
           }
         } else {
-          nextDate.setDate(nextDate.getDate() + (7 * interval));
+          nextDate.setDate(nextDate.getDate() + 7 * interval);
         }
         break;
       case 'monthly':
@@ -312,13 +370,13 @@ export class ScheduleService {
       page = '1',
       limit = '10',
       sortBy = 'startDate',
-      sortOrder = 'asc'
+      sortOrder = 'asc',
     } = query;
 
     // Build filter object
     const filter: any = {
       deletedAt: { $exists: false },
-      isActive: true
+      isActive: true,
     };
 
     // Individual field filters
@@ -326,7 +384,8 @@ export class ScheduleService {
     if (userId) filter.userId = new Types.ObjectId(userId);
     if (clinicId) filter.clinicId = new Types.ObjectId(clinicId);
     if (complexId) filter.complexId = new Types.ObjectId(complexId);
-    if (organizationId) filter.organizationId = new Types.ObjectId(organizationId);
+    if (organizationId)
+      filter.organizationId = new Types.ObjectId(organizationId);
     if (roomId) filter.roomId = roomId;
     if (equipmentId) filter.equipmentId = equipmentId;
     if (status) filter.status = status;
@@ -338,13 +397,16 @@ export class ScheduleService {
     // Date filtering
     if (startDate || endDate) {
       filter.$and = filter.$and || [];
-      
+
       if (startDate && endDate) {
         // Schedules that overlap with the given date range
         filter.$and.push({
           $or: [
-            { startDate: { $lte: new Date(endDate) }, endDate: { $gte: new Date(startDate) } }
-          ]
+            {
+              startDate: { $lte: new Date(endDate) },
+              endDate: { $gte: new Date(startDate) },
+            },
+          ],
         });
       } else if (startDate) {
         filter.endDate = { $gte: new Date(startDate) };
@@ -363,7 +425,7 @@ export class ScheduleService {
       filter.$or = [
         { title: { $regex: search, $options: 'i' } },
         { description: { $regex: search, $options: 'i' } },
-        { tags: { $in: [new RegExp(search, 'i')] } }
+        { tags: { $in: [new RegExp(search, 'i')] } },
       ];
     }
 
@@ -389,7 +451,7 @@ export class ScheduleService {
         .skip(skip)
         .limit(pageSize)
         .exec(),
-      this.scheduleModel.countDocuments(filter)
+      this.scheduleModel.countDocuments(filter),
     ]);
 
     const totalPages = Math.ceil(total / pageSize);
@@ -398,7 +460,7 @@ export class ScheduleService {
       schedules,
       total,
       page: pageNum,
-      totalPages
+      totalPages,
     };
   }
 
@@ -411,9 +473,9 @@ export class ScheduleService {
     }
 
     const schedule = await this.scheduleModel
-      .findOne({ 
+      .findOne({
         _id: new Types.ObjectId(scheduleId),
-        deletedAt: { $exists: false }
+        deletedAt: { $exists: false },
       })
       .populate('userId', 'firstName lastName email')
       .populate('clinicId', 'name address phone')
@@ -437,7 +499,7 @@ export class ScheduleService {
   async updateSchedule(
     scheduleId: string,
     updateScheduleDto: UpdateScheduleDto,
-    updatedByUserId?: string
+    updatedByUserId?: string,
   ): Promise<Schedule> {
     if (!Types.ObjectId.isValid(scheduleId)) {
       throw new BadRequestException('Invalid schedule ID format');
@@ -449,19 +511,25 @@ export class ScheduleService {
 
     const updateData: any = {
       ...updateScheduleDto,
-      updatedBy: updatedByUserId ? new Types.ObjectId(updatedByUserId) : undefined,
-      startDate: updateScheduleDto.startDate ? new Date(updateScheduleDto.startDate) : undefined,
-      endDate: updateScheduleDto.endDate ? new Date(updateScheduleDto.endDate) : undefined,
+      updatedBy: updatedByUserId
+        ? new Types.ObjectId(updatedByUserId)
+        : undefined,
+      startDate: updateScheduleDto.startDate
+        ? new Date(updateScheduleDto.startDate)
+        : undefined,
+      endDate: updateScheduleDto.endDate
+        ? new Date(updateScheduleDto.endDate)
+        : undefined,
     };
 
     const schedule = await this.scheduleModel
       .findOneAndUpdate(
-        { 
+        {
           _id: new Types.ObjectId(scheduleId),
-          deletedAt: { $exists: false }
+          deletedAt: { $exists: false },
         },
         { $set: updateData },
-        { new: true, runValidators: true }
+        { new: true, runValidators: true },
       )
       .exec();
 
@@ -476,7 +544,10 @@ export class ScheduleService {
   /**
    * Delete schedule
    */
-  async deleteSchedule(scheduleId: string, deletedByUserId?: string): Promise<void> {
+  async deleteSchedule(
+    scheduleId: string,
+    deletedByUserId?: string,
+  ): Promise<void> {
     if (!Types.ObjectId.isValid(scheduleId)) {
       throw new BadRequestException('Invalid schedule ID format');
     }
@@ -485,17 +556,19 @@ export class ScheduleService {
 
     const result = await this.scheduleModel
       .findOneAndUpdate(
-        { 
+        {
           _id: new Types.ObjectId(scheduleId),
-          deletedAt: { $exists: false }
+          deletedAt: { $exists: false },
         },
-        { 
+        {
           $set: {
             deletedAt: new Date(),
-            updatedBy: deletedByUserId ? new Types.ObjectId(deletedByUserId) : undefined,
-            isActive: false
-          }
-        }
+            updatedBy: deletedByUserId
+              ? new Types.ObjectId(deletedByUserId)
+              : undefined,
+            isActive: false,
+          },
+        },
       )
       .exec();
 
@@ -511,7 +584,7 @@ export class ScheduleService {
    */
   async createDoctorAvailability(
     createAvailabilityDto: CreateDoctorAvailabilityDto,
-    createdByUserId?: string
+    createdByUserId?: string,
   ): Promise<Schedule> {
     const scheduleDto: CreateScheduleDto = {
       scheduleType: 'doctor_availability',
@@ -530,7 +603,7 @@ export class ScheduleService {
       recurrenceEndDate: createAvailabilityDto.recurrenceEndDate,
       isAvailable: true,
       status: 'active',
-      tags: createAvailabilityDto.specialties || []
+      tags: createAvailabilityDto.specialties || [],
     };
 
     return await this.createSchedule(scheduleDto, createdByUserId);
@@ -541,7 +614,7 @@ export class ScheduleService {
    */
   async createRoomBooking(
     createBookingDto: CreateRoomBookingDto,
-    createdByUserId?: string
+    createdByUserId?: string,
   ): Promise<Schedule> {
     const scheduleDto: CreateScheduleDto = {
       scheduleType: 'room_booking',
@@ -557,7 +630,7 @@ export class ScheduleService {
       priority: createBookingDto.priority || 'medium',
       requiresApproval: createBookingDto.requiresApproval || false,
       status: 'active',
-      tags: [createBookingDto.purpose]
+      tags: [createBookingDto.purpose],
     };
 
     return await this.createSchedule(scheduleDto, createdByUserId);
@@ -568,7 +641,7 @@ export class ScheduleService {
    */
   async createEquipmentSchedule(
     createEquipmentDto: CreateEquipmentScheduleDto,
-    createdByUserId?: string
+    createdByUserId?: string,
   ): Promise<Schedule> {
     const scheduleDto: CreateScheduleDto = {
       scheduleType: 'equipment_schedule',
@@ -584,7 +657,7 @@ export class ScheduleService {
       recurrenceType: createEquipmentDto.recurrenceType,
       recurrenceInterval: createEquipmentDto.recurrenceInterval,
       status: 'active',
-      tags: [createEquipmentDto.scheduleType]
+      tags: [createEquipmentDto.scheduleType],
     };
 
     return await this.createSchedule(scheduleDto, createdByUserId);
@@ -601,12 +674,14 @@ export class ScheduleService {
       deletedAt: { $exists: false },
       isActive: true,
       status: { $in: ['active', 'draft'] },
-      scheduleType: conflictDto.scheduleType
+      scheduleType: conflictDto.scheduleType,
     };
 
     // Add resource-specific filters
-    if (conflictDto.userId) filter.userId = new Types.ObjectId(conflictDto.userId);
-    if (conflictDto.clinicId) filter.clinicId = new Types.ObjectId(conflictDto.clinicId);
+    if (conflictDto.userId)
+      filter.userId = new Types.ObjectId(conflictDto.userId);
+    if (conflictDto.clinicId)
+      filter.clinicId = new Types.ObjectId(conflictDto.clinicId);
     if (conflictDto.roomId) filter.roomId = conflictDto.roomId;
     if (conflictDto.equipmentId) filter.equipmentId = conflictDto.equipmentId;
 
@@ -634,16 +709,16 @@ export class ScheduleService {
       .exec();
 
     // Filter by time overlap
-    const timeConflicts = conflicts.filter(schedule => {
+    const timeConflicts = conflicts.filter((schedule) => {
       const schedStartTime = this.timeToMinutes(schedule.startTime);
       const schedEndTime = this.timeToMinutes(schedule.endTime);
-      
+
       return !(endTime <= schedStartTime || startTime >= schedEndTime);
     });
 
     return {
       hasConflicts: timeConflicts.length > 0,
-      conflicts: timeConflicts
+      conflicts: timeConflicts,
     };
   }
 
@@ -675,7 +750,7 @@ export class ScheduleService {
         isAvailable: true,
         status: 'active',
         isActive: true,
-        deletedAt: { $exists: false }
+        deletedAt: { $exists: false },
       })
       .exec();
 
@@ -684,7 +759,7 @@ export class ScheduleService {
         date: slotsDto.date,
         availableSlots: [],
         totalSlots: 0,
-        availableCount: 0
+        availableCount: 0,
       };
     }
 
@@ -693,7 +768,7 @@ export class ScheduleService {
       availability.startTime,
       availability.endTime,
       slotDuration,
-      availability.breakDuration || 0
+      availability.breakDuration || 0,
     );
 
     // Get existing appointments for this doctor on this date
@@ -703,30 +778,32 @@ export class ScheduleService {
         clinicId: new Types.ObjectId(slotsDto.clinicId),
         appointmentDate: {
           $gte: new Date(date.setHours(0, 0, 0, 0)),
-          $lt: new Date(date.setHours(23, 59, 59, 999))
+          $lt: new Date(date.setHours(23, 59, 59, 999)),
         },
         status: { $in: ['scheduled', 'confirmed', 'in_progress'] },
-        deletedAt: { $exists: false }
+        deletedAt: { $exists: false },
       })
       .exec();
 
     // Mark slots as unavailable if they conflict with appointments
-    const appointmentTimes = appointments.map(apt => ({
+    const appointmentTimes = appointments.map((apt) => ({
       startTime: this.timeToMinutes(apt.appointmentTime),
-      endTime: this.timeToMinutes(apt.appointmentTime) + (apt.durationMinutes || 30)
+      endTime:
+        this.timeToMinutes(apt.appointmentTime) + (apt.durationMinutes || 30),
     }));
 
-    const availableSlots = slots.map(slot => {
+    const availableSlots = slots.map((slot) => {
       const slotStartTime = this.timeToMinutes(slot.startTime);
       const slotEndTime = this.timeToMinutes(slot.endTime);
-      
-      const isConflict = appointmentTimes.some(apt => 
-        !(slotEndTime <= apt.startTime || slotStartTime >= apt.endTime)
+
+      const isConflict = appointmentTimes.some(
+        (apt) =>
+          !(slotEndTime <= apt.startTime || slotStartTime >= apt.endTime),
       );
 
       return {
         ...slot,
-        isAvailable: !isConflict
+        isAvailable: !isConflict,
       };
     });
 
@@ -734,7 +811,7 @@ export class ScheduleService {
       date: slotsDto.date,
       availableSlots,
       totalSlots: slots.length,
-      availableCount: availableSlots.filter(slot => slot.isAvailable).length
+      availableCount: availableSlots.filter((slot) => slot.isAvailable).length,
     };
   }
 
@@ -745,19 +822,23 @@ export class ScheduleService {
     startTime: string,
     endTime: string,
     slotDuration: number,
-    breakDuration: number = 0
+    breakDuration: number = 0,
   ): Array<{ startTime: string; endTime: string; duration: number }> {
-    const slots: Array<{ startTime: string; endTime: string; duration: number }> = [];
+    const slots: Array<{
+      startTime: string;
+      endTime: string;
+      duration: number;
+    }> = [];
     let currentTime = this.timeToMinutes(startTime);
     const endTimeMinutes = this.timeToMinutes(endTime);
 
     while (currentTime + slotDuration <= endTimeMinutes) {
       const slotEndTime = currentTime + slotDuration;
-      
+
       slots.push({
         startTime: this.minutesToTime(currentTime),
         endTime: this.minutesToTime(slotEndTime),
-        duration: slotDuration
+        duration: slotDuration,
       });
 
       currentTime = slotEndTime + breakDuration;
@@ -800,7 +881,7 @@ export class ScheduleService {
       deletedAt: { $exists: false },
       isActive: true,
       startDate: { $lte: new Date(calendarDto.endDate) },
-      endDate: { $gte: new Date(calendarDto.startDate) }
+      endDate: { $gte: new Date(calendarDto.startDate) },
     };
 
     // Apply filters
@@ -809,11 +890,15 @@ export class ScheduleService {
     }
 
     if (calendarDto.userIds && calendarDto.userIds.length > 0) {
-      filter.userId = { $in: calendarDto.userIds.map(id => new Types.ObjectId(id)) };
+      filter.userId = {
+        $in: calendarDto.userIds.map((id) => new Types.ObjectId(id)),
+      };
     }
 
     if (calendarDto.clinicIds && calendarDto.clinicIds.length > 0) {
-      filter.clinicId = { $in: calendarDto.clinicIds.map(id => new Types.ObjectId(id)) };
+      filter.clinicId = {
+        $in: calendarDto.clinicIds.map((id) => new Types.ObjectId(id)),
+      };
     }
 
     if (calendarDto.roomIds && calendarDto.roomIds.length > 0) {
@@ -837,7 +922,7 @@ export class ScheduleService {
       viewType: calendarDto.viewType,
       startDate: calendarDto.startDate,
       endDate: calendarDto.endDate,
-      schedules: schedules.map(schedule => ({
+      schedules: schedules.map((schedule) => ({
         id: schedule._id,
         title: schedule.title,
         scheduleType: schedule.scheduleType,
@@ -855,12 +940,12 @@ export class ScheduleService {
         isRecurring: schedule.isRecurring,
         isAvailable: schedule.isAvailable,
         isBlocked: schedule.isBlocked,
-        tags: schedule.tags
+        tags: schedule.tags,
       })),
       summary: {
         totalSchedules: schedules.length,
-        schedulesByType
-      }
+        schedulesByType,
+      },
     };
   }
 
@@ -870,7 +955,9 @@ export class ScheduleService {
   async getScheduleStats(): Promise<ScheduleStatsDto> {
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const startOfWeek = new Date(now.getTime() - (now.getDay() * 24 * 60 * 60 * 1000));
+    const startOfWeek = new Date(
+      now.getTime() - now.getDay() * 24 * 60 * 60 * 1000,
+    );
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
     const [
@@ -881,48 +968,48 @@ export class ScheduleService {
       schedulesThisMonth,
       schedulesByType,
       upcomingSchedules,
-      monthlyTrend
+      monthlyTrend,
     ] = await Promise.all([
       this.scheduleModel.countDocuments({ deletedAt: { $exists: false } }),
-      this.scheduleModel.countDocuments({ 
+      this.scheduleModel.countDocuments({
         deletedAt: { $exists: false },
         isActive: true,
-        status: 'active'
+        status: 'active',
       }),
       this.scheduleModel.countDocuments({
         deletedAt: { $exists: false },
         startDate: { $lte: today },
         endDate: { $gte: today },
-        isActive: true
+        isActive: true,
       }),
       this.scheduleModel.countDocuments({
         deletedAt: { $exists: false },
         startDate: { $gte: startOfWeek },
-        isActive: true
+        isActive: true,
       }),
       this.scheduleModel.countDocuments({
         deletedAt: { $exists: false },
         startDate: { $gte: startOfMonth },
-        isActive: true
+        isActive: true,
       }),
-      
+
       // Aggregate by schedule type
       this.scheduleModel.aggregate([
         {
           $match: {
             deletedAt: { $exists: false },
-            isActive: true
-          }
+            isActive: true,
+          },
         },
         {
           $group: {
             _id: '$scheduleType',
-            count: { $sum: 1 }
-          }
+            count: { $sum: 1 },
+          },
         },
         {
-          $sort: { count: -1 }
-        }
+          $sort: { count: -1 },
+        },
       ]),
 
       // Upcoming schedules (next 7 days)
@@ -931,10 +1018,10 @@ export class ScheduleService {
           deletedAt: { $exists: false },
           startDate: {
             $gte: today,
-            $lte: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
+            $lte: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000),
           },
           isActive: true,
-          status: 'active'
+          status: 'active',
         })
         .select('title startDate startTime scheduleType')
         .sort({ startDate: 1, startTime: 1 })
@@ -946,43 +1033,61 @@ export class ScheduleService {
         {
           $match: {
             deletedAt: { $exists: false },
-            startDate: { $gte: new Date(now.getFullYear(), now.getMonth() - 5, 1) }
-          }
+            startDate: {
+              $gte: new Date(now.getFullYear(), now.getMonth() - 5, 1),
+            },
+          },
         },
         {
           $group: {
             _id: {
               year: { $year: '$startDate' },
-              month: { $month: '$startDate' }
+              month: { $month: '$startDate' },
             },
-            count: { $sum: 1 }
-          }
+            count: { $sum: 1 },
+          },
         },
         {
-          $sort: { '_id.year': 1, '_id.month': 1 }
-        }
-      ])
+          $sort: { '_id.year': 1, '_id.month': 1 },
+        },
+      ]),
     ]);
 
     // Process results
-    const typeStats = schedulesByType.map(item => ({
+    const typeStats = schedulesByType.map((item) => ({
       type: item._id,
       count: item.count,
-      percentage: totalSchedules > 0 ? Math.round((item.count / totalSchedules) * 100) : 0
+      percentage:
+        totalSchedules > 0
+          ? Math.round((item.count / totalSchedules) * 100)
+          : 0,
     }));
 
-    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const trend = monthlyTrend.map(item => ({
+    const monthNames = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    const trend = monthlyTrend.map((item) => ({
       month: `${monthNames[item._id.month - 1]} ${item._id.year}`,
-      count: item.count
+      count: item.count,
     }));
 
-    const upcoming = upcomingSchedules.map(schedule => ({
+    const upcoming = upcomingSchedules.map((schedule) => ({
       scheduleId: (schedule._id as any).toString(),
       title: schedule.title,
       startDate: schedule.startDate,
       startTime: schedule.startTime,
-      scheduleType: schedule.scheduleType
+      scheduleType: schedule.scheduleType,
     }));
 
     return {
@@ -1000,7 +1105,7 @@ export class ScheduleService {
       oneTimeSchedules: 0, // Would implement one-time count
       averageSlotDuration: 30, // Would calculate from actual data
       upcomingSchedules: upcoming,
-      monthlyTrend: trend
+      monthlyTrend: trend,
     };
   }
 
@@ -1009,7 +1114,7 @@ export class ScheduleService {
    */
   async bulkScheduleAction(
     bulkActionDto: BulkScheduleActionDto,
-    actionByUserId?: string
+    actionByUserId?: string,
   ): Promise<{ success: number; failed: number; errors: string[] }> {
     const { scheduleIds, action, reason, effectiveDate } = bulkActionDto;
     let success = 0;
@@ -1020,19 +1125,35 @@ export class ScheduleService {
       try {
         switch (action) {
           case 'activate':
-            await this.updateSchedule(scheduleId, { status: 'active' }, actionByUserId);
+            await this.updateSchedule(
+              scheduleId,
+              { status: 'active' },
+              actionByUserId,
+            );
             break;
           case 'deactivate':
-            await this.updateSchedule(scheduleId, { status: 'inactive' }, actionByUserId);
+            await this.updateSchedule(
+              scheduleId,
+              { status: 'inactive' },
+              actionByUserId,
+            );
             break;
           case 'cancel':
-            await this.updateSchedule(scheduleId, { status: 'cancelled' }, actionByUserId);
+            await this.updateSchedule(
+              scheduleId,
+              { status: 'cancelled' },
+              actionByUserId,
+            );
             break;
           case 'approve':
             await this.approveSchedule(scheduleId, actionByUserId);
             break;
           case 'reject':
-            await this.rejectSchedule(scheduleId, reason || 'No reason provided', actionByUserId);
+            await this.rejectSchedule(
+              scheduleId,
+              reason || 'No reason provided',
+              actionByUserId,
+            );
             break;
         }
         success++;
@@ -1048,35 +1169,40 @@ export class ScheduleService {
   /**
    * Approve schedule
    */
-  private async approveSchedule(scheduleId: string, approvedByUserId?: string): Promise<void> {
-    await this.scheduleModel.findByIdAndUpdate(
-      scheduleId,
-      {
-        $set: {
-          approvalStatus: 'approved',
-          approvedBy: approvedByUserId ? new Types.ObjectId(approvedByUserId) : undefined,
-          approvedAt: new Date(),
-          status: 'active'
-        }
-      }
-    );
+  private async approveSchedule(
+    scheduleId: string,
+    approvedByUserId?: string,
+  ): Promise<void> {
+    await this.scheduleModel.findByIdAndUpdate(scheduleId, {
+      $set: {
+        approvalStatus: 'approved',
+        approvedBy: approvedByUserId
+          ? new Types.ObjectId(approvedByUserId)
+          : undefined,
+        approvedAt: new Date(),
+        status: 'active',
+      },
+    });
   }
 
   /**
    * Reject schedule
    */
-  private async rejectSchedule(scheduleId: string, reason: string, rejectedByUserId?: string): Promise<void> {
-    await this.scheduleModel.findByIdAndUpdate(
-      scheduleId,
-      {
-        $set: {
-          approvalStatus: 'rejected',
-          rejectionReason: reason,
-          approvedBy: rejectedByUserId ? new Types.ObjectId(rejectedByUserId) : undefined,
-          approvedAt: new Date(),
-          status: 'cancelled'
-        }
-      }
-    );
+  private async rejectSchedule(
+    scheduleId: string,
+    reason: string,
+    rejectedByUserId?: string,
+  ): Promise<void> {
+    await this.scheduleModel.findByIdAndUpdate(scheduleId, {
+      $set: {
+        approvalStatus: 'rejected',
+        rejectionReason: reason,
+        approvedBy: rejectedByUserId
+          ? new Types.ObjectId(rejectedByUserId)
+          : undefined,
+        approvedAt: new Date(),
+        status: 'cancelled',
+      },
+    });
   }
-} 
+}

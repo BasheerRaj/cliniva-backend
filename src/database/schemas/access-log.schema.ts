@@ -3,15 +3,28 @@ import { Document, Types } from 'mongoose';
 
 @Schema({
   timestamps: { createdAt: true, updatedAt: false },
-  collection: 'access_logs'
+  collection: 'access_logs',
 })
 export class AccessLog extends Document {
   @Prop({ type: Types.ObjectId, ref: 'User', required: true })
   userId: Types.ObjectId;
 
-  @Prop({ 
+  @Prop({
     required: true,
-    enum: ['login', 'logout', 'access_attempt', 'permission_denied', 'session_expired', 'password_change', 'role_change', 'failed_login', 'suspicious_activity', 'api_access', 'data_access', 'system_access']
+    enum: [
+      'login',
+      'logout',
+      'access_attempt',
+      'permission_denied',
+      'session_expired',
+      'password_change',
+      'role_change',
+      'failed_login',
+      'suspicious_activity',
+      'api_access',
+      'data_access',
+      'system_access',
+    ],
   })
   eventType: string;
 
@@ -24,9 +37,9 @@ export class AccessLog extends Document {
   @Prop()
   sessionId?: string;
 
-  @Prop({ 
+  @Prop({
     enum: ['success', 'failure', 'blocked', 'warning'],
-    default: 'success'
+    default: 'success',
   })
   status: string;
 
@@ -63,9 +76,9 @@ export class AccessLog extends Document {
   @Prop()
   riskScore?: number; // Security risk score (0-100)
 
-  @Prop({ 
+  @Prop({
     enum: ['low', 'medium', 'high', 'critical'],
-    default: 'low'
+    default: 'low',
   })
   riskLevel: string;
 
@@ -104,4 +117,4 @@ AccessLogSchema.index({ organizationId: 1, createdAt: -1 });
 AccessLogSchema.index({ clinicId: 1, createdAt: -1 });
 AccessLogSchema.index({ userId: 1, eventType: 1, createdAt: -1 });
 AccessLogSchema.index({ ipAddress: 1, userId: 1, createdAt: -1 });
-AccessLogSchema.index({ createdAt: -1 }); // For general time-based queries 
+AccessLogSchema.index({ createdAt: -1 }); // For general time-based queries

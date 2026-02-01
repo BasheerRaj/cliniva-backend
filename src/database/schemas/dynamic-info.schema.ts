@@ -3,12 +3,12 @@ import { Document, Types } from 'mongoose';
 
 @Schema({
   timestamps: true,
-  collection: 'dynamic_info'
+  collection: 'dynamic_info',
 })
 export class DynamicInfo extends Document {
-  @Prop({ 
+  @Prop({
     required: true,
-    enum: ['organization', 'complex', 'clinic'] 
+    enum: ['organization', 'complex', 'clinic'],
   })
   entityType: string;
 
@@ -30,4 +30,7 @@ export const DynamicInfoSchema = SchemaFactory.createForClass(DynamicInfo);
 // Indexes
 DynamicInfoSchema.index({ entityType: 1, entityId: 1 });
 DynamicInfoSchema.index({ infoType: 1 });
-DynamicInfoSchema.index({ entityType: 1, entityId: 1, infoType: 1 }, { unique: true });
+DynamicInfoSchema.index(
+  { entityType: 1, entityId: 1, infoType: 1 },
+  { unique: true },
+);

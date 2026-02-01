@@ -1,7 +1,7 @@
-import { 
-  IsString, 
-  IsNotEmpty, 
-  IsOptional, 
+import {
+  IsString,
+  IsNotEmpty,
+  IsOptional,
   IsEnum,
   IsMongoId,
   IsArray,
@@ -13,7 +13,7 @@ import {
   IsDateString,
   ValidateNested,
   IsObject,
-  IsIP
+  IsIP,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 import { UserRole } from '../../common/enums/user-role.enum';
@@ -117,7 +117,20 @@ export class CreateAccessLogDto {
   @IsNotEmpty()
   userId: string;
 
-  @IsEnum(['login', 'logout', 'access_attempt', 'permission_denied', 'session_expired', 'password_change', 'role_change', 'failed_login', 'suspicious_activity', 'api_access', 'data_access', 'system_access'])
+  @IsEnum([
+    'login',
+    'logout',
+    'access_attempt',
+    'permission_denied',
+    'session_expired',
+    'password_change',
+    'role_change',
+    'failed_login',
+    'suspicious_activity',
+    'api_access',
+    'data_access',
+    'system_access',
+  ])
   @IsNotEmpty()
   eventType: string;
 
@@ -322,7 +335,23 @@ export class AccessLogSearchDto {
   userId?: string;
 
   @IsArray()
-  @IsEnum(['login', 'logout', 'access_attempt', 'permission_denied', 'session_expired', 'password_change', 'role_change', 'failed_login', 'suspicious_activity', 'api_access', 'data_access', 'system_access'], { each: true })
+  @IsEnum(
+    [
+      'login',
+      'logout',
+      'access_attempt',
+      'permission_denied',
+      'session_expired',
+      'password_change',
+      'role_change',
+      'failed_login',
+      'suspicious_activity',
+      'api_access',
+      'data_access',
+      'system_access',
+    ],
+    { each: true },
+  )
   @IsOptional()
   eventTypes?: string[];
 
@@ -525,7 +554,15 @@ export class SecurityAlertDto {
   @IsNotEmpty()
   userId: string;
 
-  @IsEnum(['suspicious_login', 'multiple_failed_attempts', 'unusual_location', 'privilege_escalation', 'data_breach_attempt', 'account_takeover', 'brute_force_attack'])
+  @IsEnum([
+    'suspicious_login',
+    'multiple_failed_attempts',
+    'unusual_location',
+    'privilege_escalation',
+    'data_breach_attempt',
+    'account_takeover',
+    'brute_force_attack',
+  ])
   @IsNotEmpty()
   alertType: string;
 
@@ -667,4 +704,4 @@ export class AccessAuditDto {
     timestamp: Date;
     resolved: boolean;
   }>;
-} 
+}

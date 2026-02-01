@@ -1,10 +1,18 @@
-import { IsString, IsOptional, IsBoolean, IsArray, IsNumber, IsEnum, ValidateNested } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsBoolean,
+  IsArray,
+  IsNumber,
+  IsEnum,
+  ValidateNested,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 // Step types for the onboarding flow
-export type OnboardingStepType = 
+export type OnboardingStepType =
   | 'organization-overview'
-  | 'organization-contact' 
+  | 'organization-contact'
   | 'organization-legal'
   | 'complex-overview'
   | 'complex-contact'
@@ -21,9 +29,18 @@ export class OnboardingStepProgressDto {
   userId: string;
 
   @IsString()
-  @IsEnum(['organization-overview', 'organization-contact', 'organization-legal', 
-          'complex-overview', 'complex-contact', 'complex-schedule',
-          'clinic-overview', 'clinic-contact', 'clinic-schedule', 'completed'])
+  @IsEnum([
+    'organization-overview',
+    'organization-contact',
+    'organization-legal',
+    'complex-overview',
+    'complex-contact',
+    'complex-schedule',
+    'clinic-overview',
+    'clinic-contact',
+    'clinic-schedule',
+    'completed',
+  ])
   currentStep: OnboardingStepType;
 
   @IsString()
@@ -173,7 +190,15 @@ export class RealTimeValidationResponseDto {
 // Working hours hierarchy validation DTO
 export class WorkingHoursValidationDto {
   @IsString()
-  @IsEnum(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'])
+  @IsEnum([
+    'monday',
+    'tuesday',
+    'wednesday',
+    'thursday',
+    'friday',
+    'saturday',
+    'sunday',
+  ])
   dayOfWeek: string;
 
   @IsBoolean()
@@ -254,4 +279,4 @@ export class StepDataDto {
   @IsBoolean()
   @IsOptional()
   isSkipped?: boolean; // Whether step was skipped
-} 
+}

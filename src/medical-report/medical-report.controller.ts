@@ -39,23 +39,23 @@ export class MedicalReportController {
   @Post()
   async createMedicalReport(
     @Body(new ValidationPipe()) createMedicalReportDto: CreateMedicalReportDto,
-    @Request() req: any
+    @Request() req: any,
   ) {
     try {
       const report = await this.medicalReportService.createMedicalReport(
         createMedicalReportDto,
-        req.user?.userId
+        req.user?.userId,
       );
       return {
         success: true,
         message: 'Medical report created successfully',
-        data: report
+        data: report,
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to create medical report',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -65,7 +65,9 @@ export class MedicalReportController {
    * GET /medical-reports
    */
   @Get()
-  async getMedicalReports(@Query(new ValidationPipe()) query: MedicalReportSearchQueryDto) {
+  async getMedicalReports(
+    @Query(new ValidationPipe()) query: MedicalReportSearchQueryDto,
+  ) {
     try {
       const result = await this.medicalReportService.getMedicalReports(query);
       return {
@@ -76,14 +78,14 @@ export class MedicalReportController {
           total: result.total,
           page: result.page,
           totalPages: result.totalPages,
-          limit: parseInt(query.limit || '10')
-        }
+          limit: parseInt(query.limit || '10'),
+        },
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to retrieve medical reports',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -99,13 +101,13 @@ export class MedicalReportController {
       return {
         success: true,
         message: 'Medical report retrieved successfully',
-        data: report
+        data: report,
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to retrieve medical report',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -118,24 +120,24 @@ export class MedicalReportController {
   async updateMedicalReport(
     @Param('id') id: string,
     @Body(new ValidationPipe()) updateMedicalReportDto: UpdateMedicalReportDto,
-    @Request() req: any
+    @Request() req: any,
   ) {
     try {
       const report = await this.medicalReportService.updateMedicalReport(
         id,
         updateMedicalReportDto,
-        req.user?.userId
+        req.user?.userId,
       );
       return {
         success: true,
         message: 'Medical report updated successfully',
-        data: report
+        data: report,
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to update medical report',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -151,13 +153,13 @@ export class MedicalReportController {
       await this.medicalReportService.deleteMedicalReport(id, req.user?.userId);
       return {
         success: true,
-        message: 'Medical report deleted successfully'
+        message: 'Medical report deleted successfully',
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to delete medical report',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -170,24 +172,24 @@ export class MedicalReportController {
   async shareMedicalReport(
     @Param('id') id: string,
     @Body(new ValidationPipe()) shareDto: ShareMedicalReportDto,
-    @Request() req: any
+    @Request() req: any,
   ) {
     try {
       const result = await this.medicalReportService.shareMedicalReport(
         id,
         shareDto,
-        req.user?.userId
+        req.user?.userId,
       );
       return {
         success: true,
         message: result.message,
-        data: result
+        data: result,
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to share medical report',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -197,26 +199,29 @@ export class MedicalReportController {
    * GET /medical-reports/appointment/:appointmentId
    */
   @Get('appointment/:appointmentId')
-  async getMedicalReportByAppointment(@Param('appointmentId') appointmentId: string) {
+  async getMedicalReportByAppointment(
+    @Param('appointmentId') appointmentId: string,
+  ) {
     try {
-      const report = await this.medicalReportService.getReportByAppointmentId(appointmentId);
+      const report =
+        await this.medicalReportService.getReportByAppointmentId(appointmentId);
       if (!report) {
         return {
           success: true,
           message: 'No medical report found for this appointment',
-          data: null
+          data: null,
         };
       }
       return {
         success: true,
         message: 'Medical report retrieved successfully',
-        data: report
+        data: report,
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to retrieve medical report',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -228,17 +233,18 @@ export class MedicalReportController {
   @Get('patient/:patientId')
   async getPatientMedicalHistory(@Param('patientId') patientId: string) {
     try {
-      const history = await this.medicalReportService.getPatientMedicalHistory(patientId);
+      const history =
+        await this.medicalReportService.getPatientMedicalHistory(patientId);
       return {
         success: true,
         message: 'Patient medical history retrieved successfully',
-        data: history
+        data: history,
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to retrieve patient medical history',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -250,17 +256,18 @@ export class MedicalReportController {
   @Get('doctor/:doctorId/stats')
   async getDoctorReportStats(@Param('doctorId') doctorId: string) {
     try {
-      const stats = await this.medicalReportService.getDoctorReportStats(doctorId);
+      const stats =
+        await this.medicalReportService.getDoctorReportStats(doctorId);
       return {
         success: true,
         message: 'Doctor report statistics retrieved successfully',
-        data: stats
+        data: stats,
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to retrieve doctor statistics',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -276,13 +283,13 @@ export class MedicalReportController {
       return {
         success: true,
         message: 'Medical report statistics retrieved successfully',
-        data: stats
+        data: stats,
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to retrieve medical report statistics',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -294,18 +301,19 @@ export class MedicalReportController {
   @Get('follow-up/pending')
   async getPendingFollowUpReports() {
     try {
-      const reports = await this.medicalReportService.getReportsRequiringFollowUp();
+      const reports =
+        await this.medicalReportService.getReportsRequiringFollowUp();
       return {
         success: true,
         message: 'Pending follow-up reports retrieved successfully',
         data: reports,
-        count: reports.length
+        count: reports.length,
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to retrieve pending follow-up reports',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -321,7 +329,7 @@ export class MedicalReportController {
     @Query('diagnoses') diagnoses?: string,
     @Query('doctorIds') doctorIds?: string,
     @Query('hasFollowUp') hasFollowUp?: string,
-    @Query('dateRange') dateRange?: string
+    @Query('dateRange') dateRange?: string,
   ) {
     try {
       if (!searchTerm || searchTerm.trim().length === 0) {
@@ -338,20 +346,20 @@ export class MedicalReportController {
       const reports = await this.medicalReportService.searchMedicalReports(
         searchTerm,
         filters,
-        limit || 20
+        limit || 20,
       );
 
       return {
         success: true,
         message: 'Search completed successfully',
         data: reports,
-        count: reports.length
+        count: reports.length,
       };
     } catch (error) {
       return {
         success: false,
         message: 'Search failed',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -366,7 +374,7 @@ export class MedicalReportController {
     @Query('page') page?: string,
     @Query('limit') limit?: string,
     @Query('sortBy') sortBy?: string,
-    @Query('sortOrder') sortOrder?: 'asc' | 'desc'
+    @Query('sortOrder') sortOrder?: 'asc' | 'desc',
   ) {
     try {
       const query: MedicalReportSearchQueryDto = {
@@ -374,7 +382,7 @@ export class MedicalReportController {
         page: page || '1',
         limit: limit || '10',
         sortBy: sortBy || 'createdAt',
-        sortOrder: sortOrder || 'desc'
+        sortOrder: sortOrder || 'desc',
       };
 
       const result = await this.medicalReportService.getMedicalReports(query);
@@ -386,14 +394,14 @@ export class MedicalReportController {
           total: result.total,
           page: result.page,
           totalPages: result.totalPages,
-          limit: parseInt(limit || '10')
-        }
+          limit: parseInt(limit || '10'),
+        },
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to retrieve patient reports',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -406,7 +414,7 @@ export class MedicalReportController {
   async getDoctorReports(
     @Param('doctorId') doctorId: string,
     @Query('page') page?: string,
-    @Query('limit') limit?: string
+    @Query('limit') limit?: string,
   ) {
     try {
       const query: MedicalReportSearchQueryDto = {
@@ -414,7 +422,7 @@ export class MedicalReportController {
         page: page || '1',
         limit: limit || '10',
         sortBy: 'createdAt',
-        sortOrder: 'desc'
+        sortOrder: 'desc',
       };
 
       const result = await this.medicalReportService.getMedicalReports(query);
@@ -425,14 +433,14 @@ export class MedicalReportController {
         pagination: {
           total: result.total,
           page: result.page,
-          totalPages: result.totalPages
-        }
+          totalPages: result.totalPages,
+        },
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to retrieve doctor reports',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -446,18 +454,20 @@ export class MedicalReportController {
     @Query('from') dateFrom: string,
     @Query('to') dateTo: string,
     @Query('page') page?: string,
-    @Query('limit') limit?: string
+    @Query('limit') limit?: string,
   ) {
     try {
       if (!dateFrom || !dateTo) {
-        throw new BadRequestException('Both from and to date parameters are required');
+        throw new BadRequestException(
+          'Both from and to date parameters are required',
+        );
       }
 
       const query: MedicalReportSearchQueryDto = {
         dateFrom,
         dateTo,
         page: page || '1',
-        limit: limit || '20'
+        limit: limit || '20',
       };
 
       const result = await this.medicalReportService.getMedicalReports(query);
@@ -468,18 +478,18 @@ export class MedicalReportController {
         pagination: {
           total: result.total,
           page: result.page,
-          totalPages: result.totalPages
+          totalPages: result.totalPages,
         },
         dateRange: {
           from: dateFrom,
-          to: dateTo
-        }
+          to: dateTo,
+        },
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to retrieve reports by date range',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -492,15 +502,15 @@ export class MedicalReportController {
   async getReportsByVisibility(
     @Param('status') status: string,
     @Query('page') page?: string,
-    @Query('limit') limit?: string
+    @Query('limit') limit?: string,
   ) {
     try {
       const isVisible = status === 'visible';
-      
+
       const query: MedicalReportSearchQueryDto = {
         isVisibleToPatient: isVisible,
         page: page || '1',
-        limit: limit || '10'
+        limit: limit || '10',
       };
 
       const result = await this.medicalReportService.getMedicalReports(query);
@@ -511,14 +521,14 @@ export class MedicalReportController {
         pagination: {
           total: result.total,
           page: result.page,
-          totalPages: result.totalPages
-        }
+          totalPages: result.totalPages,
+        },
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to retrieve reports by visibility',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -530,31 +540,32 @@ export class MedicalReportController {
   @Get('follow-up/recommended')
   async getReportsWithFollowUp(
     @Query('page') page?: string,
-    @Query('limit') limit?: string
+    @Query('limit') limit?: string,
   ) {
     try {
       const query: MedicalReportSearchQueryDto = {
         nextAppointmentRecommended: true,
         page: page || '1',
-        limit: limit || '10'
+        limit: limit || '10',
       };
 
       const result = await this.medicalReportService.getMedicalReports(query);
       return {
         success: true,
-        message: 'Reports with follow-up recommendations retrieved successfully',
+        message:
+          'Reports with follow-up recommendations retrieved successfully',
         data: result.reports,
         pagination: {
           total: result.total,
           page: result.page,
-          totalPages: result.totalPages
-        }
+          totalPages: result.totalPages,
+        },
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to retrieve reports with follow-up',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -566,12 +577,12 @@ export class MedicalReportController {
   @Post(':id/pdf')
   async generateReportPdf(
     @Param('id') id: string,
-    @Body(new ValidationPipe()) pdfOptions: GenerateMedicalReportPdfDto
+    @Body(new ValidationPipe()) pdfOptions: GenerateMedicalReportPdfDto,
   ) {
     try {
       // Get the report data
       const report = await this.medicalReportService.getMedicalReportById(id);
-      
+
       // In a real implementation, you would:
       // 1. Use a PDF generation library (like puppeteer, jsPDF, or PDFKit)
       // 2. Create a formatted PDF with the report data
@@ -587,14 +598,14 @@ export class MedicalReportController {
           // In real implementation:
           // pdfUrl: 'url-to-generated-pdf',
           // pdfBuffer: buffer-data
-          message: 'PDF generation would be implemented here'
-        }
+          message: 'PDF generation would be implemented here',
+        },
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to generate PDF',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -605,25 +616,25 @@ export class MedicalReportController {
    */
   @Get('analytics/diagnoses')
   async getDiagnosisAnalytics(
-    @Query('limit', new ParseIntPipe({ optional: true })) limit?: number
+    @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
   ) {
     try {
       const stats = await this.medicalReportService.getMedicalReportStats();
-      
+
       return {
         success: true,
         message: 'Diagnosis analytics retrieved successfully',
         data: {
           topDiagnoses: stats.topDiagnoses.slice(0, limit || 10),
           totalUniqueDiganoses: stats.topDiagnoses.length,
-          analysisDate: new Date()
-        }
+          analysisDate: new Date(),
+        },
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to retrieve diagnosis analytics',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -637,7 +648,7 @@ export class MedicalReportController {
     try {
       // This would require implementing a separate version tracking system
       const report = await this.medicalReportService.getMedicalReportById(id);
-      
+
       return {
         success: true,
         message: 'Report version history retrieved',
@@ -645,22 +656,22 @@ export class MedicalReportController {
           reportId: id,
           currentVersion: report.version,
           versions: [
-                         {
-               version: report.version,
-               createdAt: (report as any).updatedAt || (report as any).createdAt,
-               updatedBy: report.updatedBy || report.createdBy,
-               isCurrent: true
-             }
+            {
+              version: report.version,
+              createdAt: (report as any).updatedAt || (report as any).createdAt,
+              updatedBy: report.updatedBy || report.createdBy,
+              isCurrent: true,
+            },
           ],
-          message: 'Full version tracking would be implemented here'
-        }
+          message: 'Full version tracking would be implemented here',
+        },
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to retrieve version history',
-        error: error.message
+        error: error.message,
       };
     }
   }
-} 
+}

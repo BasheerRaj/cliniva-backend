@@ -3,12 +3,21 @@ import { Document, Types } from 'mongoose';
 
 @Schema({
   timestamps: true,
-  collection: 'schedules'
+  collection: 'schedules',
 })
 export class Schedule extends Document {
-  @Prop({ 
+  @Prop({
     required: true,
-    enum: ['doctor_availability', 'room_booking', 'equipment_schedule', 'facility_hours', 'maintenance', 'recurring_template', 'block_time', 'holiday']
+    enum: [
+      'doctor_availability',
+      'room_booking',
+      'equipment_schedule',
+      'facility_hours',
+      'maintenance',
+      'recurring_template',
+      'block_time',
+      'holiday',
+    ],
   })
   scheduleType: string;
 
@@ -57,9 +66,9 @@ export class Schedule extends Document {
   @Prop({ default: false })
   isRecurring: boolean;
 
-  @Prop({ 
+  @Prop({
     enum: ['daily', 'weekly', 'monthly', 'yearly', 'custom'],
-    default: null
+    default: null,
   })
   recurrenceType?: string;
 
@@ -95,15 +104,15 @@ export class Schedule extends Document {
   breakDuration?: number; // Break time in minutes
 
   // Priority and status
-  @Prop({ 
+  @Prop({
     enum: ['low', 'medium', 'high', 'urgent'],
-    default: 'medium'
+    default: 'medium',
   })
   priority: string;
 
-  @Prop({ 
+  @Prop({
     enum: ['draft', 'active', 'inactive', 'completed', 'cancelled'],
-    default: 'active'
+    default: 'active',
   })
   status: string;
 
@@ -111,9 +120,9 @@ export class Schedule extends Document {
   @Prop({ default: false })
   requiresApproval: boolean;
 
-  @Prop({ 
+  @Prop({
     enum: ['pending', 'approved', 'rejected', 'auto_approved'],
-    default: 'auto_approved'
+    default: 'auto_approved',
   })
   approvalStatus: string;
 
@@ -191,11 +200,11 @@ ScheduleSchema.index({ startTime: 1, endTime: 1 });
 ScheduleSchema.index({ approvalStatus: 1 });
 ScheduleSchema.index({ tags: 1 });
 ScheduleSchema.index({ deletedAt: 1 });
-ScheduleSchema.index({ 
-  scheduleType: 1, 
-  userId: 1, 
-  startDate: 1, 
-  endDate: 1, 
-  startTime: 1, 
-  endTime: 1 
-}); // Composite index for conflict detection 
+ScheduleSchema.index({
+  scheduleType: 1,
+  userId: 1,
+  startDate: 1,
+  endDate: 1,
+  startTime: 1,
+  endTime: 1,
+}); // Composite index for conflict detection

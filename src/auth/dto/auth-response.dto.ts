@@ -45,13 +45,13 @@ export class UserProfileDto {
   lastLogin?: Date;
   createdAt: Date;
   updatedAt: Date;
-  
+
   // Authentication fields
   isFirstLogin?: boolean;
   lastPasswordChange?: Date;
   passwordChangeRequired?: boolean;
   preferredLanguage?: 'ar' | 'en';
-  
+
   // Onboarding-related fields
   setupComplete?: boolean;
   subscriptionId?: string | null;
@@ -78,17 +78,21 @@ export class UserProfileDto {
     this.lastLogin = user.lastLogin;
     this.createdAt = (user as any).createdAt;
     this.updatedAt = (user as any).updatedAt;
-    
+
     // Include authentication fields
     this.isFirstLogin = user.isFirstLogin;
     this.lastPasswordChange = user.lastPasswordChange;
     this.passwordChangeRequired = user.passwordChangeRequired;
     this.preferredLanguage = user.preferredLanguage;
-    
+
     // Include onboarding fields
     this.setupComplete = user.setupComplete;
-    this.subscriptionId = user.subscriptionId ? (user.subscriptionId as any).toString() : null;
-    this.organizationId = user.organizationId ? (user.organizationId as any).toString() : null;
+    this.subscriptionId = user.subscriptionId
+      ? (user.subscriptionId as any).toString()
+      : null;
+    this.organizationId = user.organizationId
+      ? (user.organizationId as any).toString()
+      : null;
     this.complexId = user.complexId ? (user.complexId as any).toString() : null;
     this.clinicId = user.clinicId ? (user.clinicId as any).toString() : null;
     this.onboardingComplete = user.onboardingComplete;

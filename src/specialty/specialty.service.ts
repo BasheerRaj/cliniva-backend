@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Specialty } from '../database/schemas/specialty.schema';
@@ -21,8 +25,8 @@ export class SpecialtyService {
 
   async createSpecialty(createDto: CreateSpecialtyDto): Promise<Specialty> {
     // Check if specialty already exists
-    const existing = await this.specialtyModel.findOne({ 
-      name: { $regex: new RegExp(`^${createDto.name}$`, 'i') }
+    const existing = await this.specialtyModel.findOne({
+      name: { $regex: new RegExp(`^${createDto.name}$`, 'i') },
     });
 
     if (existing) {
@@ -45,23 +49,28 @@ export class SpecialtyService {
     return specialty;
   }
 
-  async updateSpecialty(specialtyId: string, updateDto: UpdateSpecialtyDto): Promise<Specialty> {
+  async updateSpecialty(
+    specialtyId: string,
+    updateDto: UpdateSpecialtyDto,
+  ): Promise<Specialty> {
     // Check if name is being updated and already exists
     if (updateDto.name) {
-      const existing = await this.specialtyModel.findOne({ 
+      const existing = await this.specialtyModel.findOne({
         name: { $regex: new RegExp(`^${updateDto.name}$`, 'i') },
-        _id: { $ne: specialtyId }
+        _id: { $ne: specialtyId },
       });
 
       if (existing) {
-        throw new BadRequestException('Specialty with this name already exists');
+        throw new BadRequestException(
+          'Specialty with this name already exists',
+        );
       }
     }
 
     const updated = await this.specialtyModel.findByIdAndUpdate(
       specialtyId,
       updateDto,
-      { new: true }
+      { new: true },
     );
 
     if (!updated) {
@@ -79,11 +88,14 @@ export class SpecialtyService {
   }
 
   async searchSpecialties(searchTerm: string): Promise<Specialty[]> {
-    return await this.specialtyModel.find({
-      $or: [
-        { name: { $regex: searchTerm, $options: 'i' } },
-        { description: { $regex: searchTerm, $options: 'i' } }
-      ]
-    }).sort({ name: 1 }).exec();
+    return await this.specialtyModel
+      .find({
+        $or: [
+          { name: { $regex: searchTerm, $options: 'i' } },
+          { description: { $regex: searchTerm, $options: 'i' } },
+        ],
+      })
+      .sort({ name: 1 })
+      .exec();
   }
 }

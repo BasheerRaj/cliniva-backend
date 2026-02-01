@@ -1,1 +1,1 @@
-export * from './create-patient.dto'; 
+export * from './create-patient.dto';

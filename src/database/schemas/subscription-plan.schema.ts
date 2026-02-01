@@ -3,7 +3,7 @@ import { Document } from 'mongoose';
 
 @Schema({
   timestamps: true,
-  collection: 'subscription_plans'
+  collection: 'subscription_plans',
 })
 export class SubscriptionPlan extends Document {
   @Prop({ required: true, enum: ['company', 'complex', 'clinic'] })
@@ -22,7 +22,8 @@ export class SubscriptionPlan extends Document {
   price: number;
 }
 
-export const SubscriptionPlanSchema = SchemaFactory.createForClass(SubscriptionPlan);
+export const SubscriptionPlanSchema =
+  SchemaFactory.createForClass(SubscriptionPlan);
 
 // Indexes
 SubscriptionPlanSchema.index({ name: 1 });

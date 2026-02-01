@@ -9,7 +9,3 @@ export * from './guards/jwt-auth.guard';
 export * from './guards/first-login.guard';
 export * from './strategies/jwt.strategy';
 export * from './dto';
-
-
-
-

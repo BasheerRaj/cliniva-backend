@@ -6,10 +6,10 @@ export class PhoneNumber {
   @Prop({ required: true })
   number: string;
 
-  @Prop({ 
-    required: true, 
+  @Prop({
+    required: true,
     enum: ['primary', 'secondary', 'emergency', 'fax', 'mobile'],
-    default: 'primary'
+    default: 'primary',
   })
   type: 'primary' | 'secondary' | 'emergency' | 'fax' | 'mobile';
 
@@ -79,7 +79,7 @@ export class SocialMediaLinks {
 
 @Schema({
   timestamps: true,
-  collection: 'organizations'
+  collection: 'organizations',
 })
 export class Organization extends Document {
   // Core identification
@@ -122,17 +122,19 @@ export class Organization extends Document {
   ceoName?: string;
 
   // Contact information - STANDARDIZED
-  @Prop({ 
-    type: [{ 
-      number: { type: String, required: true }, 
-      type: { 
-        type: String, 
-        enum: ['primary', 'secondary', 'emergency', 'fax', 'mobile'], 
-        default: 'primary' 
-      }, 
-      label: String 
-    }], 
-    default: [] 
+  @Prop({
+    type: [
+      {
+        number: { type: String, required: true },
+        type: {
+          type: String,
+          enum: ['primary', 'secondary', 'emergency', 'fax', 'mobile'],
+          default: 'primary',
+        },
+        label: String,
+      },
+    ],
+    default: [],
   })
   phoneNumbers?: PhoneNumber[];
 
@@ -147,8 +149,8 @@ export class Organization extends Document {
       state: String,
       postalCode: String,
       country: String,
-      googleLocation: String
-    }
+      googleLocation: String,
+    },
   })
   address?: Address;
 
@@ -158,8 +160,8 @@ export class Organization extends Document {
       name: String,
       phone: String,
       email: String,
-      relationship: String
-    }
+      relationship: String,
+    },
   })
   emergencyContact?: OrganizationEmergencyContact;
 
@@ -172,8 +174,8 @@ export class Organization extends Document {
       linkedin: String,
       whatsapp: String,
       youtube: String,
-      website: String
-    }
+      website: String,
+    },
   })
   socialMediaLinks?: SocialMediaLinks;
 

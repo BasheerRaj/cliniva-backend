@@ -1,4 +1,10 @@
-import { Controller, Get, Post, HttpException, HttpStatus } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  HttpException,
+  HttpStatus,
+} from '@nestjs/common';
 import { DatabaseService } from './database.service';
 import { DatabaseInitializerService } from './database-initializer.service';
 
@@ -13,7 +19,7 @@ export class DatabaseController {
   async getHealth() {
     try {
       const health = await this.databaseService.getHealth();
-      
+
       if (health.status === 'error') {
         throw new HttpException(
           {
@@ -24,7 +30,7 @@ export class DatabaseController {
           HttpStatus.SERVICE_UNAVAILABLE,
         );
       }
-      
+
       return {
         statusCode: HttpStatus.OK,
         message: 'Database health check completed',
@@ -46,7 +52,7 @@ export class DatabaseController {
   async getDatabaseInfo() {
     try {
       const info = await this.databaseService.getDatabaseInfo();
-      
+
       return {
         statusCode: HttpStatus.OK,
         message: 'Database information retrieved successfully',
@@ -68,9 +74,11 @@ export class DatabaseController {
   async testConnection() {
     try {
       const result = await this.databaseService.performConnectionTest();
-      
+
       return {
-        statusCode: result.success ? HttpStatus.OK : HttpStatus.SERVICE_UNAVAILABLE,
+        statusCode: result.success
+          ? HttpStatus.OK
+          : HttpStatus.SERVICE_UNAVAILABLE,
         message: result.message,
         data: result.details || null,
         error: result.error || null,
@@ -91,7 +99,7 @@ export class DatabaseController {
   async ping() {
     try {
       await this.databaseService.testConnection();
-      
+
       return {
         statusCode: HttpStatus.OK,
         message: 'Database ping successful',
@@ -173,4 +181,3 @@ export class DatabaseController {
     }
   }
 }
-

@@ -30,4 +30,4 @@ import { PatientModule } from '../patient/patient.module';
   providers: [AppointmentService],
   exports: [AppointmentService],
 })
-export class AppointmentModule {} 
+export class AppointmentModule {}

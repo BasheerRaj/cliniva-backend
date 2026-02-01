@@ -32,4 +32,4 @@ import { SubscriptionModule } from '../subscription/subscription.module';
   providers: [EmployeeService],
   exports: [EmployeeService],
 })
-export class EmployeeModule {} 
+export class EmployeeModule {}

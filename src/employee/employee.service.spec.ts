@@ -1,5 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { getModelToken } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { EmployeeService } from './employee.service';
@@ -91,72 +95,87 @@ describe('EmployeeService', () => {
   describe('validateSingleComplexAssignment', () => {
     it('should pass validation when all clinics belong to same complex', async () => {
       const complexId = '507f1f77bcf86cd799439011';
-      const clinicIds = ['507f1f77bcf86cd799439012', '507f1f77bcf86cd799439013'];
-      
+      const clinicIds = [
+        '507f1f77bcf86cd799439012',
+        '507f1f77bcf86cd799439013',
+      ];
+
       const mockClinics = [
         { _id: clinicIds[0], complexId: new Types.ObjectId(complexId) },
-        { _id: clinicIds[1], complexId: new Types.ObjectId(complexId) }
+        { _id: clinicIds[1], complexId: new Types.ObjectId(complexId) },
       ];
 
       // Mock the clinic query
       clinicModel.find.mockReturnValue({
-        select: jest.fn().mockResolvedValue(mockClinics)
+        select: jest.fn().mockResolvedValue(mockClinics),
       } as any);
 
       const employeeDto = {
         complexId,
-        clinicIds
+        clinicIds,
       };
 
       // Should not throw
       await expect(
-        service['validateSingleComplexAssignment'](employeeDto)
+        service['validateSingleComplexAssignment'](employeeDto),
       ).resolves.not.toThrow();
     });
 
     it('should throw BadRequestException when clinics belong to different complexes', async () => {
       const complexId = '507f1f77bcf86cd799439011';
       const differentComplexId = '507f1f77bcf86cd799439014';
-      const clinicIds = ['507f1f77bcf86cd799439012', '507f1f77bcf86cd799439013'];
-      
+      const clinicIds = [
+        '507f1f77bcf86cd799439012',
+        '507f1f77bcf86cd799439013',
+      ];
+
       const mockClinics = [
         { _id: clinicIds[0], complexId: new Types.ObjectId(complexId) },
-        { _id: clinicIds[1], complexId: new Types.ObjectId(differentComplexId) }
+        {
+          _id: clinicIds[1],
+          complexId: new Types.ObjectId(differentComplexId),
+        },
       ];
 
       // Mock the clinic query
       clinicModel.find.mockReturnValue({
-        select: jest.fn().mockResolvedValue(mockClinics)
+        select: jest.fn().mockResolvedValue(mockClinics),
       } as any);
 
       const employeeDto = {
         complexId,
-        clinicIds
+        clinicIds,
       };
 
       // Should throw BadRequestException
       await expect(
-        service['validateSingleComplexAssignment'](employeeDto)
+        service['validateSingleComplexAssignment'](employeeDto),
       ).rejects.toThrow(BadRequestException);
     });
 
     it('should throw with correct error message for different complexes', async () => {
       const complexId = '507f1f77bcf86cd799439011';
       const differentComplexId = '507f1f77bcf86cd799439014';
-      const clinicIds = ['507f1f77bcf86cd799439012', '507f1f77bcf86cd799439013'];
-      
+      const clinicIds = [
+        '507f1f77bcf86cd799439012',
+        '507f1f77bcf86cd799439013',
+      ];
+
       const mockClinics = [
         { _id: clinicIds[0], complexId: new Types.ObjectId(complexId) },
-        { _id: clinicIds[1], complexId: new Types.ObjectId(differentComplexId) }
+        {
+          _id: clinicIds[1],
+          complexId: new Types.ObjectId(differentComplexId),
+        },
       ];
 
       clinicModel.find.mockReturnValue({
-        select: jest.fn().mockResolvedValue(mockClinics)
+        select: jest.fn().mockResolvedValue(mockClinics),
       } as any);
 
       const employeeDto = {
         complexId,
-        clinicIds
+        clinicIds,
       };
 
       try {
@@ -164,19 +183,21 @@ describe('EmployeeService', () => {
         fail('Should have thrown BadRequestException');
       } catch (error) {
         expect(error).toBeInstanceOf(BadRequestException);
-        expect(error.response.message).toEqual(ERROR_MESSAGES.CLINICS_DIFFERENT_COMPLEXES);
+        expect(error.response.message).toEqual(
+          ERROR_MESSAGES.CLINICS_DIFFERENT_COMPLEXES,
+        );
         expect(error.response.code).toBe('CLINICS_DIFFERENT_COMPLEXES');
       }
     });
 
     it('should skip validation when no complexId provided', async () => {
       const employeeDto = {
-        clinicIds: ['507f1f77bcf86cd799439012']
+        clinicIds: ['507f1f77bcf86cd799439012'],
       };
 
       // Should not throw and should not query clinics
       await expect(
-        service['validateSingleComplexAssignment'](employeeDto)
+        service['validateSingleComplexAssignment'](employeeDto),
       ).resolves.not.toThrow();
 
       expect(clinicModel.find).not.toHaveBeenCalled();
@@ -184,12 +205,12 @@ describe('EmployeeService', () => {
 
     it('should skip validation when no clinicIds provided', async () => {
       const employeeDto = {
-        complexId: '507f1f77bcf86cd799439011'
+        complexId: '507f1f77bcf86cd799439011',
       };
 
       // Should not throw and should not query clinics
       await expect(
-        service['validateSingleComplexAssignment'](employeeDto)
+        service['validateSingleComplexAssignment'](employeeDto),
       ).resolves.not.toThrow();
 
       expect(clinicModel.find).not.toHaveBeenCalled();
@@ -198,12 +219,12 @@ describe('EmployeeService', () => {
     it('should skip validation when clinicIds is empty array', async () => {
       const employeeDto = {
         complexId: '507f1f77bcf86cd799439011',
-        clinicIds: []
+        clinicIds: [],
       };
 
       // Should not throw and should not query clinics
       await expect(
-        service['validateSingleComplexAssignment'](employeeDto)
+        service['validateSingleComplexAssignment'](employeeDto),
       ).resolves.not.toThrow();
 
       expect(clinicModel.find).not.toHaveBeenCalled();
@@ -220,54 +241,57 @@ describe('EmployeeService', () => {
         const employeeDto = { complexId };
         const subscription = {
           planType: 'complex',
-          complexId: new Types.ObjectId(complexId)
+          complexId: new Types.ObjectId(complexId),
         };
 
         // Should not throw
         await expect(
-          service['validatePlanBasedAssignment'](employeeDto, subscription)
+          service['validatePlanBasedAssignment'](employeeDto, subscription),
         ).resolves.not.toThrow();
       });
 
       it('should throw BadRequestException when complex does not match subscription', async () => {
         const employeeComplexId = '507f1f77bcf86cd799439011';
         const subscriptionComplexId = '507f1f77bcf86cd799439012';
-        
+
         const employeeDto = { complexId: employeeComplexId };
         const subscription = {
           planType: 'complex',
-          complexId: new Types.ObjectId(subscriptionComplexId)
+          complexId: new Types.ObjectId(subscriptionComplexId),
         };
 
         // Should throw BadRequestException
         await expect(
-          service['validatePlanBasedAssignment'](employeeDto, subscription)
+          service['validatePlanBasedAssignment'](employeeDto, subscription),
         ).rejects.toThrow(BadRequestException);
       });
 
       it('should throw with correct error message for complex mismatch', async () => {
         const employeeComplexId = '507f1f77bcf86cd799439011';
         const subscriptionComplexId = '507f1f77bcf86cd799439012';
-        
+
         const employeeDto = { complexId: employeeComplexId };
         const subscription = {
           planType: 'complex',
-          complexId: new Types.ObjectId(subscriptionComplexId)
+          complexId: new Types.ObjectId(subscriptionComplexId),
         };
 
         try {
-          await service['validatePlanBasedAssignment'](employeeDto, subscription);
+          await service['validatePlanBasedAssignment'](
+            employeeDto,
+            subscription,
+          );
           fail('Should have thrown BadRequestException');
         } catch (error) {
           expect(error).toBeInstanceOf(BadRequestException);
           expect(error.response.message).toEqual({
             ar: 'يجب أن يتطابق المجمع مع اشتراكك',
-            en: 'Complex must match your subscription'
+            en: 'Complex must match your subscription',
           });
           expect(error.response.code).toBe('COMPLEX_MISMATCH');
           expect(error.response.details).toEqual({
             subscriptionComplexId: subscription.complexId,
-            providedComplexId: employeeComplexId
+            providedComplexId: employeeComplexId,
           });
         }
       });
@@ -276,12 +300,12 @@ describe('EmployeeService', () => {
         const employeeDto = {};
         const subscription = {
           planType: 'complex',
-          complexId: new Types.ObjectId('507f1f77bcf86cd799439011')
+          complexId: new Types.ObjectId('507f1f77bcf86cd799439011'),
         };
 
         // Should not throw
         await expect(
-          service['validatePlanBasedAssignment'](employeeDto, subscription)
+          service['validatePlanBasedAssignment'](employeeDto, subscription),
         ).resolves.not.toThrow();
       });
     });
@@ -292,54 +316,57 @@ describe('EmployeeService', () => {
         const employeeDto = { clinicId };
         const subscription = {
           planType: 'clinic',
-          clinicId: new Types.ObjectId(clinicId)
+          clinicId: new Types.ObjectId(clinicId),
         };
 
         // Should not throw
         await expect(
-          service['validatePlanBasedAssignment'](employeeDto, subscription)
+          service['validatePlanBasedAssignment'](employeeDto, subscription),
         ).resolves.not.toThrow();
       });
 
       it('should throw BadRequestException when clinic does not match subscription', async () => {
         const employeeClinicId = '507f1f77bcf86cd799439011';
         const subscriptionClinicId = '507f1f77bcf86cd799439012';
-        
+
         const employeeDto = { clinicId: employeeClinicId };
         const subscription = {
           planType: 'clinic',
-          clinicId: new Types.ObjectId(subscriptionClinicId)
+          clinicId: new Types.ObjectId(subscriptionClinicId),
         };
 
         // Should throw BadRequestException
         await expect(
-          service['validatePlanBasedAssignment'](employeeDto, subscription)
+          service['validatePlanBasedAssignment'](employeeDto, subscription),
         ).rejects.toThrow(BadRequestException);
       });
 
       it('should throw with correct error message for clinic mismatch', async () => {
         const employeeClinicId = '507f1f77bcf86cd799439011';
         const subscriptionClinicId = '507f1f77bcf86cd799439012';
-        
+
         const employeeDto = { clinicId: employeeClinicId };
         const subscription = {
           planType: 'clinic',
-          clinicId: new Types.ObjectId(subscriptionClinicId)
+          clinicId: new Types.ObjectId(subscriptionClinicId),
         };
 
         try {
-          await service['validatePlanBasedAssignment'](employeeDto, subscription);
+          await service['validatePlanBasedAssignment'](
+            employeeDto,
+            subscription,
+          );
           fail('Should have thrown BadRequestException');
         } catch (error) {
           expect(error).toBeInstanceOf(BadRequestException);
           expect(error.response.message).toEqual({
             ar: 'يجب أن تتطابق العيادة مع اشتراكك',
-            en: 'Clinic must match your subscription'
+            en: 'Clinic must match your subscription',
           });
           expect(error.response.code).toBe('CLINIC_MISMATCH');
           expect(error.response.details).toEqual({
             subscriptionClinicId: subscription.clinicId,
-            providedClinicId: employeeClinicId
+            providedClinicId: employeeClinicId,
           });
         }
       });
@@ -348,12 +375,12 @@ describe('EmployeeService', () => {
         const employeeDto = {};
         const subscription = {
           planType: 'clinic',
-          clinicId: new Types.ObjectId('507f1f77bcf86cd799439011')
+          clinicId: new Types.ObjectId('507f1f77bcf86cd799439011'),
         };
 
         // Should not throw
         await expect(
-          service['validatePlanBasedAssignment'](employeeDto, subscription)
+          service['validatePlanBasedAssignment'](employeeDto, subscription),
         ).resolves.not.toThrow();
       });
     });
@@ -363,12 +390,12 @@ describe('EmployeeService', () => {
         const employeeDto = { complexId: '507f1f77bcf86cd799439011' };
         const subscription = {
           planType: 'company',
-          organizationId: new Types.ObjectId('507f1f77bcf86cd799439020')
+          organizationId: new Types.ObjectId('507f1f77bcf86cd799439020'),
         };
 
         // Should not throw - company plan has no restrictions
         await expect(
-          service['validatePlanBasedAssignment'](employeeDto, subscription)
+          service['validatePlanBasedAssignment'](employeeDto, subscription),
         ).resolves.not.toThrow();
       });
 
@@ -376,12 +403,12 @@ describe('EmployeeService', () => {
         const employeeDto = { clinicId: '507f1f77bcf86cd799439011' };
         const subscription = {
           planType: 'company',
-          organizationId: new Types.ObjectId('507f1f77bcf86cd799439020')
+          organizationId: new Types.ObjectId('507f1f77bcf86cd799439020'),
         };
 
         // Should not throw - company plan has no restrictions
         await expect(
-          service['validatePlanBasedAssignment'](employeeDto, subscription)
+          service['validatePlanBasedAssignment'](employeeDto, subscription),
         ).resolves.not.toThrow();
       });
     });
@@ -396,23 +423,36 @@ describe('EmployeeService', () => {
     const mockEmployee = {
       _id: employeeId,
       email: 'employee@test.com',
-      isActive: true
+      isActive: true,
     };
 
     it('should successfully delete employee when not self-deletion', async () => {
       // Mock ValidationUtil.validateEntityExists
-      jest.spyOn(ValidationUtil, 'validateEntityExists').mockResolvedValue(mockEmployee);
-      
+      jest
+        .spyOn(ValidationUtil, 'validateEntityExists')
+        .mockResolvedValue(mockEmployee);
+
       // Mock ValidationUtil.validateNotSelfModification (should not throw)
-      jest.spyOn(ValidationUtil, 'validateNotSelfModification').mockImplementation(() => {});
+      jest
+        .spyOn(ValidationUtil, 'validateNotSelfModification')
+        .mockImplementation(() => {});
 
       // Mock database updates
-      userModel.findByIdAndUpdate.mockResolvedValue({ ...mockEmployee, isActive: false });
-      employeeProfileModel.findOneAndUpdate.mockResolvedValue({ isActive: false });
+      userModel.findByIdAndUpdate.mockResolvedValue({
+        ...mockEmployee,
+        isActive: false,
+      });
+      employeeProfileModel.findOneAndUpdate.mockResolvedValue({
+        isActive: false,
+      });
       employeeShiftModel.updateMany.mockResolvedValue({ modifiedCount: 2 });
 
       // Mock ResponseBuilder
-      const mockResponse = { success: true, data: null, message: ERROR_MESSAGES.EMPLOYEE_DELETED };
+      const mockResponse = {
+        success: true,
+        data: null,
+        message: ERROR_MESSAGES.EMPLOYEE_DELETED,
+      };
       jest.spyOn(ResponseBuilder, 'success').mockReturnValue(mockResponse);
 
       const result = await service.deleteEmployee(employeeId, deletedByUserId);
@@ -421,32 +461,31 @@ describe('EmployeeService', () => {
       expect(ValidationUtil.validateEntityExists).toHaveBeenCalledWith(
         userModel,
         employeeId,
-        ERROR_MESSAGES.EMPLOYEE_NOT_FOUND
+        ERROR_MESSAGES.EMPLOYEE_NOT_FOUND,
       );
       expect(ValidationUtil.validateNotSelfModification).toHaveBeenCalledWith(
         employeeId,
         deletedByUserId,
-        'delete'
+        'delete',
       );
 
       // Verify database updates
-      expect(userModel.findByIdAndUpdate).toHaveBeenCalledWith(
-        employeeId,
-        { $set: { isActive: false } }
-      );
+      expect(userModel.findByIdAndUpdate).toHaveBeenCalledWith(employeeId, {
+        $set: { isActive: false },
+      });
       expect(employeeProfileModel.findOneAndUpdate).toHaveBeenCalledWith(
         { userId: new Types.ObjectId(employeeId) },
-        { $set: { isActive: false } }
+        { $set: { isActive: false } },
       );
       expect(employeeShiftModel.updateMany).toHaveBeenCalledWith(
         { userId: new Types.ObjectId(employeeId) },
-        { $set: { isActive: false } }
+        { $set: { isActive: false } },
       );
 
       // Verify response
       expect(ResponseBuilder.success).toHaveBeenCalledWith(
         null,
-        ERROR_MESSAGES.EMPLOYEE_DELETED
+        ERROR_MESSAGES.EMPLOYEE_DELETED,
       );
       expect(result).toEqual(mockResponse);
     });
@@ -455,27 +494,31 @@ describe('EmployeeService', () => {
       const sameUserId = '507f1f77bcf86cd799439011';
 
       // Mock ValidationUtil.validateEntityExists
-      jest.spyOn(ValidationUtil, 'validateEntityExists').mockResolvedValue(mockEmployee);
-      
+      jest
+        .spyOn(ValidationUtil, 'validateEntityExists')
+        .mockResolvedValue(mockEmployee);
+
       // Mock ValidationUtil.validateNotSelfModification to throw
-      jest.spyOn(ValidationUtil, 'validateNotSelfModification').mockImplementation(() => {
-        throw new ForbiddenException({
-          message: ERROR_MESSAGES.CANNOT_DELETE_SELF,
-          code: 'SELF_MODIFICATION_FORBIDDEN',
-          details: { action: 'delete', userId: sameUserId }
+      jest
+        .spyOn(ValidationUtil, 'validateNotSelfModification')
+        .mockImplementation(() => {
+          throw new ForbiddenException({
+            message: ERROR_MESSAGES.CANNOT_DELETE_SELF,
+            code: 'SELF_MODIFICATION_FORBIDDEN',
+            details: { action: 'delete', userId: sameUserId },
+          });
         });
-      });
 
       // Should throw ForbiddenException
       await expect(
-        service.deleteEmployee(sameUserId, sameUserId)
+        service.deleteEmployee(sameUserId, sameUserId),
       ).rejects.toThrow(ForbiddenException);
 
       // Verify validation was called
       expect(ValidationUtil.validateNotSelfModification).toHaveBeenCalledWith(
         sameUserId,
         sameUserId,
-        'delete'
+        'delete',
       );
 
       // Verify database was not updated
@@ -492,20 +535,20 @@ describe('EmployeeService', () => {
         new NotFoundException({
           message: ERROR_MESSAGES.EMPLOYEE_NOT_FOUND,
           code: 'ENTITY_NOT_FOUND',
-          details: { id: nonExistentId }
-        })
+          details: { id: nonExistentId },
+        }),
       );
 
       // Should throw NotFoundException
       await expect(
-        service.deleteEmployee(nonExistentId, deletedByUserId)
+        service.deleteEmployee(nonExistentId, deletedByUserId),
       ).rejects.toThrow(NotFoundException);
 
       // Verify validation was called
       expect(ValidationUtil.validateEntityExists).toHaveBeenCalledWith(
         userModel,
         nonExistentId,
-        ERROR_MESSAGES.EMPLOYEE_NOT_FOUND
+        ERROR_MESSAGES.EMPLOYEE_NOT_FOUND,
       );
 
       // Verify database was not updated
@@ -514,18 +557,31 @@ describe('EmployeeService', () => {
 
     it('should work without deletedByUserId parameter', async () => {
       // Mock ValidationUtil.validateEntityExists
-      jest.spyOn(ValidationUtil, 'validateEntityExists').mockResolvedValue(mockEmployee);
-      
+      jest
+        .spyOn(ValidationUtil, 'validateEntityExists')
+        .mockResolvedValue(mockEmployee);
+
       // Mock ValidationUtil.validateNotSelfModification (should not be called)
-      jest.spyOn(ValidationUtil, 'validateNotSelfModification').mockImplementation(() => {});
+      jest
+        .spyOn(ValidationUtil, 'validateNotSelfModification')
+        .mockImplementation(() => {});
 
       // Mock database updates
-      userModel.findByIdAndUpdate.mockResolvedValue({ ...mockEmployee, isActive: false });
-      employeeProfileModel.findOneAndUpdate.mockResolvedValue({ isActive: false });
+      userModel.findByIdAndUpdate.mockResolvedValue({
+        ...mockEmployee,
+        isActive: false,
+      });
+      employeeProfileModel.findOneAndUpdate.mockResolvedValue({
+        isActive: false,
+      });
       employeeShiftModel.updateMany.mockResolvedValue({ modifiedCount: 0 });
 
       // Mock ResponseBuilder
-      const mockResponse = { success: true, data: null, message: ERROR_MESSAGES.EMPLOYEE_DELETED };
+      const mockResponse = {
+        success: true,
+        data: null,
+        message: ERROR_MESSAGES.EMPLOYEE_DELETED,
+      };
       jest.spyOn(ResponseBuilder, 'success').mockReturnValue(mockResponse);
 
       const result = await service.deleteEmployee(employeeId);
@@ -554,7 +610,7 @@ describe('EmployeeService', () => {
         phone: '1234567890',
         employeeNumber: 'EMP20240001',
         jobTitle: 'Senior Doctor',
-        profilePictureUrl: 'http://example.com/pic1.jpg'
+        profilePictureUrl: 'http://example.com/pic1.jpg',
       },
       {
         _id: '507f1f77bcf86cd799439012',
@@ -565,14 +621,14 @@ describe('EmployeeService', () => {
         phone: '0987654321',
         employeeNumber: 'EMP20240002',
         jobTitle: 'Head Nurse',
-        profilePictureUrl: 'http://example.com/pic2.jpg'
-      }
+        profilePictureUrl: 'http://example.com/pic2.jpg',
+      },
     ];
 
     it('should return only active employees', async () => {
       // Mock aggregate pipeline
       userModel.aggregate.mockReturnValue({
-        exec: jest.fn().mockResolvedValue(mockActiveEmployees)
+        exec: jest.fn().mockResolvedValue(mockActiveEmployees),
       } as any);
 
       // Mock ResponseBuilder
@@ -583,13 +639,13 @@ describe('EmployeeService', () => {
 
       // Verify aggregate was called
       expect(userModel.aggregate).toHaveBeenCalled();
-      
+
       // Verify the pipeline includes active filter
       const pipeline = userModel.aggregate.mock.calls[0][0];
       const matchStage = pipeline.find((stage: any) => stage.$match);
       expect(matchStage.$match).toEqual({
         isActive: true,
-        'employeeProfile.isActive': true
+        'employeeProfile.isActive': true,
       });
 
       // Verify response
@@ -599,9 +655,9 @@ describe('EmployeeService', () => {
 
     it('should filter by role when provided', async () => {
       const filteredEmployees = [mockActiveEmployees[0]]; // Only doctor
-      
+
       userModel.aggregate.mockReturnValue({
-        exec: jest.fn().mockResolvedValue(filteredEmployees)
+        exec: jest.fn().mockResolvedValue(filteredEmployees),
       } as any);
 
       const mockResponse = { success: true, data: filteredEmployees };
@@ -611,11 +667,11 @@ describe('EmployeeService', () => {
 
       // Verify aggregate was called
       expect(userModel.aggregate).toHaveBeenCalled();
-      
+
       // Verify the pipeline includes role filter
       const pipeline = userModel.aggregate.mock.calls[0][0];
-      const roleMatchStage = pipeline.find((stage: any) => 
-        stage.$match && stage.$match.role
+      const roleMatchStage = pipeline.find(
+        (stage: any) => stage.$match && stage.$match.role,
       );
       expect(roleMatchStage.$match.role).toBe('doctor');
 
@@ -624,9 +680,9 @@ describe('EmployeeService', () => {
 
     it('should filter by complexId when provided', async () => {
       const complexId = '507f1f77bcf86cd799439020';
-      
+
       userModel.aggregate.mockReturnValue({
-        exec: jest.fn().mockResolvedValue(mockActiveEmployees)
+        exec: jest.fn().mockResolvedValue(mockActiveEmployees),
       } as any);
 
       const mockResponse = { success: true, data: mockActiveEmployees };
@@ -636,20 +692,22 @@ describe('EmployeeService', () => {
 
       // Verify aggregate was called
       expect(userModel.aggregate).toHaveBeenCalled();
-      
+
       // Verify the pipeline includes complexId filter
       const pipeline = userModel.aggregate.mock.calls[0][0];
-      const complexMatchStage = pipeline.find((stage: any) => 
-        stage.$match && stage.$match.complexId
+      const complexMatchStage = pipeline.find(
+        (stage: any) => stage.$match && stage.$match.complexId,
       );
-      expect(complexMatchStage.$match.complexId).toEqual(new Types.ObjectId(complexId));
+      expect(complexMatchStage.$match.complexId).toEqual(
+        new Types.ObjectId(complexId),
+      );
     });
 
     it('should filter by clinicId when provided', async () => {
       const clinicId = '507f1f77bcf86cd799439030';
-      
+
       userModel.aggregate.mockReturnValue({
-        exec: jest.fn().mockResolvedValue(mockActiveEmployees)
+        exec: jest.fn().mockResolvedValue(mockActiveEmployees),
       } as any);
 
       const mockResponse = { success: true, data: mockActiveEmployees };
@@ -659,21 +717,23 @@ describe('EmployeeService', () => {
 
       // Verify aggregate was called
       expect(userModel.aggregate).toHaveBeenCalled();
-      
+
       // Verify the pipeline includes clinicId filter
       const pipeline = userModel.aggregate.mock.calls[0][0];
-      const clinicMatchStage = pipeline.find((stage: any) => 
-        stage.$match && stage.$match.clinicId
+      const clinicMatchStage = pipeline.find(
+        (stage: any) => stage.$match && stage.$match.clinicId,
       );
-      expect(clinicMatchStage.$match.clinicId).toEqual(new Types.ObjectId(clinicId));
+      expect(clinicMatchStage.$match.clinicId).toEqual(
+        new Types.ObjectId(clinicId),
+      );
     });
 
     it('should apply multiple filters simultaneously', async () => {
       const complexId = '507f1f77bcf86cd799439020';
       const role = 'doctor';
-      
+
       userModel.aggregate.mockReturnValue({
-        exec: jest.fn().mockResolvedValue([mockActiveEmployees[0]])
+        exec: jest.fn().mockResolvedValue([mockActiveEmployees[0]]),
       } as any);
 
       const mockResponse = { success: true, data: [mockActiveEmployees[0]] };
@@ -683,18 +743,19 @@ describe('EmployeeService', () => {
 
       // Verify aggregate was called
       expect(userModel.aggregate).toHaveBeenCalled();
-      
+
       // Verify the pipeline includes both filters
       const pipeline = userModel.aggregate.mock.calls[0][0];
-      const filterMatchStage = pipeline.find((stage: any) => 
-        stage.$match && (stage.$match.role || stage.$match.complexId)
+      const filterMatchStage = pipeline.find(
+        (stage: any) =>
+          stage.$match && (stage.$match.role || stage.$match.complexId),
       );
       expect(filterMatchStage).toBeDefined();
     });
 
     it('should return empty array when no active employees found', async () => {
       userModel.aggregate.mockReturnValue({
-        exec: jest.fn().mockResolvedValue([])
+        exec: jest.fn().mockResolvedValue([]),
       } as any);
 
       const mockResponse = { success: true, data: [] };
@@ -708,7 +769,7 @@ describe('EmployeeService', () => {
 
     it('should include employee profile fields in projection', async () => {
       userModel.aggregate.mockReturnValue({
-        exec: jest.fn().mockResolvedValue(mockActiveEmployees)
+        exec: jest.fn().mockResolvedValue(mockActiveEmployees),
       } as any);
 
       const mockResponse = { success: true, data: mockActiveEmployees };
@@ -719,7 +780,7 @@ describe('EmployeeService', () => {
       // Verify the pipeline includes projection stage
       const pipeline = userModel.aggregate.mock.calls[0][0];
       const projectStage = pipeline.find((stage: any) => stage.$project);
-      
+
       expect(projectStage).toBeDefined();
       expect(projectStage.$project).toHaveProperty('employeeNumber');
       expect(projectStage.$project).toHaveProperty('jobTitle');
@@ -728,7 +789,7 @@ describe('EmployeeService', () => {
 
     it('should sort results by name', async () => {
       userModel.aggregate.mockReturnValue({
-        exec: jest.fn().mockResolvedValue(mockActiveEmployees)
+        exec: jest.fn().mockResolvedValue(mockActiveEmployees),
       } as any);
 
       const mockResponse = { success: true, data: mockActiveEmployees };
@@ -739,7 +800,7 @@ describe('EmployeeService', () => {
       // Verify the pipeline includes sort stage
       const pipeline = userModel.aggregate.mock.calls[0][0];
       const sortStage = pipeline.find((stage: any) => stage.$sort);
-      
+
       expect(sortStage).toBeDefined();
       expect(sortStage.$sort).toEqual({ firstName: 1, lastName: 1 });
     });
@@ -747,7 +808,7 @@ describe('EmployeeService', () => {
     it('should exclude inactive users from results', async () => {
       // This test verifies that the aggregation pipeline filters out inactive users
       userModel.aggregate.mockReturnValue({
-        exec: jest.fn().mockResolvedValue(mockActiveEmployees)
+        exec: jest.fn().mockResolvedValue(mockActiveEmployees),
       } as any);
 
       const mockResponse = { success: true, data: mockActiveEmployees };
@@ -757,10 +818,10 @@ describe('EmployeeService', () => {
 
       // Verify the pipeline has the correct match stage for active users
       const pipeline = userModel.aggregate.mock.calls[0][0];
-      const matchStage = pipeline.find((stage: any) => 
-        stage.$match && stage.$match.isActive !== undefined
+      const matchStage = pipeline.find(
+        (stage: any) => stage.$match && stage.$match.isActive !== undefined,
       );
-      
+
       expect(matchStage.$match.isActive).toBe(true);
       expect(matchStage.$match['employeeProfile.isActive']).toBe(true);
     });

@@ -1,4 +1,9 @@
-import { Injectable, ExecutionContext, UnauthorizedException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  ExecutionContext,
+  UnauthorizedException,
+  Logger,
+} from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { Observable } from 'rxjs';
 import { InjectModel } from '@nestjs/mongoose';
@@ -17,8 +22,10 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
 
   constructor(
     @InjectModel(User.name) private readonly userModel: Model<User>,
-    @InjectModel(Subscription.name) private readonly subscriptionModel: Model<Subscription>,
-    @InjectModel(SubscriptionPlan.name) private readonly subscriptionPlanModel: Model<SubscriptionPlan>,
+    @InjectModel(Subscription.name)
+    private readonly subscriptionModel: Model<Subscription>,
+    @InjectModel(SubscriptionPlan.name)
+    private readonly subscriptionPlanModel: Model<SubscriptionPlan>,
     private readonly sessionService: SessionService,
     private readonly tokenService: TokenService,
   ) {
@@ -28,11 +35,11 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     try {
       const request = context.switchToHttp().getRequest();
-      
+
       // Step 1: Extract token from request header
       const authHeader = request.headers.authorization;
       const token = this.tokenService.extractTokenFromHeader(authHeader);
-      
+
       if (!token) {
         this.logger.warn('No token found in authorization header');
         throw new UnauthorizedException({
@@ -45,10 +52,13 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
       const tokenHash = this.tokenService.hashToken(token);
 
       // Step 3: Check if token is blacklisted
-      const isBlacklisted = await this.sessionService.isTokenBlacklisted(tokenHash);
-      
+      const isBlacklisted =
+        await this.sessionService.isTokenBlacklisted(tokenHash);
+
       if (isBlacklisted) {
-        this.logger.warn(`Blacklisted token attempted: ${tokenHash.substring(0, 10)}...`);
+        this.logger.warn(
+          `Blacklisted token attempted: ${tokenHash.substring(0, 10)}...`,
+        );
         throw new UnauthorizedException({
           message: AUTH_ERROR_MESSAGES[AuthErrorCode.TOKEN_BLACKLISTED],
           code: AuthErrorCode.TOKEN_BLACKLISTED,
@@ -57,21 +67,23 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
 
       // Step 4: If not blacklisted, proceed with normal JWT validation
       const result = await super.canActivate(context);
-      
+
       if (!result) {
         this.logger.warn('JWT authentication failed');
         return false;
       }
 
-      this.logger.debug(`JWT authentication successful for user: ${request.user?.id}`);
-      
+      this.logger.debug(
+        `JWT authentication successful for user: ${request.user?.id}`,
+      );
+
       return true;
     } catch (error) {
       // If it's already an UnauthorizedException, re-throw it
       if (error instanceof UnauthorizedException) {
         throw error;
       }
-      
+
       // For other errors, log and throw generic authentication error
       this.logger.error(`JWT Auth Guard error: ${error.message}`, error.stack);
       throw new UnauthorizedException({
@@ -207,11 +219,8 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     return request.user?.isSetupComplete || false;
   }
 
-  // Helper method to check onboarding completion status  
+  // Helper method to check onboarding completion status
   static isOnboardingComplete(request: any): boolean {
     return request.user?.isOnboardingComplete || false;
   }
 }
-
-
-

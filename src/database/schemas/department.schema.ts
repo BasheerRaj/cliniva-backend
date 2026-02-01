@@ -3,7 +3,7 @@ import { Document } from 'mongoose';
 
 @Schema({
   timestamps: true,
-  collection: 'departments'
+  collection: 'departments',
 })
 export class Department extends Document {
   @Prop({ required: true, unique: true })

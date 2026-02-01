@@ -1,7 +1,7 @@
-import { 
-  IsString, 
-  IsNotEmpty, 
-  IsOptional, 
+import {
+  IsString,
+  IsNotEmpty,
+  IsOptional,
   IsBoolean,
   IsMongoId,
   Length,
@@ -10,7 +10,7 @@ import {
   IsEnum,
   IsNumber,
   Min,
-  Max
+  Max,
 } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
 
@@ -213,7 +213,15 @@ export class MedicalReportTemplateDto {
   @Length(0, 1000)
   followUpInstructionsTemplate?: string;
 
-  @IsEnum(['general', 'cardiology', 'dermatology', 'pediatrics', 'orthopedics', 'neurology', 'other'])
+  @IsEnum([
+    'general',
+    'cardiology',
+    'dermatology',
+    'pediatrics',
+    'orthopedics',
+    'neurology',
+    'other',
+  ])
   @IsOptional()
   specialty?: string;
 
@@ -284,7 +292,7 @@ export class MedicalReportResponseDto {
   createdAt: Date;
   updatedAt: Date;
   deletedAt?: Date;
-  
+
   // Populated fields (optional)
   appointment?: {
     _id: string;
@@ -421,4 +429,4 @@ export class MedicalReportFilterDto {
   @IsString()
   @IsOptional()
   dateRange?: string; // 'today', 'week', 'month', 'quarter', 'year'
-} 
+}

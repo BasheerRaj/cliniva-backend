@@ -24,7 +24,10 @@ export interface EntityStructure {
 
 @Injectable()
 export class EntityRelationshipUtil {
-  static validateEntityHierarchy(planType: string, entities: EntityHierarchy): boolean {
+  static validateEntityHierarchy(
+    planType: string,
+    entities: EntityHierarchy,
+  ): boolean {
     switch (planType.toLowerCase()) {
       case 'company':
         return this.validateCompanyPlanHierarchy(entities);
@@ -37,30 +40,37 @@ export class EntityRelationshipUtil {
     }
   }
 
-  private static validateCompanyPlanHierarchy(entities: EntityHierarchy): boolean {
+  private static validateCompanyPlanHierarchy(
+    entities: EntityHierarchy,
+  ): boolean {
     // Company plan: Must have organization, can have multiple complexes and clinics
     if (!entities.organization) return false;
-    
+
     // If complexes exist, they should have departments
     if (entities.complexes && entities.complexes.length > 0) {
       return !!(entities.departments && entities.departments.length > 0);
     }
-    
+
     return true;
   }
 
-  private static validateComplexPlanHierarchy(entities: EntityHierarchy): boolean {
+  private static validateComplexPlanHierarchy(
+    entities: EntityHierarchy,
+  ): boolean {
     // Complex plan: Must have at least one complex, departments, and can have clinics
     if (!entities.complexes || entities.complexes.length === 0) return false;
-    if (!entities.departments || entities.departments.length === 0) return false;
-    
+    if (!entities.departments || entities.departments.length === 0)
+      return false;
+
     return true;
   }
 
-  private static validateClinicPlanHierarchy(entities: EntityHierarchy): boolean {
+  private static validateClinicPlanHierarchy(
+    entities: EntityHierarchy,
+  ): boolean {
     // Clinic plan: Must have at least one clinic
     if (!entities.clinics || entities.clinics.length === 0) return false;
-    
+
     return true;
   }
 
@@ -68,13 +78,16 @@ export class EntityRelationshipUtil {
     const entityRequirements = {
       company: ['organization'],
       complex: ['complex', 'department'],
-      clinic: ['clinic']
+      clinic: ['clinic'],
     };
 
     return entityRequirements[planType.toLowerCase()] || [];
   }
 
-  static validateEntityDependencies(entityType: string, dependencies: any[]): boolean {
+  static validateEntityDependencies(
+    entityType: string,
+    dependencies: any[],
+  ): boolean {
     const dependencyRules = {
       organization: [], // No dependencies
       complex: ['subscription'], // Can optionally depend on organization
@@ -86,22 +99,25 @@ export class EntityRelationshipUtil {
       workingHours: ['entity'], // Depends on any entity (organization, complex, clinic)
       contact: ['entity'], // Depends on any entity
       dynamicInfo: ['entity'], // Depends on any entity
-      userAccess: ['user', 'entity'] // Depends on user and entity
+      userAccess: ['user', 'entity'], // Depends on user and entity
     };
 
     const requiredDependencies = dependencyRules[entityType] || [];
-    
+
     // Check if all required dependencies are provided
-    return requiredDependencies.every(dep => {
+    return requiredDependencies.every((dep) => {
       if (dep === 'entity') {
         // For supporting entities, any entity ID is acceptable
-        return dependencies.some(d => d && typeof d === 'string');
+        return dependencies.some((d) => d && typeof d === 'string');
       }
-      return dependencies.some(d => d && d.type === dep);
+      return dependencies.some((d) => d && d.type === dep);
     });
   }
 
-  static generateEntityStructure(planType: string, inputData: any): EntityStructure {
+  static generateEntityStructure(
+    planType: string,
+    inputData: any,
+  ): EntityStructure {
     const structure: EntityStructure = {
       planType: planType.toLowerCase(),
       entities: {
@@ -111,8 +127,8 @@ export class EntityRelationshipUtil {
         services: [],
         workingHours: [],
         contacts: [],
-        dynamicInfo: []
-      }
+        dynamicInfo: [],
+      },
     };
 
     switch (planType.toLowerCase()) {
@@ -122,13 +138,15 @@ export class EntityRelationshipUtil {
         structure.entities.departments = inputData.departments || [];
         structure.entities.clinics = inputData.clinics || [];
         break;
-        
+
       case 'complex':
-        structure.entities.complexes = inputData.complexes || [inputData.complex];
+        structure.entities.complexes = inputData.complexes || [
+          inputData.complex,
+        ];
         structure.entities.departments = inputData.departments || [];
         structure.entities.clinics = inputData.clinics || [];
         break;
-        
+
       case 'clinic':
         structure.entities.clinics = inputData.clinics || [inputData.clinic];
         break;
@@ -157,7 +175,7 @@ export class EntityRelationshipUtil {
         'workingHours',
         'contact',
         'dynamicInfo',
-        'userAccess'
+        'userAccess',
       ],
       complex: [
         'subscription',
@@ -170,7 +188,7 @@ export class EntityRelationshipUtil {
         'workingHours',
         'contact',
         'dynamicInfo',
-        'userAccess'
+        'userAccess',
       ],
       clinic: [
         'subscription',
@@ -180,8 +198,8 @@ export class EntityRelationshipUtil {
         'workingHours',
         'contact',
         'dynamicInfo',
-        'userAccess'
-      ]
+        'userAccess',
+      ],
     };
 
     return creationOrder[planType.toLowerCase()] || [];
@@ -190,9 +208,9 @@ export class EntityRelationshipUtil {
   static validateEntityRelationships(entities: any[]): boolean {
     // Validate that referenced entities exist
     const entityMap = new Map();
-    
+
     // First pass: collect all entity IDs
-    entities.forEach(entity => {
+    entities.forEach((entity) => {
       if (entity.id || entity._id) {
         entityMap.set(entity.id || entity._id, entity);
       }
@@ -221,9 +239,9 @@ export class EntityRelationshipUtil {
     if (!entityData) {
       return [];
     }
-    
+
     const references: string[] = [];
-    
+
     // Common reference fields
     const referenceFields = [
       'organizationId',
@@ -233,10 +251,10 @@ export class EntityRelationshipUtil {
       'complexDepartmentId',
       'serviceId',
       'subscriptionId',
-      'userId'
+      'userId',
     ];
 
-    referenceFields.forEach(field => {
+    referenceFields.forEach((field) => {
       if (entityData[field]) {
         references.push(entityData[field]);
       }

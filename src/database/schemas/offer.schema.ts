@@ -3,7 +3,7 @@ import { Document, Types } from 'mongoose';
 
 @Schema({
   timestamps: true,
-  collection: 'offers'
+  collection: 'offers',
 })
 export class Offer extends Document {
   @Prop({ required: true })
@@ -12,9 +12,9 @@ export class Offer extends Document {
   @Prop()
   description?: string;
 
-  @Prop({ 
+  @Prop({
     required: true,
-    enum: ['percent', 'amount'] 
+    enum: ['percent', 'amount'],
   })
   discountType: string;
 

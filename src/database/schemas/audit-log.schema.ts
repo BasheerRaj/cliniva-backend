@@ -4,13 +4,13 @@ import { AuditEventType } from '../../common/enums/audit-event-type.enum';
 
 @Schema({
   timestamps: { createdAt: 'timestamp', updatedAt: false },
-  collection: 'audit_logs'
+  collection: 'audit_logs',
 })
 export class AuditLog extends Document {
-  @Prop({ 
+  @Prop({
     required: true,
     type: String,
-    enum: Object.values(AuditEventType)
+    enum: Object.values(AuditEventType),
   })
   eventType: AuditEventType;
 

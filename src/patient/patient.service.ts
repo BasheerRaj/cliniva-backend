@@ -1,21 +1,21 @@
-import { 
-  Injectable, 
-  NotFoundException, 
-  BadRequestException, 
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
   ConflictException,
-  Logger
+  Logger,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Patient } from '../database/schemas/patient.schema';
-import { 
-  CreatePatientDto, 
-  UpdatePatientDto, 
-  PatientSearchQueryDto, 
+import {
+  CreatePatientDto,
+  UpdatePatientDto,
+  PatientSearchQueryDto,
   UpdateMedicalHistoryDto,
   CreateEmergencyContactDto,
   PatientStatsDto,
-  PatientResponseDto 
+  PatientResponseDto,
 } from './dto';
 
 @Injectable()
@@ -32,16 +32,15 @@ export class PatientService {
   private async generatePatientNumber(): Promise<string> {
     const prefix = 'PAT';
     const year = new Date().getFullYear();
-    
+
     // Find the last patient number for current year
-    const lastPatient = await this.patientModel
-      .findOne(
-        { 
-          patientNumber: { $regex: `^${prefix}${year}` } 
-        },
-        {},
-        { sort: { patientNumber: -1 } }
-      );
+    const lastPatient = await this.patientModel.findOne(
+      {
+        patientNumber: { $regex: `^${prefix}${year}` },
+      },
+      {},
+      { sort: { patientNumber: -1 } },
+    );
 
     let nextNumber = 1;
     if (lastPatient && lastPatient.patientNumber) {
@@ -55,19 +54,24 @@ export class PatientService {
   /**
    * Validate patient data
    */
-  private async validatePatientData(patientDto: CreatePatientDto | UpdatePatientDto, isUpdate = false, patientId?: string): Promise<void> {
+  private async validatePatientData(
+    patientDto: CreatePatientDto | UpdatePatientDto,
+    isUpdate = false,
+    patientId?: string,
+  ): Promise<void> {
     // Check for duplicate email
     if (patientDto.email) {
-      const emailQuery: any = { 
+      const emailQuery: any = {
         email: patientDto.email,
-        deletedAt: { $exists: false }
+        deletedAt: { $exists: false },
       };
-      
+
       if (isUpdate && patientId) {
         emailQuery._id = { $ne: new Types.ObjectId(patientId) };
       }
 
-      const existingPatientByEmail = await this.patientModel.findOne(emailQuery);
+      const existingPatientByEmail =
+        await this.patientModel.findOne(emailQuery);
       if (existingPatientByEmail) {
         throw new ConflictException('Patient with this email already exists');
       }
@@ -75,18 +79,21 @@ export class PatientService {
 
     // Check for duplicate phone
     if (patientDto.phone) {
-      const phoneQuery: any = { 
+      const phoneQuery: any = {
         phone: patientDto.phone,
-        deletedAt: { $exists: false }
+        deletedAt: { $exists: false },
       };
-      
+
       if (isUpdate && patientId) {
         phoneQuery._id = { $ne: new Types.ObjectId(patientId) };
       }
 
-      const existingPatientByPhone = await this.patientModel.findOne(phoneQuery);
+      const existingPatientByPhone =
+        await this.patientModel.findOne(phoneQuery);
       if (existingPatientByPhone) {
-        throw new ConflictException('Patient with this phone number already exists');
+        throw new ConflictException(
+          'Patient with this phone number already exists',
+        );
       }
     }
 
@@ -94,7 +101,7 @@ export class PatientService {
     if (patientDto.dateOfBirth) {
       const dob = new Date(patientDto.dateOfBirth);
       const today = new Date();
-      
+
       if (dob > today) {
         throw new BadRequestException('Date of birth cannot be in the future');
       }
@@ -102,43 +109,58 @@ export class PatientService {
       // Check if age is reasonable (not older than 150 years)
       const age = today.getFullYear() - dob.getFullYear();
       if (age > 150) {
-        throw new BadRequestException('Invalid date of birth: age cannot exceed 150 years');
+        throw new BadRequestException(
+          'Invalid date of birth: age cannot exceed 150 years',
+        );
       }
     }
 
     // Validate emergency contact
     if (patientDto.emergencyContactName && !patientDto.emergencyContactPhone) {
-      throw new BadRequestException('Emergency contact phone is required when emergency contact name is provided');
+      throw new BadRequestException(
+        'Emergency contact phone is required when emergency contact name is provided',
+      );
     }
 
     if (patientDto.emergencyContactPhone && !patientDto.emergencyContactName) {
-      throw new BadRequestException('Emergency contact name is required when emergency contact phone is provided');
+      throw new BadRequestException(
+        'Emergency contact name is required when emergency contact phone is provided',
+      );
     }
   }
 
   /**
    * Create a new patient
    */
-  async createPatient(createPatientDto: CreatePatientDto, createdByUserId?: string): Promise<Patient> {
-    this.logger.log(`Creating patient: ${createPatientDto.firstName} ${createPatientDto.lastName}`);
+  async createPatient(
+    createPatientDto: CreatePatientDto,
+    createdByUserId?: string,
+  ): Promise<Patient> {
+    this.logger.log(
+      `Creating patient: ${createPatientDto.firstName} ${createPatientDto.lastName}`,
+    );
 
     await this.validatePatientData(createPatientDto);
-    
+
     const patientNumber = await this.generatePatientNumber();
-    
+
     const patientData = {
       ...createPatientDto,
       patientNumber,
       dateOfBirth: new Date(createPatientDto.dateOfBirth),
       preferredLanguage: createPatientDto.preferredLanguage || 'english',
       isPortalEnabled: createPatientDto.isPortalEnabled || false,
-      createdBy: createdByUserId ? new Types.ObjectId(createdByUserId) : undefined,
+      createdBy: createdByUserId
+        ? new Types.ObjectId(createdByUserId)
+        : undefined,
     };
 
     const patient = new this.patientModel(patientData);
     const savedPatient = await patient.save();
-    
-    this.logger.log(`Patient created successfully with ID: ${savedPatient._id}`);
+
+    this.logger.log(
+      `Patient created successfully with ID: ${savedPatient._id}`,
+    );
     return savedPatient;
   }
 
@@ -165,12 +187,12 @@ export class PatientService {
       page = '1',
       limit = '10',
       sortBy = 'createdAt',
-      sortOrder = 'desc'
+      sortOrder = 'desc',
     } = query;
 
     // Build filter object
     const filter: any = {
-      deletedAt: { $exists: false } // Exclude soft-deleted patients
+      deletedAt: { $exists: false }, // Exclude soft-deleted patients
     };
 
     // Search across multiple fields
@@ -180,7 +202,7 @@ export class PatientService {
         { lastName: { $regex: search, $options: 'i' } },
         { phone: { $regex: search, $options: 'i' } },
         { email: { $regex: search, $options: 'i' } },
-        { patientNumber: { $regex: search, $options: 'i' } }
+        { patientNumber: { $regex: search, $options: 'i' } },
       ];
     }
 
@@ -191,8 +213,10 @@ export class PatientService {
     if (email) filter.email = { $regex: email, $options: 'i' };
     if (gender) filter.gender = gender;
     if (bloodType) filter.bloodType = bloodType;
-    if (insuranceProvider) filter.insuranceProvider = { $regex: insuranceProvider, $options: 'i' };
-    if (nationality) filter.nationality = { $regex: nationality, $options: 'i' };
+    if (insuranceProvider)
+      filter.insuranceProvider = { $regex: insuranceProvider, $options: 'i' };
+    if (nationality)
+      filter.nationality = { $regex: nationality, $options: 'i' };
     if (isPortalEnabled !== undefined) filter.isPortalEnabled = isPortalEnabled;
 
     // Pagination
@@ -211,7 +235,7 @@ export class PatientService {
         .skip(skip)
         .limit(pageSize)
         .exec(),
-      this.patientModel.countDocuments(filter)
+      this.patientModel.countDocuments(filter),
     ]);
 
     const totalPages = Math.ceil(total / pageSize);
@@ -220,7 +244,7 @@ export class PatientService {
       patients,
       total,
       page: pageNum,
-      totalPages
+      totalPages,
     };
   }
 
@@ -233,9 +257,9 @@ export class PatientService {
     }
 
     const patient = await this.patientModel
-      .findOne({ 
+      .findOne({
         _id: new Types.ObjectId(patientId),
-        deletedAt: { $exists: false }
+        deletedAt: { $exists: false },
       })
       .exec();
 
@@ -251,9 +275,9 @@ export class PatientService {
    */
   async getPatientByNumber(patientNumber: string): Promise<Patient> {
     const patient = await this.patientModel
-      .findOne({ 
+      .findOne({
         patientNumber,
-        deletedAt: { $exists: false }
+        deletedAt: { $exists: false },
       })
       .exec();
 
@@ -268,9 +292,9 @@ export class PatientService {
    * Update patient
    */
   async updatePatient(
-    patientId: string, 
+    patientId: string,
     updatePatientDto: UpdatePatientDto,
-    updatedByUserId?: string
+    updatedByUserId?: string,
   ): Promise<Patient> {
     if (!Types.ObjectId.isValid(patientId)) {
       throw new BadRequestException('Invalid patient ID format');
@@ -282,7 +306,9 @@ export class PatientService {
 
     const updateData: any = {
       ...updatePatientDto,
-      updatedBy: updatedByUserId ? new Types.ObjectId(updatedByUserId) : undefined,
+      updatedBy: updatedByUserId
+        ? new Types.ObjectId(updatedByUserId)
+        : undefined,
     };
 
     // Convert date string to Date object if provided
@@ -292,12 +318,12 @@ export class PatientService {
 
     const patient = await this.patientModel
       .findOneAndUpdate(
-        { 
+        {
           _id: new Types.ObjectId(patientId),
-          deletedAt: { $exists: false }
+          deletedAt: { $exists: false },
         },
         { $set: updateData },
-        { new: true, runValidators: true }
+        { new: true, runValidators: true },
       )
       .exec();
 
@@ -312,7 +338,10 @@ export class PatientService {
   /**
    * Soft delete patient
    */
-  async deletePatient(patientId: string, deletedByUserId?: string): Promise<void> {
+  async deletePatient(
+    patientId: string,
+    deletedByUserId?: string,
+  ): Promise<void> {
     if (!Types.ObjectId.isValid(patientId)) {
       throw new BadRequestException('Invalid patient ID format');
     }
@@ -321,16 +350,18 @@ export class PatientService {
 
     const result = await this.patientModel
       .findOneAndUpdate(
-        { 
+        {
           _id: new Types.ObjectId(patientId),
-          deletedAt: { $exists: false }
+          deletedAt: { $exists: false },
         },
-        { 
+        {
           $set: {
             deletedAt: new Date(),
-            updatedBy: deletedByUserId ? new Types.ObjectId(deletedByUserId) : undefined,
-          }
-        }
+            updatedBy: deletedByUserId
+              ? new Types.ObjectId(deletedByUserId)
+              : undefined,
+          },
+        },
       )
       .exec();
 
@@ -347,7 +378,7 @@ export class PatientService {
   async updateMedicalHistory(
     patientId: string,
     updateMedicalHistoryDto: UpdateMedicalHistoryDto,
-    updatedByUserId?: string
+    updatedByUserId?: string,
   ): Promise<Patient> {
     if (!Types.ObjectId.isValid(patientId)) {
       throw new BadRequestException('Invalid patient ID format');
@@ -355,17 +386,19 @@ export class PatientService {
 
     const updateData: any = {
       ...updateMedicalHistoryDto,
-      updatedBy: updatedByUserId ? new Types.ObjectId(updatedByUserId) : undefined,
+      updatedBy: updatedByUserId
+        ? new Types.ObjectId(updatedByUserId)
+        : undefined,
     };
 
     const patient = await this.patientModel
       .findOneAndUpdate(
-        { 
+        {
           _id: new Types.ObjectId(patientId),
-          deletedAt: { $exists: false }
+          deletedAt: { $exists: false },
         },
         { $set: updateData },
-        { new: true }
+        { new: true },
       )
       .exec();
 
@@ -381,7 +414,7 @@ export class PatientService {
    */
   async getPatientStats(): Promise<PatientStatsDto> {
     const now = new Date();
-    const thirtyDaysAgo = new Date(now.getTime() - (30 * 24 * 60 * 60 * 1000));
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
     const [
       totalPatients,
@@ -391,71 +424,71 @@ export class PatientService {
       patientsWithInsurance,
       patientsWithPortalAccess,
       recentPatients,
-      avgAgeResult
+      avgAgeResult,
     ] = await Promise.all([
       // Total patients
       this.patientModel.countDocuments({ deletedAt: { $exists: false } }),
-      
+
       // Active patients (not deleted)
       this.patientModel.countDocuments({ deletedAt: { $exists: false } }),
-      
+
       // Male patients
-      this.patientModel.countDocuments({ 
-        gender: 'male', 
-        deletedAt: { $exists: false } 
+      this.patientModel.countDocuments({
+        gender: 'male',
+        deletedAt: { $exists: false },
       }),
-      
+
       // Female patients
-      this.patientModel.countDocuments({ 
-        gender: 'female', 
-        deletedAt: { $exists: false } 
+      this.patientModel.countDocuments({
+        gender: 'female',
+        deletedAt: { $exists: false },
       }),
-      
+
       // Patients with insurance
-      this.patientModel.countDocuments({ 
+      this.patientModel.countDocuments({
         insuranceProvider: { $exists: true, $ne: '' },
-        deletedAt: { $exists: false }
+        deletedAt: { $exists: false },
       }),
-      
+
       // Patients with portal access
-      this.patientModel.countDocuments({ 
+      this.patientModel.countDocuments({
         isPortalEnabled: true,
-        deletedAt: { $exists: false }
+        deletedAt: { $exists: false },
       }),
-      
+
       // Recent patients (last 30 days)
       this.patientModel.countDocuments({
         createdAt: { $gte: thirtyDaysAgo },
-        deletedAt: { $exists: false }
+        deletedAt: { $exists: false },
       }),
-      
+
       // Average age
       this.patientModel.aggregate([
         {
           $match: {
             deletedAt: { $exists: false },
-            dateOfBirth: { $exists: true }
-          }
+            dateOfBirth: { $exists: true },
+          },
         },
         {
           $project: {
             age: {
               $floor: {
                 $divide: [
-                  { $subtract: [new Date(), "$dateOfBirth"] },
-                  365.25 * 24 * 60 * 60 * 1000
-                ]
-              }
-            }
-          }
+                  { $subtract: [new Date(), '$dateOfBirth'] },
+                  365.25 * 24 * 60 * 60 * 1000,
+                ],
+              },
+            },
+          },
         },
         {
           $group: {
             _id: null,
-            avgAge: { $avg: "$age" }
-          }
-        }
-      ])
+            avgAge: { $avg: '$age' },
+          },
+        },
+      ]),
     ]);
 
     return {
@@ -466,7 +499,7 @@ export class PatientService {
       avgAge: avgAgeResult[0]?.avgAge || 0,
       patientsWithInsurance,
       patientsWithPortalAccess,
-      recentPatients
+      recentPatients,
     };
   }
 
@@ -474,8 +507,8 @@ export class PatientService {
    * Search patients by term (advanced search)
    */
   async searchPatients(
-    searchTerm: string, 
-    limit: number = 20
+    searchTerm: string,
+    limit: number = 20,
   ): Promise<Patient[]> {
     if (!searchTerm || searchTerm.trim().length === 0) {
       return [];
@@ -492,16 +525,16 @@ export class PatientService {
           { phone: searchRegex },
           { email: searchRegex },
           { patientNumber: searchRegex },
-          { 
+          {
             $expr: {
               $regexMatch: {
-                input: { $concat: ["$firstName", " ", "$lastName"] },
+                input: { $concat: ['$firstName', ' ', '$lastName'] },
                 regex: searchTerm.trim(),
-                options: "i"
-              }
-            }
-          }
-        ]
+                options: 'i',
+              },
+            },
+          },
+        ],
       })
       .sort({ firstName: 1, lastName: 1 })
       .limit(Math.min(limit, 50)) // Max 50 results
@@ -524,12 +557,12 @@ export class PatientService {
    */
   async patientExistsByEmail(email: string): Promise<boolean> {
     const patient = await this.patientModel
-      .findOne({ 
+      .findOne({
         email,
-        deletedAt: { $exists: false }
+        deletedAt: { $exists: false },
       })
       .exec();
-    
+
     return !!patient;
   }
 
@@ -538,12 +571,12 @@ export class PatientService {
    */
   async patientExistsByPhone(phone: string): Promise<boolean> {
     const patient = await this.patientModel
-      .findOne({ 
+      .findOne({
         phone,
-        deletedAt: { $exists: false }
+        deletedAt: { $exists: false },
       })
       .exec();
-    
+
     return !!patient;
   }
 
@@ -554,27 +587,27 @@ export class PatientService {
     const today = new Date();
     const currentMonth = today.getMonth() + 1;
     const currentDay = today.getDate();
-    
+
     // This is a simplified version - for production, you'd need more complex date logic
     return await this.patientModel
-      .find({ 
+      .find({
         deletedAt: { $exists: false },
-        dateOfBirth: { $exists: true }
+        dateOfBirth: { $exists: true },
       })
       .exec()
-      .then(patients => {
-        return patients.filter(patient => {
+      .then((patients) => {
+        return patients.filter((patient) => {
           const dob = new Date(patient.dateOfBirth);
           const birthMonth = dob.getMonth() + 1;
           const birthDay = dob.getDate();
-          
+
           // Simple check for same month and day within range
           if (birthMonth === currentMonth) {
-            return birthDay >= currentDay && birthDay <= (currentDay + days);
+            return birthDay >= currentDay && birthDay <= currentDay + days;
           }
-          
+
           return false;
         });
       });
   }
-} 
+}

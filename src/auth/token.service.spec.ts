@@ -83,7 +83,9 @@ describe('TokenService', () => {
         throw new Error('JWT signing failed');
       });
 
-      expect(() => service.generateAccessToken(payload)).toThrow('Failed to generate access token');
+      expect(() => service.generateAccessToken(payload)).toThrow(
+        'Failed to generate access token',
+      );
     });
   });
 
@@ -118,7 +120,9 @@ describe('TokenService', () => {
         throw new Error('JWT signing failed');
       });
 
-      expect(() => service.generateRefreshToken(payload)).toThrow('Failed to generate refresh token');
+      expect(() => service.generateRefreshToken(payload)).toThrow(
+        'Failed to generate refresh token',
+      );
     });
   });
 
@@ -196,7 +200,9 @@ describe('TokenService', () => {
         throw error;
       });
 
-      await expect(service.verifyToken(token)).rejects.toThrow('Token verification failed');
+      await expect(service.verifyToken(token)).rejects.toThrow(
+        'Token verification failed',
+      );
     });
   });
 

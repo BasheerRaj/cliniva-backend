@@ -3,7 +3,7 @@ import { Document, Types } from 'mongoose';
 
 @Schema({
   timestamps: true,
-  collection: 'notifications'
+  collection: 'notifications',
 })
 export class Notification extends Document {
   @Prop({ type: Types.ObjectId, ref: 'User', required: true })
@@ -18,23 +18,30 @@ export class Notification extends Document {
   @Prop({ required: true })
   message: string;
 
-  @Prop({ 
+  @Prop({
     required: true,
     enum: [
-      'appointment_reminder', 'appointment_cancelled', 'payment_due', 
-      'test_results_ready', 'prescription_ready', 'system_maintenance', 
-      'security_alert', 'general'
-    ] 
+      'appointment_reminder',
+      'appointment_cancelled',
+      'payment_due',
+      'test_results_ready',
+      'prescription_ready',
+      'system_maintenance',
+      'security_alert',
+      'general',
+    ],
   })
   notificationType: string;
 
-  @Prop({ 
+  @Prop({
     enum: ['low', 'normal', 'high', 'urgent'],
-    default: 'normal' 
+    default: 'normal',
   })
   priority: string;
 
-  @Prop({ enum: ['appointment', 'invoice', 'medical_report', 'patient', 'user'] })
+  @Prop({
+    enum: ['appointment', 'invoice', 'medical_report', 'patient', 'user'],
+  })
   relatedEntityType?: string;
 
   @Prop({ type: Types.ObjectId })
@@ -46,15 +53,15 @@ export class Notification extends Document {
   @Prop()
   readAt?: Date;
 
-  @Prop({ 
+  @Prop({
     enum: ['in_app', 'email', 'sms', 'push'],
-    default: 'in_app' 
+    default: 'in_app',
   })
   deliveryMethod: string;
 
-  @Prop({ 
+  @Prop({
     enum: ['pending', 'sent', 'delivered', 'failed'],
-    default: 'pending' 
+    default: 'pending',
   })
   deliveryStatus: string;
 

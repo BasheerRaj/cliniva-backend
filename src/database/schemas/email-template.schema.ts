@@ -3,7 +3,7 @@ import { Document, Types } from 'mongoose';
 
 @Schema({
   timestamps: true,
-  collection: 'email_templates'
+  collection: 'email_templates',
 })
 export class EmailTemplate extends Document {
   @Prop({ required: true, unique: true })

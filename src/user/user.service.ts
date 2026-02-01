@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, Logger, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  Logger,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectModel, InjectConnection } from '@nestjs/mongoose';
 import { Model, Types, Connection } from 'mongoose';
 import { User } from '../database/schemas/user.schema';
@@ -25,11 +30,14 @@ export class UserService {
 
   constructor(
     @InjectModel(User.name) private userModel: Model<User>,
-    @InjectModel(Organization.name) private organizationModel: Model<Organization>,
+    @InjectModel(Organization.name)
+    private organizationModel: Model<Organization>,
     @InjectModel(Complex.name) private complexModel: Model<Complex>,
     @InjectModel(Clinic.name) private clinicModel: Model<Clinic>,
-    @InjectModel(Subscription.name) private subscriptionModel: Model<Subscription>,
-    @InjectModel(SubscriptionPlan.name) private subscriptionPlanModel: Model<SubscriptionPlan>,
+    @InjectModel(Subscription.name)
+    private subscriptionModel: Model<Subscription>,
+    @InjectModel(SubscriptionPlan.name)
+    private subscriptionPlanModel: Model<SubscriptionPlan>,
     @InjectModel(Appointment.name) private appointmentModel: Model<Appointment>,
     @InjectConnection() private connection: Connection,
     private readonly sessionService: SessionService,
@@ -46,16 +54,31 @@ export class UserService {
 
       // Get user with subscription info
       console.log('🔍 Looking for user with ID:', userId);
-      const user = await this.userModel.findById(userId).populate('subscriptionId').exec();
-      console.log('👤 Found user:', user ? `${user.email} (${user.role})` : 'null');
+      const user = await this.userModel
+        .findById(userId)
+        .populate('subscriptionId')
+        .exec();
+      console.log(
+        '👤 Found user:',
+        user ? `${user.email} (${user.role})` : 'null',
+      );
       if (!user) {
-        throw new NotFoundException('User not found');
+        throw new NotFoundException({
+          message: ERROR_MESSAGES.USER_NOT_FOUND,
+          code: 'USER_NOT_FOUND',
+        });
       }
 
       // Get subscription details
-      const subscription = await this.subscriptionModel.findById(user.subscriptionId).populate('planId').exec();
+      const subscription = await this.subscriptionModel
+        .findById(user.subscriptionId)
+        .populate('planId')
+        .exec();
       if (!subscription) {
-        throw new NotFoundException('User subscription not found');
+        throw new NotFoundException({
+          message: ERROR_MESSAGES.SUBSCRIPTION_NOT_FOUND,
+          code: 'SUBSCRIPTION_NOT_FOUND',
+        });
       }
 
       const plan = subscription.planId as any; // Populated SubscriptionPlan
@@ -63,16 +86,22 @@ export class UserService {
 
       // Check existing entities
       const [organizationCount, complexCount, clinicCount] = await Promise.all([
-        this.organizationModel.countDocuments({ ownerId: new Types.ObjectId(userId) }).exec(),
-        this.complexModel.countDocuments({ ownerId: new Types.ObjectId(userId) }).exec(),
-        this.clinicModel.countDocuments({ ownerId: new Types.ObjectId(userId) }).exec(),
+        this.organizationModel
+          .countDocuments({ ownerId: new Types.ObjectId(userId) })
+          .exec(),
+        this.complexModel
+          .countDocuments({ ownerId: new Types.ObjectId(userId) })
+          .exec(),
+        this.clinicModel
+          .countDocuments({ ownerId: new Types.ObjectId(userId) })
+          .exec(),
       ]);
 
       console.log('📊 Entity counts:', {
         organizationCount,
-        complexCount, 
+        complexCount,
         clinicCount,
-        userId
+        userId,
       });
 
       const hasOrganization = organizationCount > 0;
@@ -128,20 +157,23 @@ export class UserService {
         nextStep,
       };
     } catch (error) {
-      this.logger.error(`Error checking user entities for user ${userId}:`, error);
+      this.logger.error(
+        `Error checking user entities for user ${userId}:`,
+        error,
+      );
       throw error;
     }
   }
 
   /**
    * Update user information with session invalidation hooks
-   * 
+   *
    * This method handles user updates and automatically invalidates sessions
    * when critical fields (email, role) are changed.
-   * 
+   *
    * Task 17.1: Add session invalidation to user update operations
    * Requirements: 3.1, 3.2, 3.8
-   * 
+   *
    * @param userId - User ID to update
    * @param updateUserDto - Update data
    * @param adminId - Admin ID performing the update (optional)
@@ -155,18 +187,27 @@ export class UserService {
     try {
       // Validate userId format
       if (!Types.ObjectId.isValid(userId)) {
-        throw new BadRequestException(`Invalid userId format: ${userId}`);
+        throw new BadRequestException({
+          message: ERROR_MESSAGES.INVALID_ID_FORMAT,
+          code: 'INVALID_ID_FORMAT',
+          details: { userId },
+        });
       }
 
       // Get current user data
       const currentUser = await this.userModel.findById(userId).exec();
       if (!currentUser) {
-        throw new NotFoundException('User not found');
+        throw new NotFoundException({
+          message: ERROR_MESSAGES.USER_NOT_FOUND,
+          code: 'USER_NOT_FOUND',
+        });
       }
 
       // Track what changed for session invalidation
-      const emailChanged = updateUserDto.email && updateUserDto.email !== currentUser.email;
-      const roleChanged = updateUserDto.role && updateUserDto.role !== currentUser.role;
+      const emailChanged =
+        updateUserDto.email && updateUserDto.email !== currentUser.email;
+      const roleChanged =
+        updateUserDto.role && updateUserDto.role !== currentUser.role;
       const oldEmail = currentUser.email;
       const oldRole = currentUser.role;
 
@@ -175,18 +216,23 @@ export class UserService {
         .findByIdAndUpdate(
           userId,
           { $set: updateUserDto },
-          { new: true, runValidators: true }
+          { new: true, runValidators: true },
         )
         .exec();
 
       if (!updatedUser) {
-        throw new NotFoundException('User not found after update');
+        throw new NotFoundException({
+          message: ERROR_MESSAGES.USER_NOT_FOUND,
+          code: 'USER_NOT_FOUND',
+        });
       }
 
       // Handle email change - Requirement 3.1
       if (emailChanged) {
-        this.logger.log(`Email changed for user ${userId}: ${oldEmail} -> ${updateUserDto.email}`);
-        
+        this.logger.log(
+          `Email changed for user ${userId}: ${oldEmail} -> ${updateUserDto.email}`,
+        );
+
         // Invalidate all user sessions - Requirement 3.1
         await this.sessionService.invalidateUserSessions(
           userId,
@@ -214,8 +260,10 @@ export class UserService {
 
       // Handle role change - Requirement 3.2
       if (roleChanged) {
-        this.logger.log(`Role changed for user ${userId}: ${oldRole} -> ${updateUserDto.role}`);
-        
+        this.logger.log(
+          `Role changed for user ${userId}: ${oldRole} -> ${updateUserDto.role}`,
+        );
+
         // Invalidate all user sessions - Requirement 3.2
         await this.sessionService.invalidateUserSessions(
           userId,
@@ -252,14 +300,14 @@ export class UserService {
 
   /**
    * Update user status (activate/deactivate) with self-modification check
-   * 
+   *
    * This method handles user status changes and automatically invalidates sessions
    * when deactivating a user. It prevents users from deactivating their own accounts.
-   * 
+   *
    * Task 4.1: Implement updateUserStatus method
    * Requirements: 3.1 (BZR-n0c4e9f2)
    * Design: Section 3.2.1
-   * 
+   *
    * @param userId - User ID to update status
    * @param updateUserStatusDto - Status update data
    * @param currentUserId - ID of user performing the action
@@ -277,7 +325,11 @@ export class UserService {
     try {
       // Validate not self-modification when deactivating
       if (!updateUserStatusDto.isActive) {
-        ValidationUtil.validateNotSelfModification(userId, currentUserId, 'deactivate');
+        ValidationUtil.validateNotSelfModification(
+          userId,
+          currentUserId,
+          'deactivate',
+        );
       }
 
       // Validate user exists
@@ -332,14 +384,14 @@ export class UserService {
 
   /**
    * Deactivate doctor with appointment transfer
-   * 
+   *
    * This method handles doctor deactivation with optional appointment transfer.
    * It uses database transactions to ensure atomicity and prevents self-modification.
-   * 
+   *
    * Task 4.2: Implement deactivateDoctorWithTransfer method
    * Requirements: 3.3 (BZR-q0d8a9f1)
    * Design: Section 3.2.1
-   * 
+   *
    * @param doctorId - Doctor ID to deactivate
    * @param transferData - Transfer options (transfer, skip, or error)
    * @param currentUserId - ID of user performing the action
@@ -359,7 +411,11 @@ export class UserService {
 
     try {
       // Validate not self-modification
-      ValidationUtil.validateNotSelfModification(doctorId, currentUserId, 'deactivate');
+      ValidationUtil.validateNotSelfModification(
+        doctorId,
+        currentUserId,
+        'deactivate',
+      );
 
       // Validate doctor exists
       const doctor = await ValidationUtil.validateEntityExists(
@@ -503,14 +559,14 @@ export class UserService {
 
   /**
    * Get users for dropdown (only active users)
-   * 
+   *
    * This method returns a list of active users for dropdown/selection purposes.
    * It filters out deactivated users and applies optional filters for role, complex, and clinic.
-   * 
+   *
    * Task 4.3: Implement getUsersForDropdown method
    * Requirements: 3.2 (BZR-q4f3e1b8)
    * Design: Section 3.2.1
-   * 
+   *
    * @param filters - Optional filters (role, complexId, clinicId)
    * @returns Standardized response with active users
    */

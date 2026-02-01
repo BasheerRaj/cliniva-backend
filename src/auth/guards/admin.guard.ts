@@ -10,15 +10,15 @@ import { UserRole } from '../../common/enums/user-role.enum';
 
 /**
  * AdminGuard - Ensures user has admin, owner, or super_admin role
- * 
+ *
  * This guard should be used after JwtAuthGuard to ensure the user is authenticated
  * and has the necessary administrative privileges.
- * 
+ *
  * Allowed roles:
  * - super_admin: Platform-level administration
  * - owner: Organization/complex/clinic owner with full control
  * - admin: Administrative staff with management permissions
- * 
+ *
  * Usage:
  * @UseGuards(JwtAuthGuard, AdminGuard)
  */

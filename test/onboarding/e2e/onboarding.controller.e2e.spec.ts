@@ -4,11 +4,11 @@ import { MongooseModule } from '@nestjs/mongoose';
 import request from 'supertest';
 import { OnboardingModule } from '../../../src/onboarding/onboarding.module';
 import { DatabaseModule } from '../../../src/database/database.module';
-import { 
+import {
   validCompanyPlanData,
   validComplexPlanData,
   validClinicPlanData,
-  invalidOnboardingData
+  invalidOnboardingData,
 } from '../fixtures/onboarding-data.fixture';
 
 describe('OnboardingController E2E', () => {
@@ -20,7 +20,7 @@ describe('OnboardingController E2E', () => {
       imports: [
         MongooseModule.forRoot(global.__MONGO_URI__),
         DatabaseModule,
-        OnboardingModule
+        OnboardingModule,
       ],
     }).compile();
 
@@ -95,13 +95,13 @@ describe('OnboardingController E2E', () => {
               openingTime: '09:00',
               closingTime: '17:00',
               breakStartTime: '12:00',
-              breakEndTime: '13:00'
+              breakEndTime: '13:00',
             },
             {
               dayOfWeek: 'friday',
-              isWorkingDay: false
-            }
-          ]
+              isWorkingDay: false,
+            },
+          ],
         };
 
         const response = await request(app.getHttpServer())
@@ -118,13 +118,13 @@ describe('OnboardingController E2E', () => {
           contacts: [
             {
               contactType: 'email',
-              contactValue: 'test@clinic.com'
+              contactValue: 'test@clinic.com',
             },
             {
               contactType: 'facebook',
-              contactValue: 'https://facebook.com/clinic'
-            }
-          ]
+              contactValue: 'https://facebook.com/clinic',
+            },
+          ],
         };
 
         const response = await request(app.getHttpServer())
@@ -140,8 +140,8 @@ describe('OnboardingController E2E', () => {
           ...validClinicPlanData,
           legalInfo: {
             termsConditions: 'Terms and conditions...',
-            privacyPolicy: 'Privacy policy...'
-          }
+            privacyPolicy: 'Privacy policy...',
+          },
         };
 
         const response = await request(app.getHttpServer())
@@ -172,7 +172,9 @@ describe('OnboardingController E2E', () => {
           .expect(201);
 
         expect(response.body.success).toBe(false);
-        expect(response.body.error).toContain('Company plan requires organization data');
+        expect(response.body.error).toContain(
+          'Company plan requires organization data',
+        );
       });
 
       it('should return error for complex plan without complexes', async () => {
@@ -182,7 +184,9 @@ describe('OnboardingController E2E', () => {
           .expect(201);
 
         expect(response.body.success).toBe(false);
-        expect(response.body.error).toContain('Complex plan requires at least one complex');
+        expect(response.body.error).toContain(
+          'Complex plan requires at least one complex',
+        );
       });
 
       it('should return error for clinic plan without clinics', async () => {
@@ -192,7 +196,9 @@ describe('OnboardingController E2E', () => {
           .expect(201);
 
         expect(response.body.success).toBe(false);
-        expect(response.body.error).toContain('Clinic plan requires at least one clinic');
+        expect(response.body.error).toContain(
+          'Clinic plan requires at least one clinic',
+        );
       });
 
       it('should return error for invalid working hours', async () => {
@@ -212,7 +218,9 @@ describe('OnboardingController E2E', () => {
           .expect(201);
 
         expect(response.body.success).toBe(false);
-        expect(response.body.error).toContain('Working hours validation failed');
+        expect(response.body.error).toContain(
+          'Working hours validation failed',
+        );
       });
 
       it('should return error for exceeding plan limits', async () => {
@@ -242,7 +250,7 @@ describe('OnboardingController E2E', () => {
           .post('/onboarding/complete')
           .send({
             subscriptionData: validCompanyPlanData.subscriptionData,
-            organization: validCompanyPlanData.organization
+            organization: validCompanyPlanData.organization,
           })
           .expect(400); // This should be caught by class-validator
 
@@ -254,7 +262,7 @@ describe('OnboardingController E2E', () => {
           .post('/onboarding/complete')
           .send({
             userData: validCompanyPlanData.userData,
-            organization: validCompanyPlanData.organization
+            organization: validCompanyPlanData.organization,
           })
           .expect(400);
 
@@ -266,8 +274,8 @@ describe('OnboardingController E2E', () => {
           ...validCompanyPlanData,
           userData: {
             ...validCompanyPlanData.userData,
-            email: 'invalid-email'
-          }
+            email: 'invalid-email',
+          },
         };
 
         const response = await request(app.getHttpServer())
@@ -283,8 +291,8 @@ describe('OnboardingController E2E', () => {
           ...validCompanyPlanData,
           subscriptionData: {
             ...validCompanyPlanData.subscriptionData,
-            planType: 'invalid_plan'
-          }
+            planType: 'invalid_plan',
+          },
         };
 
         const response = await request(app.getHttpServer())
@@ -373,7 +381,9 @@ describe('OnboardingController E2E', () => {
 
         expect(response.body.success).toBe(false);
         expect(response.body.data.isValid).toBe(false);
-        expect(response.body.data.errors).toContain('Company plan requires organization data');
+        expect(response.body.data.errors).toContain(
+          'Company plan requires organization data',
+        );
       });
 
       it('should return validation errors for invalid working hours', async () => {
@@ -392,7 +402,7 @@ describe('OnboardingController E2E', () => {
       it('should handle validationStep parameter', async () => {
         const dataWithValidationStep = {
           ...validCompanyPlanData,
-          validationStep: 'organization'
+          validationStep: 'organization',
         };
 
         const response = await request(app.getHttpServer())
@@ -409,7 +419,7 @@ describe('OnboardingController E2E', () => {
         // Send malformed data that might cause internal errors
         const malformedData = {
           userData: null,
-          subscriptionData: null
+          subscriptionData: null,
         };
 
         const response = await request(app.getHttpServer())
@@ -431,10 +441,12 @@ describe('OnboardingController E2E', () => {
         .expect(200);
 
       expect(response.body.success).toBe(true);
-      expect(response.body.message).toBe('Available plans retrieved successfully');
+      expect(response.body.message).toBe(
+        'Available plans retrieved successfully',
+      );
       expect(response.body.data).toBeDefined();
       expect(Array.isArray(response.body.data)).toBe(true);
-      
+
       // Should contain company, complex, and clinic plans
       const planTypes = response.body.data.map((plan: any) => plan.type);
       expect(planTypes).toContain('company');
@@ -448,7 +460,7 @@ describe('OnboardingController E2E', () => {
         .expect(200);
 
       expect(response.body.data.length).toBeGreaterThan(0);
-      
+
       const plan = response.body.data[0];
       expect(plan).toHaveProperty('id');
       expect(plan).toHaveProperty('name');
@@ -472,7 +484,7 @@ describe('OnboardingController E2E', () => {
   describe('/onboarding/progress/:userId (GET)', () => {
     it('should retrieve onboarding progress for user', async () => {
       const userId = 'test_user_123';
-      
+
       const response = await request(app.getHttpServer())
         .get(`/onboarding/progress/${userId}`)
         .expect(200);
@@ -484,7 +496,7 @@ describe('OnboardingController E2E', () => {
 
     it('should handle invalid user ID format', async () => {
       const invalidUserId = 'invalid-user-id';
-      
+
       const response = await request(app.getHttpServer())
         .get(`/onboarding/progress/${invalidUserId}`)
         .expect(200);
@@ -495,7 +507,7 @@ describe('OnboardingController E2E', () => {
 
     it('should handle service errors gracefully', async () => {
       const userId = 'error_user_123';
-      
+
       const response = await request(app.getHttpServer())
         .get(`/onboarding/progress/${userId}`)
         .expect(200);
@@ -518,38 +530,48 @@ describe('OnboardingController E2E', () => {
     it('should handle large onboarding payloads', async () => {
       const largeDataSet = {
         ...validCompanyPlanData,
-        complexes: Array(5).fill(0).map((_, i) => ({
-          name: `Complex ${i + 1}`,
-          address: `Very long address for complex ${i + 1} with lots of details about the location and surrounding area`,
-          phone: `+96611${String(i).padStart(7, '0')}`,
-          email: `complex${i + 1}@example.com`,
-          managerName: `Manager Name for Complex ${i + 1}`,
-          departmentIds: ['dept1', 'dept2', 'dept3']
-        })),
-        departments: Array(20).fill(0).map((_, i) => ({
-          name: `Department ${i + 1}`,
-          description: `Detailed description for department ${i + 1} with comprehensive information about services and capabilities`
-        })),
-        clinics: Array(10).fill(0).map((_, i) => ({
-          name: `Clinic ${i + 1}`,
-          address: `Detailed address for clinic ${i + 1}`,
-          phone: `+96612${String(i).padStart(7, '0')}`,
-          email: `clinic${i + 1}@example.com`,
-          capacity: {
-            maxStaff: 20,
-            maxDoctors: 5,
-            maxPatients: 100,
-            sessionDuration: 45
-          }
-        })),
-        workingHours: Array(35).fill(0).map((_, i) => ({
-          dayOfWeek: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'][i % 5],
-          isWorkingDay: true,
-          openingTime: '09:00',
-          closingTime: '17:00',
-          breakStartTime: '12:00',
-          breakEndTime: '13:00'
-        }))
+        complexes: Array(5)
+          .fill(0)
+          .map((_, i) => ({
+            name: `Complex ${i + 1}`,
+            address: `Very long address for complex ${i + 1} with lots of details about the location and surrounding area`,
+            phone: `+96611${String(i).padStart(7, '0')}`,
+            email: `complex${i + 1}@example.com`,
+            managerName: `Manager Name for Complex ${i + 1}`,
+            departmentIds: ['dept1', 'dept2', 'dept3'],
+          })),
+        departments: Array(20)
+          .fill(0)
+          .map((_, i) => ({
+            name: `Department ${i + 1}`,
+            description: `Detailed description for department ${i + 1} with comprehensive information about services and capabilities`,
+          })),
+        clinics: Array(10)
+          .fill(0)
+          .map((_, i) => ({
+            name: `Clinic ${i + 1}`,
+            address: `Detailed address for clinic ${i + 1}`,
+            phone: `+96612${String(i).padStart(7, '0')}`,
+            email: `clinic${i + 1}@example.com`,
+            capacity: {
+              maxStaff: 20,
+              maxDoctors: 5,
+              maxPatients: 100,
+              sessionDuration: 45,
+            },
+          })),
+        workingHours: Array(35)
+          .fill(0)
+          .map((_, i) => ({
+            dayOfWeek: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'][
+              i % 5
+            ],
+            isWorkingDay: true,
+            openingTime: '09:00',
+            closingTime: '17:00',
+            breakStartTime: '12:00',
+            breakEndTime: '13:00',
+          })),
       };
 
       const response = await request(app.getHttpServer())
@@ -563,31 +585,34 @@ describe('OnboardingController E2E', () => {
 
   describe('Concurrent Requests', () => {
     it('should handle concurrent onboarding requests', async () => {
-      const requests = Array(3).fill(0).map((_, i) => {
-        const data = {
-          ...validClinicPlanData,
-          userData: {
-            ...validClinicPlanData.userData,
-            email: `user${i}@example.com`
-          },
-          clinics: [{
-            ...validClinicPlanData.clinics![0],
-            name: `Clinic ${i + 1}`
-          }]
-        };
+      const requests = Array(3)
+        .fill(0)
+        .map((_, i) => {
+          const data = {
+            ...validClinicPlanData,
+            userData: {
+              ...validClinicPlanData.userData,
+              email: `user${i}@example.com`,
+            },
+            clinics: [
+              {
+                ...validClinicPlanData.clinics![0],
+                name: `Clinic ${i + 1}`,
+              },
+            ],
+          };
 
-        return request(app.getHttpServer())
-          .post('/onboarding/complete')
-          .send(data);
-      });
+          return request(app.getHttpServer())
+            .post('/onboarding/complete')
+            .send(data);
+        });
 
       const responses = await Promise.all(requests);
 
-      responses.forEach(response => {
+      responses.forEach((response) => {
         expect(response.status).toBe(201);
         expect(response.body.success).toBe(true);
       });
     }, 30000);
   });
 });
-

@@ -1,1 +1,1 @@
-export * from './create-dynamic-info.dto'; 
+export * from './create-dynamic-info.dto';

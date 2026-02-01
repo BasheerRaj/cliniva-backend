@@ -1,4 +1,10 @@
-import { IsString, IsNotEmpty, IsOptional, IsNumber, Min } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsOptional,
+  IsNumber,
+  Min,
+} from 'class-validator';
 
 export class CreateDoctorSpecialtyDto {
   @IsString()
@@ -93,4 +99,4 @@ export class BulkAssignSpecialtiesDto {
   @IsNumber()
   @Min(0)
   yearsOfExperience?: number = 0;
-} 
+}

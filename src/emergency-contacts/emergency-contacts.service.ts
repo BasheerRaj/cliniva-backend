@@ -1,9 +1,9 @@
-import { 
-  Injectable, 
-  NotFoundException, 
-  BadRequestException, 
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
   ConflictException,
-  Logger 
+  Logger,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -16,7 +16,7 @@ import {
   CreateEmergencyContactDto,
   UpdateEmergencyContactDto,
   EmergencyContactSearchDto,
-  BulkEmergencyContactDto
+  BulkEmergencyContactDto,
 } from './dto';
 
 @Injectable()
@@ -24,9 +24,11 @@ export class EmergencyContactsService {
   private readonly logger = new Logger(EmergencyContactsService.name);
 
   constructor(
-    @InjectModel('EmergencyContact') private readonly emergencyContactModel: Model<EmergencyContact>,
+    @InjectModel('EmergencyContact')
+    private readonly emergencyContactModel: Model<EmergencyContact>,
     @InjectModel('Patient') private readonly patientModel: Model<Patient>,
-    @InjectModel('Organization') private readonly organizationModel: Model<Organization>,
+    @InjectModel('Organization')
+    private readonly organizationModel: Model<Organization>,
     @InjectModel('Complex') private readonly complexModel: Model<Complex>,
     @InjectModel('Clinic') private readonly clinicModel: Model<Clinic>,
   ) {}
@@ -34,8 +36,12 @@ export class EmergencyContactsService {
   /**
    * Add emergency contact
    */
-  async addEmergencyContact(createDto: CreateEmergencyContactDto): Promise<EmergencyContact> {
-    this.logger.log(`Adding emergency contact for ${createDto.entityType}: ${createDto.entityId}`);
+  async addEmergencyContact(
+    createDto: CreateEmergencyContactDto,
+  ): Promise<EmergencyContact> {
+    this.logger.log(
+      `Adding emergency contact for ${createDto.entityType}: ${createDto.entityId}`,
+    );
 
     // Validate entity exists
     await this.validateEntity(createDto.entityType, createDto.entityId);
@@ -54,31 +60,38 @@ export class EmergencyContactsService {
       alternativePhone: createDto.alternativePhone,
       email: createDto.email,
       isActive: createDto.isActive !== false,
-      isPrimary: createDto.isPrimary || false
+      isPrimary: createDto.isPrimary || false,
     };
 
     const contact = new this.emergencyContactModel(contactData);
     const savedContact = await contact.save();
 
-    this.logger.log(`Emergency contact added successfully: ${savedContact._id}`);
+    this.logger.log(
+      `Emergency contact added successfully: ${savedContact._id}`,
+    );
     return savedContact;
   }
 
   /**
    * Get emergency contacts for entity (e.g., patient)
    */
-  async getEmergencyContactsByEntity(entityType: string, entityId: string): Promise<EmergencyContact[]> {
+  async getEmergencyContactsByEntity(
+    entityType: string,
+    entityId: string,
+  ): Promise<EmergencyContact[]> {
     if (!Types.ObjectId.isValid(entityId)) {
       throw new BadRequestException('Invalid entity ID format');
     }
 
-    this.logger.log(`Fetching emergency contacts for ${entityType}: ${entityId}`);
+    this.logger.log(
+      `Fetching emergency contacts for ${entityType}: ${entityId}`,
+    );
 
     const contacts = await this.emergencyContactModel
       .find({
         entityType,
         entityId: new Types.ObjectId(entityId),
-        isActive: true
+        isActive: true,
       })
       .sort({ isPrimary: -1, createdAt: -1 })
       .exec();
@@ -107,7 +120,7 @@ export class EmergencyContactsService {
    */
   async updateEmergencyContact(
     contactId: string,
-    updateDto: UpdateEmergencyContactDto
+    updateDto: UpdateEmergencyContactDto,
   ): Promise<EmergencyContact> {
     if (!Types.ObjectId.isValid(contactId)) {
       throw new BadRequestException('Invalid contact ID format');
@@ -119,11 +132,18 @@ export class EmergencyContactsService {
 
     // If setting as primary, unset other primary contacts for this entity
     if (updateDto.isPrimary && !existingContact.isPrimary) {
-      await this.unsetPrimaryContacts(existingContact.entityType, existingContact.entityId.toString());
+      await this.unsetPrimaryContacts(
+        existingContact.entityType,
+        existingContact.entityId.toString(),
+      );
     }
 
     const contact = await this.emergencyContactModel
-      .findByIdAndUpdate(contactId, { $set: updateDto }, { new: true, runValidators: true })
+      .findByIdAndUpdate(
+        contactId,
+        { $set: updateDto },
+        { new: true, runValidators: true },
+      )
       .exec();
 
     if (!contact) {
@@ -144,7 +164,8 @@ export class EmergencyContactsService {
 
     this.logger.log(`Deleting emergency contact: ${contactId}`);
 
-    const result = await this.emergencyContactModel.findByIdAndDelete(contactId);
+    const result =
+      await this.emergencyContactModel.findByIdAndDelete(contactId);
     if (!result) {
       throw new NotFoundException('Emergency contact not found');
     }
@@ -170,7 +191,7 @@ export class EmergencyContactsService {
       page = '1',
       limit = '10',
       sortBy = 'createdAt',
-      sortOrder = 'desc'
+      sortOrder = 'desc',
     } = query;
 
     // Build filter
@@ -189,7 +210,7 @@ export class EmergencyContactsService {
         { contactName: new RegExp(search, 'i') },
         { contactPhone: new RegExp(search, 'i') },
         { relationship: new RegExp(search, 'i') },
-        { email: new RegExp(search, 'i') }
+        { email: new RegExp(search, 'i') },
       ];
     }
 
@@ -209,7 +230,7 @@ export class EmergencyContactsService {
         .skip(skip)
         .limit(pageSize)
         .exec(),
-      this.emergencyContactModel.countDocuments(filter)
+      this.emergencyContactModel.countDocuments(filter),
     ]);
 
     const totalPages = Math.ceil(total / pageSize);
@@ -218,14 +239,17 @@ export class EmergencyContactsService {
       data,
       total,
       page: pageNum,
-      totalPages
+      totalPages,
     };
   }
 
   /**
    * Get primary emergency contact for entity
    */
-  async getPrimaryContact(entityType: string, entityId: string): Promise<EmergencyContact | null> {
+  async getPrimaryContact(
+    entityType: string,
+    entityId: string,
+  ): Promise<EmergencyContact | null> {
     if (!Types.ObjectId.isValid(entityId)) {
       throw new BadRequestException('Invalid entity ID format');
     }
@@ -235,7 +259,7 @@ export class EmergencyContactsService {
         entityType,
         entityId: new Types.ObjectId(entityId),
         isPrimary: true,
-        isActive: true
+        isActive: true,
       })
       .exec();
 
@@ -247,13 +271,20 @@ export class EmergencyContactsService {
    */
   async setPrimaryContact(contactId: string): Promise<EmergencyContact> {
     const contact = await this.getEmergencyContactById(contactId);
-    
+
     // Unset other primary contacts for this entity
-    await this.unsetPrimaryContacts(contact.entityType, contact.entityId.toString());
+    await this.unsetPrimaryContacts(
+      contact.entityType,
+      contact.entityId.toString(),
+    );
 
     // Set this contact as primary
     const updatedContact = await this.emergencyContactModel
-      .findByIdAndUpdate(contactId, { $set: { isPrimary: true } }, { new: true })
+      .findByIdAndUpdate(
+        contactId,
+        { $set: { isPrimary: true } },
+        { new: true },
+      )
       .exec();
 
     this.logger.log(`Contact set as primary: ${contactId}`);
@@ -268,7 +299,9 @@ export class EmergencyContactsService {
     failed: number;
     errors: string[];
   }> {
-    this.logger.log(`Bulk adding contacts for ${bulkDto.entityType}: ${bulkDto.entityId}`);
+    this.logger.log(
+      `Bulk adding contacts for ${bulkDto.entityType}: ${bulkDto.entityId}`,
+    );
 
     // Validate entity exists
     await this.validateEntity(bulkDto.entityType, bulkDto.entityId);
@@ -287,7 +320,7 @@ export class EmergencyContactsService {
           relationship: contactData.relationship,
           alternativePhone: contactData.alternativePhone,
           email: contactData.email,
-          isPrimary: contactData.isPrimary
+          isPrimary: contactData.isPrimary,
         });
         success++;
       } catch (error) {
@@ -314,33 +347,36 @@ export class EmergencyContactsService {
       contactsByEntityType,
       primaryContacts,
       contactsWithEmail,
-      contactsWithAlternativePhone
+      contactsWithAlternativePhone,
     ] = await Promise.all([
       this.emergencyContactModel.countDocuments({ isActive: true }),
       this.emergencyContactModel.aggregate([
         { $match: { isActive: true } },
-        { $group: { _id: '$entityType', count: { $sum: 1 } } }
+        { $group: { _id: '$entityType', count: { $sum: 1 } } },
       ]),
-      this.emergencyContactModel.countDocuments({ isPrimary: true, isActive: true }),
-      this.emergencyContactModel.countDocuments({ 
-        email: { $exists: true, $ne: null }, 
-        isActive: true 
+      this.emergencyContactModel.countDocuments({
+        isPrimary: true,
+        isActive: true,
       }),
-      this.emergencyContactModel.countDocuments({ 
-        alternativePhone: { $exists: true, $ne: null }, 
-        isActive: true 
-      })
+      this.emergencyContactModel.countDocuments({
+        email: { $exists: true, $ne: null },
+        isActive: true,
+      }),
+      this.emergencyContactModel.countDocuments({
+        alternativePhone: { $exists: true, $ne: null },
+        isActive: true,
+      }),
     ]);
 
     return {
       totalContacts,
-      contactsByEntityType: contactsByEntityType.map(item => ({
+      contactsByEntityType: contactsByEntityType.map((item) => ({
         entityType: item._id,
-        count: item.count
+        count: item.count,
       })),
       primaryContacts,
       contactsWithEmail,
-      contactsWithAlternativePhone
+      contactsWithAlternativePhone,
     };
   }
 
@@ -349,7 +385,10 @@ export class EmergencyContactsService {
   /**
    * Validate that the entity exists
    */
-  private async validateEntity(entityType: string, entityId: string): Promise<void> {
+  private async validateEntity(
+    entityType: string,
+    entityId: string,
+  ): Promise<void> {
     if (!Types.ObjectId.isValid(entityId)) {
       throw new BadRequestException('Invalid entity ID format');
     }
@@ -381,14 +420,17 @@ export class EmergencyContactsService {
   /**
    * Unset primary status for other contacts of the same entity
    */
-  private async unsetPrimaryContacts(entityType: string, entityId: string): Promise<void> {
+  private async unsetPrimaryContacts(
+    entityType: string,
+    entityId: string,
+  ): Promise<void> {
     await this.emergencyContactModel.updateMany(
       {
         entityType,
         entityId: new Types.ObjectId(entityId),
-        isPrimary: true
+        isPrimary: true,
       },
-      { $set: { isPrimary: false } }
+      { $set: { isPrimary: false } },
     );
   }
-} 
+}

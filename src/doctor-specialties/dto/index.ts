@@ -1,1 +1,1 @@
-export * from './create-doctor-specialty.dto'; 
+export * from './create-doctor-specialty.dto';

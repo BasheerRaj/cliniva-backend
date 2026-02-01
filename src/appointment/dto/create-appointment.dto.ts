@@ -1,9 +1,9 @@
-import { 
-  IsString, 
-  IsNotEmpty, 
-  IsOptional, 
-  IsDateString, 
-  IsEnum, 
+import {
+  IsString,
+  IsNotEmpty,
+  IsOptional,
+  IsDateString,
+  IsEnum,
   IsNumber,
   Min,
   Max,
@@ -12,7 +12,7 @@ import {
   Length,
   IsArray,
   ValidateNested,
-  IsBoolean
+  IsBoolean,
 } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
 
@@ -40,7 +40,7 @@ export class CreateAppointmentDto {
   @IsString()
   @IsNotEmpty()
   @Matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, {
-    message: 'Time must be in HH:mm format (e.g., 14:30)'
+    message: 'Time must be in HH:mm format (e.g., 14:30)',
   })
   appointmentTime: string; // HH:mm format
 
@@ -50,14 +50,25 @@ export class CreateAppointmentDto {
   @Max(240)
   durationMinutes?: number; // 15 minutes to 4 hours
 
-  @IsEnum(['scheduled', 'confirmed', 'in_progress', 'completed', 'cancelled', 'no_show'], {
-    message: 'Status must be one of: scheduled, confirmed, in_progress, completed, cancelled, no_show'
-  })
+  @IsEnum(
+    [
+      'scheduled',
+      'confirmed',
+      'in_progress',
+      'completed',
+      'cancelled',
+      'no_show',
+    ],
+    {
+      message:
+        'Status must be one of: scheduled, confirmed, in_progress, completed, cancelled, no_show',
+    },
+  )
   @IsOptional()
   status?: string;
 
   @IsEnum(['low', 'medium', 'high', 'urgent'], {
-    message: 'Urgency level must be one of: low, medium, high, urgent'
+    message: 'Urgency level must be one of: low, medium, high, urgent',
   })
   @IsOptional()
   urgencyLevel?: string;
@@ -92,7 +103,7 @@ export class UpdateAppointmentDto {
   @IsString()
   @IsOptional()
   @Matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, {
-    message: 'Time must be in HH:mm format (e.g., 14:30)'
+    message: 'Time must be in HH:mm format (e.g., 14:30)',
   })
   appointmentTime?: string;
 
@@ -102,7 +113,14 @@ export class UpdateAppointmentDto {
   @Max(240)
   durationMinutes?: number;
 
-  @IsEnum(['scheduled', 'confirmed', 'in_progress', 'completed', 'cancelled', 'no_show'])
+  @IsEnum([
+    'scheduled',
+    'confirmed',
+    'in_progress',
+    'completed',
+    'cancelled',
+    'no_show',
+  ])
   @IsOptional()
   status?: string;
 
@@ -187,7 +205,14 @@ export class AppointmentSearchQueryDto {
   @IsOptional()
   dateTo?: string;
 
-  @IsEnum(['scheduled', 'confirmed', 'in_progress', 'completed', 'cancelled', 'no_show'])
+  @IsEnum([
+    'scheduled',
+    'confirmed',
+    'in_progress',
+    'completed',
+    'cancelled',
+    'no_show',
+  ])
   @IsOptional()
   status?: string;
 
@@ -296,7 +321,7 @@ export class AppointmentResponseDto {
   createdAt: Date;
   updatedAt: Date;
   deletedAt?: Date;
-  
+
   // Populated fields (optional)
   patient?: {
     _id: string;
@@ -337,7 +362,7 @@ export class DayScheduleDto {
   clinicId: string;
   workingHours: {
     start: string; // HH:mm
-    end: string;   // HH:mm
+    end: string; // HH:mm
     breaks: Array<{
       start: string;
       end: string;
@@ -350,7 +375,11 @@ export class DayScheduleDto {
 }
 
 export class AppointmentConflictDto {
-  conflictType: 'doctor_busy' | 'patient_busy' | 'clinic_closed' | 'service_unavailable';
+  conflictType:
+    | 'doctor_busy'
+    | 'patient_busy'
+    | 'clinic_closed'
+    | 'service_unavailable';
   message: string;
   conflictingAppointmentId?: string;
   suggestedTimes?: string[]; // Alternative time suggestions
@@ -371,4 +400,4 @@ export class ConfirmAppointmentDto {
   @IsOptional()
   @Transform(({ value }) => value === 'true' || value === true)
   sendReminderSms?: boolean;
-} 
+}

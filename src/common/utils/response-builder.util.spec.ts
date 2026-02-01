@@ -1,5 +1,9 @@
 import { ResponseBuilder } from './response-builder.util';
-import { BilingualMessage, ApiResponse, PaginatedResponse } from '../types/bilingual-message.type';
+import {
+  BilingualMessage,
+  ApiResponse,
+  PaginatedResponse,
+} from '../types/bilingual-message.type';
 
 describe('ResponseBuilder', () => {
   // ============================================================================
@@ -10,7 +14,7 @@ describe('ResponseBuilder', () => {
       const data = { id: '123', name: 'Test User' };
       const message: BilingualMessage = {
         ar: 'تم إنشاء المستخدم بنجاح',
-        en: 'User created successfully'
+        en: 'User created successfully',
       };
 
       const response = ResponseBuilder.success(data, message);
@@ -18,7 +22,7 @@ describe('ResponseBuilder', () => {
       expect(response).toEqual({
         success: true,
         data,
-        message
+        message,
       });
     });
 
@@ -29,7 +33,7 @@ describe('ResponseBuilder', () => {
 
       expect(response).toEqual({
         success: true,
-        data
+        data,
       });
       expect(response.message).toBeUndefined();
     });
@@ -39,7 +43,7 @@ describe('ResponseBuilder', () => {
 
       expect(response).toEqual({
         success: true,
-        data: null
+        data: null,
       });
     });
 
@@ -48,21 +52,21 @@ describe('ResponseBuilder', () => {
 
       expect(response).toEqual({
         success: true,
-        data: undefined
+        data: undefined,
       });
     });
 
     it('should handle array data', () => {
       const data = [
         { id: '1', name: 'User 1' },
-        { id: '2', name: 'User 2' }
+        { id: '2', name: 'User 2' },
       ];
 
       const response = ResponseBuilder.success(data);
 
       expect(response).toEqual({
         success: true,
-        data
+        data,
       });
     });
 
@@ -94,13 +98,13 @@ describe('ResponseBuilder', () => {
           profile: {
             firstName: 'John',
             lastName: 'Doe',
-            contacts: ['email@test.com', 'phone']
-          }
+            contacts: ['email@test.com', 'phone'],
+          },
         },
         metadata: {
           createdAt: new Date(),
-          updatedAt: new Date()
-        }
+          updatedAt: new Date(),
+        },
       };
 
       const response = ResponseBuilder.success(complexData);
@@ -116,7 +120,7 @@ describe('ResponseBuilder', () => {
     it('should build paginated response with all metadata', () => {
       const data = [
         { id: '1', name: 'User 1' },
-        { id: '2', name: 'User 2' }
+        { id: '2', name: 'User 2' },
       ];
       const page = 1;
       const limit = 10;
@@ -131,8 +135,8 @@ describe('ResponseBuilder', () => {
           page: 1,
           limit: 10,
           total: 25,
-          totalPages: 3
-        }
+          totalPages: 3,
+        },
       });
     });
 
@@ -144,7 +148,7 @@ describe('ResponseBuilder', () => {
         { total: 31, limit: 10, expectedPages: 4 },
         { total: 100, limit: 20, expectedPages: 5 },
         { total: 1, limit: 10, expectedPages: 1 },
-        { total: 0, limit: 10, expectedPages: 0 }
+        { total: 0, limit: 10, expectedPages: 0 },
       ];
 
       scenarios.forEach(({ total, limit, expectedPages }) => {
@@ -157,7 +161,7 @@ describe('ResponseBuilder', () => {
       const data = [{ id: '1' }];
       const message: BilingualMessage = {
         ar: 'تم جلب البيانات بنجاح',
-        en: 'Data fetched successfully'
+        en: 'Data fetched successfully',
       };
 
       const response = ResponseBuilder.paginated(data, 1, 10, 1, message);
@@ -175,8 +179,8 @@ describe('ResponseBuilder', () => {
           page: 1,
           limit: 10,
           total: 0,
-          totalPages: 0
-        }
+          totalPages: 0,
+        },
       });
     });
 
@@ -219,13 +223,13 @@ describe('ResponseBuilder', () => {
         {
           id: '1',
           user: { name: 'User 1' },
-          metadata: { createdAt: new Date() }
+          metadata: { createdAt: new Date() },
         },
         {
           id: '2',
           user: { name: 'User 2' },
-          metadata: { createdAt: new Date() }
-        }
+          metadata: { createdAt: new Date() },
+        },
       ];
 
       const response = ResponseBuilder.paginated(complexData, 1, 10, 2);
@@ -241,7 +245,7 @@ describe('ResponseBuilder', () => {
         page: 1,
         limit: 10,
         total: 2,
-        totalPages: 1
+        totalPages: 1,
       });
     });
 
@@ -261,7 +265,7 @@ describe('ResponseBuilder', () => {
       const code = 'USER_NOT_FOUND';
       const message: BilingualMessage = {
         ar: 'المستخدم غير موجود',
-        en: 'User not found'
+        en: 'User not found',
       };
 
       const response = ResponseBuilder.error(code, message);
@@ -270,8 +274,8 @@ describe('ResponseBuilder', () => {
         success: false,
         error: {
           code,
-          message
-        }
+          message,
+        },
       });
     });
 
@@ -279,11 +283,11 @@ describe('ResponseBuilder', () => {
       const code = 'VALIDATION_ERROR';
       const message: BilingualMessage = {
         ar: 'خطأ في التحقق',
-        en: 'Validation error'
+        en: 'Validation error',
       };
       const details = {
         field: 'email',
-        reason: 'Invalid format'
+        reason: 'Invalid format',
       };
 
       const response = ResponseBuilder.error(code, message, details);
@@ -293,8 +297,8 @@ describe('ResponseBuilder', () => {
         error: {
           code,
           message,
-          details
-        }
+          details,
+        },
       });
     });
 
@@ -321,9 +325,20 @@ describe('ResponseBuilder', () => {
     });
 
     it('should always set success to false', () => {
-      const response1 = ResponseBuilder.error('CODE1', { ar: 'خطأ', en: 'Error' });
-      const response2 = ResponseBuilder.error('CODE2', { ar: 'خطأ', en: 'Error' }, {});
-      const response3 = ResponseBuilder.error('CODE3', { ar: 'خطأ', en: 'Error' }, null);
+      const response1 = ResponseBuilder.error('CODE1', {
+        ar: 'خطأ',
+        en: 'Error',
+      });
+      const response2 = ResponseBuilder.error(
+        'CODE2',
+        { ar: 'خطأ', en: 'Error' },
+        {},
+      );
+      const response3 = ResponseBuilder.error(
+        'CODE3',
+        { ar: 'خطأ', en: 'Error' },
+        null,
+      );
 
       expect(response1.success).toBe(false);
       expect(response2.success).toBe(false);
@@ -331,7 +346,10 @@ describe('ResponseBuilder', () => {
     });
 
     it('should not include data property', () => {
-      const response = ResponseBuilder.error('ERROR', { ar: 'خطأ', en: 'Error' });
+      const response = ResponseBuilder.error('ERROR', {
+        ar: 'خطأ',
+        en: 'Error',
+      });
 
       expect(response.data).toBeUndefined();
     });
@@ -345,8 +363,8 @@ describe('ResponseBuilder', () => {
         lastAttempt: new Date(),
         errors: [
           { field: 'email', message: 'Invalid' },
-          { field: 'phone', message: 'Required' }
-        ]
+          { field: 'phone', message: 'Required' },
+        ],
       };
 
       const response = ResponseBuilder.error(code, message, details);
@@ -360,11 +378,14 @@ describe('ResponseBuilder', () => {
         'INVALID_CREDENTIALS',
         'FORBIDDEN',
         'INTERNAL_SERVER_ERROR',
-        'CUSTOM_ERROR_123'
+        'CUSTOM_ERROR_123',
       ];
 
-      codes.forEach(code => {
-        const response = ResponseBuilder.error(code, { ar: 'خطأ', en: 'Error' });
+      codes.forEach((code) => {
+        const response = ResponseBuilder.error(code, {
+          ar: 'خطأ',
+          en: 'Error',
+        });
         expect(response.error?.code).toBe(code);
       });
     });
@@ -372,7 +393,7 @@ describe('ResponseBuilder', () => {
     it('should handle bilingual messages correctly', () => {
       const message: BilingualMessage = {
         ar: 'رسالة الخطأ بالعربية',
-        en: 'Error message in English'
+        en: 'Error message in English',
       };
 
       const response = ResponseBuilder.error('ERROR', message);
@@ -407,14 +428,14 @@ describe('ResponseBuilder', () => {
 
       const clinics: Clinic[] = [
         { id: '1', name: 'Clinic 1' },
-        { id: '2', name: 'Clinic 2' }
+        { id: '2', name: 'Clinic 2' },
       ];
 
       const response: PaginatedResponse<Clinic> = ResponseBuilder.paginated(
         clinics,
         1,
         10,
-        2
+        2,
       );
 
       expect(response.data?.[0].id).toBe('1');
@@ -422,10 +443,10 @@ describe('ResponseBuilder', () => {
     });
 
     it('should maintain type safety for error response', () => {
-      const response: ApiResponse = ResponseBuilder.error(
-        'ERROR',
-        { ar: 'خطأ', en: 'Error' }
-      );
+      const response: ApiResponse = ResponseBuilder.error('ERROR', {
+        ar: 'خطأ',
+        en: 'Error',
+      });
 
       expect(response.success).toBe(false);
       expect(response.error?.code).toBe('ERROR');
@@ -438,8 +459,16 @@ describe('ResponseBuilder', () => {
   describe('Integration', () => {
     it('should create consistent response structures', () => {
       const successResponse = ResponseBuilder.success({ id: '1' });
-      const paginatedResponse = ResponseBuilder.paginated([{ id: '1' }], 1, 10, 1);
-      const errorResponse = ResponseBuilder.error('ERROR', { ar: 'خطأ', en: 'Error' });
+      const paginatedResponse = ResponseBuilder.paginated(
+        [{ id: '1' }],
+        1,
+        10,
+        1,
+      );
+      const errorResponse = ResponseBuilder.error('ERROR', {
+        ar: 'خطأ',
+        en: 'Error',
+      });
 
       // All should have success property
       expect(successResponse).toHaveProperty('success');
@@ -461,7 +490,7 @@ describe('ResponseBuilder', () => {
       // Scenario 1: User creation success
       const createUserResponse = ResponseBuilder.success(
         { id: '123', email: 'user@test.com' },
-        { ar: 'تم إنشاء المستخدم', en: 'User created' }
+        { ar: 'تم إنشاء المستخدم', en: 'User created' },
       );
       expect(createUserResponse.success).toBe(true);
       expect(createUserResponse.data).toBeDefined();
@@ -472,7 +501,7 @@ describe('ResponseBuilder', () => {
         [{ id: '1' }, { id: '2' }],
         1,
         20,
-        45
+        45,
       );
       expect(listUsersResponse.meta?.totalPages).toBe(3);
 
@@ -480,7 +509,7 @@ describe('ResponseBuilder', () => {
       const notFoundResponse = ResponseBuilder.error(
         'USER_NOT_FOUND',
         { ar: 'المستخدم غير موجود', en: 'User not found' },
-        { userId: '123' }
+        { userId: '123' },
       );
       expect(notFoundResponse.success).toBe(false);
       expect(notFoundResponse.error?.details.userId).toBe('123');

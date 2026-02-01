@@ -4,7 +4,7 @@ import { UserRole } from '../../common/enums/user-role.enum';
 
 @Schema({
   timestamps: true,
-  collection: 'users'
+  collection: 'users',
 })
 export class User extends Document {
   @Prop({ required: true, unique: true })
@@ -22,11 +22,11 @@ export class User extends Document {
   @Prop()
   phone?: string;
 
-  @Prop({ 
+  @Prop({
     required: true,
     type: String,
     enum: Object.values(UserRole),
-    default: UserRole.PATIENT
+    default: UserRole.PATIENT,
   })
   role: UserRole;
 

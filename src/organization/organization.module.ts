@@ -15,7 +15,7 @@ import { CommonModule } from '../common/common.module';
       { name: 'Organization', schema: OrganizationSchema },
       { name: 'User', schema: UserSchema },
       { name: 'Subscription', schema: SubscriptionSchema },
-      { name: 'SubscriptionPlan', schema: SubscriptionPlanSchema }
+      { name: 'SubscriptionPlan', schema: SubscriptionPlanSchema },
     ]),
     SubscriptionModule,
     CommonModule,

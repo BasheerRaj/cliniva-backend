@@ -285,13 +285,19 @@ describe('Bilingual Message Validation', () => {
   describe('Project Message Collections Validation', () => {
     it('should validate AUTH_ERROR_MESSAGES has all translations', () => {
       expect(() => {
-        assertValidBilingualMessages(AUTH_ERROR_MESSAGES, 'AUTH_ERROR_MESSAGES');
+        assertValidBilingualMessages(
+          AUTH_ERROR_MESSAGES,
+          'AUTH_ERROR_MESSAGES',
+        );
       }).not.toThrow();
     });
 
     it('should validate AUTH_SUCCESS_MESSAGES has all translations', () => {
       expect(() => {
-        assertValidBilingualMessages(AUTH_SUCCESS_MESSAGES, 'AUTH_SUCCESS_MESSAGES');
+        assertValidBilingualMessages(
+          AUTH_SUCCESS_MESSAGES,
+          'AUTH_SUCCESS_MESSAGES',
+        );
       }).not.toThrow();
     });
 

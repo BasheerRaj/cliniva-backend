@@ -6,4 +6,4 @@ export * from './validate-onboarding.dto';
 export * from './organization-step.dto';
 export * from './complex-step.dto';
 export * from './clinic-step.dto';
-export * from './step-progress.dto'; 
+export * from './step-progress.dto';

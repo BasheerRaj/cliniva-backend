@@ -1,6 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getConnectionToken } from '@nestjs/mongoose';
-import { BadRequestException, InternalServerErrorException } from '@nestjs/common';
+import {
+  BadRequestException,
+  InternalServerErrorException,
+} from '@nestjs/common';
 import { OnboardingService } from '../../../src/onboarding/onboarding.service';
 import { SubscriptionService } from '../../../src/subscription/subscription.service';
 import { OrganizationService } from '../../../src/organization/organization.service';
@@ -12,7 +15,7 @@ import { WorkingHoursService } from '../../../src/working-hours/working-hours.se
 import { ContactService } from '../../../src/contact/contact.service';
 import { DynamicInfoService } from '../../../src/dynamic-info/dynamic-info.service';
 import { UserAccessService } from '../../../src/user-access/user-access.service';
-import { 
+import {
   mockSubscriptionService,
   mockOrganizationService,
   mockComplexService,
@@ -25,14 +28,14 @@ import {
   mockUserAccessService,
   mockConnection,
   resetAllMocks,
-  makeServiceFail
+  makeServiceFail,
 } from '../mocks/service.mocks';
-import { 
+import {
   validCompanyPlanData,
   validComplexPlanData,
   validClinicPlanData,
   invalidOnboardingData,
-  mockServiceResponses
+  mockServiceResponses,
 } from '../fixtures/onboarding-data.fixture';
 
 describe('OnboardingService', () => {
@@ -45,48 +48,48 @@ describe('OnboardingService', () => {
         OnboardingService,
         {
           provide: getConnectionToken(),
-          useValue: mockConnection
+          useValue: mockConnection,
         },
         {
           provide: SubscriptionService,
-          useValue: mockSubscriptionService
+          useValue: mockSubscriptionService,
         },
         {
           provide: OrganizationService,
-          useValue: mockOrganizationService
+          useValue: mockOrganizationService,
         },
         {
           provide: ComplexService,
-          useValue: mockComplexService
+          useValue: mockComplexService,
         },
         {
           provide: ClinicService,
-          useValue: mockClinicService
+          useValue: mockClinicService,
         },
         {
           provide: DepartmentService,
-          useValue: mockDepartmentService
+          useValue: mockDepartmentService,
         },
         {
           provide: ServiceService,
-          useValue: mockServiceService
+          useValue: mockServiceService,
         },
         {
           provide: WorkingHoursService,
-          useValue: mockWorkingHoursService
+          useValue: mockWorkingHoursService,
         },
         {
           provide: ContactService,
-          useValue: mockContactService
+          useValue: mockContactService,
         },
         {
           provide: DynamicInfoService,
-          useValue: mockDynamicInfoService
+          useValue: mockDynamicInfoService,
         },
         {
           provide: UserAccessService,
-          useValue: mockUserAccessService
-        }
+          useValue: mockUserAccessService,
+        },
       ],
     }).compile();
 
@@ -101,21 +104,24 @@ describe('OnboardingService', () => {
   describe('validateOnboardingData', () => {
     describe('Valid Data Validation', () => {
       it('should validate valid company plan data', async () => {
-        const result = await service.validateOnboardingData(validCompanyPlanData);
+        const result =
+          await service.validateOnboardingData(validCompanyPlanData);
 
         expect(result.isValid).toBe(true);
         expect(result.errors).toHaveLength(0);
       });
 
       it('should validate valid complex plan data', async () => {
-        const result = await service.validateOnboardingData(validComplexPlanData);
+        const result =
+          await service.validateOnboardingData(validComplexPlanData);
 
         expect(result.isValid).toBe(true);
         expect(result.errors).toHaveLength(0);
       });
 
       it('should validate valid clinic plan data', async () => {
-        const result = await service.validateOnboardingData(validClinicPlanData);
+        const result =
+          await service.validateOnboardingData(validClinicPlanData);
 
         expect(result.isValid).toBe(true);
         expect(result.errors).toHaveLength(0);
@@ -124,7 +130,9 @@ describe('OnboardingService', () => {
 
     describe('Invalid Plan Type Validation', () => {
       it('should reject invalid plan type', async () => {
-        const result = await service.validateOnboardingData(invalidOnboardingData.invalidPlanType);
+        const result = await service.validateOnboardingData(
+          invalidOnboardingData.invalidPlanType,
+        );
 
         expect(result.isValid).toBe(false);
         expect(result.errors).toContain('Invalid plan type');
@@ -133,32 +141,50 @@ describe('OnboardingService', () => {
 
     describe('Plan-Specific Validation', () => {
       it('should reject company plan without organization', async () => {
-        const result = await service.validateOnboardingData(invalidOnboardingData.companyPlanWithoutOrganization);
+        const result = await service.validateOnboardingData(
+          invalidOnboardingData.companyPlanWithoutOrganization,
+        );
 
         expect(result.isValid).toBe(false);
-        expect(result.errors).toContain('Company plan requires organization data');
+        expect(result.errors).toContain(
+          'Company plan requires organization data',
+        );
       });
 
       it('should reject complex plan without complexes', async () => {
-        const result = await service.validateOnboardingData(invalidOnboardingData.complexPlanWithoutComplexes);
+        const result = await service.validateOnboardingData(
+          invalidOnboardingData.complexPlanWithoutComplexes,
+        );
 
         expect(result.isValid).toBe(false);
-        expect(result.errors).toContain('Complex plan requires at least one complex');
+        expect(result.errors).toContain(
+          'Complex plan requires at least one complex',
+        );
       });
 
       it('should reject clinic plan without clinics', async () => {
-        const result = await service.validateOnboardingData(invalidOnboardingData.clinicPlanWithoutClinics);
+        const result = await service.validateOnboardingData(
+          invalidOnboardingData.clinicPlanWithoutClinics,
+        );
 
         expect(result.isValid).toBe(false);
-        expect(result.errors).toContain('Clinic plan requires at least one clinic');
+        expect(result.errors).toContain(
+          'Clinic plan requires at least one clinic',
+        );
       });
 
       it('should reject clinic plan without capacity', async () => {
-        const result = await service.validateOnboardingData(invalidOnboardingData.clinicPlanWithoutCapacity);
+        const result = await service.validateOnboardingData(
+          invalidOnboardingData.clinicPlanWithoutCapacity,
+        );
 
         expect(result.isValid).toBe(false);
-        expect(result.errors).toContain('Clinic plan requires maximum patient capacity');
-        expect(result.errors).toContain('Clinic plan requires default session duration');
+        expect(result.errors).toContain(
+          'Clinic plan requires maximum patient capacity',
+        );
+        expect(result.errors).toContain(
+          'Clinic plan requires default session duration',
+        );
       });
     });
 
@@ -167,47 +193,73 @@ describe('OnboardingService', () => {
         const data = {
           ...validCompanyPlanData,
           complexes: [{ name: 'Complex 1' }],
-          departments: [] // Should fail - complexes without departments
+          departments: [], // Should fail - complexes without departments
         };
 
         const result = await service.validateOnboardingData(data);
 
         expect(result.isValid).toBe(false);
-        expect(result.errors).toContain('Invalid entity hierarchy for selected plan');
+        expect(result.errors).toContain(
+          'Invalid entity hierarchy for selected plan',
+        );
       });
     });
 
     describe('Plan Limits Validation', () => {
       it('should reject exceeding plan limits', async () => {
-        const result = await service.validateOnboardingData(invalidOnboardingData.exceedsPlanLimits);
+        const result = await service.validateOnboardingData(
+          invalidOnboardingData.exceedsPlanLimits,
+        );
 
         expect(result.isValid).toBe(false);
-        expect(result.errors.some(error => error.includes('Maximum 1 clinic(s) allowed'))).toBe(true);
+        expect(
+          result.errors.some((error) =>
+            error.includes('Maximum 1 clinic(s) allowed'),
+          ),
+        ).toBe(true);
       });
     });
 
     describe('Working Hours Validation', () => {
       it('should reject invalid working hours format', async () => {
-        const result = await service.validateOnboardingData(invalidOnboardingData.invalidWorkingHours);
+        const result = await service.validateOnboardingData(
+          invalidOnboardingData.invalidWorkingHours,
+        );
 
         expect(result.isValid).toBe(false);
-        expect(result.errors.some(error => error.includes('Invalid day'))).toBe(true);
+        expect(
+          result.errors.some((error) => error.includes('Invalid day')),
+        ).toBe(true);
       });
 
       it('should reject conflicting working hours hierarchy', async () => {
-        const result = await service.validateOnboardingData(invalidOnboardingData.conflictingWorkingHours);
+        const result = await service.validateOnboardingData(
+          invalidOnboardingData.conflictingWorkingHours,
+        );
 
         expect(result.isValid).toBe(false);
-        expect(result.errors.some(error => error.includes('Clinic cannot be open on sunday when Complex is closed'))).toBe(true);
+        expect(
+          result.errors.some((error) =>
+            error.includes(
+              'Clinic cannot be open on sunday when Complex is closed',
+            ),
+          ),
+        ).toBe(true);
       });
     });
 
     describe('Legal Information Validation', () => {
       it('should reject invalid VAT number', async () => {
-        const result = await service.validateOnboardingData(invalidOnboardingData.invalidVATNumber as any);
+        const result = await service.validateOnboardingData(
+          invalidOnboardingData.invalidVATNumber as any,
+        );
 
         expect(result.isValid).toBe(false);
-        expect(result.errors.some(error => error.includes('Invalid VAT number format'))).toBe(true);
+        expect(
+          result.errors.some((error) =>
+            error.includes('Invalid VAT number format'),
+          ),
+        ).toBe(true);
       });
     });
   });
@@ -223,11 +275,13 @@ describe('OnboardingService', () => {
         expect(result.entities.organization).toBeDefined();
 
         // Verify service calls
-        expect(mockSubscriptionService.createSubscription).toHaveBeenCalledWith({
-          userId: expect.any(String),
-          planId: validCompanyPlanData.subscriptionData.planId,
-          planType: validCompanyPlanData.subscriptionData.planType
-        });
+        expect(mockSubscriptionService.createSubscription).toHaveBeenCalledWith(
+          {
+            userId: expect.any(String),
+            planId: validCompanyPlanData.subscriptionData.planId,
+            planType: validCompanyPlanData.subscriptionData.planType,
+          },
+        );
         expect(mockOrganizationService.createOrganization).toHaveBeenCalled();
       });
 
@@ -239,7 +293,9 @@ describe('OnboardingService', () => {
         expect(result.entities.complexes!.length).toBeGreaterThan(0);
 
         expect(mockComplexService.createComplex).toHaveBeenCalled();
-        expect(mockOrganizationService.createOrganization).not.toHaveBeenCalled();
+        expect(
+          mockOrganizationService.createOrganization,
+        ).not.toHaveBeenCalled();
       });
 
       it('should complete clinic plan onboarding successfully', async () => {
@@ -249,7 +305,9 @@ describe('OnboardingService', () => {
         expect(result.entities.clinics).toBeDefined();
 
         expect(mockClinicService.createClinic).toHaveBeenCalled();
-        expect(mockOrganizationService.createOrganization).not.toHaveBeenCalled();
+        expect(
+          mockOrganizationService.createOrganization,
+        ).not.toHaveBeenCalled();
         expect(mockComplexService.createComplex).not.toHaveBeenCalled();
       });
     });
@@ -267,7 +325,9 @@ describe('OnboardingService', () => {
 
       it('should abort transaction on validation failure', async () => {
         try {
-          await service.completeOnboarding(invalidOnboardingData.invalidPlanType);
+          await service.completeOnboarding(
+            invalidOnboardingData.invalidPlanType,
+          );
         } catch (error) {
           // Expected to throw
         }
@@ -278,7 +338,10 @@ describe('OnboardingService', () => {
       });
 
       it('should abort transaction on service failure', async () => {
-        makeServiceFail('subscription', new Error('Subscription service failed'));
+        makeServiceFail(
+          'subscription',
+          new Error('Subscription service failed'),
+        );
 
         try {
           await service.completeOnboarding(validCompanyPlanData);
@@ -295,23 +358,29 @@ describe('OnboardingService', () => {
     describe('Error Handling', () => {
       it('should throw BadRequestException for validation errors', async () => {
         await expect(
-          service.completeOnboarding(invalidOnboardingData.invalidPlanType)
+          service.completeOnboarding(invalidOnboardingData.invalidPlanType),
         ).rejects.toThrow(BadRequestException);
       });
 
       it('should throw InternalServerErrorException for service errors', async () => {
-        makeServiceFail('subscription', new Error('Database connection failed'));
+        makeServiceFail(
+          'subscription',
+          new Error('Database connection failed'),
+        );
 
         await expect(
-          service.completeOnboarding(validCompanyPlanData)
+          service.completeOnboarding(validCompanyPlanData),
         ).rejects.toThrow(InternalServerErrorException);
       });
 
       it('should handle organization service failure', async () => {
-        makeServiceFail('organization', new Error('Organization creation failed'));
+        makeServiceFail(
+          'organization',
+          new Error('Organization creation failed'),
+        );
 
         await expect(
-          service.completeOnboarding(validCompanyPlanData)
+          service.completeOnboarding(validCompanyPlanData),
         ).rejects.toThrow(InternalServerErrorException);
       });
 
@@ -319,7 +388,7 @@ describe('OnboardingService', () => {
         makeServiceFail('complex', new Error('Complex creation failed'));
 
         await expect(
-          service.completeOnboarding(validComplexPlanData)
+          service.completeOnboarding(validComplexPlanData),
         ).rejects.toThrow(InternalServerErrorException);
       });
 
@@ -327,7 +396,7 @@ describe('OnboardingService', () => {
         makeServiceFail('clinic', new Error('Clinic creation failed'));
 
         await expect(
-          service.completeOnboarding(validClinicPlanData)
+          service.completeOnboarding(validClinicPlanData),
         ).rejects.toThrow(InternalServerErrorException);
       });
     });
@@ -343,14 +412,14 @@ describe('OnboardingService', () => {
               dayOfWeek: 'tuesday',
               isWorkingDay: true,
               openingTime: '09:00',
-              closingTime: '17:00'
-            }
-          ]
+              closingTime: '17:00',
+            },
+          ],
         };
 
         mockClinicService.createClinic.mockResolvedValue({
           ...mockServiceResponses.clinic,
-          name: 'Bright Smile Dental Clinic'
+          name: 'Bright Smile Dental Clinic',
         });
 
         await service.completeOnboarding(dataWithWorkingHours);
@@ -364,9 +433,9 @@ describe('OnboardingService', () => {
           contacts: [
             {
               contactType: 'email',
-              contactValue: 'test@example.com'
-            }
-          ]
+              contactValue: 'test@example.com',
+            },
+          ],
         };
 
         await service.completeOnboarding(dataWithContacts);
@@ -379,8 +448,8 @@ describe('OnboardingService', () => {
           ...validClinicPlanData,
           legalInfo: {
             termsConditions: 'Terms and conditions...',
-            privacyPolicy: 'Privacy policy...'
-          }
+            privacyPolicy: 'Privacy policy...',
+          },
         };
 
         await service.completeOnboarding(dataWithLegalInfo);
@@ -400,14 +469,14 @@ describe('OnboardingService', () => {
           workingHours: [
             {
               dayOfWeek: 'monday',
-              isWorkingDay: true
+              isWorkingDay: true,
               // Missing opening and closing times
-            }
-          ]
+            },
+          ],
         };
 
         await expect(
-          service.completeOnboarding(dataWithInvalidWorkingHours)
+          service.completeOnboarding(dataWithInvalidWorkingHours),
         ).rejects.toThrow(BadRequestException);
       });
     });
@@ -419,41 +488,53 @@ describe('OnboardingService', () => {
         const result = await service.completeOnboarding(validCompanyPlanData);
 
         expect(result.entities.organization).toBeDefined();
-        expect(mockOrganizationService.createOrganization).toHaveBeenCalledWith({
-          subscriptionId: expect.any(String),
-          name: validCompanyPlanData.organization?.name,
-          legalName: validCompanyPlanData.organization?.legalName,
-          registrationNumber: validCompanyPlanData.organization?.registrationNumber,
-          phone: validCompanyPlanData.organization?.phone,
-          email: validCompanyPlanData.organization?.email,
-          address: validCompanyPlanData.organization?.address,
-          googleLocation: validCompanyPlanData.organization?.googleLocation,
-          logoUrl: validCompanyPlanData.organization?.logoUrl,
-          website: validCompanyPlanData.organization?.website,
-          yearEstablished: validCompanyPlanData.organization?.businessProfile?.yearEstablished,
-          mission: validCompanyPlanData.organization?.businessProfile?.mission,
-          vision: validCompanyPlanData.organization?.businessProfile?.vision,
-          ceoName: validCompanyPlanData.organization?.businessProfile?.ceoName,
-          vatNumber: validCompanyPlanData.organization?.legalInfo?.vatNumber,
-          crNumber: validCompanyPlanData.organization?.legalInfo?.crNumber
-        });
+        expect(mockOrganizationService.createOrganization).toHaveBeenCalledWith(
+          {
+            subscriptionId: expect.any(String),
+            name: validCompanyPlanData.organization?.name,
+            legalName: validCompanyPlanData.organization?.legalName,
+            registrationNumber:
+              validCompanyPlanData.organization?.registrationNumber,
+            phone: validCompanyPlanData.organization?.phone,
+            email: validCompanyPlanData.organization?.email,
+            address: validCompanyPlanData.organization?.address,
+            googleLocation: validCompanyPlanData.organization?.googleLocation,
+            logoUrl: validCompanyPlanData.organization?.logoUrl,
+            website: validCompanyPlanData.organization?.website,
+            yearEstablished:
+              validCompanyPlanData.organization?.businessProfile
+                ?.yearEstablished,
+            mission:
+              validCompanyPlanData.organization?.businessProfile?.mission,
+            vision: validCompanyPlanData.organization?.businessProfile?.vision,
+            ceoName:
+              validCompanyPlanData.organization?.businessProfile?.ceoName,
+            vatNumber: validCompanyPlanData.organization?.legalInfo?.vatNumber,
+            crNumber: validCompanyPlanData.organization?.legalInfo?.crNumber,
+          },
+        );
       });
 
       it('should create complexes with department relationships', async () => {
         await service.completeOnboarding(validCompanyPlanData);
 
         expect(mockComplexService.createComplex).toHaveBeenCalled();
-        expect(mockDepartmentService.createComplexDepartment).toHaveBeenCalled();
+        expect(
+          mockDepartmentService.createComplexDepartment,
+        ).toHaveBeenCalled();
       });
 
       it('should handle company plan without organization name', async () => {
         const invalidData = {
           ...validCompanyPlanData,
-          organization: { ...validCompanyPlanData.organization, name: undefined }
+          organization: {
+            ...validCompanyPlanData.organization,
+            name: undefined,
+          },
         };
 
         await expect(
-          service.completeOnboarding(invalidData as any)
+          service.completeOnboarding(invalidData as any),
         ).rejects.toThrow('Organization name is required for company plan');
       });
     });
@@ -463,7 +544,9 @@ describe('OnboardingService', () => {
         await service.completeOnboarding(validComplexPlanData);
 
         expect(mockComplexService.createComplex).toHaveBeenCalled();
-        expect(mockOrganizationService.createOrganization).not.toHaveBeenCalled();
+        expect(
+          mockOrganizationService.createOrganization,
+        ).not.toHaveBeenCalled();
       });
     });
 
@@ -472,7 +555,9 @@ describe('OnboardingService', () => {
         await service.completeOnboarding(validClinicPlanData);
 
         expect(mockClinicService.createClinic).toHaveBeenCalled();
-        expect(mockOrganizationService.createOrganization).not.toHaveBeenCalled();
+        expect(
+          mockOrganizationService.createOrganization,
+        ).not.toHaveBeenCalled();
         expect(mockComplexService.createComplex).not.toHaveBeenCalled();
       });
     });
@@ -490,7 +575,7 @@ describe('OnboardingService', () => {
       // Mock service returning object with _id
       mockOrganizationService.createOrganization.mockResolvedValue({
         _id: 'org_object_id_123',
-        name: 'Test Org'
+        name: 'Test Org',
       });
 
       const result = await service.completeOnboarding(validCompanyPlanData);
@@ -498,15 +583,15 @@ describe('OnboardingService', () => {
       expect(result.entities.organization).toBeDefined();
       expect(mockComplexService.createComplex).toHaveBeenCalledWith(
         expect.objectContaining({
-          organizationId: 'org_object_id_123'
-        })
+          organizationId: 'org_object_id_123',
+        }),
       );
     });
 
     it('should handle services returning objects with id field', async () => {
       mockOrganizationService.createOrganization.mockResolvedValue({
         id: 'org_regular_id_123',
-        name: 'Test Org'
+        name: 'Test Org',
       });
 
       const result = await service.completeOnboarding(validCompanyPlanData);
@@ -516,7 +601,7 @@ describe('OnboardingService', () => {
 
     it('should handle services returning objects without id field', async () => {
       mockOrganizationService.createOrganization.mockResolvedValue({
-        name: 'Test Org'
+        name: 'Test Org',
         // No id or _id field
       });
 
@@ -535,7 +620,7 @@ describe('OnboardingService', () => {
         complexes: [],
         clinics: [],
         workingHours: [],
-        contacts: []
+        contacts: [],
       };
 
       const result = await service.completeOnboarding(dataWithEmptyArrays);
@@ -551,7 +636,7 @@ describe('OnboardingService', () => {
         complexes: undefined,
         clinics: undefined,
         workingHours: undefined,
-        contacts: undefined
+        contacts: undefined,
       };
 
       const result = await service.completeOnboarding(dataWithUndefined);
@@ -562,17 +647,23 @@ describe('OnboardingService', () => {
     it('should handle very large entity counts within limits', async () => {
       const dataWithManyEntities = {
         ...validCompanyPlanData,
-        complexes: Array(10).fill(0).map((_, i) => ({
-          name: `Complex ${i + 1}`,
-          departmentIds: ['dept1']
-        })),
-        departments: Array(100).fill(0).map((_, i) => ({
-          name: `Department ${i + 1}`
-        })),
-        clinics: Array(50).fill(0).map((_, i) => ({
-          name: `Clinic ${i + 1}`,
-          capacity: { maxPatients: 100, sessionDuration: 30 }
-        }))
+        complexes: Array(10)
+          .fill(0)
+          .map((_, i) => ({
+            name: `Complex ${i + 1}`,
+            departmentIds: ['dept1'],
+          })),
+        departments: Array(100)
+          .fill(0)
+          .map((_, i) => ({
+            name: `Department ${i + 1}`,
+          })),
+        clinics: Array(50)
+          .fill(0)
+          .map((_, i) => ({
+            name: `Clinic ${i + 1}`,
+            capacity: { maxPatients: 100, sessionDuration: 30 },
+          })),
       };
 
       const result = await service.completeOnboarding(dataWithManyEntities);
@@ -583,4 +674,3 @@ describe('OnboardingService', () => {
     });
   });
 });
-

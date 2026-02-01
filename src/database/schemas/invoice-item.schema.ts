@@ -3,7 +3,7 @@ import { Document, Types } from 'mongoose';
 
 @Schema({
   timestamps: true,
-  collection: 'invoice_items'
+  collection: 'invoice_items',
 })
 export class InvoiceItem extends Document {
   @Prop({ type: Types.ObjectId, ref: 'Invoice', required: true })
@@ -25,7 +25,7 @@ export class InvoiceItem extends Document {
 export const InvoiceItemSchema = SchemaFactory.createForClass(InvoiceItem);
 
 // Virtual for total price
-InvoiceItemSchema.virtual('totalPrice').get(function() {
+InvoiceItemSchema.virtual('totalPrice').get(function () {
   return this.quantity * this.unitPrice;
 });
 

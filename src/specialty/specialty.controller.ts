@@ -12,7 +12,10 @@ import {
   Query,
 } from '@nestjs/common';
 import { SpecialtyService } from './specialty.service';
-import { CreateSpecialtyDto, UpdateSpecialtyDto } from './dto/create-specialty.dto';
+import {
+  CreateSpecialtyDto,
+  UpdateSpecialtyDto,
+} from './dto/create-specialty.dto';
 import { Specialty } from '../database/schemas/specialty.schema';
 
 @Controller('specialties')
@@ -77,7 +80,9 @@ export class SpecialtyController {
    * Search specialties
    */
   @Get('search/:term')
-  async searchSpecialties(@Param('term') searchTerm: string): Promise<Specialty[]> {
+  async searchSpecialties(
+    @Param('term') searchTerm: string,
+  ): Promise<Specialty[]> {
     return this.specialtyService.searchSpecialties(searchTerm);
   }
 }

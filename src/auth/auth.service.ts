@@ -40,8 +40,8 @@ export class AuthService {
   async register(registerDto: RegisterDto): Promise<AuthResponseDto> {
     try {
       // Check if user already exists
-      const existingUser = await this.userModel.findOne({ 
-        email: registerDto.email.toLowerCase() 
+      const existingUser = await this.userModel.findOne({
+        email: registerDto.email.toLowerCase(),
       });
 
       if (existingUser) {
@@ -114,15 +114,19 @@ export class AuthService {
 
   /**
    * Login user
-   * 
+   *
    * Requirements: 1.1, 5.1
    * Task: 12.1 - Handle first login flag and audit logging
    */
-  async login(loginDto: LoginDto, ipAddress?: string, userAgent?: string): Promise<AuthResponseDto> {
+  async login(
+    loginDto: LoginDto,
+    ipAddress?: string,
+    userAgent?: string,
+  ): Promise<AuthResponseDto> {
     try {
       // Find user by email
-      const user = await this.userModel.findOne({ 
-        email: loginDto.email.toLowerCase() 
+      const user = await this.userModel.findOne({
+        email: loginDto.email.toLowerCase(),
       });
 
       if (!user) {
@@ -208,19 +212,25 @@ export class AuthService {
       let planType: string | null = null;
       if (user.subscriptionId) {
         try {
-          const subscription = await this.subscriptionService.getSubscriptionById(user.subscriptionId.toString());
+          const subscription =
+            await this.subscriptionService.getSubscriptionById(
+              user.subscriptionId.toString(),
+            );
           if (subscription) {
             // The planId is populated with the full SubscriptionPlan object
             const plan = subscription.planId as any;
             planType = plan.name; // The planType is stored in the plan's 'name' field
           }
         } catch (error) {
-          this.logger.warn(`Could not fetch planType for user ${user.email}: ${error.message}`);
+          this.logger.warn(
+            `Could not fetch planType for user ${user.email}: ${error.message}`,
+          );
         }
       }
 
       // Check isFirstLogin flag and include passwordChangeRequired in response - Requirement 1.1
-      const passwordChangeRequired = user.isFirstLogin || user.passwordChangeRequired || false;
+      const passwordChangeRequired =
+        user.isFirstLogin || user.passwordChangeRequired || false;
 
       return {
         ...tokens,
@@ -265,10 +275,10 @@ export class AuthService {
 
   /**
    * Refresh access token with blacklist check
-   * 
+   *
    * Requirements: 7.3, 7.4, 7.5
    * Task: 19.1
-   * 
+   *
    * @param refreshToken - Refresh token to use for generating new tokens
    * @returns AuthResponse with new tokens and user data
    */
@@ -280,8 +290,9 @@ export class AuthService {
         .update(refreshToken)
         .digest('hex');
 
-      const isBlacklisted = await this.sessionService.isTokenBlacklisted(tokenHash);
-      
+      const isBlacklisted =
+        await this.sessionService.isTokenBlacklisted(tokenHash);
+
       if (isBlacklisted) {
         this.logger.warn('Attempted to use blacklisted refresh token');
         throw new UnauthorizedException({
@@ -295,7 +306,8 @@ export class AuthService {
 
       // Validate token signature and expiration - Requirement 7.3
       const payload = this.jwtService.verify(refreshToken, {
-        secret: process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET + '_refresh',
+        secret:
+          process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET + '_refresh',
       });
 
       // Find user
@@ -316,7 +328,7 @@ export class AuthService {
       // Blacklist old refresh token (single-use) - Requirement 7.5
       // Get expiration from the old token payload
       const oldTokenExpiry = new Date(payload.exp * 1000);
-      
+
       await this.sessionService.addTokenToBlacklist(
         refreshToken,
         (user._id as any).toString(),
@@ -324,7 +336,9 @@ export class AuthService {
         'token_refresh',
       );
 
-      this.logger.log(`Refresh token used and blacklisted for user ${user._id}`);
+      this.logger.log(
+        `Refresh token used and blacklisted for user ${user._id}`,
+      );
 
       // Return new tokens - Requirement 7.4
       return {
@@ -344,7 +358,7 @@ export class AuthService {
       if (error instanceof UnauthorizedException) {
         throw error;
       }
-      
+
       // Handle JWT-specific errors
       if (error.name === 'TokenExpiredError') {
         this.logger.warn('Refresh token expired');
@@ -356,7 +370,7 @@ export class AuthService {
           code: 'AUTH_002',
         });
       }
-      
+
       if (error.name === 'JsonWebTokenError') {
         this.logger.warn('Invalid refresh token');
         throw new UnauthorizedException({
@@ -408,7 +422,10 @@ export class AuthService {
       }
       return null;
     } catch (error) {
-      this.logger.error(`User validation failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `User validation failed: ${error.message}`,
+        error.stack,
+      );
       return null;
     }
   }
@@ -453,7 +470,8 @@ export class AuthService {
         expiresIn: accessTokenExpiry,
       }),
       this.jwtService.signAsync(payload, {
-        secret: process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET + '_refresh',
+        secret:
+          process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET + '_refresh',
         expiresIn: refreshTokenExpiry,
       }),
     ]);
@@ -478,7 +496,9 @@ export class AuthService {
       });
     } catch (error) {
       // Don't throw error for this operation, just log it
-      this.logger.warn(`Failed to update last login for user ${userId}: ${error.message}`);
+      this.logger.warn(
+        `Failed to update last login for user ${userId}: ${error.message}`,
+      );
     }
   }
 
@@ -493,11 +513,16 @@ export class AuthService {
     const unit = matches[2];
 
     switch (unit) {
-      case 's': return value;
-      case 'm': return value * 60;
-      case 'h': return value * 3600;
-      case 'd': return value * 86400;
-      default: return 86400;
+      case 's':
+        return value;
+      case 'm':
+        return value * 60;
+      case 'h':
+        return value * 3600;
+      case 'd':
+        return value * 86400;
+      default:
+        return 86400;
     }
   }
 
@@ -533,7 +558,7 @@ export class AuthService {
         hasSubscriptionId: !!user.subscriptionId,
         hasOrganizationId: !!user.organizationId,
         isOwner: user.role === 'owner',
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       };
     } catch (error) {
       throw new BadRequestException({
@@ -548,10 +573,10 @@ export class AuthService {
 
   /**
    * First login password change
-   * 
+   *
    * Requirements: 1.1-1.6, 2.1-2.3
    * Task: 8.1
-   * 
+   *
    * @param userId - User ID requesting password change
    * @param currentPassword - Current password for verification
    * @param newPassword - New password to set
@@ -630,10 +655,7 @@ export class AuthService {
       );
 
       // Call AuditService to log password change
-      await this.auditService.logPasswordChange(
-        userId,
-        'first_login',
-      );
+      await this.auditService.logPasswordChange(userId, 'first_login');
 
       // Return new tokens and updated user (Requirement 1.5)
       return {
@@ -676,9 +698,9 @@ export class AuthService {
 
   /**
    * Change password for authenticated user
-   * 
+   *
    * Requirements: 2.1-2.4, 9.3
-   * 
+   *
    * @param userId - User ID requesting password change
    * @param currentPassword - Current password for verification
    * @param newPassword - New password to set
@@ -691,7 +713,8 @@ export class AuthService {
   ): Promise<any> {
     try {
       // Check rate limit for user (3 per hour) - Requirement 9.3
-      const isAllowed = await this.rateLimitService.checkPasswordChangeLimit(userId);
+      const isAllowed =
+        await this.rateLimitService.checkPasswordChangeLimit(userId);
       if (!isAllowed) {
         throw new BadRequestException({
           message: {
@@ -767,14 +790,13 @@ export class AuthService {
       );
 
       // Call AuditService to log password change
-      await this.auditService.logPasswordChange(
-        userId,
-        'user_initiated',
-      );
+      await this.auditService.logPasswordChange(userId, 'user_initiated');
 
       // TODO: Call EmailService to send confirmation (Requirement 4.4)
       // This will be implemented when EmailService is available (Task 7)
-      this.logger.log(`Email confirmation needed for password change by user ${userId}`);
+      this.logger.log(
+        `Email confirmation needed for password change by user ${userId}`,
+      );
 
       // Return success response
       return {
@@ -807,20 +829,18 @@ export class AuthService {
 
   /**
    * Request password reset
-   * 
+   *
    * Requirements: 2.5, 2.6, 2.10, 7.9
-   * 
+   *
    * @param email - User email address
    * @param ipAddress - Request IP address for rate limiting
    * @returns Success response (doesn't reveal if email exists)
    */
-  async forgotPassword(
-    email: string,
-    ipAddress: string,
-  ): Promise<any> {
+  async forgotPassword(email: string, ipAddress: string): Promise<any> {
     try {
       // Check rate limit for IP address (5 per hour) - Requirement 2.10
-      const isAllowed = await this.rateLimitService.checkPasswordResetLimit(ipAddress);
+      const isAllowed =
+        await this.rateLimitService.checkPasswordResetLimit(ipAddress);
       if (!isAllowed) {
         throw new BadRequestException({
           message: {
@@ -832,8 +852,8 @@ export class AuthService {
       }
 
       // Find user by email
-      const user = await this.userModel.findOne({ 
-        email: email.toLowerCase() 
+      const user = await this.userModel.findOne({
+        email: email.toLowerCase(),
       });
 
       // If user exists, generate and send reset token
@@ -863,13 +883,17 @@ export class AuthService {
         //   resetToken,
         //   user.preferredLanguage || 'en'
         // );
-        this.logger.log(`Password reset email needed for ${user.email} with token: ${resetToken}`);
+        this.logger.log(
+          `Password reset email needed for ${user.email} with token: ${resetToken}`,
+        );
 
         // Call AuditService to log reset request
         await this.auditService.logPasswordResetRequest(email, ipAddress);
       } else {
         // User doesn't exist, but we still log the attempt
-        this.logger.log(`Password reset requested for non-existent email: ${email}`);
+        this.logger.log(
+          `Password reset requested for non-existent email: ${email}`,
+        );
         await this.auditService.logPasswordResetRequest(email, ipAddress);
       }
 
@@ -902,17 +926,14 @@ export class AuthService {
 
   /**
    * Reset password using reset token
-   * 
+   *
    * Requirements: 2.7-2.9
-   * 
+   *
    * @param token - Password reset token from email
    * @param newPassword - New password to set
    * @returns Success response with bilingual message
    */
-  async resetPassword(
-    token: string,
-    newPassword: string,
-  ): Promise<any> {
+  async resetPassword(token: string, newPassword: string): Promise<any> {
     try {
       // Hash provided token to match stored hash
       const hashedToken = crypto
@@ -937,7 +958,10 @@ export class AuthService {
       }
 
       // Validate token not expired - Requirement 2.8
-      if (!user.passwordResetExpires || user.passwordResetExpires < new Date()) {
+      if (
+        !user.passwordResetExpires ||
+        user.passwordResetExpires < new Date()
+      ) {
         throw new BadRequestException({
           message: {
             ar: 'انتهت صلاحية رمز إعادة تعيين كلمة المرور',
@@ -990,7 +1014,9 @@ export class AuthService {
       //   user.firstName,
       //   user.preferredLanguage || 'en'
       // );
-      this.logger.log(`Password reset confirmation email needed for ${user.email}`);
+      this.logger.log(
+        `Password reset confirmation email needed for ${user.email}`,
+      );
 
       // Return success response
       return {
@@ -1004,10 +1030,7 @@ export class AuthService {
       if (error instanceof BadRequestException) {
         throw error;
       }
-      this.logger.error(
-        `Password reset failed: ${error.message}`,
-        error.stack,
-      );
+      this.logger.error(`Password reset failed: ${error.message}`, error.stack);
       throw new BadRequestException({
         message: {
           ar: 'فشل إعادة تعيين كلمة المرور',
@@ -1020,10 +1043,10 @@ export class AuthService {
 
   /**
    * Logout user and blacklist tokens
-   * 
+   *
    * Requirements: 3.5
    * Task: 18.1
-   * 
+   *
    * @param userId - User ID logging out
    * @param accessToken - Access token to blacklist
    * @param refreshToken - Refresh token to blacklist (optional)
@@ -1066,9 +1089,14 @@ export class AuthService {
       if (refreshToken) {
         let refreshTokenExpiry: Date;
         try {
-          const refreshPayload = await this.jwtService.verifyAsync(refreshToken, {
-            secret: process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET + '_refresh',
-          });
+          const refreshPayload = await this.jwtService.verifyAsync(
+            refreshToken,
+            {
+              secret:
+                process.env.JWT_REFRESH_SECRET ||
+                process.env.JWT_SECRET + '_refresh',
+            },
+          );
           refreshTokenExpiry = new Date(refreshPayload.exp * 1000);
         } catch (error) {
           // If token is already expired or invalid, use a default expiry
@@ -1082,7 +1110,9 @@ export class AuthService {
           'logout',
         );
 
-        this.logger.log(`Refresh token blacklisted for user ${userId} on logout`);
+        this.logger.log(
+          `Refresh token blacklisted for user ${userId} on logout`,
+        );
       }
 
       // Call AuditService to log logout
@@ -1126,17 +1156,14 @@ export class AuthService {
 
   /**
    * Send password reset email (admin-initiated)
-   * 
+   *
    * Requirements: 2.5, 2.6, 8.5
-   * 
+   *
    * @param userId - User ID to send reset email to
    * @param adminId - Admin ID who initiated the reset
    * @returns Success response with bilingual message
    */
-  async sendPasswordResetEmail(
-    userId: string,
-    adminId: string,
-  ): Promise<any> {
+  async sendPasswordResetEmail(userId: string, adminId: string): Promise<any> {
     try {
       // Verify admin has permission (admin, owner, or super_admin)
       const admin = await this.userModel.findById(adminId);
@@ -1189,7 +1216,9 @@ export class AuthService {
       user.passwordResetUsed = false;
       await user.save();
 
-      this.logger.log(`Admin ${adminId} initiated password reset for user ${userId}`);
+      this.logger.log(
+        `Admin ${adminId} initiated password reset for user ${userId}`,
+      );
 
       // TODO: Call EmailService to send reset email - Requirement 2.6
       // This will be implemented when EmailService is available (Task 7)
@@ -1199,14 +1228,12 @@ export class AuthService {
       //   resetToken,
       //   user.preferredLanguage || 'en'
       // );
-      this.logger.log(`Password reset email needed for ${user.email} with token: ${resetToken}`);
+      this.logger.log(
+        `Password reset email needed for ${user.email} with token: ${resetToken}`,
+      );
 
       // Call AuditService to log admin-initiated reset
-      await this.auditService.logPasswordChange(
-        userId,
-        'admin_reset',
-        adminId,
-      );
+      await this.auditService.logPasswordChange(userId, 'admin_reset', adminId);
 
       // Return success response
       return {

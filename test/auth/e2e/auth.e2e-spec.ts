@@ -6,13 +6,13 @@ import request from 'supertest';
 
 import { AppModule } from '../../../src/app.module';
 import { AuthModule } from '../../../src/auth/auth.module';
-import { 
-  validRegisterData, 
-  validLoginData, 
-  invalidRegisterData, 
+import {
+  validRegisterData,
+  validLoginData,
+  invalidRegisterData,
   invalidLoginData,
   userRoleFixtures,
-  testEnvironment 
+  testEnvironment,
 } from '../fixtures/auth.fixtures';
 
 describe('Authentication (e2e)', () => {
@@ -29,13 +29,15 @@ describe('Authentication (e2e)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
-    
+
     // Apply validation pipe
-    app.useGlobalPipes(new ValidationPipe({
-      transform: true,
-      whitelist: true,
-      forbidNonWhitelisted: true,
-    }));
+    app.useGlobalPipes(
+      new ValidationPipe({
+        transform: true,
+        whitelist: true,
+        forbidNonWhitelisted: true,
+      }),
+    );
 
     await app.init();
   });
@@ -66,7 +68,9 @@ describe('Authentication (e2e)', () => {
         .send(invalidRegisterData.invalidEmail)
         .expect(400)
         .expect((res) => {
-          expect(res.body.message).toContain('Please provide a valid email address');
+          expect(res.body.message).toContain(
+            'Please provide a valid email address',
+          );
         });
     });
 
@@ -123,7 +127,7 @@ describe('Authentication (e2e)', () => {
           expect(res.body).toHaveProperty('access_token');
           expect(res.body).toHaveProperty('refresh_token');
           expect(res.body.user.email).toBe(validLoginData.email);
-          
+
           // Store tokens for subsequent tests
           accessToken = res.body.access_token;
           refreshToken = res.body.refresh_token;
@@ -219,9 +223,7 @@ describe('Authentication (e2e)', () => {
     });
 
     it('should reject request without token', () => {
-      return request(app.getHttpServer())
-        .get('/auth/profile')
-        .expect(401);
+      return request(app.getHttpServer()).get('/auth/profile').expect(401);
     });
 
     it('should reject request with invalid token', () => {
@@ -254,9 +256,7 @@ describe('Authentication (e2e)', () => {
     });
 
     it('should reject logout without token', () => {
-      return request(app.getHttpServer())
-        .post('/auth/logout')
-        .expect(401);
+      return request(app.getHttpServer()).post('/auth/logout').expect(401);
     });
   });
 

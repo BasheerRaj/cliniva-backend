@@ -1,9 +1,15 @@
-import { IsString, IsOptional, IsNumber, IsUrl, IsBoolean, IsArray, ValidateNested, IsEnum } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsNumber,
+  IsUrl,
+  IsBoolean,
+  IsArray,
+  ValidateNested,
+  IsEnum,
+} from 'class-validator';
 import { Type } from 'class-transformer';
-import { 
-  ContactInfoDto, 
-  LegalInfoDto 
-} from './shared-base.dto';
+import { ContactInfoDto, LegalInfoDto } from './shared-base.dto';
 import { InheritanceSettingsDto } from './step-progress.dto';
 
 // Complex overview form - basic entity information
@@ -73,8 +79,23 @@ export class ComplexContactDto extends ContactInfoDto {
 
 export class ComplexWorkingHoursDto {
   @IsString()
-  @IsEnum(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'])
-  dayOfWeek: 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday';
+  @IsEnum([
+    'monday',
+    'tuesday',
+    'wednesday',
+    'thursday',
+    'friday',
+    'saturday',
+    'sunday',
+  ])
+  dayOfWeek:
+    | 'monday'
+    | 'tuesday'
+    | 'wednesday'
+    | 'thursday'
+    | 'friday'
+    | 'saturday'
+    | 'sunday';
 
   @IsBoolean()
   isWorkingDay: boolean;
@@ -130,4 +151,4 @@ export class ComplexStepDto {
   @IsBoolean()
   @IsOptional()
   completeSetup?: boolean; // Finalize complex setup
-} 
+}

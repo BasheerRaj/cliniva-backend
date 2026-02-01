@@ -19,12 +19,12 @@ import * as path from 'path';
 const storage = diskStorage({
   destination: (req, file, cb) => {
     const uploadPath = './uploads';
-    
+
     // Create uploads directory if it doesn't exist
     if (!fs.existsSync(uploadPath)) {
       fs.mkdirSync(uploadPath, { recursive: true });
     }
-    
+
     cb(null, uploadPath);
   },
   filename: (req, file, cb) => {
@@ -39,26 +39,30 @@ const fileFilter = (req: any, file: Express.Multer.File, cb: any) => {
   // Allow only specific file types
   const allowedTypes = [
     'image/jpeg',
-    'image/jpg', 
+    'image/jpg',
     'image/png',
     'image/gif',
     'image/webp',
     'image/svg+xml',
     'application/pdf',
     'application/msword',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   ];
 
   if (allowedTypes.includes(file.mimetype)) {
     cb(null, true);
   } else {
-    cb(new BadRequestException('Invalid file type. Only images and documents are allowed.'), false);
+    cb(
+      new BadRequestException(
+        'Invalid file type. Only images and documents are allowed.',
+      ),
+      false,
+    );
   }
 };
 
 @Controller('upload')
 export class UploadController {
-  
   @Post()
   @UseInterceptors(
     FileInterceptor('file', {
@@ -67,7 +71,7 @@ export class UploadController {
       limits: {
         fileSize: 10 * 1024 * 1024, // 10MB limit
       },
-    })
+    }),
   )
   async uploadFile(@UploadedFile() file: Express.Multer.File) {
     try {
@@ -95,9 +99,8 @@ export class UploadController {
           mimetype: file.mimetype,
           size: file.size,
           uploadedAt: new Date().toISOString(),
-        }
+        },
       };
-
     } catch (error) {
       // Clean up uploaded file if there's an error
       if (file && file.path && fs.existsSync(file.path)) {
@@ -108,9 +111,9 @@ export class UploadController {
         {
           success: false,
           message: error.message || 'File upload failed',
-          error: error.message
+          error: error.message,
         },
-        error.status || HttpStatus.INTERNAL_SERVER_ERROR
+        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
   }
@@ -121,11 +124,11 @@ export class UploadController {
       storage: diskStorage({
         destination: (req, file, cb) => {
           const uploadPath = './uploads/logos';
-          
+
           if (!fs.existsSync(uploadPath)) {
             fs.mkdirSync(uploadPath, { recursive: true });
           }
-          
+
           cb(null, uploadPath);
         },
         filename: (req, file, cb) => {
@@ -135,18 +138,30 @@ export class UploadController {
       }),
       fileFilter: (req, file, cb) => {
         // Only allow image files for logos
-        const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'];
-        
+        const allowedTypes = [
+          'image/jpeg',
+          'image/jpg',
+          'image/png',
+          'image/gif',
+          'image/webp',
+          'image/svg+xml',
+        ];
+
         if (allowedTypes.includes(file.mimetype)) {
           cb(null, true);
         } else {
-          cb(new BadRequestException('Logo must be an image file (JPEG, PNG, GIF, WebP, or SVG)'), false);
+          cb(
+            new BadRequestException(
+              'Logo must be an image file (JPEG, PNG, GIF, WebP, or SVG)',
+            ),
+            false,
+          );
         }
       },
       limits: {
         fileSize: 5 * 1024 * 1024, // 5MB limit for logos
       },
-    })
+    }),
   )
   async uploadLogo(@UploadedFile() file: Express.Multer.File) {
     try {
@@ -168,10 +183,9 @@ export class UploadController {
           mimetype: file.mimetype,
           size: file.size,
           uploadedAt: new Date().toISOString(),
-          type: 'logo'
-        }
+          type: 'logo',
+        },
       };
-
     } catch (error) {
       if (file && file.path && fs.existsSync(file.path)) {
         fs.unlinkSync(file.path);
@@ -181,9 +195,9 @@ export class UploadController {
         {
           success: false,
           message: error.message || 'Logo upload failed',
-          error: error.message
+          error: error.message,
         },
-        error.status || HttpStatus.INTERNAL_SERVER_ERROR
+        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
   }
@@ -194,11 +208,11 @@ export class UploadController {
       storage: diskStorage({
         destination: (req, file, cb) => {
           const uploadPath = './uploads/documents';
-          
+
           if (!fs.existsSync(uploadPath)) {
             fs.mkdirSync(uploadPath, { recursive: true });
           }
-          
+
           cb(null, uploadPath);
         },
         filename: (req, file, cb) => {
@@ -214,19 +228,24 @@ export class UploadController {
           'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
           'image/jpeg',
           'image/jpg',
-          'image/png'
+          'image/png',
         ];
-        
+
         if (allowedTypes.includes(file.mimetype)) {
           cb(null, true);
         } else {
-          cb(new BadRequestException('Document must be PDF, Word, or image file'), false);
+          cb(
+            new BadRequestException(
+              'Document must be PDF, Word, or image file',
+            ),
+            false,
+          );
         }
       },
       limits: {
         fileSize: 15 * 1024 * 1024, // 15MB limit for documents
       },
-    })
+    }),
   )
   async uploadDocument(@UploadedFile() file: Express.Multer.File) {
     try {
@@ -248,10 +267,9 @@ export class UploadController {
           mimetype: file.mimetype,
           size: file.size,
           uploadedAt: new Date().toISOString(),
-          type: 'document'
-        }
+          type: 'document',
+        },
       };
-
     } catch (error) {
       if (file && file.path && fs.existsSync(file.path)) {
         fs.unlinkSync(file.path);
@@ -261,10 +279,10 @@ export class UploadController {
         {
           success: false,
           message: error.message || 'Document upload failed',
-          error: error.message
+          error: error.message,
         },
-        error.status || HttpStatus.INTERNAL_SERVER_ERROR
+        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
   }
-} 
+}

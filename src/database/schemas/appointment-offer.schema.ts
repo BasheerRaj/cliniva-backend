@@ -3,7 +3,7 @@ import { Document, Types } from 'mongoose';
 
 @Schema({
   timestamps: true,
-  collection: 'appointment_offers'
+  collection: 'appointment_offers',
 })
 export class AppointmentOffer extends Document {
   @Prop({ type: Types.ObjectId, ref: 'Appointment', required: true })
@@ -16,7 +16,8 @@ export class AppointmentOffer extends Document {
   discountAmount: number;
 }
 
-export const AppointmentOfferSchema = SchemaFactory.createForClass(AppointmentOffer);
+export const AppointmentOfferSchema =
+  SchemaFactory.createForClass(AppointmentOffer);
 
 // Indexes
 AppointmentOfferSchema.index({ appointmentId: 1 });

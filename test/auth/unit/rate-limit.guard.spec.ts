@@ -79,14 +79,18 @@ describe('RateLimitGuard', () => {
       // Mock reflector to return null (no rate limit config)
       jest.spyOn(reflector, 'get').mockReturnValue(null);
 
-      const result = await guard.canActivate(mockExecutionContext as ExecutionContext);
+      const result = await guard.canActivate(
+        mockExecutionContext as ExecutionContext,
+      );
 
       expect(result).toBe(true);
       expect(reflector.get).toHaveBeenCalledWith(
         RATE_LIMIT_KEY,
         mockExecutionContext.getHandler(),
       );
-      expect(mockRateLimitService.checkPasswordResetLimit).not.toHaveBeenCalled();
+      expect(
+        mockRateLimitService.checkPasswordResetLimit,
+      ).not.toHaveBeenCalled();
     });
 
     describe('PASSWORD_RESET rate limiting', () => {
@@ -100,10 +104,14 @@ describe('RateLimitGuard', () => {
         jest.spyOn(reflector, 'get').mockReturnValue(rateLimitConfig);
         mockRateLimitService.checkPasswordResetLimit.mockResolvedValue(true);
 
-        const result = await guard.canActivate(mockExecutionContext as ExecutionContext);
+        const result = await guard.canActivate(
+          mockExecutionContext as ExecutionContext,
+        );
 
         expect(result).toBe(true);
-        expect(mockRateLimitService.checkPasswordResetLimit).toHaveBeenCalledWith('192.168.1.1');
+        expect(
+          mockRateLimitService.checkPasswordResetLimit,
+        ).toHaveBeenCalledWith('192.168.1.1');
         expect(mockAuditService.logRateLimitViolation).not.toHaveBeenCalled();
       });
 
@@ -112,11 +120,11 @@ describe('RateLimitGuard', () => {
         mockRateLimitService.checkPasswordResetLimit.mockResolvedValue(false);
 
         await expect(
-          guard.canActivate(mockExecutionContext as ExecutionContext)
+          guard.canActivate(mockExecutionContext as ExecutionContext),
         ).rejects.toThrow(HttpException);
 
         await expect(
-          guard.canActivate(mockExecutionContext as ExecutionContext)
+          guard.canActivate(mockExecutionContext as ExecutionContext),
         ).rejects.toMatchObject({
           response: {
             success: false,
@@ -146,10 +154,14 @@ describe('RateLimitGuard', () => {
         jest.spyOn(reflector, 'get').mockReturnValue(rateLimitConfig);
         mockRateLimitService.checkLoginAttemptLimit.mockResolvedValue(true);
 
-        const result = await guard.canActivate(mockExecutionContext as ExecutionContext);
+        const result = await guard.canActivate(
+          mockExecutionContext as ExecutionContext,
+        );
 
         expect(result).toBe(true);
-        expect(mockRateLimitService.checkLoginAttemptLimit).toHaveBeenCalledWith('192.168.1.1');
+        expect(
+          mockRateLimitService.checkLoginAttemptLimit,
+        ).toHaveBeenCalledWith('192.168.1.1');
         expect(mockAuditService.logRateLimitViolation).not.toHaveBeenCalled();
       });
 
@@ -158,7 +170,7 @@ describe('RateLimitGuard', () => {
         mockRateLimitService.checkLoginAttemptLimit.mockResolvedValue(false);
 
         await expect(
-          guard.canActivate(mockExecutionContext as ExecutionContext)
+          guard.canActivate(mockExecutionContext as ExecutionContext),
         ).rejects.toThrow(HttpException);
 
         expect(mockAuditService.logRateLimitViolation).toHaveBeenCalledWith(
@@ -180,10 +192,14 @@ describe('RateLimitGuard', () => {
         jest.spyOn(reflector, 'get').mockReturnValue(rateLimitConfig);
         mockRateLimitService.checkPasswordChangeLimit.mockResolvedValue(true);
 
-        const result = await guard.canActivate(mockExecutionContext as ExecutionContext);
+        const result = await guard.canActivate(
+          mockExecutionContext as ExecutionContext,
+        );
 
         expect(result).toBe(true);
-        expect(mockRateLimitService.checkPasswordChangeLimit).toHaveBeenCalledWith('user-123');
+        expect(
+          mockRateLimitService.checkPasswordChangeLimit,
+        ).toHaveBeenCalledWith('user-123');
         expect(mockAuditService.logRateLimitViolation).not.toHaveBeenCalled();
       });
 
@@ -192,7 +208,7 @@ describe('RateLimitGuard', () => {
         mockRateLimitService.checkPasswordChangeLimit.mockResolvedValue(false);
 
         await expect(
-          guard.canActivate(mockExecutionContext as ExecutionContext)
+          guard.canActivate(mockExecutionContext as ExecutionContext),
         ).rejects.toThrow(HttpException);
 
         expect(mockAuditService.logRateLimitViolation).toHaveBeenCalledWith(
@@ -217,10 +233,14 @@ describe('RateLimitGuard', () => {
           getClass: jest.fn(),
         };
 
-        const result = await guard.canActivate(contextWithoutUser as ExecutionContext);
+        const result = await guard.canActivate(
+          contextWithoutUser as ExecutionContext,
+        );
 
         expect(result).toBe(true);
-        expect(mockRateLimitService.checkPasswordChangeLimit).not.toHaveBeenCalled();
+        expect(
+          mockRateLimitService.checkPasswordChangeLimit,
+        ).not.toHaveBeenCalled();
       });
     });
 
@@ -233,7 +253,9 @@ describe('RateLimitGuard', () => {
 
       jest.spyOn(reflector, 'get').mockReturnValue(unknownConfig);
 
-      const result = await guard.canActivate(mockExecutionContext as ExecutionContext);
+      const result = await guard.canActivate(
+        mockExecutionContext as ExecutionContext,
+      );
 
       expect(result).toBe(true);
     });
@@ -247,10 +269,12 @@ describe('RateLimitGuard', () => {
 
       jest.spyOn(reflector, 'get').mockReturnValue(rateLimitConfig);
       mockRateLimitService.checkPasswordResetLimit.mockRejectedValue(
-        new Error('Service error')
+        new Error('Service error'),
       );
 
-      const result = await guard.canActivate(mockExecutionContext as ExecutionContext);
+      const result = await guard.canActivate(
+        mockExecutionContext as ExecutionContext,
+      );
 
       // Should fail open (allow request) on service error
       expect(result).toBe(true);
@@ -280,7 +304,9 @@ describe('RateLimitGuard', () => {
 
       await guard.canActivate(contextWithConnection as ExecutionContext);
 
-      expect(mockRateLimitService.checkPasswordResetLimit).toHaveBeenCalledWith('10.0.0.1');
+      expect(mockRateLimitService.checkPasswordResetLimit).toHaveBeenCalledWith(
+        '10.0.0.1',
+      );
     });
 
     it('should use "unknown" IP when no IP is available', async () => {
@@ -306,7 +332,9 @@ describe('RateLimitGuard', () => {
 
       await guard.canActivate(contextWithoutIP as ExecutionContext);
 
-      expect(mockRateLimitService.checkPasswordResetLimit).toHaveBeenCalledWith('unknown');
+      expect(mockRateLimitService.checkPasswordResetLimit).toHaveBeenCalledWith(
+        'unknown',
+      );
     });
   });
 });

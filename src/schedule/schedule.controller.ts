@@ -43,23 +43,23 @@ export class ScheduleController {
   @Post()
   async createSchedule(
     @Body(new ValidationPipe()) createScheduleDto: CreateScheduleDto,
-    @Request() req: any
+    @Request() req: any,
   ) {
     try {
       const schedule = await this.scheduleService.createSchedule(
         createScheduleDto,
-        req.user?.userId
+        req.user?.userId,
       );
       return {
         success: true,
         message: 'Schedule created successfully',
-        data: schedule
+        data: schedule,
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to create schedule',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -69,7 +69,9 @@ export class ScheduleController {
    * GET /schedules
    */
   @Get()
-  async getSchedules(@Query(new ValidationPipe()) query: ScheduleSearchQueryDto) {
+  async getSchedules(
+    @Query(new ValidationPipe()) query: ScheduleSearchQueryDto,
+  ) {
     try {
       const result = await this.scheduleService.getSchedules(query);
       return {
@@ -80,14 +82,14 @@ export class ScheduleController {
           total: result.total,
           page: result.page,
           totalPages: result.totalPages,
-          limit: parseInt(query.limit || '10')
-        }
+          limit: parseInt(query.limit || '10'),
+        },
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to retrieve schedules',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -103,13 +105,13 @@ export class ScheduleController {
       return {
         success: true,
         message: 'Schedule retrieved successfully',
-        data: schedule
+        data: schedule,
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to retrieve schedule',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -122,24 +124,24 @@ export class ScheduleController {
   async updateSchedule(
     @Param('id') id: string,
     @Body(new ValidationPipe()) updateScheduleDto: UpdateScheduleDto,
-    @Request() req: any
+    @Request() req: any,
   ) {
     try {
       const schedule = await this.scheduleService.updateSchedule(
         id,
         updateScheduleDto,
-        req.user?.userId
+        req.user?.userId,
       );
       return {
         success: true,
         message: 'Schedule updated successfully',
-        data: schedule
+        data: schedule,
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to update schedule',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -155,13 +157,13 @@ export class ScheduleController {
       await this.scheduleService.deleteSchedule(id, req.user?.userId);
       return {
         success: true,
-        message: 'Schedule deleted successfully'
+        message: 'Schedule deleted successfully',
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to delete schedule',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -172,24 +174,25 @@ export class ScheduleController {
    */
   @Post('doctor-availability')
   async createDoctorAvailability(
-    @Body(new ValidationPipe()) createAvailabilityDto: CreateDoctorAvailabilityDto,
-    @Request() req: any
+    @Body(new ValidationPipe())
+    createAvailabilityDto: CreateDoctorAvailabilityDto,
+    @Request() req: any,
   ) {
     try {
       const schedule = await this.scheduleService.createDoctorAvailability(
         createAvailabilityDto,
-        req.user?.userId
+        req.user?.userId,
       );
       return {
         success: true,
         message: 'Doctor availability created successfully',
-        data: schedule
+        data: schedule,
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to create doctor availability',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -201,23 +204,23 @@ export class ScheduleController {
   @Post('room-booking')
   async createRoomBooking(
     @Body(new ValidationPipe()) createBookingDto: CreateRoomBookingDto,
-    @Request() req: any
+    @Request() req: any,
   ) {
     try {
       const schedule = await this.scheduleService.createRoomBooking(
         createBookingDto,
-        req.user?.userId
+        req.user?.userId,
       );
       return {
         success: true,
         message: 'Room booking created successfully',
-        data: schedule
+        data: schedule,
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to create room booking',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -229,23 +232,23 @@ export class ScheduleController {
   @Post('equipment')
   async createEquipmentSchedule(
     @Body(new ValidationPipe()) createEquipmentDto: CreateEquipmentScheduleDto,
-    @Request() req: any
+    @Request() req: any,
   ) {
     try {
       const schedule = await this.scheduleService.createEquipmentSchedule(
         createEquipmentDto,
-        req.user?.userId
+        req.user?.userId,
       );
       return {
         success: true,
         message: 'Equipment schedule created successfully',
-        data: schedule
+        data: schedule,
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to create equipment schedule',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -256,17 +259,18 @@ export class ScheduleController {
    */
   @Post('check-conflicts')
   async checkScheduleConflicts(
-    @Body(new ValidationPipe()) conflictDto: CheckScheduleConflictDto
+    @Body(new ValidationPipe()) conflictDto: CheckScheduleConflictDto,
   ) {
     try {
-      const result = await this.scheduleService.checkScheduleConflicts(conflictDto);
+      const result =
+        await this.scheduleService.checkScheduleConflicts(conflictDto);
       return {
         success: true,
         message: 'Conflict check completed',
         data: {
           hasConflicts: result.hasConflicts,
           conflictCount: result.conflicts.length,
-          conflicts: result.conflicts.map(conflict => ({
+          conflicts: result.conflicts.map((conflict) => ({
             id: conflict._id,
             title: conflict.title,
             scheduleType: conflict.scheduleType,
@@ -274,15 +278,15 @@ export class ScheduleController {
             endDate: conflict.endDate,
             startTime: conflict.startTime,
             endTime: conflict.endTime,
-            user: conflict.userId
-          }))
-        }
+            user: conflict.userId,
+          })),
+        },
       };
     } catch (error) {
       return {
         success: false,
         message: 'Conflict check failed',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -293,20 +297,20 @@ export class ScheduleController {
    */
   @Post('available-slots')
   async getAvailableTimeSlots(
-    @Body(new ValidationPipe()) slotsDto: GetAvailableTimeSlotsDto
+    @Body(new ValidationPipe()) slotsDto: GetAvailableTimeSlotsDto,
   ) {
     try {
       const result = await this.scheduleService.getAvailableTimeSlots(slotsDto);
       return {
         success: true,
         message: 'Available time slots retrieved successfully',
-        data: result
+        data: result,
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to retrieve available time slots',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -317,20 +321,20 @@ export class ScheduleController {
    */
   @Post('calendar-view')
   async getCalendarView(
-    @Body(new ValidationPipe()) calendarDto: CalendarViewDto
+    @Body(new ValidationPipe()) calendarDto: CalendarViewDto,
   ) {
     try {
       const result = await this.scheduleService.getCalendarView(calendarDto);
       return {
         success: true,
         message: 'Calendar view retrieved successfully',
-        data: result
+        data: result,
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to retrieve calendar view',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -346,13 +350,13 @@ export class ScheduleController {
       return {
         success: true,
         message: 'Schedule statistics retrieved successfully',
-        data: stats
+        data: stats,
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to retrieve schedule statistics',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -364,23 +368,23 @@ export class ScheduleController {
   @Post('bulk-action')
   async bulkScheduleAction(
     @Body(new ValidationPipe()) bulkActionDto: BulkScheduleActionDto,
-    @Request() req: any
+    @Request() req: any,
   ) {
     try {
       const result = await this.scheduleService.bulkScheduleAction(
         bulkActionDto,
-        req.user?.userId
+        req.user?.userId,
       );
       return {
         success: true,
         message: 'Bulk action completed',
-        data: result
+        data: result,
       };
     } catch (error) {
       return {
         success: false,
         message: 'Bulk action failed',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -395,7 +399,7 @@ export class ScheduleController {
     @Query('page') page?: string,
     @Query('limit') limit?: string,
     @Query('startDate') startDate?: string,
-    @Query('endDate') endDate?: string
+    @Query('endDate') endDate?: string,
   ) {
     try {
       const query: ScheduleSearchQueryDto = {
@@ -403,7 +407,7 @@ export class ScheduleController {
         startDate,
         endDate,
         page: page || '1',
-        limit: limit || '10'
+        limit: limit || '10',
       };
 
       const result = await this.scheduleService.getSchedules(query);
@@ -414,14 +418,14 @@ export class ScheduleController {
         pagination: {
           total: result.total,
           page: result.page,
-          totalPages: result.totalPages
-        }
+          totalPages: result.totalPages,
+        },
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to retrieve schedules by type',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -435,7 +439,7 @@ export class ScheduleController {
     @Param('doctorId') doctorId: string,
     @Query('clinicId') clinicId?: string,
     @Query('startDate') startDate?: string,
-    @Query('endDate') endDate?: string
+    @Query('endDate') endDate?: string,
   ) {
     try {
       const query: ScheduleSearchQueryDto = {
@@ -445,7 +449,7 @@ export class ScheduleController {
         startDate,
         endDate,
         isAvailable: true,
-        status: 'active'
+        status: 'active',
       };
 
       const result = await this.scheduleService.getSchedules(query);
@@ -453,13 +457,13 @@ export class ScheduleController {
         success: true,
         message: 'Doctor availability retrieved successfully',
         data: result.schedules,
-        count: result.total
+        count: result.total,
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to retrieve doctor availability',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -473,7 +477,7 @@ export class ScheduleController {
     @Param('roomId') roomId: string,
     @Query('clinicId') clinicId?: string,
     @Query('startDate') startDate?: string,
-    @Query('endDate') endDate?: string
+    @Query('endDate') endDate?: string,
   ) {
     try {
       const query: ScheduleSearchQueryDto = {
@@ -482,7 +486,7 @@ export class ScheduleController {
         clinicId,
         startDate,
         endDate,
-        status: 'active'
+        status: 'active',
       };
 
       const result = await this.scheduleService.getSchedules(query);
@@ -490,13 +494,13 @@ export class ScheduleController {
         success: true,
         message: 'Room bookings retrieved successfully',
         data: result.schedules,
-        count: result.total
+        count: result.total,
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to retrieve room bookings',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -511,7 +515,7 @@ export class ScheduleController {
     @Query('clinicId') clinicId?: string,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
-    @Query('scheduleType') scheduleSubType?: string
+    @Query('scheduleType') scheduleSubType?: string,
   ) {
     try {
       const query: ScheduleSearchQueryDto = {
@@ -520,7 +524,7 @@ export class ScheduleController {
         clinicId,
         startDate,
         endDate,
-        status: 'active'
+        status: 'active',
       };
 
       const result = await this.scheduleService.getSchedules(query);
@@ -528,13 +532,13 @@ export class ScheduleController {
         success: true,
         message: 'Equipment schedules retrieved successfully',
         data: result.schedules,
-        count: result.total
+        count: result.total,
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to retrieve equipment schedules',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -550,7 +554,7 @@ export class ScheduleController {
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
     @Query('page') page?: string,
-    @Query('limit') limit?: string
+    @Query('limit') limit?: string,
   ) {
     try {
       const query: ScheduleSearchQueryDto = {
@@ -559,7 +563,7 @@ export class ScheduleController {
         startDate,
         endDate,
         page: page || '1',
-        limit: limit || '20'
+        limit: limit || '20',
       };
 
       const result = await this.scheduleService.getSchedules(query);
@@ -570,14 +574,14 @@ export class ScheduleController {
         pagination: {
           total: result.total,
           page: result.page,
-          totalPages: result.totalPages
-        }
+          totalPages: result.totalPages,
+        },
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to retrieve clinic schedules',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -593,7 +597,7 @@ export class ScheduleController {
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
     @Query('page') page?: string,
-    @Query('limit') limit?: string
+    @Query('limit') limit?: string,
   ) {
     try {
       const query: ScheduleSearchQueryDto = {
@@ -602,7 +606,7 @@ export class ScheduleController {
         startDate,
         endDate,
         page: page || '1',
-        limit: limit || '20'
+        limit: limit || '20',
       };
 
       const result = await this.scheduleService.getSchedules(query);
@@ -613,14 +617,14 @@ export class ScheduleController {
         pagination: {
           total: result.total,
           page: result.page,
-          totalPages: result.totalPages
-        }
+          totalPages: result.totalPages,
+        },
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to retrieve user schedules',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -633,11 +637,11 @@ export class ScheduleController {
   async getTodaySchedules(
     @Query('scheduleType') scheduleType?: string,
     @Query('clinicId') clinicId?: string,
-    @Query('userId') userId?: string
+    @Query('userId') userId?: string,
   ) {
     try {
       const today = new Date().toISOString().split('T')[0];
-      
+
       const query: ScheduleSearchQueryDto = {
         scheduleType,
         clinicId,
@@ -647,7 +651,7 @@ export class ScheduleController {
         status: 'active',
         limit: '100',
         sortBy: 'startTime',
-        sortOrder: 'asc'
+        sortOrder: 'asc',
       };
 
       const result = await this.scheduleService.getSchedules(query);
@@ -656,13 +660,13 @@ export class ScheduleController {
         message: "Today's schedules retrieved successfully",
         data: result.schedules,
         count: result.total,
-        date: today
+        date: today,
       };
     } catch (error) {
       return {
         success: false,
         message: "Failed to retrieve today's schedules",
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -676,7 +680,7 @@ export class ScheduleController {
     @Query('scheduleType') scheduleType?: string,
     @Query('clinicId') clinicId?: string,
     @Query('userId') userId?: string,
-    @Query('days', new ParseIntPipe({ optional: true })) days?: number
+    @Query('days', new ParseIntPipe({ optional: true })) days?: number,
   ) {
     try {
       const today = new Date();
@@ -692,7 +696,7 @@ export class ScheduleController {
         status: 'active',
         limit: '100',
         sortBy: 'startDate',
-        sortOrder: 'asc'
+        sortOrder: 'asc',
       };
 
       const result = await this.scheduleService.getSchedules(query);
@@ -704,14 +708,14 @@ export class ScheduleController {
         dateRange: {
           from: today.toISOString().split('T')[0],
           to: endDate.toISOString().split('T')[0],
-          days: days || 7
-        }
+          days: days || 7,
+        },
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to retrieve upcoming schedules',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -725,7 +729,7 @@ export class ScheduleController {
     @Query('scheduleType') scheduleType?: string,
     @Query('clinicId') clinicId?: string,
     @Query('page') page?: string,
-    @Query('limit') limit?: string
+    @Query('limit') limit?: string,
   ) {
     try {
       const query: ScheduleSearchQueryDto = {
@@ -733,7 +737,7 @@ export class ScheduleController {
         clinicId,
         isRecurring: true,
         page: page || '1',
-        limit: limit || '20'
+        limit: limit || '20',
       };
 
       const result = await this.scheduleService.getSchedules(query);
@@ -744,14 +748,14 @@ export class ScheduleController {
         pagination: {
           total: result.total,
           page: result.page,
-          totalPages: result.totalPages
-        }
+          totalPages: result.totalPages,
+        },
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to retrieve recurring schedules',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -765,7 +769,7 @@ export class ScheduleController {
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
     @Query('clinicId') clinicId?: string,
-    @Query('userId') userId?: string
+    @Query('userId') userId?: string,
   ) {
     try {
       if (!startDate || !endDate) {
@@ -779,7 +783,7 @@ export class ScheduleController {
         clinicId,
         userId,
         isBlocked: true,
-        status: 'active'
+        status: 'active',
       };
 
       const result = await this.scheduleService.getSchedules(query);
@@ -787,13 +791,13 @@ export class ScheduleController {
         success: true,
         message: 'Blocked time slots retrieved successfully',
         data: result.schedules,
-        count: result.total
+        count: result.total,
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to retrieve blocked time slots',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -806,21 +810,21 @@ export class ScheduleController {
   async getScheduleTypeAnalytics() {
     try {
       const stats = await this.scheduleService.getScheduleStats();
-      
+
       return {
         success: true,
         message: 'Schedule type analytics retrieved successfully',
         data: {
           schedulesByType: stats.schedulesByType,
           totalSchedules: stats.totalSchedules,
-          analysisDate: new Date()
-        }
+          analysisDate: new Date(),
+        },
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to retrieve schedule analytics',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -833,7 +837,7 @@ export class ScheduleController {
   async getScheduleUtilization() {
     try {
       const stats = await this.scheduleService.getScheduleStats();
-      
+
       return {
         success: true,
         message: 'Schedule utilization analytics retrieved successfully',
@@ -841,14 +845,14 @@ export class ScheduleController {
           doctorUtilization: stats.doctorUtilization,
           roomUtilization: stats.roomUtilization,
           averageSlotDuration: stats.averageSlotDuration,
-          analysisDate: new Date()
-        }
+          analysisDate: new Date(),
+        },
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to retrieve utilization analytics',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -861,7 +865,7 @@ export class ScheduleController {
   async getScheduleTrends() {
     try {
       const stats = await this.scheduleService.getScheduleStats();
-      
+
       return {
         success: true,
         message: 'Schedule trends retrieved successfully',
@@ -870,14 +874,14 @@ export class ScheduleController {
           schedulesToday: stats.schedulesToday,
           schedulesThisWeek: stats.schedulesThisWeek,
           schedulesThisMonth: stats.schedulesThisMonth,
-          analysisDate: new Date()
-        }
+          analysisDate: new Date(),
+        },
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to retrieve schedule trends',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -889,7 +893,7 @@ export class ScheduleController {
   @Get('pending-approval')
   async getPendingApprovalSchedules(
     @Query('page') page?: string,
-    @Query('limit') limit?: string
+    @Query('limit') limit?: string,
   ) {
     try {
       // This would be implemented by filtering schedules with pending approval status
@@ -898,13 +902,13 @@ export class ScheduleController {
         message: 'Pending approval schedules retrieved successfully',
         data: [],
         count: 0,
-        message_note: 'Approval workflow would be implemented here'
+        message_note: 'Approval workflow would be implemented here',
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to retrieve pending approval schedules',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -919,7 +923,7 @@ export class ScheduleController {
     @Query('scheduleType') scheduleType?: string,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
-    @Query('limit', new ParseIntPipe({ optional: true })) limit?: number
+    @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
   ) {
     try {
       if (!searchTerm || searchTerm.trim().length === 0) {
@@ -931,7 +935,7 @@ export class ScheduleController {
         scheduleType,
         startDate,
         endDate,
-        limit: (limit || 20).toString()
+        limit: (limit || 20).toString(),
       };
 
       const result = await this.scheduleService.getSchedules(query);
@@ -939,13 +943,13 @@ export class ScheduleController {
         success: true,
         message: 'Search completed successfully',
         data: result.schedules,
-        count: result.total
+        count: result.total,
       };
     } catch (error) {
       return {
         success: false,
         message: 'Search failed',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -957,14 +961,14 @@ export class ScheduleController {
   @Get('export/data')
   async exportSchedules(
     @Query('format') format?: string,
-    @Query() filters?: ScheduleSearchQueryDto
+    @Query() filters?: ScheduleSearchQueryDto,
   ) {
     try {
       const result = await this.scheduleService.getSchedules({
         ...filters,
-        limit: '1000' // Export more records
+        limit: '1000', // Export more records
       });
-      
+
       return {
         success: true,
         message: 'Schedule export prepared successfully',
@@ -973,15 +977,15 @@ export class ScheduleController {
           totalExported: result.total,
           format: format || 'json',
           exportDate: new Date(),
-          message: 'Export functionality would generate CSV/Excel file here'
-        }
+          message: 'Export functionality would generate CSV/Excel file here',
+        },
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to export schedules',
-        error: error.message
+        error: error.message,
       };
     }
   }
-} 
+}

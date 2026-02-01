@@ -1,8 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getConnectionToken } from '@nestjs/mongoose';
-import { BadRequestException, InternalServerErrorException } from '@nestjs/common';
+import {
+  BadRequestException,
+  InternalServerErrorException,
+} from '@nestjs/common';
 import { OnboardingService } from '../../../src/onboarding/onboarding.service';
-import { 
+import {
   mockSubscriptionService,
   mockOrganizationService,
   mockComplexService,
@@ -15,9 +18,13 @@ import {
   mockUserAccessService,
   mockConnection,
   resetAllMocks,
-  makeServiceFail
+  makeServiceFail,
 } from '../mocks/service.mocks';
-import { validCompanyPlanData, validComplexPlanData, validClinicPlanData } from '../fixtures/onboarding-data.fixture';
+import {
+  validCompanyPlanData,
+  validComplexPlanData,
+  validClinicPlanData,
+} from '../fixtures/onboarding-data.fixture';
 import { SubscriptionService } from '../../../src/subscription/subscription.service';
 import { OrganizationService } from '../../../src/organization/organization.service';
 import { ComplexService } from '../../../src/complex/complex.service';
@@ -39,48 +46,48 @@ describe('Error Scenarios Tests', () => {
         OnboardingService,
         {
           provide: getConnectionToken(),
-          useValue: mockConnection
+          useValue: mockConnection,
         },
         {
           provide: SubscriptionService,
-          useValue: mockSubscriptionService
+          useValue: mockSubscriptionService,
         },
         {
           provide: OrganizationService,
-          useValue: mockOrganizationService
+          useValue: mockOrganizationService,
         },
         {
           provide: ComplexService,
-          useValue: mockComplexService
+          useValue: mockComplexService,
         },
         {
           provide: ClinicService,
-          useValue: mockClinicService
+          useValue: mockClinicService,
         },
         {
           provide: DepartmentService,
-          useValue: mockDepartmentService
+          useValue: mockDepartmentService,
         },
         {
           provide: ServiceService,
-          useValue: mockServiceService
+          useValue: mockServiceService,
         },
         {
           provide: WorkingHoursService,
-          useValue: mockWorkingHoursService
+          useValue: mockWorkingHoursService,
         },
         {
           provide: ContactService,
-          useValue: mockContactService
+          useValue: mockContactService,
         },
         {
           provide: DynamicInfoService,
-          useValue: mockDynamicInfoService
+          useValue: mockDynamicInfoService,
         },
         {
           provide: UserAccessService,
-          useValue: mockUserAccessService
-        }
+          useValue: mockUserAccessService,
+        },
       ],
     }).compile();
 
@@ -97,7 +104,7 @@ describe('Error Scenarios Tests', () => {
       makeServiceFail('subscription', new Error('Database connection failed'));
 
       await expect(
-        service.completeOnboarding(validCompanyPlanData)
+        service.completeOnboarding(validCompanyPlanData),
       ).rejects.toThrow(InternalServerErrorException);
 
       // Verify transaction was aborted
@@ -107,10 +114,13 @@ describe('Error Scenarios Tests', () => {
     });
 
     it('should handle organization service failure', async () => {
-      makeServiceFail('organization', new Error('Organization creation failed'));
+      makeServiceFail(
+        'organization',
+        new Error('Organization creation failed'),
+      );
 
       await expect(
-        service.completeOnboarding(validCompanyPlanData)
+        service.completeOnboarding(validCompanyPlanData),
       ).rejects.toThrow(InternalServerErrorException);
 
       expect(mockSubscriptionService.createSubscription).toHaveBeenCalled();
@@ -123,7 +133,7 @@ describe('Error Scenarios Tests', () => {
       makeServiceFail('complex', new Error('Complex creation failed'));
 
       await expect(
-        service.completeOnboarding(validComplexPlanData)
+        service.completeOnboarding(validComplexPlanData),
       ).rejects.toThrow(InternalServerErrorException);
     });
 
@@ -131,7 +141,7 @@ describe('Error Scenarios Tests', () => {
       makeServiceFail('clinic', new Error('Clinic creation failed'));
 
       await expect(
-        service.completeOnboarding(validClinicPlanData)
+        service.completeOnboarding(validClinicPlanData),
       ).rejects.toThrow(InternalServerErrorException);
     });
 
@@ -140,23 +150,25 @@ describe('Error Scenarios Tests', () => {
 
       const complexDataWithDepts = {
         ...validComplexPlanData,
-        complexes: [{
-          name: 'Test Complex',
-          departmentIds: ['dept1', 'dept2']
-        }],
-        departments: [
-          { name: 'Department 1' },
-          { name: 'Department 2' }
-        ]
+        complexes: [
+          {
+            name: 'Test Complex',
+            departmentIds: ['dept1', 'dept2'],
+          },
+        ],
+        departments: [{ name: 'Department 1' }, { name: 'Department 2' }],
       };
 
       await expect(
-        service.completeOnboarding(complexDataWithDepts)
+        service.completeOnboarding(complexDataWithDepts),
       ).rejects.toThrow(InternalServerErrorException);
     });
 
     it('should handle working hours service failure', async () => {
-      makeServiceFail('workingHours', new Error('Working hours creation failed'));
+      makeServiceFail(
+        'workingHours',
+        new Error('Working hours creation failed'),
+      );
 
       const dataWithWorkingHours = {
         ...validClinicPlanData,
@@ -167,13 +179,13 @@ describe('Error Scenarios Tests', () => {
             dayOfWeek: 'monday',
             isWorkingDay: true,
             openingTime: '09:00',
-            closingTime: '17:00'
-          }
-        ]
+            closingTime: '17:00',
+          },
+        ],
       };
 
       await expect(
-        service.completeOnboarding(dataWithWorkingHours)
+        service.completeOnboarding(dataWithWorkingHours),
       ).rejects.toThrow(InternalServerErrorException);
     });
 
@@ -185,13 +197,13 @@ describe('Error Scenarios Tests', () => {
         contacts: [
           {
             contactType: 'email',
-            contactValue: 'test@example.com'
-          }
-        ]
+            contactValue: 'test@example.com',
+          },
+        ],
       };
 
       await expect(
-        service.completeOnboarding(dataWithContacts)
+        service.completeOnboarding(dataWithContacts),
       ).rejects.toThrow(InternalServerErrorException);
     });
 
@@ -202,12 +214,12 @@ describe('Error Scenarios Tests', () => {
         ...validClinicPlanData,
         legalInfo: {
           termsConditions: 'Terms and conditions...',
-          privacyPolicy: 'Privacy policy...'
-        }
+          privacyPolicy: 'Privacy policy...',
+        },
       };
 
       await expect(
-        service.completeOnboarding(dataWithLegalInfo)
+        service.completeOnboarding(dataWithLegalInfo),
       ).rejects.toThrow(InternalServerErrorException);
     });
 
@@ -215,7 +227,7 @@ describe('Error Scenarios Tests', () => {
       makeServiceFail('userAccess', new Error('User access creation failed'));
 
       await expect(
-        service.completeOnboarding(validClinicPlanData)
+        service.completeOnboarding(validClinicPlanData),
       ).rejects.toThrow(InternalServerErrorException);
     });
 
@@ -224,7 +236,7 @@ describe('Error Scenarios Tests', () => {
       makeServiceFail('complex', new Error('Complex failed'));
 
       await expect(
-        service.completeOnboarding(validCompanyPlanData)
+        service.completeOnboarding(validCompanyPlanData),
       ).rejects.toThrow(InternalServerErrorException);
 
       // Should fail at the first service (organization)
@@ -240,38 +252,44 @@ describe('Error Scenarios Tests', () => {
     });
 
     it('should handle session start failure', async () => {
-      mockConnection.startSession.mockRejectedValue(new Error('Session start failed'));
+      mockConnection.startSession.mockRejectedValue(
+        new Error('Session start failed'),
+      );
 
       await expect(
-        service.completeOnboarding(validClinicPlanData)
+        service.completeOnboarding(validClinicPlanData),
       ).rejects.toThrow(Error);
     });
 
     it('should handle transaction start failure', async () => {
       const mockSession = {
-        startTransaction: jest.fn().mockRejectedValue(new Error('Transaction start failed')),
+        startTransaction: jest
+          .fn()
+          .mockRejectedValue(new Error('Transaction start failed')),
         commitTransaction: jest.fn(),
         abortTransaction: jest.fn(),
-        endSession: jest.fn()
+        endSession: jest.fn(),
       };
       mockConnection.startSession.mockResolvedValue(mockSession);
 
       await expect(
-        service.completeOnboarding(validClinicPlanData)
+        service.completeOnboarding(validClinicPlanData),
       ).rejects.toThrow(Error);
     });
 
     it('should handle transaction commit failure', async () => {
       const mockSession = {
         startTransaction: jest.fn(),
-        commitTransaction: jest.fn().mockRejectedValue(new Error('Commit failed')),
+        commitTransaction: jest
+          .fn()
+          .mockRejectedValue(new Error('Commit failed')),
         abortTransaction: jest.fn(),
-        endSession: jest.fn()
+        endSession: jest.fn(),
       };
       mockConnection.startSession.mockResolvedValue(mockSession);
 
       await expect(
-        service.completeOnboarding(validClinicPlanData)
+        service.completeOnboarding(validClinicPlanData),
       ).rejects.toThrow(Error);
 
       expect(mockSession.abortTransaction).toHaveBeenCalled();
@@ -280,17 +298,19 @@ describe('Error Scenarios Tests', () => {
 
     it('should handle transaction abort failure', async () => {
       makeServiceFail('subscription', new Error('Subscription failed'));
-      
+
       const mockSession = {
         startTransaction: jest.fn(),
         commitTransaction: jest.fn(),
-        abortTransaction: jest.fn().mockRejectedValue(new Error('Abort failed')),
-        endSession: jest.fn()
+        abortTransaction: jest
+          .fn()
+          .mockRejectedValue(new Error('Abort failed')),
+        endSession: jest.fn(),
       };
       mockConnection.startSession.mockResolvedValue(mockSession);
 
       await expect(
-        service.completeOnboarding(validClinicPlanData)
+        service.completeOnboarding(validClinicPlanData),
       ).rejects.toThrow(Error);
 
       expect(mockSession.endSession).toHaveBeenCalled();
@@ -301,7 +321,9 @@ describe('Error Scenarios Tests', () => {
         startTransaction: jest.fn(),
         commitTransaction: jest.fn(),
         abortTransaction: jest.fn(),
-        endSession: jest.fn().mockRejectedValue(new Error('End session failed'))
+        endSession: jest
+          .fn()
+          .mockRejectedValue(new Error('End session failed')),
       };
       mockConnection.startSession.mockResolvedValue(mockSession);
 
@@ -313,7 +335,7 @@ describe('Error Scenarios Tests', () => {
         // Accept that session end failure might be propagated
         expect(error).toBeDefined();
       }
-      
+
       // Reset the mock after this test
       resetAllMocks();
     });
@@ -325,29 +347,27 @@ describe('Error Scenarios Tests', () => {
     });
 
     it('should handle null/undefined data', async () => {
-      await expect(
-        service.completeOnboarding(null as any)
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.completeOnboarding(null as any)).rejects.toThrow(
+        BadRequestException,
+      );
 
       await expect(
-        service.completeOnboarding(undefined as any)
+        service.completeOnboarding(undefined as any),
       ).rejects.toThrow();
     });
 
     it('should handle empty objects', async () => {
-      await expect(
-        service.completeOnboarding({} as any)
-      ).rejects.toThrow();
+      await expect(service.completeOnboarding({} as any)).rejects.toThrow();
     });
 
     it('should handle malformed subscription data', async () => {
       const malformedData = {
         ...validClinicPlanData,
-        subscriptionData: null
+        subscriptionData: null,
       };
 
       await expect(
-        service.completeOnboarding(malformedData as any)
+        service.completeOnboarding(malformedData as any),
       ).rejects.toThrow();
     });
 
@@ -356,15 +376,15 @@ describe('Error Scenarios Tests', () => {
         ...validClinicPlanData,
         subscriptionData: {
           planType: 'clinic',
-          planId: 'company_plan_id' // Mismatched plan ID
+          planId: 'company_plan_id', // Mismatched plan ID
         },
         organization: {
-          name: 'Should not be allowed for clinic plan'
-        }
+          name: 'Should not be allowed for clinic plan',
+        },
       };
 
       await expect(
-        service.completeOnboarding(invalidCombination as any)
+        service.completeOnboarding(invalidCombination as any),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -373,38 +393,44 @@ describe('Error Scenarios Tests', () => {
       (circularData as any).self = circularData; // Create circular reference
 
       // Should handle gracefully (serialization might fail, but shouldn't crash)
-      await expect(
-        service.completeOnboarding(circularData)
-      ).rejects.toThrow();
+      await expect(service.completeOnboarding(circularData)).rejects.toThrow();
     });
 
     it('should handle extremely large data objects', async () => {
       const largeData = {
         ...validCompanyPlanData,
-        complexes: Array(1000).fill(0).map((_, i) => ({
-          name: `Complex ${i}`,
-          departmentIds: Array(100).fill(0).map((_, j) => `dept_${i}_${j}`)
-        })),
-        departments: Array(10000).fill(0).map((_, i) => ({
-          name: `Department ${i}`,
-          description: 'A'.repeat(10000) // Very long description
-        }))
+        complexes: Array(1000)
+          .fill(0)
+          .map((_, i) => ({
+            name: `Complex ${i}`,
+            departmentIds: Array(100)
+              .fill(0)
+              .map((_, j) => `dept_${i}_${j}`),
+          })),
+        departments: Array(10000)
+          .fill(0)
+          .map((_, i) => ({
+            name: `Department ${i}`,
+            description: 'A'.repeat(10000), // Very long description
+          })),
       };
 
       // Should reject due to plan limits
-      await expect(
-        service.completeOnboarding(largeData)
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.completeOnboarding(largeData)).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('should handle special characters and encoding issues', async () => {
       const specialCharData = {
         ...validClinicPlanData,
-        clinics: [{
-          name: '🏥 Clinic \x00\x01\x02 with 𝕰𝖒𝖔𝖏𝖎 and ™©® symbols',
-          capacity: { maxPatients: 50, sessionDuration: 30 },
-          specialization: 'General 💊 Medicine & 🩺 Diagnostics'
-        }]
+        clinics: [
+          {
+            name: '🏥 Clinic \x00\x01\x02 with 𝕰𝖒𝖔𝖏𝖎 and ™©® symbols',
+            capacity: { maxPatients: 50, sessionDuration: 30 },
+            specialization: 'General 💊 Medicine & 🩺 Diagnostics',
+          },
+        ],
       };
 
       // Should handle special characters gracefully
@@ -422,14 +448,14 @@ describe('Error Scenarios Tests', () => {
             dayOfWeek: 'monday',
             isWorkingDay: true,
             openingTime: 'not-a-time',
-            closingTime: '25:61'
-          }
-        ]
+            closingTime: '25:61',
+          },
+        ],
       };
 
-      await expect(
-        service.completeOnboarding(invalidTimeData)
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.completeOnboarding(invalidTimeData)).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('should handle impossible time combinations', async () => {
@@ -440,9 +466,9 @@ describe('Error Scenarios Tests', () => {
             dayOfWeek: 'monday',
             isWorkingDay: true,
             openingTime: '18:00',
-            closingTime: '09:00' // Closing before opening
-          }
-        ]
+            closingTime: '09:00', // Closing before opening
+          },
+        ],
       };
 
       // This should pass basic format validation but might fail business logic
@@ -456,14 +482,14 @@ describe('Error Scenarios Tests', () => {
         workingHours: [
           {
             dayOfWeek: 'monday',
-            isWorkingDay: true
+            isWorkingDay: true,
             // Missing opening and closing times
-          }
-        ]
+          },
+        ],
       };
 
       await expect(
-        service.completeOnboarding(incompleteWorkingHours)
+        service.completeOnboarding(incompleteWorkingHours),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -476,7 +502,7 @@ describe('Error Scenarios Tests', () => {
             entityType: 'complex',
             entityName: 'Al-Zahra Medical Complex',
             dayOfWeek: 'friday',
-            isWorkingDay: false
+            isWorkingDay: false,
           },
           // Multiple clinics trying to work when complex is closed
           {
@@ -485,7 +511,7 @@ describe('Error Scenarios Tests', () => {
             dayOfWeek: 'friday',
             isWorkingDay: true,
             openingTime: '09:00',
-            closingTime: '17:00'
+            closingTime: '17:00',
           },
           {
             entityType: 'clinic',
@@ -493,13 +519,13 @@ describe('Error Scenarios Tests', () => {
             dayOfWeek: 'friday',
             isWorkingDay: true,
             openingTime: '10:00',
-            closingTime: '16:00'
-          }
-        ]
+            closingTime: '16:00',
+          },
+        ],
       };
 
       await expect(
-        service.completeOnboarding(conflictingHierarchicalData)
+        service.completeOnboarding(conflictingHierarchicalData),
       ).rejects.toThrow(BadRequestException);
     });
   });
@@ -510,26 +536,28 @@ describe('Error Scenarios Tests', () => {
         ...validCompanyPlanData,
         organization: {
           ...validCompanyPlanData.organization,
-          name: '' // Empty name
-        }
+          name: '', // Empty name
+        },
       };
 
       await expect(
-        service.completeOnboarding(organizationWithoutName as any)
+        service.completeOnboarding(organizationWithoutName as any),
       ).rejects.toThrow('Organization name is required for company plan');
     });
 
     it('should handle clinic capacity validation errors', async () => {
       const invalidCapacityData = {
         ...validClinicPlanData,
-        clinics: [{
-          name: 'Test Clinic',
-          capacity: {} // Missing required capacity fields
-        }]
+        clinics: [
+          {
+            name: 'Test Clinic',
+            capacity: {}, // Missing required capacity fields
+          },
+        ],
       };
 
       await expect(
-        service.completeOnboarding(invalidCapacityData as any)
+        service.completeOnboarding(invalidCapacityData as any),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -538,12 +566,14 @@ describe('Error Scenarios Tests', () => {
         ...validClinicPlanData,
         userData: {
           ...validClinicPlanData.userData,
-          email: 'not-an-email'
-        }
+          email: 'not-an-email',
+        },
       };
 
       // This would be caught by DTO validation before reaching the service
-      const result = await service.validateOnboardingData(invalidEmailData as any);
+      const result = await service.validateOnboardingData(
+        invalidEmailData as any,
+      );
       expect(result.isValid).toBe(true); // Service-level validation doesn't check email format
     });
 
@@ -552,8 +582,8 @@ describe('Error Scenarios Tests', () => {
         ...validClinicPlanData,
         organization: {
           name: 'Test Organization',
-          phone: '123' // Invalid phone format
-        }
+          phone: '123', // Invalid phone format
+        },
       };
 
       const result = await service.validateOnboardingData(invalidPhoneData);
@@ -563,12 +593,14 @@ describe('Error Scenarios Tests', () => {
     it('should handle invalid URL formats', async () => {
       const invalidUrlData = {
         ...validClinicPlanData,
-        clinics: [{
-          name: 'Test Clinic',
-          website: 'not-a-url',
-          logoUrl: 'also-not-a-url',
-          capacity: { maxPatients: 50, sessionDuration: 30 }
-        }]
+        clinics: [
+          {
+            name: 'Test Clinic',
+            website: 'not-a-url',
+            logoUrl: 'also-not-a-url',
+            capacity: { maxPatients: 50, sessionDuration: 30 },
+          },
+        ],
       };
 
       const result = await service.validateOnboardingData(invalidUrlData);
@@ -583,14 +615,18 @@ describe('Error Scenarios Tests', () => {
           name: 'Test Organization', // Ensure name is defined
           legalInfo: {
             vatNumber: '123', // Invalid VAT format
-            crNumber: '1010123456'
-          }
-        }
+            crNumber: '1010123456',
+          },
+        },
       };
 
       const result = await service.validateOnboardingData(invalidVATData);
       expect(result.isValid).toBe(false); // VAT validation is implemented
-      expect(result.errors.some(error => error.includes('Invalid VAT number format'))).toBe(true);
+      expect(
+        result.errors.some((error) =>
+          error.includes('Invalid VAT number format'),
+        ),
+      ).toBe(true);
     });
 
     it('should handle CR number validation in business profile', async () => {
@@ -601,9 +637,9 @@ describe('Error Scenarios Tests', () => {
           name: 'Test Organization', // Ensure name is defined
           legalInfo: {
             vatNumber: '300123456789001',
-            crNumber: 'invalid-cr' // Invalid CR format
-          }
-        }
+            crNumber: 'invalid-cr', // Invalid CR format
+          },
+        },
       };
 
       const result = await service.validateOnboardingData(invalidCRData);
@@ -620,8 +656,8 @@ describe('Error Scenarios Tests', () => {
         organization: {
           ...validCompanyPlanData.organization,
           name: 'Test Organization', // Ensure name is defined
-          description: 'A'.repeat(10 * 1024 * 1024) // 10MB string
-        }
+          description: 'A'.repeat(10 * 1024 * 1024), // 10MB string
+        },
       };
 
       // Should either complete or fail gracefully without crashing
@@ -635,31 +671,33 @@ describe('Error Scenarios Tests', () => {
     it('should handle timeout scenarios', async () => {
       // Simulate slow service response
       mockSubscriptionService.createSubscription.mockImplementation(
-        () => new Promise(resolve => setTimeout(resolve, 10000)) // 10 second delay
+        () => new Promise((resolve) => setTimeout(resolve, 10000)), // 10 second delay
       );
 
       // Should timeout gracefully
       await expect(
-        service.completeOnboarding(validClinicPlanData)
+        service.completeOnboarding(validClinicPlanData),
       ).rejects.toThrow();
     }, 15000); // 15 second test timeout
 
     it('should handle concurrent onboarding attempts', async () => {
       // Multiple simultaneous onboarding requests
-      const promises = Array(10).fill(0).map((_, i) => {
-        const data = {
-          ...validClinicPlanData,
-          userData: {
-            ...validClinicPlanData.userData,
-            email: `user${i}@example.com`
-          }
-        };
-        return service.completeOnboarding(data);
-      });
+      const promises = Array(10)
+        .fill(0)
+        .map((_, i) => {
+          const data = {
+            ...validClinicPlanData,
+            userData: {
+              ...validClinicPlanData.userData,
+              email: `user${i}@example.com`,
+            },
+          };
+          return service.completeOnboarding(data);
+        });
 
       // All should complete successfully
       const results = await Promise.all(promises);
-      results.forEach(result => {
+      results.forEach((result) => {
         expect(result.success).toBe(true);
       });
     });
@@ -670,15 +708,15 @@ describe('Error Scenarios Tests', () => {
       // Simulate database connection loss after subscription creation
       mockSubscriptionService.createSubscription.mockResolvedValueOnce({
         id: 'sub_123',
-        planType: 'company'
+        planType: 'company',
       });
-      
+
       mockOrganizationService.createOrganization.mockRejectedValue(
-        new Error('Connection lost')
+        new Error('Connection lost'),
       );
 
       await expect(
-        service.completeOnboarding(validCompanyPlanData)
+        service.completeOnboarding(validCompanyPlanData),
       ).rejects.toThrow(InternalServerErrorException);
 
       const session = mockConnection.startSession();
@@ -689,11 +727,11 @@ describe('Error Scenarios Tests', () => {
       // Simulate service returning corrupted data
       mockSubscriptionService.createSubscription.mockResolvedValue({
         corrupted: 'data',
-        missing: 'id'
+        missing: 'id',
       });
 
       await expect(
-        service.completeOnboarding(validCompanyPlanData)
+        service.completeOnboarding(validCompanyPlanData),
       ).rejects.toThrow(InternalServerErrorException);
     });
 
@@ -701,7 +739,7 @@ describe('Error Scenarios Tests', () => {
       mockSubscriptionService.createSubscription.mockResolvedValue(null);
 
       await expect(
-        service.completeOnboarding(validCompanyPlanData)
+        service.completeOnboarding(validCompanyPlanData),
       ).rejects.toThrow(InternalServerErrorException);
     });
 
@@ -711,7 +749,7 @@ describe('Error Scenarios Tests', () => {
       });
 
       await expect(
-        service.completeOnboarding(validCompanyPlanData)
+        service.completeOnboarding(validCompanyPlanData),
       ).rejects.toThrow(InternalServerErrorException);
     });
   });
@@ -722,12 +760,12 @@ describe('Error Scenarios Tests', () => {
         ...validCompanyPlanData,
         subscriptionData: {
           planType: 'invalid',
-          planId: 'invalid'
-        }
+          planId: 'invalid',
+        },
       };
 
       await expect(
-        service.completeOnboarding(invalidData as any)
+        service.completeOnboarding(invalidData as any),
       ).rejects.toThrow(BadRequestException);
 
       // Verify no services were called after validation failure
@@ -739,7 +777,7 @@ describe('Error Scenarios Tests', () => {
       makeServiceFail('organization', new Error('Cleanup test'));
 
       await expect(
-        service.completeOnboarding(validCompanyPlanData)
+        service.completeOnboarding(validCompanyPlanData),
       ).rejects.toThrow(InternalServerErrorException);
 
       const session = mockConnection.startSession();
@@ -750,17 +788,19 @@ describe('Error Scenarios Tests', () => {
 
     it('should handle cleanup failure gracefully', async () => {
       makeServiceFail('subscription', new Error('Service failure'));
-      
+
       const mockSession = {
         startTransaction: jest.fn(),
         commitTransaction: jest.fn(),
-        abortTransaction: jest.fn().mockRejectedValue(new Error('Cleanup failed')),
-        endSession: jest.fn()
+        abortTransaction: jest
+          .fn()
+          .mockRejectedValue(new Error('Cleanup failed')),
+        endSession: jest.fn(),
       };
       mockConnection.startSession.mockResolvedValue(mockSession);
 
       await expect(
-        service.completeOnboarding(validCompanyPlanData)
+        service.completeOnboarding(validCompanyPlanData),
       ).rejects.toThrow(Error);
 
       // Should still attempt to end session even if abort fails
@@ -768,4 +808,3 @@ describe('Error Scenarios Tests', () => {
     });
   });
 });
-

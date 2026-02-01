@@ -2,104 +2,159 @@ import { Injectable, BadRequestException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { WorkingHours } from '../database/schemas/working-hours.schema';
-import { CreateWorkingHoursDto, UpdateWorkingHoursDto } from './dto/create-working-hours.dto';
+import {
+  CreateWorkingHoursDto,
+  UpdateWorkingHoursDto,
+} from './dto/create-working-hours.dto';
 import { ValidationUtil } from '../common/utils/validation.util';
+import {
+  ERROR_MESSAGES,
+  createDynamicMessage,
+} from '../common/utils/error-messages.constant';
 
 @Injectable()
 export class WorkingHoursService {
   constructor(
-    @InjectModel('WorkingHours') private readonly workingHoursModel: Model<WorkingHours>,
+    @InjectModel('WorkingHours')
+    private readonly workingHoursModel: Model<WorkingHours>,
   ) {}
 
-  async createWorkingHours(createDto: CreateWorkingHoursDto): Promise<WorkingHours[]> {
+  async createWorkingHours(
+    createDto: CreateWorkingHoursDto,
+  ): Promise<WorkingHours[]> {
     // Validate schedule
     const validation = ValidationUtil.validateWorkingHours(createDto.schedule);
     if (!validation.isValid) {
-      throw new BadRequestException(`Schedule validation failed: ${validation.errors.join(', ')}`);
+      throw new BadRequestException({
+        message: createDynamicMessage(
+          `${ERROR_MESSAGES.SCHEDULE_VALIDATION_FAILED.ar}: ${validation.errors.join(', ')}`,
+          `${ERROR_MESSAGES.SCHEDULE_VALIDATION_FAILED.en}: ${validation.errors.join(', ')}`,
+          {},
+        ),
+        code: 'SCHEDULE_VALIDATION_FAILED',
+        details: { errors: validation.errors },
+      });
     }
 
     // Delete existing working hours for this entity
     await this.workingHoursModel.deleteMany({
       entityType: createDto.entityType,
-      entityId: new Types.ObjectId(createDto.entityId)
+      entityId: new Types.ObjectId(createDto.entityId),
     });
 
     // Create new working hours
-    const workingHours = createDto.schedule.map(schedule => ({
+    const workingHours = createDto.schedule.map((schedule) => ({
       entityType: createDto.entityType,
       entityId: new Types.ObjectId(createDto.entityId),
       ...schedule,
-      isActive: true
+      isActive: true,
     }));
 
     return await this.workingHoursModel.insertMany(workingHours);
   }
 
-  async updateWorkingHours(entityType: string, entityId: string, updateDto: UpdateWorkingHoursDto): Promise<WorkingHours[]> {
+  async updateWorkingHours(
+    entityType: string,
+    entityId: string,
+    updateDto: UpdateWorkingHoursDto,
+  ): Promise<WorkingHours[]> {
     // Validate schedule
     const validation = ValidationUtil.validateWorkingHours(updateDto.schedule);
     if (!validation.isValid) {
-      throw new BadRequestException(`Schedule validation failed: ${validation.errors.join(', ')}`);
+      throw new BadRequestException({
+        message: createDynamicMessage(
+          `${ERROR_MESSAGES.SCHEDULE_VALIDATION_FAILED.ar}: ${validation.errors.join(', ')}`,
+          `${ERROR_MESSAGES.SCHEDULE_VALIDATION_FAILED.en}: ${validation.errors.join(', ')}`,
+          {},
+        ),
+        code: 'SCHEDULE_VALIDATION_FAILED',
+        details: { errors: validation.errors },
+      });
     }
 
     // Delete existing and create new
     await this.workingHoursModel.deleteMany({
       entityType,
-      entityId: new Types.ObjectId(entityId)
+      entityId: new Types.ObjectId(entityId),
     });
 
-    const workingHours = updateDto.schedule.map(schedule => ({
+    const workingHours = updateDto.schedule.map((schedule) => ({
       entityType,
       entityId: new Types.ObjectId(entityId),
       ...schedule,
-      isActive: true
+      isActive: true,
     }));
 
     return await this.workingHoursModel.insertMany(workingHours);
   }
 
-  async getWorkingHours(entityType: string, entityId: string): Promise<WorkingHours[]> {
-    return await this.workingHoursModel.find({
-      entityType,
-      entityId: new Types.ObjectId(entityId),
-      isActive: true
-    }).exec();
+  async getWorkingHours(
+    entityType: string,
+    entityId: string,
+  ): Promise<WorkingHours[]> {
+    return await this.workingHoursModel
+      .find({
+        entityType,
+        entityId: new Types.ObjectId(entityId),
+        isActive: true,
+      })
+      .exec();
   }
 
   async createWorkingHoursWithParentValidation(
     createDto: CreateWorkingHoursDto,
     parentEntityType?: string,
-    parentEntityId?: string
+    parentEntityId?: string,
   ): Promise<WorkingHours[]> {
     // Validate schedule individually first
     const validation = ValidationUtil.validateWorkingHours(createDto.schedule);
     if (!validation.isValid) {
-      throw new BadRequestException(`Schedule validation failed: ${validation.errors.join(', ')}`);
+      throw new BadRequestException({
+        message: createDynamicMessage(
+          `${ERROR_MESSAGES.SCHEDULE_VALIDATION_FAILED.ar}: ${validation.errors.join(', ')}`,
+          `${ERROR_MESSAGES.SCHEDULE_VALIDATION_FAILED.en}: ${validation.errors.join(', ')}`,
+          {},
+        ),
+        code: 'SCHEDULE_VALIDATION_FAILED',
+        details: { errors: validation.errors },
+      });
     }
 
     // If parent entity specified, validate against parent working hours
     if (parentEntityType && parentEntityId) {
-      const parentSchedule = await this.getWorkingHours(parentEntityType, parentEntityId);
-      
+      const parentSchedule = await this.getWorkingHours(
+        parentEntityType,
+        parentEntityId,
+      );
+
       if (parentSchedule.length > 0) {
-        const parentScheduleData = parentSchedule.map(schedule => ({
+        const parentScheduleData = parentSchedule.map((schedule) => ({
           dayOfWeek: schedule.dayOfWeek,
           isWorkingDay: schedule.isWorkingDay,
           openingTime: schedule.openingTime,
           closingTime: schedule.closingTime,
           breakStartTime: schedule.breakStartTime,
-          breakEndTime: schedule.breakEndTime
+          breakEndTime: schedule.breakEndTime,
         }));
 
-        const hierarchicalValidation = ValidationUtil.validateHierarchicalWorkingHours(
-          parentScheduleData,
-          createDto.schedule,
-          `${parentEntityType} (${parentEntityId})`,
-          `${createDto.entityType} (${createDto.entityId})`
-        );
+        const hierarchicalValidation =
+          ValidationUtil.validateHierarchicalWorkingHours(
+            parentScheduleData,
+            createDto.schedule,
+            `${parentEntityType} (${parentEntityId})`,
+            `${createDto.entityType} (${createDto.entityId})`,
+          );
 
         if (!hierarchicalValidation.isValid) {
-          throw new BadRequestException(`Hierarchical validation failed: ${hierarchicalValidation.errors.join(', ')}`);
+          throw new BadRequestException({
+            message: createDynamicMessage(
+              `${ERROR_MESSAGES.HIERARCHICAL_VALIDATION_FAILED.ar}: ${hierarchicalValidation.errors.join(', ')}`,
+              `${ERROR_MESSAGES.HIERARCHICAL_VALIDATION_FAILED.en}: ${hierarchicalValidation.errors.join(', ')}`,
+              {},
+            ),
+            code: 'HIERARCHICAL_VALIDATION_FAILED',
+            details: { errors: hierarchicalValidation.errors },
+          });
         }
       }
     }
@@ -111,59 +166,68 @@ export class WorkingHoursService {
   async validateClinicHoursWithinComplex(
     clinicId: string,
     clinicSchedule: any[],
-    complexId: string
+    complexId: string,
   ): Promise<{ isValid: boolean; errors: string[] }> {
     // Get complex working hours
     const complexSchedule = await this.getWorkingHours('complex', complexId);
-    
+
     if (complexSchedule.length === 0) {
       // If complex has no working hours set, allow any clinic hours
       return { isValid: true, errors: [] };
     }
 
-    const complexScheduleData = complexSchedule.map(schedule => ({
+    const complexScheduleData = complexSchedule.map((schedule) => ({
       dayOfWeek: schedule.dayOfWeek,
       isWorkingDay: schedule.isWorkingDay,
       openingTime: schedule.openingTime,
       closingTime: schedule.closingTime,
       breakStartTime: schedule.breakStartTime,
-      breakEndTime: schedule.breakEndTime
+      breakEndTime: schedule.breakEndTime,
     }));
 
     return ValidationUtil.validateHierarchicalWorkingHours(
       complexScheduleData,
       clinicSchedule,
       `Complex (${complexId})`,
-      `Clinic (${clinicId})`
+      `Clinic (${clinicId})`,
     );
   }
 
   async getParentEntityWorkingHours(
     childEntityType: string,
-    childEntityId: string
-  ): Promise<{ parentType: string; parentId: string; schedule: WorkingHours[] } | null> {
+    childEntityId: string,
+  ): Promise<{
+    parentType: string;
+    parentId: string;
+    schedule: WorkingHours[];
+  } | null> {
     // This would need to be implemented based on your entity relationships
     // For now, return null - this would require querying the clinic/complex relationships
-    
+
     if (childEntityType === 'clinic') {
       // You would query the clinic to get its complexDepartmentId
       // Then query complexDepartment to get complexId
       // Then return the complex working hours
       // For now, returning null as this requires database queries
     }
-    
+
     return null;
   }
 
-  async createBulkWorkingHours(schedules: any[], entityMappings: Array<{ type: string; id: string }>): Promise<void> {
+  async createBulkWorkingHours(
+    schedules: any[],
+    entityMappings: Array<{ type: string; id: string }>,
+  ): Promise<void> {
     // This method would handle bulk creation during onboarding
     for (const mapping of entityMappings) {
-      const entitySchedules = schedules.filter(s => s.entityType === mapping.type);
+      const entitySchedules = schedules.filter(
+        (s) => s.entityType === mapping.type,
+      );
       if (entitySchedules.length > 0) {
         await this.createWorkingHours({
           entityType: mapping.type,
           entityId: mapping.id,
-          schedule: entitySchedules
+          schedule: entitySchedules,
         });
       }
     }
@@ -171,32 +235,39 @@ export class WorkingHoursService {
 
   async createBulkWorkingHoursWithValidation(
     schedules: any[],
-    entityMappings: Array<{ type: string; id: string; parentType?: string; parentId?: string }>
+    entityMappings: Array<{
+      type: string;
+      id: string;
+      parentType?: string;
+      parentId?: string;
+    }>,
   ): Promise<void> {
     // Sort entities by hierarchy (complex before clinic)
     const sortedMappings = entityMappings.sort((a, b) => {
-      const hierarchy = { 'organization': 1, 'complex': 2, 'clinic': 3 };
+      const hierarchy = { organization: 1, complex: 2, clinic: 3 };
       return (hierarchy[a.type] || 999) - (hierarchy[b.type] || 999);
     });
 
     for (const mapping of sortedMappings) {
-      const entitySchedules = schedules.filter(s => s.entityType === mapping.type);
+      const entitySchedules = schedules.filter(
+        (s) => s.entityType === mapping.type,
+      );
       if (entitySchedules.length > 0) {
         if (mapping.parentType && mapping.parentId) {
           await this.createWorkingHoursWithParentValidation(
             {
               entityType: mapping.type,
               entityId: mapping.id,
-              schedule: entitySchedules
+              schedule: entitySchedules,
             },
             mapping.parentType,
-            mapping.parentId
+            mapping.parentId,
           );
         } else {
           await this.createWorkingHours({
             entityType: mapping.type,
             entityId: mapping.id,
-            schedule: entitySchedules
+            schedule: entitySchedules,
           });
         }
       }

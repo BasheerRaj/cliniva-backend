@@ -1,4 +1,11 @@
-import { IsString, IsNotEmpty, IsOptional, IsEnum, IsBoolean, IsEmail } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsOptional,
+  IsEnum,
+  IsBoolean,
+  IsEmail,
+} from 'class-validator';
 
 export class CreateEmergencyContactDto {
   @IsString()
@@ -138,4 +145,4 @@ export class BulkEmergencyContactDto {
     email?: string;
     isPrimary?: boolean;
   }>;
-} 
+}

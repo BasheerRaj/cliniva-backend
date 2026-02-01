@@ -1,6 +1,19 @@
-import { Controller, Post, Get, Put, Body, Param, HttpStatus, HttpCode, BadRequestException } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Get,
+  Put,
+  Body,
+  Param,
+  HttpStatus,
+  HttpCode,
+  BadRequestException,
+} from '@nestjs/common';
 import { SubscriptionService } from './subscription.service';
-import { CreateSubscriptionDto, UpdateSubscriptionStatusDto } from './dto/create-subscription.dto';
+import {
+  CreateSubscriptionDto,
+  UpdateSubscriptionStatusDto,
+} from './dto/create-subscription.dto';
 
 @Controller('subscriptions')
 export class SubscriptionController {
@@ -8,20 +21,24 @@ export class SubscriptionController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  async createSubscription(@Body() createSubscriptionDto: CreateSubscriptionDto) {
+  async createSubscription(
+    @Body() createSubscriptionDto: CreateSubscriptionDto,
+  ) {
     try {
-      const subscription = await this.subscriptionService.createSubscription(createSubscriptionDto);
-      
+      const subscription = await this.subscriptionService.createSubscription(
+        createSubscriptionDto,
+      );
+
       return {
         success: true,
         message: 'Subscription created successfully',
-        data: subscription
+        data: subscription,
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to create subscription',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -29,18 +46,19 @@ export class SubscriptionController {
   @Get('user/:userId')
   async getUserSubscription(@Param('userId') userId: string) {
     try {
-      const subscription = await this.subscriptionService.getSubscriptionByUser(userId);
-      
+      const subscription =
+        await this.subscriptionService.getSubscriptionByUser(userId);
+
       return {
         success: true,
         message: subscription ? 'Subscription found' : 'No subscription found',
-        data: subscription
+        data: subscription,
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to retrieve subscription',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -49,21 +67,25 @@ export class SubscriptionController {
   @HttpCode(HttpStatus.OK)
   async updateSubscriptionStatus(
     @Param('id') id: string,
-    @Body() updateStatusDto: UpdateSubscriptionStatusDto
+    @Body() updateStatusDto: UpdateSubscriptionStatusDto,
   ) {
     try {
-      const subscription = await this.subscriptionService.updateSubscriptionStatus(id, updateStatusDto);
-      
+      const subscription =
+        await this.subscriptionService.updateSubscriptionStatus(
+          id,
+          updateStatusDto,
+        );
+
       return {
         success: true,
         message: 'Subscription status updated successfully',
-        data: subscription
+        data: subscription,
       };
     } catch (error) {
       return {
         success: false,
         message: 'Failed to update subscription status',
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -72,9 +94,9 @@ export class SubscriptionController {
   async getSubscriptionPlans() {
     try {
       const rawPlans = await this.subscriptionService.getAllSubscriptionPlans();
-      
+
       // Transform plans to match frontend expectations
-      const enrichedPlans = rawPlans.map(plan => ({
+      const enrichedPlans = rawPlans.map((plan) => ({
         _id: plan._id,
         name: this.getDisplayName(plan.name),
         type: plan.name, // clinic, complex, company
@@ -88,9 +110,9 @@ export class SubscriptionController {
         maxOrganizations: plan.maxOrganizations,
         isActive: true,
         isPopular: plan.name === 'complex', // Mark complex as popular
-        description: this.getDescription(plan.name)
+        description: this.getDescription(plan.name),
       }));
-      
+
       return enrichedPlans;
     } catch (error) {
       throw new BadRequestException('Failed to retrieve subscription plans');
@@ -100,19 +122,24 @@ export class SubscriptionController {
   private getDisplayName(planType: string): string {
     const names = {
       clinic: 'Single Clinic Plan',
-      complex: 'Complex Plan', 
-      company: 'Company Plan'
+      complex: 'Complex Plan',
+      company: 'Company Plan',
     };
     return names[planType] || planType;
   }
 
   private getDescription(planType: string): string {
     const descriptions = {
-      clinic: 'Simple and affordable solution for independent clinics and small practices',
-      complex: 'Ideal for medical complexes with multiple departments and clinics under one roof',
-      company: 'Perfect for large healthcare networks managing multiple complexes and locations'
+      clinic:
+        'Simple and affordable solution for independent clinics and small practices',
+      complex:
+        'Ideal for medical complexes with multiple departments and clinics under one roof',
+      company:
+        'Perfect for large healthcare networks managing multiple complexes and locations',
     };
-    return descriptions[planType] || 'Professional healthcare management solution';
+    return (
+      descriptions[planType] || 'Professional healthcare management solution'
+    );
   }
 
   private getFeatures(planType: string): string[] {
@@ -131,14 +158,24 @@ export class SubscriptionController {
         'Centralized admin and reporting',
         'Multi-location support',
         'Role hierarchy across all levels',
-      ]
+      ],
     };
-    return features[planType] || ['Professional features', '24/7 support', 'Secure platform'];
+    return (
+      features[planType] || [
+        'Professional features',
+        '24/7 support',
+        'Secure platform',
+      ]
+    );
   }
 
-  private getLimitations(plan: { maxClinics?: number; maxComplexes?: number; maxOrganizations?: number }): string[] {
+  private getLimitations(plan: {
+    maxClinics?: number;
+    maxComplexes?: number;
+    maxOrganizations?: number;
+  }): string[] {
     const result: string[] = [];
-    
+
     if (plan.maxClinics) {
       result.push(`Up to ${plan.maxClinics} clinics`);
     }
@@ -148,7 +185,7 @@ export class SubscriptionController {
     if (plan.maxOrganizations) {
       result.push(`Up to ${plan.maxOrganizations} organizations`);
     }
-    
+
     return result.length > 0 ? result : ['Professional features included'];
   }
 }

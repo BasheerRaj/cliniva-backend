@@ -3,7 +3,7 @@ import { Document, Types } from 'mongoose';
 
 @Schema({
   timestamps: true,
-  collection: 'patients'
+  collection: 'patients',
 })
 export class Patient extends Document {
   @Prop({ type: Types.ObjectId, ref: 'User' })
@@ -21,9 +21,9 @@ export class Patient extends Document {
   @Prop({ required: true })
   dateOfBirth: Date;
 
-  @Prop({ 
+  @Prop({
     required: true,
-    enum: ['male', 'female', 'other'] 
+    enum: ['male', 'female', 'other'],
   })
   gender: string;
 

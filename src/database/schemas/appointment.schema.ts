@@ -3,7 +3,7 @@ import { Document, Types } from 'mongoose';
 
 @Schema({
   timestamps: true,
-  collection: 'appointments'
+  collection: 'appointments',
 })
 export class Appointment extends Document {
   @Prop({ type: Types.ObjectId, ref: 'Patient', required: true })
@@ -27,15 +27,22 @@ export class Appointment extends Document {
   @Prop({ default: 30 })
   durationMinutes: number;
 
-  @Prop({ 
-    enum: ['scheduled', 'confirmed', 'in_progress', 'completed', 'cancelled', 'no_show'],
-    default: 'scheduled' 
+  @Prop({
+    enum: [
+      'scheduled',
+      'confirmed',
+      'in_progress',
+      'completed',
+      'cancelled',
+      'no_show',
+    ],
+    default: 'scheduled',
   })
   status: string;
 
-  @Prop({ 
+  @Prop({
     enum: ['low', 'medium', 'high', 'urgent'],
-    default: 'medium' 
+    default: 'medium',
   })
   urgencyLevel: string;
 

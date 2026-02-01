@@ -3,7 +3,7 @@ import { Document, Types } from 'mongoose';
 
 @Schema({
   timestamps: true,
-  collection: 'subscriptions'
+  collection: 'subscriptions',
 })
 export class Subscription extends Document {
   @Prop({ type: Types.ObjectId, required: true })
@@ -12,9 +12,9 @@ export class Subscription extends Document {
   @Prop({ type: Types.ObjectId, ref: 'SubscriptionPlan', required: true })
   planId: Types.ObjectId;
 
-  @Prop({ 
-    enum: ['active', 'inactive', 'cancelled'], 
-    default: 'active' 
+  @Prop({
+    enum: ['active', 'inactive', 'cancelled'],
+    default: 'active',
   })
   status: string;
 

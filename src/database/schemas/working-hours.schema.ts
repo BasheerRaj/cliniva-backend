@@ -3,21 +3,29 @@ import { Document, Types } from 'mongoose';
 
 @Schema({
   timestamps: true,
-  collection: 'working_hours'
+  collection: 'working_hours',
 })
 export class WorkingHours extends Document {
-  @Prop({ 
+  @Prop({
     required: true,
-    enum: ['organization', 'complex', 'clinic'] 
+    enum: ['organization', 'complex', 'clinic'],
   })
   entityType: string;
 
   @Prop({ type: Types.ObjectId, required: true })
   entityId: Types.ObjectId;
 
-  @Prop({ 
+  @Prop({
     required: true,
-    enum: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] 
+    enum: [
+      'monday',
+      'tuesday',
+      'wednesday',
+      'thursday',
+      'friday',
+      'saturday',
+      'sunday',
+    ],
   })
   dayOfWeek: string;
 
@@ -44,4 +52,7 @@ export const WorkingHoursSchema = SchemaFactory.createForClass(WorkingHours);
 
 // Indexes
 WorkingHoursSchema.index({ entityType: 1, entityId: 1 });
-WorkingHoursSchema.index({ entityType: 1, entityId: 1, dayOfWeek: 1 }, { unique: true });
+WorkingHoursSchema.index(
+  { entityType: 1, entityId: 1, dayOfWeek: 1 },
+  { unique: true },
+);

@@ -1,10 +1,10 @@
-import { 
-  Injectable, 
-  NotFoundException, 
-  BadRequestException, 
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
   ConflictException,
   ForbiddenException,
-  Logger
+  Logger,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -16,8 +16,8 @@ import { EmployeeShift } from '../database/schemas/employee-shift.schema';
 import { Organization } from '../database/schemas/organization.schema';
 import { Complex } from '../database/schemas/complex.schema';
 import { Clinic } from '../database/schemas/clinic.schema';
-import { 
-  CreateEmployeeDto, 
+import {
+  CreateEmployeeDto,
   UpdateEmployeeDto,
   EmployeeSearchQueryDto,
   CreateEmployeeDocumentDto,
@@ -29,7 +29,7 @@ import {
   EmployeeStatsDto,
   AssignEmployeeDto,
   EmployeeAttendanceDto,
-  TerminateEmployeeDto
+  TerminateEmployeeDto,
 } from './dto';
 import { ValidationUtil } from '../common/utils/validation.util';
 import { ResponseBuilder } from '../common/utils/response-builder.util';
@@ -41,10 +41,14 @@ export class EmployeeService {
 
   constructor(
     @InjectModel('User') private readonly userModel: Model<User>,
-    @InjectModel('EmployeeProfile') private readonly employeeProfileModel: Model<EmployeeProfile>,
-    @InjectModel('EmployeeDocument') private readonly employeeDocumentModel: Model<EmployeeDocument>,
-    @InjectModel('EmployeeShift') private readonly employeeShiftModel: Model<EmployeeShift>,
-    @InjectModel('Organization') private readonly organizationModel: Model<Organization>,
+    @InjectModel('EmployeeProfile')
+    private readonly employeeProfileModel: Model<EmployeeProfile>,
+    @InjectModel('EmployeeDocument')
+    private readonly employeeDocumentModel: Model<EmployeeDocument>,
+    @InjectModel('EmployeeShift')
+    private readonly employeeShiftModel: Model<EmployeeShift>,
+    @InjectModel('Organization')
+    private readonly organizationModel: Model<Organization>,
     @InjectModel('Complex') private readonly complexModel: Model<Complex>,
     @InjectModel('Clinic') private readonly clinicModel: Model<Clinic>,
   ) {}
@@ -55,18 +59,20 @@ export class EmployeeService {
   private async generateEmployeeNumber(): Promise<string> {
     const currentYear = new Date().getFullYear();
     const prefix = `EMP${currentYear}`;
-    
+
     // Find the last employee number for this year
     const lastEmployee = await this.employeeProfileModel
       .findOne({
-        employeeNumber: { $regex: `^${prefix}` }
+        employeeNumber: { $regex: `^${prefix}` },
       })
       .sort({ employeeNumber: -1 })
       .exec();
 
     let nextNumber = 1;
     if (lastEmployee && lastEmployee.employeeNumber) {
-      const lastNumber = parseInt(lastEmployee.employeeNumber.substring(prefix.length));
+      const lastNumber = parseInt(
+        lastEmployee.employeeNumber.substring(prefix.length),
+      );
       nextNumber = lastNumber + 1;
     }
 
@@ -79,26 +85,26 @@ export class EmployeeService {
   private async validateEmployeeData(
     employeeDto: CreateEmployeeDto | UpdateEmployeeDto,
     isUpdate = false,
-    employeeId?: string
+    employeeId?: string,
   ): Promise<void> {
     const createDto = employeeDto as CreateEmployeeDto;
 
     // For creation, validate required fields and uniqueness
     if (!isUpdate) {
       // Check email uniqueness
-      const existingUserByEmail = await this.userModel.findOne({ 
-        email: createDto.email 
+      const existingUserByEmail = await this.userModel.findOne({
+        email: createDto.email,
       });
-      
+
       if (existingUserByEmail) {
         throw new ConflictException('Email already exists');
       }
 
       // Validate phone uniqueness
-      const existingUserByPhone = await this.userModel.findOne({ 
-        phone: createDto.phone 
+      const existingUserByPhone = await this.userModel.findOne({
+        phone: createDto.phone,
       });
-      
+
       if (existingUserByPhone) {
         throw new ConflictException('Phone number already exists');
       }
@@ -106,9 +112,9 @@ export class EmployeeService {
       // Validate employee number uniqueness (if provided)
       if (createDto.employeeNumber) {
         const existingEmployee = await this.employeeProfileModel.findOne({
-          employeeNumber: createDto.employeeNumber
+          employeeNumber: createDto.employeeNumber,
         });
-        
+
         if (existingEmployee) {
           throw new ConflictException('Employee number already exists');
         }
@@ -117,9 +123,9 @@ export class EmployeeService {
       // Validate card number uniqueness (if provided)
       if (createDto.cardNumber) {
         const existingEmployeeByCard = await this.employeeProfileModel.findOne({
-          cardNumber: createDto.cardNumber
+          cardNumber: createDto.cardNumber,
         });
-        
+
         if (existingEmployeeByCard) {
           throw new ConflictException('Card number already exists');
         }
@@ -130,12 +136,16 @@ export class EmployeeService {
     if (createDto.dateOfBirth) {
       const birthDate = new Date(createDto.dateOfBirth);
       const today = new Date();
-      const minAge = new Date(today.getFullYear() - 16, today.getMonth(), today.getDate());
-      
+      const minAge = new Date(
+        today.getFullYear() - 16,
+        today.getMonth(),
+        today.getDate(),
+      );
+
       if (birthDate > today) {
         throw new BadRequestException('Date of birth cannot be in the future');
       }
-      
+
       if (birthDate > minAge) {
         throw new BadRequestException('Employee must be at least 16 years old');
       }
@@ -145,21 +155,32 @@ export class EmployeeService {
     if (createDto.dateOfHiring) {
       const hiringDate = new Date(createDto.dateOfHiring);
       const today = new Date();
-      const maxFutureDate = new Date(today.getFullYear() + 1, today.getMonth(), today.getDate());
-      
+      const maxFutureDate = new Date(
+        today.getFullYear() + 1,
+        today.getMonth(),
+        today.getDate(),
+      );
+
       if (hiringDate > maxFutureDate) {
-        throw new BadRequestException('Hiring date cannot be more than 1 year in the future');
+        throw new BadRequestException(
+          'Hiring date cannot be more than 1 year in the future',
+        );
       }
     }
 
     // Validate salary (if provided, should be reasonable)
-    if (createDto.salary && (createDto.salary < 0 || createDto.salary > 1000000)) {
+    if (
+      createDto.salary &&
+      (createDto.salary < 0 || createDto.salary > 1000000)
+    ) {
       throw new BadRequestException('Salary must be between 0 and 1,000,000');
     }
 
     // Validate assignment entities exist
     if (createDto.organizationId) {
-      const organization = await this.organizationModel.findById(createDto.organizationId);
+      const organization = await this.organizationModel.findById(
+        createDto.organizationId,
+      );
       if (!organization) {
         throw new NotFoundException('Organization not found');
       }
@@ -183,25 +204,25 @@ export class EmployeeService {
   /**
    * Validate single complex assignment
    * Ensures that all clinics assigned to an employee belong to the same complex.
-   * 
+   *
    * Business Rule: BZR-5e6f7a8b - Single complex assignment validation
    * Requirements: 3.5
    * Design: Section 3.3.1
-   * 
+   *
    * @private
    * @param {Object} employeeDto - Employee data containing complexId and clinicIds
    * @param {string} [employeeDto.complexId] - The complex ID the employee is assigned to
    * @param {string[]} [employeeDto.clinicIds] - Array of clinic IDs the employee is assigned to
    * @returns {Promise<void>}
    * @throws {BadRequestException} When clinics belong to different complexes
-   * 
+   *
    * @example
    * // Valid: All clinics belong to the same complex
    * await this.validateSingleComplexAssignment({
    *   complexId: 'complex123',
    *   clinicIds: ['clinic1', 'clinic2']
    * });
-   * 
+   *
    * @example
    * // Invalid: Clinics belong to different complexes
    * await this.validateSingleComplexAssignment({
@@ -210,9 +231,10 @@ export class EmployeeService {
    * });
    * // Throws BadRequestException with bilingual error message
    */
-  private async validateSingleComplexAssignment(
-    employeeDto: { complexId?: string; clinicIds?: string[] }
-  ): Promise<void> {
+  private async validateSingleComplexAssignment(employeeDto: {
+    complexId?: string;
+    clinicIds?: string[];
+  }): Promise<void> {
     // Skip validation if no complex or clinics provided
     if (!employeeDto.complexId || !employeeDto.clinicIds?.length) {
       return;
@@ -222,21 +244,21 @@ export class EmployeeService {
     await ValidationUtil.validateSingleComplexAssignment(
       employeeDto.clinicIds,
       employeeDto.complexId,
-      this.clinicModel
+      this.clinicModel,
     );
   }
 
   /**
    * Validate plan-based assignment
    * Ensures that employee assignments match the subscription plan type.
-   * 
+   *
    * Business Rules:
    * - BZR-i4c3e2f7: Plan 2 (Complex) - Complex must match subscription
    * - BZR-j8a9f0d5: Plan 3 (Clinic) - Clinic must match subscription
-   * 
+   *
    * Requirements: 3.6
    * Design: Section 3.3.1
-   * 
+   *
    * @private
    * @param {Object} employeeDto - Employee data containing assignment IDs
    * @param {string} [employeeDto.complexId] - The complex ID the employee is assigned to
@@ -247,14 +269,14 @@ export class EmployeeService {
    * @param {Types.ObjectId} [subscription.clinicId] - Clinic ID from subscription (for Plan 3)
    * @returns {Promise<void>}
    * @throws {BadRequestException} When assignment doesn't match subscription plan
-   * 
+   *
    * @example
    * // Valid: Plan 2 (Complex) - Complex matches subscription
    * await this.validatePlanBasedAssignment(
    *   { complexId: 'complex123' },
    *   { planType: 'complex', complexId: new Types.ObjectId('complex123') }
    * );
-   * 
+   *
    * @example
    * // Invalid: Plan 2 (Complex) - Complex doesn't match subscription
    * await this.validatePlanBasedAssignment(
@@ -262,7 +284,7 @@ export class EmployeeService {
    *   { planType: 'complex', complexId: new Types.ObjectId('complex123') }
    * );
    * // Throws BadRequestException with bilingual error message
-   * 
+   *
    * @example
    * // Valid: Plan 3 (Clinic) - Clinic matches subscription
    * await this.validatePlanBasedAssignment(
@@ -272,39 +294,43 @@ export class EmployeeService {
    */
   private async validatePlanBasedAssignment(
     employeeDto: any,
-    subscription: any
+    subscription: any,
   ): Promise<void> {
     // Plan 2: Complex plan - validate complex matches subscription
     if (subscription.planType === 'complex') {
-      if (employeeDto.complexId && 
-          employeeDto.complexId !== subscription.complexId?.toString()) {
+      if (
+        employeeDto.complexId &&
+        employeeDto.complexId !== subscription.complexId?.toString()
+      ) {
         throw new BadRequestException({
           message: {
             ar: 'يجب أن يتطابق المجمع مع اشتراكك',
-            en: 'Complex must match your subscription'
+            en: 'Complex must match your subscription',
           },
           code: 'COMPLEX_MISMATCH',
           details: {
             subscriptionComplexId: subscription.complexId,
-            providedComplexId: employeeDto.complexId
-          }
+            providedComplexId: employeeDto.complexId,
+          },
         });
       }
-    } 
+    }
     // Plan 3: Clinic plan - validate clinic matches subscription
     else if (subscription.planType === 'clinic') {
-      if (employeeDto.clinicId && 
-          employeeDto.clinicId !== subscription.clinicId?.toString()) {
+      if (
+        employeeDto.clinicId &&
+        employeeDto.clinicId !== subscription.clinicId?.toString()
+      ) {
         throw new BadRequestException({
           message: {
             ar: 'يجب أن تتطابق العيادة مع اشتراكك',
-            en: 'Clinic must match your subscription'
+            en: 'Clinic must match your subscription',
           },
           code: 'CLINIC_MISMATCH',
           details: {
             subscriptionClinicId: subscription.clinicId,
-            providedClinicId: employeeDto.clinicId
-          }
+            providedClinicId: employeeDto.clinicId,
+          },
         });
       }
     }
@@ -314,19 +340,19 @@ export class EmployeeService {
 
   /**
    * Create a new employee
-   * 
+   *
    * Business Rules:
    * - BZR-5e6f7a8b: Single complex assignment validation
    * - BZR-i4c3e2f7: Plan 2 - Complex must match subscription
    * - BZR-j8a9f0d5: Plan 3 - Clinic must match subscription
-   * 
+   *
    * Requirements: 3.5, 3.6
    * Design: Section 3.3.1
    */
   async createEmployee(
     createEmployeeDto: CreateEmployeeDto,
     createdByUserId?: string,
-    subscription?: any
+    subscription?: any,
   ): Promise<any> {
     this.logger.log(`Creating employee: ${createEmployeeDto.email}`);
 
@@ -347,10 +373,14 @@ export class EmployeeService {
 
     // Hash the password
     const saltRounds = 10;
-    const hashedPassword = await bcrypt.hash(createEmployeeDto.password, saltRounds);
+    const hashedPassword = await bcrypt.hash(
+      createEmployeeDto.password,
+      saltRounds,
+    );
 
     // Generate employee number if not provided
-    const employeeNumber = createEmployeeDto.employeeNumber || await this.generateEmployeeNumber();
+    const employeeNumber =
+      createEmployeeDto.employeeNumber || (await this.generateEmployeeNumber());
 
     // Create user account
     const userData = {
@@ -394,7 +424,9 @@ export class EmployeeService {
     const employeeProfile = new this.employeeProfileModel(profileData);
     const savedProfile = await employeeProfile.save();
 
-    this.logger.log(`Employee created successfully: ${savedUser.email} (ID: ${savedUser._id})`);
+    this.logger.log(
+      `Employee created successfully: ${savedUser.email} (ID: ${savedUser._id})`,
+    );
 
     // Return combined user and profile data
     return {
@@ -429,12 +461,12 @@ export class EmployeeService {
       page = '1',
       limit = '10',
       sortBy = 'createdAt',
-      sortOrder = 'desc'
+      sortOrder = 'desc',
     } = query;
 
     // Build user filter
     const userFilter: any = {};
-    
+
     if (firstName) userFilter.firstName = { $regex: firstName, $options: 'i' };
     if (lastName) userFilter.lastName = { $regex: lastName, $options: 'i' };
     if (email) userFilter.email = { $regex: email, $options: 'i' };
@@ -447,20 +479,22 @@ export class EmployeeService {
         { firstName: { $regex: search, $options: 'i' } },
         { lastName: { $regex: search, $options: 'i' } },
         { email: { $regex: search, $options: 'i' } },
-        { phone: { $regex: search, $options: 'i' } }
+        { phone: { $regex: search, $options: 'i' } },
       ];
     }
 
     // Build employee profile filter
     const profileFilter: any = { isActive: true };
-    
-    if (employeeNumber) profileFilter.employeeNumber = { $regex: employeeNumber, $options: 'i' };
+
+    if (employeeNumber)
+      profileFilter.employeeNumber = { $regex: employeeNumber, $options: 'i' };
     if (jobTitle) profileFilter.jobTitle = { $regex: jobTitle, $options: 'i' };
 
     // Date filtering
     if (dateHiredFrom || dateHiredTo) {
       profileFilter.dateOfHiring = {};
-      if (dateHiredFrom) profileFilter.dateOfHiring.$gte = new Date(dateHiredFrom);
+      if (dateHiredFrom)
+        profileFilter.dateOfHiring.$gte = new Date(dateHiredFrom);
       if (dateHiredTo) profileFilter.dateOfHiring.$lte = new Date(dateHiredTo);
     }
 
@@ -485,14 +519,14 @@ export class EmployeeService {
           from: 'employee_profiles',
           localField: '_id',
           foreignField: 'userId',
-          as: 'employeeProfile'
-        }
+          as: 'employeeProfile',
+        },
       },
       {
         $unwind: {
           path: '$employeeProfile',
-          preserveNullAndEmptyArrays: false
-        }
+          preserveNullAndEmptyArrays: false,
+        },
       },
       {
         $match: {
@@ -500,60 +534,55 @@ export class EmployeeService {
           'employeeProfile.isActive': true,
           ...(Object.keys(profileFilter).length > 1 && {
             $and: Object.entries(profileFilter).map(([key, value]) => ({
-              [`employeeProfile.${key}`]: value
-            }))
-          })
-        }
+              [`employeeProfile.${key}`]: value,
+            })),
+          }),
+        },
       },
       {
         $lookup: {
           from: 'organizations',
           localField: 'organizationId',
           foreignField: '_id',
-          as: 'organization'
-        }
+          as: 'organization',
+        },
       },
       {
         $lookup: {
           from: 'complexes',
           localField: 'complexId',
           foreignField: '_id',
-          as: 'complex'
-        }
+          as: 'complex',
+        },
       },
       {
         $lookup: {
           from: 'clinics',
           localField: 'clinicId',
           foreignField: '_id',
-          as: 'clinic'
-        }
+          as: 'clinic',
+        },
       },
       {
         $addFields: {
           organization: { $arrayElemAt: ['$organization', 0] },
           complex: { $arrayElemAt: ['$complex', 0] },
-          clinic: { $arrayElemAt: ['$clinic', 0] }
-        }
+          clinic: { $arrayElemAt: ['$clinic', 0] },
+        },
       },
       {
-        $sort: sort
+        $sort: sort,
       },
       {
         $facet: {
-          data: [
-            { $skip: skip },
-            { $limit: pageSize }
-          ],
-          count: [
-            { $count: 'total' }
-          ]
-        }
-      }
+          data: [{ $skip: skip }, { $limit: pageSize }],
+          count: [{ $count: 'total' }],
+        },
+      },
     ];
 
     const result = await this.userModel.aggregate(pipeline).exec();
-    
+
     const employees = result[0].data || [];
     const total = result[0].count[0]?.total || 0;
     const totalPages = Math.ceil(total / pageSize);
@@ -562,7 +591,7 @@ export class EmployeeService {
       employees,
       total,
       page: pageNum,
-      totalPages
+      totalPages,
     };
   }
 
@@ -576,73 +605,73 @@ export class EmployeeService {
 
     const pipeline = [
       {
-        $match: { _id: new Types.ObjectId(employeeId) }
+        $match: { _id: new Types.ObjectId(employeeId) },
       },
       {
         $lookup: {
           from: 'employee_profiles',
           localField: '_id',
           foreignField: 'userId',
-          as: 'employeeProfile'
-        }
+          as: 'employeeProfile',
+        },
       },
       {
         $unwind: {
           path: '$employeeProfile',
-          preserveNullAndEmptyArrays: false
-        }
+          preserveNullAndEmptyArrays: false,
+        },
       },
       {
         $lookup: {
           from: 'employee_shifts',
           localField: '_id',
           foreignField: 'userId',
-          as: 'shifts'
-        }
+          as: 'shifts',
+        },
       },
       {
         $lookup: {
           from: 'employee_documents',
           localField: '_id',
           foreignField: 'userId',
-          as: 'documents'
-        }
+          as: 'documents',
+        },
       },
       {
         $lookup: {
           from: 'organizations',
           localField: 'organizationId',
           foreignField: '_id',
-          as: 'organization'
-        }
+          as: 'organization',
+        },
       },
       {
         $lookup: {
           from: 'complexes',
           localField: 'complexId',
           foreignField: '_id',
-          as: 'complex'
-        }
+          as: 'complex',
+        },
       },
       {
         $lookup: {
           from: 'clinics',
           localField: 'clinicId',
           foreignField: '_id',
-          as: 'clinic'
-        }
+          as: 'clinic',
+        },
       },
       {
         $addFields: {
           organization: { $arrayElemAt: ['$organization', 0] },
           complex: { $arrayElemAt: ['$complex', 0] },
-          clinic: { $arrayElemAt: ['$clinic', 0] }
-        }
-      }
+          clinic: { $arrayElemAt: ['$clinic', 0] },
+        },
+      },
     ];
 
     const result = await this.userModel.aggregate(pipeline).exec();
-    
+
     if (!result || result.length === 0) {
       throw new NotFoundException('Employee not found');
     }
@@ -652,12 +681,12 @@ export class EmployeeService {
 
   /**
    * Update employee information
-   * 
+   *
    * Business Rules:
    * - BZR-5e6f7a8b: Single complex assignment validation
    * - BZR-i4c3e2f7: Plan 2 - Complex must match subscription
    * - BZR-j8a9f0d5: Plan 3 - Clinic must match subscription
-   * 
+   *
    * Requirements: 3.5, 3.6
    * Design: Section 3.3.1
    */
@@ -665,7 +694,7 @@ export class EmployeeService {
     employeeId: string,
     updateEmployeeDto: UpdateEmployeeDto,
     updatedByUserId?: string,
-    subscription?: any
+    subscription?: any,
   ): Promise<any> {
     this.logger.log(`Updating employee: ${employeeId}`);
 
@@ -674,7 +703,7 @@ export class EmployeeService {
     const employee = await ValidationUtil.validateEntityExists(
       this.userModel,
       employeeId,
-      ERROR_MESSAGES.EMPLOYEE_NOT_FOUND
+      ERROR_MESSAGES.EMPLOYEE_NOT_FOUND,
     );
 
     // Validate employee data (existing validation for uniqueness, dates, etc.)
@@ -696,22 +725,36 @@ export class EmployeeService {
     const profileUpdates: any = {};
 
     // User fields
-    if (updateEmployeeDto.firstName) userUpdates.firstName = updateEmployeeDto.firstName;
-    if (updateEmployeeDto.lastName) userUpdates.lastName = updateEmployeeDto.lastName;
+    if (updateEmployeeDto.firstName)
+      userUpdates.firstName = updateEmployeeDto.firstName;
+    if (updateEmployeeDto.lastName)
+      userUpdates.lastName = updateEmployeeDto.lastName;
     if (updateEmployeeDto.phone) userUpdates.phone = updateEmployeeDto.phone;
-    if (updateEmployeeDto.nationality) userUpdates.nationality = updateEmployeeDto.nationality;
-    if (updateEmployeeDto.address) userUpdates.address = updateEmployeeDto.address;
-    if (updateEmployeeDto.isActive !== undefined) userUpdates.isActive = updateEmployeeDto.isActive;
+    if (updateEmployeeDto.nationality)
+      userUpdates.nationality = updateEmployeeDto.nationality;
+    if (updateEmployeeDto.address)
+      userUpdates.address = updateEmployeeDto.address;
+    if (updateEmployeeDto.isActive !== undefined)
+      userUpdates.isActive = updateEmployeeDto.isActive;
 
     // Profile fields
-    if (updateEmployeeDto.cardNumber) profileUpdates.cardNumber = updateEmployeeDto.cardNumber;
-    if (updateEmployeeDto.maritalStatus) profileUpdates.maritalStatus = updateEmployeeDto.maritalStatus;
-    if (updateEmployeeDto.numberOfChildren !== undefined) profileUpdates.numberOfChildren = updateEmployeeDto.numberOfChildren;
-    if (updateEmployeeDto.profilePictureUrl) profileUpdates.profilePictureUrl = updateEmployeeDto.profilePictureUrl;
-    if (updateEmployeeDto.jobTitle) profileUpdates.jobTitle = updateEmployeeDto.jobTitle;
-    if (updateEmployeeDto.salary !== undefined) profileUpdates.salary = updateEmployeeDto.salary;
-    if (updateEmployeeDto.bankAccount) profileUpdates.bankAccount = updateEmployeeDto.bankAccount;
-    if (updateEmployeeDto.socialSecurityNumber) profileUpdates.socialSecurityNumber = updateEmployeeDto.socialSecurityNumber;
+    if (updateEmployeeDto.cardNumber)
+      profileUpdates.cardNumber = updateEmployeeDto.cardNumber;
+    if (updateEmployeeDto.maritalStatus)
+      profileUpdates.maritalStatus = updateEmployeeDto.maritalStatus;
+    if (updateEmployeeDto.numberOfChildren !== undefined)
+      profileUpdates.numberOfChildren = updateEmployeeDto.numberOfChildren;
+    if (updateEmployeeDto.profilePictureUrl)
+      profileUpdates.profilePictureUrl = updateEmployeeDto.profilePictureUrl;
+    if (updateEmployeeDto.jobTitle)
+      profileUpdates.jobTitle = updateEmployeeDto.jobTitle;
+    if (updateEmployeeDto.salary !== undefined)
+      profileUpdates.salary = updateEmployeeDto.salary;
+    if (updateEmployeeDto.bankAccount)
+      profileUpdates.bankAccount = updateEmployeeDto.bankAccount;
+    if (updateEmployeeDto.socialSecurityNumber)
+      profileUpdates.socialSecurityNumber =
+        updateEmployeeDto.socialSecurityNumber;
     if (updateEmployeeDto.taxId) profileUpdates.taxId = updateEmployeeDto.taxId;
     if (updateEmployeeDto.notes) profileUpdates.notes = updateEmployeeDto.notes;
 
@@ -720,7 +763,7 @@ export class EmployeeService {
       await this.userModel.findByIdAndUpdate(
         employeeId,
         { $set: userUpdates },
-        { new: true, runValidators: true }
+        { new: true, runValidators: true },
       );
     }
 
@@ -729,7 +772,7 @@ export class EmployeeService {
       await this.employeeProfileModel.findOneAndUpdate(
         { userId: new Types.ObjectId(employeeId) },
         { $set: profileUpdates },
-        { new: true, runValidators: true }
+        { new: true, runValidators: true },
       );
     }
 
@@ -741,31 +784,34 @@ export class EmployeeService {
     // Return standardized response using ResponseBuilder
     return ResponseBuilder.success(
       updatedEmployee,
-      ERROR_MESSAGES.EMPLOYEE_UPDATED
+      ERROR_MESSAGES.EMPLOYEE_UPDATED,
     );
   }
 
   /**
    * Soft delete employee
-   * 
+   *
    * Business Rule: BZR-m3d5a8b7 - Cannot delete own account
    * Requirements: 3.1
    * Design: Section 3.3.1
-   * 
+   *
    * @param {string} employeeId - The ID of the employee to delete
    * @param {string} deletedByUserId - The ID of the user performing the deletion
    * @returns {Promise<any>} Standardized response with success message
    * @throws {BadRequestException} When trying to delete own account
    * @throws {NotFoundException} When employee is not found
    */
-  async deleteEmployee(employeeId: string, deletedByUserId?: string): Promise<any> {
+  async deleteEmployee(
+    employeeId: string,
+    deletedByUserId?: string,
+  ): Promise<any> {
     this.logger.log(`Soft deleting employee: ${employeeId}`);
 
     // Validate employee exists using ValidationUtil
     const employee = await ValidationUtil.validateEntityExists(
       this.userModel,
       employeeId,
-      ERROR_MESSAGES.EMPLOYEE_NOT_FOUND
+      ERROR_MESSAGES.EMPLOYEE_NOT_FOUND,
     );
 
     // Validate not self-deletion using ValidationUtil
@@ -774,47 +820,41 @@ export class EmployeeService {
       ValidationUtil.validateNotSelfModification(
         employeeId,
         deletedByUserId,
-        'delete'
+        'delete',
       );
     }
 
     // Deactivate user account (soft delete)
-    await this.userModel.findByIdAndUpdate(
-      employeeId,
-      { 
-        $set: { 
-          isActive: false 
-        }
-      }
-    );
+    await this.userModel.findByIdAndUpdate(employeeId, {
+      $set: {
+        isActive: false,
+      },
+    });
 
     // Deactivate employee profile
     await this.employeeProfileModel.findOneAndUpdate(
       { userId: new Types.ObjectId(employeeId) },
-      { 
-        $set: { 
-          isActive: false 
-        }
-      }
+      {
+        $set: {
+          isActive: false,
+        },
+      },
     );
 
     // Deactivate all shifts
     await this.employeeShiftModel.updateMany(
       { userId: new Types.ObjectId(employeeId) },
-      { 
-        $set: { 
-          isActive: false 
-        }
-      }
+      {
+        $set: {
+          isActive: false,
+        },
+      },
     );
 
     this.logger.log(`Employee soft deleted successfully: ${employeeId}`);
 
     // Return standardized response using ResponseBuilder
-    return ResponseBuilder.success(
-      null,
-      ERROR_MESSAGES.EMPLOYEE_DELETED
-    );
+    return ResponseBuilder.success(null, ERROR_MESSAGES.EMPLOYEE_DELETED);
   }
 
   /**
@@ -823,7 +863,7 @@ export class EmployeeService {
   async terminateEmployee(
     employeeId: string,
     terminateDto: TerminateEmployeeDto,
-    terminatedByUserId?: string
+    terminatedByUserId?: string,
   ): Promise<any> {
     if (!Types.ObjectId.isValid(employeeId)) {
       throw new BadRequestException('Invalid employee ID format');
@@ -841,42 +881,42 @@ export class EmployeeService {
     }
 
     const terminationDate = new Date(terminateDto.terminationDate);
-    
+
     // Validate termination date
     if (terminationDate < employee.employeeProfile.dateOfHiring) {
-      throw new BadRequestException('Termination date cannot be before hiring date');
+      throw new BadRequestException(
+        'Termination date cannot be before hiring date',
+      );
     }
 
     // Update user account
-    await this.userModel.findByIdAndUpdate(
-      employeeId,
-      { 
-        $set: { 
-          isActive: false 
-        }
-      }
-    );
+    await this.userModel.findByIdAndUpdate(employeeId, {
+      $set: {
+        isActive: false,
+      },
+    });
 
     // Update employee profile with termination details
     await this.employeeProfileModel.findOneAndUpdate(
       { userId: new Types.ObjectId(employeeId) },
-      { 
-        $set: { 
+      {
+        $set: {
           isActive: false,
           terminationDate: terminationDate,
-          notes: `${employee.employeeProfile.notes || ''}\n\nTERMINATION:\nType: ${terminateDto.terminationType}\nReason: ${terminateDto.reason}\n${terminateDto.finalNotes || ''}`.trim()
-        }
-      }
+          notes:
+            `${employee.employeeProfile.notes || ''}\n\nTERMINATION:\nType: ${terminateDto.terminationType}\nReason: ${terminateDto.reason}\n${terminateDto.finalNotes || ''}`.trim(),
+        },
+      },
     );
 
     // Deactivate all shifts
     await this.employeeShiftModel.updateMany(
       { userId: new Types.ObjectId(employeeId) },
-      { 
-        $set: { 
-          isActive: false 
-        }
-      }
+      {
+        $set: {
+          isActive: false,
+        },
+      },
     );
 
     this.logger.log(`Employee terminated successfully: ${employeeId}`);
@@ -905,7 +945,7 @@ export class EmployeeService {
    */
   async searchEmployees(
     searchTerm: string,
-    limit: number = 20
+    limit: number = 20,
   ): Promise<any[]> {
     if (!searchTerm || searchTerm.trim().length === 0) {
       return [];
@@ -917,14 +957,14 @@ export class EmployeeService {
           from: 'employee_profiles',
           localField: '_id',
           foreignField: 'userId',
-          as: 'employeeProfile'
-        }
+          as: 'employeeProfile',
+        },
       },
       {
         $unwind: {
           path: '$employeeProfile',
-          preserveNullAndEmptyArrays: false
-        }
+          preserveNullAndEmptyArrays: false,
+        },
       },
       {
         $match: {
@@ -935,13 +975,20 @@ export class EmployeeService {
             { lastName: { $regex: searchTerm, $options: 'i' } },
             { email: { $regex: searchTerm, $options: 'i' } },
             { phone: { $regex: searchTerm, $options: 'i' } },
-            { 'employeeProfile.employeeNumber': { $regex: searchTerm, $options: 'i' } },
-            { 'employeeProfile.jobTitle': { $regex: searchTerm, $options: 'i' } }
-          ]
-        }
+            {
+              'employeeProfile.employeeNumber': {
+                $regex: searchTerm,
+                $options: 'i',
+              },
+            },
+            {
+              'employeeProfile.jobTitle': { $regex: searchTerm, $options: 'i' },
+            },
+          ],
+        },
       },
       {
-        $limit: Math.min(limit, 50)
+        $limit: Math.min(limit, 50),
       },
       {
         $project: {
@@ -952,9 +999,9 @@ export class EmployeeService {
           phone: 1,
           role: 1,
           employeeNumber: '$employeeProfile.employeeNumber',
-          jobTitle: '$employeeProfile.jobTitle'
-        }
-      }
+          jobTitle: '$employeeProfile.jobTitle',
+        },
+      },
     ];
 
     return await this.userModel.aggregate(pipeline).exec();
@@ -977,24 +1024,24 @@ export class EmployeeService {
       salaryStats,
       genderStats,
       monthlyHiringTrend,
-      upcomingExpirations
+      upcomingExpirations,
     ] = await Promise.all([
       // Total employees count
       this.employeeProfileModel.countDocuments({}),
 
-      // Active employees count  
+      // Active employees count
       this.employeeProfileModel.countDocuments({ isActive: true }),
 
       // New hires this month
       this.employeeProfileModel.countDocuments({
         dateOfHiring: { $gte: startOfMonth },
-        isActive: true
+        isActive: true,
       }),
 
       // New hires this year
       this.employeeProfileModel.countDocuments({
         dateOfHiring: { $gte: startOfYear },
-        isActive: true
+        isActive: true,
       }),
 
       // Employees by role
@@ -1004,44 +1051,44 @@ export class EmployeeService {
             from: 'employee_profiles',
             localField: '_id',
             foreignField: 'userId',
-            as: 'profile'
-          }
+            as: 'profile',
+          },
         },
         {
-          $unwind: '$profile'
+          $unwind: '$profile',
         },
         {
-          $match: { 'profile.isActive': true }
+          $match: { 'profile.isActive': true },
         },
         {
           $group: {
             _id: '$role',
-            count: { $sum: 1 }
-          }
+            count: { $sum: 1 },
+          },
         },
         {
-          $sort: { count: -1 }
-        }
+          $sort: { count: -1 },
+        },
       ]),
 
       // Salary statistics
       this.employeeProfileModel.aggregate([
         {
-          $match: { 
+          $match: {
             isActive: true,
-            salary: { $gt: 0 }
-          }
+            salary: { $gt: 0 },
+          },
         },
         {
           $lookup: {
             from: 'users',
             localField: 'userId',
             foreignField: '_id',
-            as: 'user'
-          }
+            as: 'user',
+          },
         },
         {
-          $unwind: '$user'
+          $unwind: '$user',
         },
         {
           $group: {
@@ -1051,11 +1098,11 @@ export class EmployeeService {
             roleStats: {
               $push: {
                 role: '$user.role',
-                salary: '$salary'
-              }
-            }
-          }
-        }
+                salary: '$salary',
+              },
+            },
+          },
+        },
       ]),
 
       // Gender distribution
@@ -1065,44 +1112,44 @@ export class EmployeeService {
             from: 'employee_profiles',
             localField: '_id',
             foreignField: 'userId',
-            as: 'profile'
-          }
+            as: 'profile',
+          },
         },
         {
-          $unwind: '$profile'
+          $unwind: '$profile',
         },
         {
-          $match: { 'profile.isActive': true }
+          $match: { 'profile.isActive': true },
         },
         {
           $group: {
             _id: '$gender',
-            count: { $sum: 1 }
-          }
-        }
+            count: { $sum: 1 },
+          },
+        },
       ]),
 
       // Monthly hiring trend (last 12 months)
       this.employeeProfileModel.aggregate([
         {
           $match: {
-            dateOfHiring: { 
-              $gte: new Date(now.getFullYear() - 1, now.getMonth(), 1) 
-            }
-          }
+            dateOfHiring: {
+              $gte: new Date(now.getFullYear() - 1, now.getMonth(), 1),
+            },
+          },
         },
         {
           $group: {
             _id: {
               year: { $year: '$dateOfHiring' },
-              month: { $month: '$dateOfHiring' }
+              month: { $month: '$dateOfHiring' },
             },
-            count: { $sum: 1 }
-          }
+            count: { $sum: 1 },
+          },
         },
         {
-          $sort: { '_id.year': 1, '_id.month': 1 }
-        }
+          $sort: { '_id.year': 1, '_id.month': 1 },
+        },
       ]),
 
       // Upcoming document expirations (next 30 days)
@@ -1111,90 +1158,97 @@ export class EmployeeService {
           $match: {
             expiryDate: {
               $gte: now,
-              $lte: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
+              $lte: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000),
             },
             status: 'active',
-            isActive: true
-          }
+            isActive: true,
+          },
         },
         {
           $lookup: {
             from: 'users',
             localField: 'userId',
             foreignField: '_id',
-            as: 'user'
-          }
+            as: 'user',
+          },
         },
         {
-          $unwind: '$user'
+          $unwind: '$user',
         },
         {
           $project: {
             employeeId: '$userId',
             employeeName: {
-              $concat: ['$user.firstName', ' ', '$user.lastName']
+              $concat: ['$user.firstName', ' ', '$user.lastName'],
             },
             documentType: 1,
             expiryDate: 1,
             daysUntilExpiry: {
               $divide: [
                 { $subtract: ['$expiryDate', now] },
-                24 * 60 * 60 * 1000
-              ]
-            }
-          }
+                24 * 60 * 60 * 1000,
+              ],
+            },
+          },
         },
         {
-          $sort: { expiryDate: 1 }
-        }
-      ])
+          $sort: { expiryDate: 1 },
+        },
+      ]),
     ]);
 
     // Calculate additional statistics
     const inactiveEmployees = totalEmployees - activeEmployees;
-    
+
     // Calculate average tenure
     const tenureResult = await this.employeeProfileModel.aggregate([
       {
-        $match: { isActive: true }
+        $match: { isActive: true },
       },
       {
         $addFields: {
           tenureMonths: {
             $divide: [
               { $subtract: [now, '$dateOfHiring'] },
-              30 * 24 * 60 * 60 * 1000 // Approximate months
-            ]
-          }
-        }
+              30 * 24 * 60 * 60 * 1000, // Approximate months
+            ],
+          },
+        },
       },
       {
         $group: {
           _id: null,
-          averageTenure: { $avg: '$tenureMonths' }
-        }
-      }
+          averageTenure: { $avg: '$tenureMonths' },
+        },
+      },
     ]);
 
-    const averageTenure = tenureResult.length > 0 ? Math.round(tenureResult[0].averageTenure) : 0;
+    const averageTenure =
+      tenureResult.length > 0 ? Math.round(tenureResult[0].averageTenure) : 0;
 
     // Process role statistics
-    const roleStats = employeesByRole.map(item => ({
+    const roleStats = employeesByRole.map((item) => ({
       role: item._id,
       count: item.count,
-      percentage: totalEmployees > 0 ? Math.round((item.count / totalEmployees) * 100) : 0
+      percentage:
+        totalEmployees > 0
+          ? Math.round((item.count / totalEmployees) * 100)
+          : 0,
     }));
 
     // Process salary statistics
-    const salaryStatistics = salaryStats.length > 0 ? {
-      averageSalary: Math.round(salaryStats[0].averageSalary || 0),
-      medianSalary: 0, // Would calculate from sorted salaries array
-      salaryRangeByRole: [] // Would group by role and calculate ranges
-    } : {
-      averageSalary: 0,
-      medianSalary: 0,
-      salaryRangeByRole: []
-    };
+    const salaryStatistics =
+      salaryStats.length > 0
+        ? {
+            averageSalary: Math.round(salaryStats[0].averageSalary || 0),
+            medianSalary: 0, // Would calculate from sorted salaries array
+            salaryRangeByRole: [], // Would group by role and calculate ranges
+          }
+        : {
+            averageSalary: 0,
+            medianSalary: 0,
+            salaryRangeByRole: [],
+          };
 
     // Process gender distribution
     const genderDistribution = {
@@ -1202,23 +1256,40 @@ export class EmployeeService {
       female: 0,
       other: 0,
       malePercentage: 0,
-      femalePercentage: 0
+      femalePercentage: 0,
     };
 
-    genderStats.forEach(stat => {
+    genderStats.forEach((stat) => {
       genderDistribution[stat._id] = stat.count;
     });
 
     if (totalEmployees > 0) {
-      genderDistribution.malePercentage = Math.round((genderDistribution.male / totalEmployees) * 100);
-      genderDistribution.femalePercentage = Math.round((genderDistribution.female / totalEmployees) * 100);
+      genderDistribution.malePercentage = Math.round(
+        (genderDistribution.male / totalEmployees) * 100,
+      );
+      genderDistribution.femalePercentage = Math.round(
+        (genderDistribution.female / totalEmployees) * 100,
+      );
     }
 
     // Process monthly hiring trend
-    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const monthlyTrend = monthlyHiringTrend.map(item => ({
+    const monthNames = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    const monthlyTrend = monthlyHiringTrend.map((item) => ({
       month: `${monthNames[item._id.month - 1]} ${item._id.year}`,
-      count: item.count
+      count: item.count,
     }));
 
     return {
@@ -1234,7 +1305,7 @@ export class EmployeeService {
       salaryStatistics,
       genderDistribution,
       ageDistribution: [], // Would calculate age ranges
-      monthlyHiringTrend: monthlyTrend
+      monthlyHiringTrend: monthlyTrend,
     };
   }
 
@@ -1243,7 +1314,7 @@ export class EmployeeService {
    */
   async createEmployeeDocument(
     createDocumentDto: CreateEmployeeDocumentDto,
-    uploadedByUserId?: string
+    uploadedByUserId?: string,
   ): Promise<any> {
     // Validate employee exists
     const employee = await this.getEmployeeById(createDocumentDto.userId);
@@ -1254,12 +1325,18 @@ export class EmployeeService {
     const documentData = {
       ...createDocumentDto,
       userId: new Types.ObjectId(createDocumentDto.userId),
-      uploadedBy: uploadedByUserId ? new Types.ObjectId(uploadedByUserId) : undefined,
+      uploadedBy: uploadedByUserId
+        ? new Types.ObjectId(uploadedByUserId)
+        : undefined,
       status: 'active',
       isVerified: false,
       isActive: true,
-      issueDate: createDocumentDto.issueDate ? new Date(createDocumentDto.issueDate) : undefined,
-      expiryDate: createDocumentDto.expiryDate ? new Date(createDocumentDto.expiryDate) : undefined,
+      issueDate: createDocumentDto.issueDate
+        ? new Date(createDocumentDto.issueDate)
+        : undefined,
+      expiryDate: createDocumentDto.expiryDate
+        ? new Date(createDocumentDto.expiryDate)
+        : undefined,
     };
 
     const document = new this.employeeDocumentModel(documentData);
@@ -1272,7 +1349,7 @@ export class EmployeeService {
   async updateEmployeeDocument(
     documentId: string,
     updateDocumentDto: UpdateEmployeeDocumentDto,
-    updatedByUserId?: string
+    updatedByUserId?: string,
   ): Promise<any> {
     if (!Types.ObjectId.isValid(documentId)) {
       throw new BadRequestException('Invalid document ID format');
@@ -1280,7 +1357,9 @@ export class EmployeeService {
 
     const updateData: any = {
       ...updateDocumentDto,
-      expiryDate: updateDocumentDto.expiryDate ? new Date(updateDocumentDto.expiryDate) : undefined,
+      expiryDate: updateDocumentDto.expiryDate
+        ? new Date(updateDocumentDto.expiryDate)
+        : undefined,
     };
 
     if (updateDocumentDto.isVerified && updatedByUserId) {
@@ -1292,7 +1371,7 @@ export class EmployeeService {
       .findByIdAndUpdate(
         documentId,
         { $set: updateData },
-        { new: true, runValidators: true }
+        { new: true, runValidators: true },
       )
       .exec();
 
@@ -1312,9 +1391,9 @@ export class EmployeeService {
     }
 
     return await this.employeeDocumentModel
-      .find({ 
+      .find({
         userId: new Types.ObjectId(employeeId),
-        isActive: true 
+        isActive: true,
       })
       .populate('uploadedBy', 'firstName lastName')
       .populate('verifiedBy', 'firstName lastName')
@@ -1326,7 +1405,7 @@ export class EmployeeService {
    * Create employee shift
    */
   async createEmployeeShift(
-    createShiftDto: CreateEmployeeShiftDto
+    createShiftDto: CreateEmployeeShiftDto,
   ): Promise<any> {
     // Validate employee exists
     const employee = await this.getEmployeeById(createShiftDto.userId);
@@ -1350,11 +1429,13 @@ export class EmployeeService {
       dayOfWeek: createShiftDto.dayOfWeek,
       entityType: createShiftDto.entityType,
       entityId: new Types.ObjectId(createShiftDto.entityId),
-      isActive: true
+      isActive: true,
     });
 
     if (existingShift) {
-      throw new ConflictException(`Employee already has a shift on ${createShiftDto.dayOfWeek} for this ${createShiftDto.entityType}`);
+      throw new ConflictException(
+        `Employee already has a shift on ${createShiftDto.dayOfWeek} for this ${createShiftDto.entityType}`,
+      );
     }
 
     const shiftData = {
@@ -1378,9 +1459,9 @@ export class EmployeeService {
     }
 
     return await this.employeeShiftModel
-      .find({ 
+      .find({
         userId: new Types.ObjectId(employeeId),
-        isActive: true 
+        isActive: true,
       })
       .populate('entityId')
       .sort({ dayOfWeek: 1, startTime: 1 })
@@ -1392,7 +1473,7 @@ export class EmployeeService {
    */
   async bulkEmployeeAction(
     bulkActionDto: BulkEmployeeActionDto,
-    actionByUserId?: string
+    actionByUserId?: string,
   ): Promise<{ success: number; failed: number; errors: string[] }> {
     const { employeeIds, action, reason, effectiveDate } = bulkActionDto;
     let success = 0;
@@ -1403,23 +1484,33 @@ export class EmployeeService {
       try {
         switch (action) {
           case 'activate':
-            await this.updateEmployee(employeeId, { isActive: true }, actionByUserId);
+            await this.updateEmployee(
+              employeeId,
+              { isActive: true },
+              actionByUserId,
+            );
             break;
           case 'deactivate':
-            await this.updateEmployee(employeeId, { isActive: false }, actionByUserId);
+            await this.updateEmployee(
+              employeeId,
+              { isActive: false },
+              actionByUserId,
+            );
             break;
           case 'terminate':
             if (!effectiveDate || !reason) {
-              throw new BadRequestException('Termination requires effective date and reason');
+              throw new BadRequestException(
+                'Termination requires effective date and reason',
+              );
             }
             await this.terminateEmployee(
-              employeeId, 
+              employeeId,
               {
                 terminationDate: effectiveDate,
                 terminationType: 'other',
                 reason,
               },
-              actionByUserId
+              actionByUserId,
             );
             break;
           case 'export':
@@ -1438,32 +1529,32 @@ export class EmployeeService {
 
   /**
    * Get employees for dropdown (only active users)
-   * 
+   *
    * Business Rule: BZR-q4f3e1b8 - Deactivated user restrictions in dropdowns
    * Requirements: 3.2
    * Design: Section 3.3.1
-   * 
+   *
    * Returns only active employees for dropdown selection, with optional filtering
    * by complex, clinic, or role. This ensures deactivated users are automatically
    * excluded from assignment dropdowns.
-   * 
+   *
    * @param {Object} [filters] - Optional filters for the query
    * @param {string} [filters.complexId] - Filter by complex ID
    * @param {string} [filters.clinicId] - Filter by clinic ID
    * @param {string} [filters.role] - Filter by user role
    * @returns {Promise<any>} Standardized response with active employees
-   * 
+   *
    * @example
    * // Get all active employees
    * const result = await this.getEmployeesForDropdown();
-   * 
+   *
    * @example
    * // Get active doctors in a specific complex
    * const result = await this.getEmployeesForDropdown({
    *   role: 'doctor',
    *   complexId: 'complex123'
    * });
-   * 
+   *
    * @example
    * // Get active employees in a specific clinic
    * const result = await this.getEmployeesForDropdown({
@@ -1485,23 +1576,23 @@ export class EmployeeService {
           from: 'employee_profiles',
           localField: '_id',
           foreignField: 'userId',
-          as: 'employeeProfile'
-        }
+          as: 'employeeProfile',
+        },
       },
       // Unwind employee profile (only include users with profiles)
       {
         $unwind: {
           path: '$employeeProfile',
-          preserveNullAndEmptyArrays: false
-        }
+          preserveNullAndEmptyArrays: false,
+        },
       },
       // Filter: Only active users and active employee profiles
       {
         $match: {
           isActive: true,
-          'employeeProfile.isActive': true
-        }
-      }
+          'employeeProfile.isActive': true,
+        },
+      },
     ];
 
     // Apply optional filters
@@ -1522,7 +1613,7 @@ export class EmployeeService {
     // Add additional filters if any exist
     if (Object.keys(additionalFilters).length > 0) {
       pipeline.push({
-        $match: additionalFilters
+        $match: additionalFilters,
       });
     }
 
@@ -1537,13 +1628,13 @@ export class EmployeeService {
         phone: 1,
         employeeNumber: '$employeeProfile.employeeNumber',
         jobTitle: '$employeeProfile.jobTitle',
-        profilePictureUrl: '$employeeProfile.profilePictureUrl'
-      }
+        profilePictureUrl: '$employeeProfile.profilePictureUrl',
+      },
     });
 
     // Sort by name
     pipeline.push({
-      $sort: { firstName: 1, lastName: 1 }
+      $sort: { firstName: 1, lastName: 1 },
     });
 
     // Execute aggregation
@@ -1554,4 +1645,4 @@ export class EmployeeService {
     // Return standardized response using ResponseBuilder
     return ResponseBuilder.success(employees);
   }
-} 
+}

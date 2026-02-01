@@ -405,7 +405,9 @@ describe('User Management (e2e)', () => {
       }
 
       // Verify doctor was deactivated
-      const deactivatedDoctor = await userModel.findById(doctorWithAppointmentsId);
+      const deactivatedDoctor = await userModel.findById(
+        doctorWithAppointmentsId,
+      );
       expect(deactivatedDoctor.isActive).toBe(false);
       expect(deactivatedDoctor.deactivatedAt).toBeDefined();
       expect(deactivatedDoctor.deactivatedBy).toBeDefined();
@@ -449,7 +451,9 @@ describe('User Management (e2e)', () => {
       expect(response.body.data.appointmentsRescheduled).toBe(2);
 
       // Verify doctor was deactivated
-      const deactivatedDoctor = await userModel.findById(doctorWithAppointmentsId);
+      const deactivatedDoctor = await userModel.findById(
+        doctorWithAppointmentsId,
+      );
       expect(deactivatedDoctor.isActive).toBe(false);
 
       // Verify appointments were marked for rescheduling
@@ -496,7 +500,9 @@ describe('User Management (e2e)', () => {
       expect(response.body.error.details.appointmentCount).toBe(2);
 
       // Verify doctor was NOT deactivated
-      const unchangedDoctor = await userModel.findById(doctorWithAppointmentsId);
+      const unchangedDoctor = await userModel.findById(
+        doctorWithAppointmentsId,
+      );
       expect(unchangedDoctor.isActive).toBe(true);
     });
 
@@ -584,7 +590,9 @@ describe('User Management (e2e)', () => {
       );
 
       // Verify rollback: doctor should still be active
-      const unchangedDoctor = await userModel.findById(doctorWithAppointmentsId);
+      const unchangedDoctor = await userModel.findById(
+        doctorWithAppointmentsId,
+      );
       expect(unchangedDoctor.isActive).toBe(true);
       expect(unchangedDoctor.deactivatedAt).toBeUndefined();
 
@@ -635,7 +643,9 @@ describe('User Management (e2e)', () => {
       expect(response.body.data.appointmentsRescheduled).toBe(0);
 
       // Verify doctor was deactivated
-      const deactivatedDoctor = await userModel.findById(doctorNoAppointments._id);
+      const deactivatedDoctor = await userModel.findById(
+        doctorNoAppointments._id,
+      );
       expect(deactivatedDoctor.isActive).toBe(false);
 
       // Clean up
@@ -691,7 +701,9 @@ describe('User Management (e2e)', () => {
       verifyBilingualMessage(response.body.error.message);
 
       // Verify doctor was NOT deactivated (rollback)
-      const unchangedDoctor = await userModel.findById(doctorWithAppointmentsId);
+      const unchangedDoctor = await userModel.findById(
+        doctorWithAppointmentsId,
+      );
       expect(unchangedDoctor.isActive).toBe(true);
     });
 
@@ -1027,9 +1039,7 @@ describe('User Management (e2e)', () => {
     });
 
     it('should return 401 when no authentication token provided', async () => {
-      await request(app.getHttpServer())
-        .get('/users/dropdown')
-        .expect(401);
+      await request(app.getHttpServer()).get('/users/dropdown').expect(401);
     });
 
     it('should return 401 when invalid authentication token provided', async () => {

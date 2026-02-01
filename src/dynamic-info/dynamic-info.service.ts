@@ -1,42 +1,49 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { DynamicInfo } from '../database/schemas/dynamic-info.schema';
-import { 
-  CreateDynamicInfoDto, 
-  UpdateDynamicInfoDto, 
+import {
+  CreateDynamicInfoDto,
+  UpdateDynamicInfoDto,
   DynamicInfoSearchDto,
-  InfoTypeDto 
+  InfoTypeDto,
 } from './dto/create-dynamic-info.dto';
 
 @Injectable()
 export class DynamicInfoService {
   constructor(
-    @InjectModel('DynamicInfo') private readonly dynamicInfoModel: Model<DynamicInfo>,
+    @InjectModel('DynamicInfo')
+    private readonly dynamicInfoModel: Model<DynamicInfo>,
   ) {}
 
-  async createDynamicInfo(createDto: CreateDynamicInfoDto): Promise<DynamicInfo> {
+  async createDynamicInfo(
+    createDto: CreateDynamicInfoDto,
+  ): Promise<DynamicInfo> {
     // Check if info already exists for this entity and type
     await this.dynamicInfoModel.findOneAndUpdate(
       {
         entityType: createDto.entityType,
         entityId: new Types.ObjectId(createDto.entityId),
-        infoType: createDto.infoType
+        infoType: createDto.infoType,
       },
       {
         entityType: createDto.entityType,
         entityId: new Types.ObjectId(createDto.entityId),
         infoType: createDto.infoType,
         infoValue: createDto.infoValue,
-        isActive: createDto.isActive !== false
+        isActive: createDto.isActive !== false,
       },
-      { upsert: true, new: true }
+      { upsert: true, new: true },
     );
 
     const result = await this.dynamicInfoModel.findOne({
       entityType: createDto.entityType,
       entityId: new Types.ObjectId(createDto.entityId),
-      infoType: createDto.infoType
+      infoType: createDto.infoType,
     });
 
     if (!result) {
@@ -46,7 +53,10 @@ export class DynamicInfoService {
     return result;
   }
 
-  async updateDynamicInfo(infoId: string, updateDto: UpdateDynamicInfoDto): Promise<DynamicInfo> {
+  async updateDynamicInfo(
+    infoId: string,
+    updateDto: UpdateDynamicInfoDto,
+  ): Promise<DynamicInfo> {
     const info = await this.dynamicInfoModel.findById(infoId);
     if (!info) {
       throw new NotFoundException('Dynamic info not found');
@@ -56,12 +66,17 @@ export class DynamicInfoService {
     return await info.save();
   }
 
-  async getDynamicInfoByEntity(entityType: string, entityId: string): Promise<DynamicInfo[]> {
-    return await this.dynamicInfoModel.find({
-      entityType,
-      entityId: new Types.ObjectId(entityId),
-      isActive: true
-    }).exec();
+  async getDynamicInfoByEntity(
+    entityType: string,
+    entityId: string,
+  ): Promise<DynamicInfo[]> {
+    return await this.dynamicInfoModel
+      .find({
+        entityType,
+        entityId: new Types.ObjectId(entityId),
+        isActive: true,
+      })
+      .exec();
   }
 
   async getDynamicInfoById(id: string): Promise<DynamicInfo> {
@@ -103,7 +118,7 @@ export class DynamicInfoService {
       page = '1',
       limit = '10',
       sortBy = 'createdAt',
-      sortOrder = 'desc'
+      sortOrder = 'desc',
     } = query;
 
     // Build filter
@@ -121,7 +136,7 @@ export class DynamicInfoService {
       filter.$or = [
         { infoType: new RegExp(search, 'i') },
         { infoValue: new RegExp(search, 'i') },
-        { entityType: new RegExp(search, 'i') }
+        { entityType: new RegExp(search, 'i') },
       ];
     }
 
@@ -141,7 +156,7 @@ export class DynamicInfoService {
         .skip(skip)
         .limit(pageSize)
         .exec(),
-      this.dynamicInfoModel.countDocuments(filter)
+      this.dynamicInfoModel.countDocuments(filter),
     ]);
 
     const totalPages = Math.ceil(total / pageSize);
@@ -150,7 +165,7 @@ export class DynamicInfoService {
       data,
       total,
       page: pageNum,
-      totalPages
+      totalPages,
     };
   }
 
@@ -160,59 +175,62 @@ export class DynamicInfoService {
       {
         type: 'privacy_policy',
         description: 'Privacy Policy Document',
-        category: 'Legal'
+        category: 'Legal',
       },
       {
         type: 'terms_conditions',
         description: 'Terms and Conditions',
-        category: 'Legal'
+        category: 'Legal',
       },
       {
         type: 'certifications',
         description: 'Professional Certifications',
-        category: 'Credentials'
+        category: 'Credentials',
       },
       {
         type: 'awards',
         description: 'Awards and Recognition',
-        category: 'Achievements'
+        category: 'Achievements',
       },
       {
         type: 'licenses',
         description: 'Professional Licenses',
-        category: 'Credentials'
+        category: 'Credentials',
       },
       {
         type: 'insurance_info',
         description: 'Insurance Information',
-        category: 'Business'
+        category: 'Business',
       },
       {
         type: 'emergency_procedures',
         description: 'Emergency Procedures',
-        category: 'Safety'
+        category: 'Safety',
       },
       {
         type: 'contact_hours',
         description: 'Contact Hours and Availability',
-        category: 'Operations'
+        category: 'Operations',
       },
       {
         type: 'specializations',
         description: 'Medical Specializations',
-        category: 'Medical'
+        category: 'Medical',
       },
       {
         type: 'equipment_list',
         description: 'Medical Equipment Inventory',
-        category: 'Resources'
-      }
+        category: 'Resources',
+      },
     ];
 
     return infoTypes;
   }
 
-  async createLegalDocuments(legalInfo: any, entityMappings: Array<{ type: string; id: string }>): Promise<void> {
+  async createLegalDocuments(
+    legalInfo: any,
+    entityMappings: Array<{ type: string; id: string }>,
+  ): Promise<void> {
     for (const mapping of entityMappings) {
       if (legalInfo.termsConditions) {
         await this.createDynamicInfo({
@@ -220,7 +238,7 @@ export class DynamicInfoService {
           entityId: mapping.id,
           infoType: 'terms_conditions',
           infoValue: legalInfo.termsConditions,
-          isActive: true
+          isActive: true,
         });
       }
 
@@ -230,7 +248,7 @@ export class DynamicInfoService {
           entityId: mapping.id,
           infoType: 'privacy_policy',
           infoValue: legalInfo.privacyPolicy,
-          isActive: true
+          isActive: true,
         });
       }
     }

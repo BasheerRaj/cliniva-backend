@@ -8,7 +8,11 @@ import { FirstLoginGuard } from '../../../src/auth/guards/first-login.guard';
 import { RateLimitGuard } from '../../../src/auth/guards/rate-limit.guard';
 import { LoginDto, RegisterDto, RefreshTokenDto } from '../../../src/auth/dto';
 import { UserRole } from '../../../src/common/enums/user-role.enum';
-import { mockAuthService, mockAuthResponse, mockUserProfile } from '../mocks/auth.mocks';
+import {
+  mockAuthService,
+  mockAuthResponse,
+  mockUserProfile,
+} from '../mocks/auth.mocks';
 
 describe('AuthController', () => {
   let controller: AuthController;
@@ -51,7 +55,7 @@ describe('AuthController', () => {
 
     it('should register a new user', async () => {
       const result = await controller.register(registerDto);
-      
+
       expect(authService.register).toHaveBeenCalledWith(registerDto);
       expect(result).toEqual(mockAuthResponse);
     });
@@ -77,7 +81,7 @@ describe('AuthController', () => {
       };
 
       const result = await controller.login(loginDto, mockRequest);
-      
+
       expect(authService.login).toHaveBeenCalledWith(
         loginDto,
         '192.168.1.1',
@@ -92,7 +96,7 @@ describe('AuthController', () => {
       };
 
       const result = await controller.login(loginDto, mockRequest);
-      
+
       expect(authService.login).toHaveBeenCalledWith(
         loginDto,
         'unknown',
@@ -109,8 +113,10 @@ describe('AuthController', () => {
 
     it('should refresh access token', async () => {
       const result = await controller.refresh(refreshTokenDto);
-      
-      expect(authService.refreshToken).toHaveBeenCalledWith(refreshTokenDto.refresh_token);
+
+      expect(authService.refreshToken).toHaveBeenCalledWith(
+        refreshTokenDto.refresh_token,
+      );
       expect(result).toEqual(mockAuthResponse);
     });
   });
@@ -122,7 +128,7 @@ describe('AuthController', () => {
 
     it('should return user profile', async () => {
       const result = await controller.getProfile(mockRequest);
-      
+
       expect(authService.getProfile).toHaveBeenCalledWith('user-id');
       expect(result).toEqual(mockUserProfile);
     });
@@ -135,7 +141,7 @@ describe('AuthController', () => {
       const mockRefreshToken = 'mock-refresh-token';
       const mockIpAddress = '127.0.0.1';
       const mockUserAgent = 'Mozilla/5.0';
-      
+
       const mockLogoutResponse = {
         success: true,
         message: {
@@ -153,7 +159,7 @@ describe('AuthController', () => {
         mockIpAddress,
         mockUserAgent,
       );
-      
+
       expect(authService.logout).toHaveBeenCalledWith(
         'user123',
         'mock-access-token',
@@ -166,9 +172,15 @@ describe('AuthController', () => {
 
     it('should throw error if no access token provided', async () => {
       const mockRequest = { user: { id: 'user123' } };
-      
+
       await expect(
-        controller.logout(mockRequest, undefined, undefined, undefined, undefined),
+        controller.logout(
+          mockRequest,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+        ),
       ).rejects.toThrow(UnauthorizedException);
     });
   });
@@ -181,14 +193,16 @@ describe('AuthController', () => {
     };
 
     const mockRequest = {
-      user: { 
+      user: {
         userId: 'user-id',
         sub: 'user-id',
       },
     };
 
     beforeEach(() => {
-      mockAuthService.firstLoginPasswordChange = jest.fn().mockResolvedValue(mockAuthResponse);
+      mockAuthService.firstLoginPasswordChange = jest
+        .fn()
+        .mockResolvedValue(mockAuthResponse);
     });
 
     it('should change password on first login', async () => {
@@ -196,7 +210,7 @@ describe('AuthController', () => {
         firstLoginPasswordChangeDto,
         mockRequest,
       );
-      
+
       expect(authService.firstLoginPasswordChange).toHaveBeenCalledWith(
         'user-id',
         'OldPass123!',
@@ -222,7 +236,10 @@ describe('AuthController', () => {
       };
 
       await expect(
-        controller.firstLoginPasswordChange(firstLoginPasswordChangeDto, requestWithoutUser),
+        controller.firstLoginPasswordChange(
+          firstLoginPasswordChangeDto,
+          requestWithoutUser,
+        ),
       ).rejects.toThrow();
     });
 
@@ -232,7 +249,10 @@ describe('AuthController', () => {
       );
 
       await expect(
-        controller.firstLoginPasswordChange(firstLoginPasswordChangeDto, mockRequest),
+        controller.firstLoginPasswordChange(
+          firstLoginPasswordChangeDto,
+          mockRequest,
+        ),
       ).rejects.toThrow();
     });
   });
@@ -245,7 +265,7 @@ describe('AuthController', () => {
     };
 
     const mockRequest = {
-      user: { 
+      user: {
         userId: 'user-id',
         sub: 'user-id',
       },
@@ -260,7 +280,9 @@ describe('AuthController', () => {
     };
 
     beforeEach(() => {
-      mockAuthService.changePassword = jest.fn().mockResolvedValue(mockSuccessResponse);
+      mockAuthService.changePassword = jest
+        .fn()
+        .mockResolvedValue(mockSuccessResponse);
     });
 
     it('should change password for authenticated user', async () => {
@@ -268,7 +290,7 @@ describe('AuthController', () => {
         changePasswordDto,
         mockRequest,
       );
-      
+
       expect(authService.changePassword).toHaveBeenCalledWith(
         'user-id',
         'OldPass123!',
@@ -313,14 +335,10 @@ describe('AuthController', () => {
         changePasswordDto,
         mockRequest,
       );
-      
+
       expect(result.message).toHaveProperty('ar');
       expect(result.message).toHaveProperty('en');
       expect(result.success).toBe(true);
     });
   });
 });
-
-
-
-

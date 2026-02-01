@@ -6,9 +6,7 @@ import { SpecialtySchema } from '../database/schemas/specialty.schema';
 
 @Module({
   imports: [
-    MongooseModule.forFeature([
-      { name: 'Specialty', schema: SpecialtySchema }
-    ])
+    MongooseModule.forFeature([{ name: 'Specialty', schema: SpecialtySchema }]),
   ],
   controllers: [SpecialtyController],
   providers: [SpecialtyService],

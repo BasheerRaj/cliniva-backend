@@ -22,25 +22,33 @@ export const SKIP_FIRST_LOGIN_CHECK = 'skipFirstLoginCheck';
  * Use this on the first-login-password-change endpoint
  */
 export const SkipFirstLoginCheck = () => {
-  return (target: any, propertyKey?: string, descriptor?: PropertyDescriptor) => {
-    Reflect.defineMetadata(SKIP_FIRST_LOGIN_CHECK, true, descriptor?.value || target);
+  return (
+    target: any,
+    propertyKey?: string,
+    descriptor?: PropertyDescriptor,
+  ) => {
+    Reflect.defineMetadata(
+      SKIP_FIRST_LOGIN_CHECK,
+      true,
+      descriptor?.value || target,
+    );
     return descriptor || target;
   };
 };
 
 /**
  * FirstLoginGuard enforces password change requirement for users on their first login
- * 
+ *
  * Requirements:
  * - Extract user from request (after JWT validation)
  * - Check if user.isFirstLogin is true
  * - If true and endpoint is not password change, throw ForbiddenException with AUTH_009
  * - If false or endpoint is password change, allow request
- * 
+ *
  * Usage:
  * - Apply after JwtAuthGuard to ensure user is authenticated
  * - Use @SkipFirstLoginCheck() decorator on first-login-password-change endpoint
- * 
+ *
  * @see Requirements 1.2, 1.6
  */
 @Injectable()
@@ -69,7 +77,9 @@ export class FirstLoginGuard implements CanActivate {
 
     // User should be populated by JwtAuthGuard
     if (!user || !user.userId) {
-      this.logger.warn('No user found in request - JwtAuthGuard should run first');
+      this.logger.warn(
+        'No user found in request - JwtAuthGuard should run first',
+      );
       throw new ForbiddenException({
         message: AUTH_ERROR_MESSAGES[AuthErrorCode.TOKEN_INVALID],
         code: AuthErrorCode.TOKEN_INVALID,
@@ -93,7 +103,7 @@ export class FirstLoginGuard implements CanActivate {
         this.logger.warn(
           `User ${user.userId} attempted to access protected resource without changing password`,
         );
-        
+
         // Throw ForbiddenException with AUTH_009 code
         throw new ForbiddenException({
           message: AUTH_ERROR_MESSAGES[AuthErrorCode.PASSWORD_CHANGE_REQUIRED],

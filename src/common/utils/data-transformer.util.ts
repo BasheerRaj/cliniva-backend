@@ -88,7 +88,9 @@ export interface AddressInput {
 
 @Injectable()
 export class DataTransformerUtil {
-  static transformOnboardingDataToEntities(data: OnboardingData): EntityCreationData[] {
+  static transformOnboardingDataToEntities(
+    data: OnboardingData,
+  ): EntityCreationData[] {
     const entities: EntityCreationData[] = [];
     let order = 1;
 
@@ -98,7 +100,7 @@ export class DataTransformerUtil {
         type: 'subscription',
         data: data.subscription,
         dependencies: [],
-        order: order++
+        order: order++,
       });
     }
 
@@ -108,44 +110,46 @@ export class DataTransformerUtil {
         type: 'organization',
         data: data.organization,
         dependencies: ['subscription'],
-        order: order++
+        order: order++,
       });
     }
 
     // Complexes
     if (data.complexes && data.complexes.length > 0) {
-      data.complexes.forEach(complex => {
+      data.complexes.forEach((complex) => {
         entities.push({
           type: 'complex',
           data: complex,
-          dependencies: data.organization ? ['subscription', 'organization'] : ['subscription'],
-          order: order++
+          dependencies: data.organization
+            ? ['subscription', 'organization']
+            : ['subscription'],
+          order: order++,
         });
       });
     }
 
     // Departments
     if (data.departments && data.departments.length > 0) {
-      data.departments.forEach(department => {
+      data.departments.forEach((department) => {
         entities.push({
           type: 'department',
           data: department,
           dependencies: [],
-          order: order++
+          order: order++,
         });
       });
     }
 
     // Complex-Department relationships
     if (data.complexes && data.departments) {
-      data.complexes.forEach(complex => {
+      data.complexes.forEach((complex) => {
         if (complex.departmentIds && complex.departmentIds.length > 0) {
-          complex.departmentIds.forEach(departmentId => {
+          complex.departmentIds.forEach((departmentId) => {
             entities.push({
               type: 'complexDepartment',
               data: { complexId: complex.id, departmentId },
               dependencies: ['complex', 'department'],
-              order: order++
+              order: order++,
             });
           });
         }
@@ -154,24 +158,26 @@ export class DataTransformerUtil {
 
     // Clinics
     if (data.clinics && data.clinics.length > 0) {
-      data.clinics.forEach(clinic => {
+      data.clinics.forEach((clinic) => {
         entities.push({
           type: 'clinic',
           data: clinic,
-          dependencies: clinic.complexDepartmentId ? ['complexDepartment'] : ['subscription'],
-          order: order++
+          dependencies: clinic.complexDepartmentId
+            ? ['complexDepartment']
+            : ['subscription'],
+          order: order++,
         });
       });
     }
 
     // Services
     if (data.services && data.services.length > 0) {
-      data.services.forEach(service => {
+      data.services.forEach((service) => {
         entities.push({
           type: 'service',
           data: service,
           dependencies: ['complexDepartment'],
-          order: order++
+          order: order++,
         });
       });
     }
@@ -182,57 +188,71 @@ export class DataTransformerUtil {
     return entities.sort((a, b) => a.order - b.order);
   }
 
-  private static addSupportingEntities(entities: EntityCreationData[], data: OnboardingData, startOrder: number): void {
+  private static addSupportingEntities(
+    entities: EntityCreationData[],
+    data: OnboardingData,
+    startOrder: number,
+  ): void {
     let order = startOrder;
 
     // Working hours
     if (data.workingHours && data.workingHours.length > 0) {
-      data.workingHours.forEach(workingHour => {
+      data.workingHours.forEach((workingHour) => {
         entities.push({
           type: 'workingHours',
           data: workingHour,
           dependencies: ['entity'],
-          order: order++
+          order: order++,
         });
       });
     }
 
     // Contacts
     if (data.contacts && data.contacts.length > 0) {
-      data.contacts.forEach(contact => {
+      data.contacts.forEach((contact) => {
         entities.push({
           type: 'contact',
           data: contact,
           dependencies: ['entity'],
-          order: order++
+          order: order++,
         });
       });
     }
 
     // Dynamic info
     if (data.dynamicInfo && data.dynamicInfo.length > 0) {
-      data.dynamicInfo.forEach(info => {
+      data.dynamicInfo.forEach((info) => {
         entities.push({
           type: 'dynamicInfo',
           data: info,
           dependencies: ['entity'],
-          order: order++
+          order: order++,
         });
       });
     }
   }
 
-  static normalizeContactData(contacts: ContactInput[], entityType: string, entityId: string): Contact[] {
-    return contacts.map(contact => ({
+  static normalizeContactData(
+    contacts: ContactInput[],
+    entityType: string,
+    entityId: string,
+  ): Contact[] {
+    return contacts.map((contact) => ({
       entityType: contact.entityType || entityType,
       entityId: new Types.ObjectId(contact.entityId || entityId),
       contactType: contact.contactType.toLowerCase(),
-      contactValue: this.normalizeContactValue(contact.contactType, contact.contactValue),
-      isActive: contact.isActive !== false
+      contactValue: this.normalizeContactValue(
+        contact.contactType,
+        contact.contactValue,
+      ),
+      isActive: contact.isActive !== false,
     }));
   }
 
-  private static normalizeContactValue(contactType: string, value: string): string {
+  private static normalizeContactValue(
+    contactType: string,
+    value: string,
+  ): string {
     switch (contactType.toLowerCase()) {
       case 'email':
         return value.toLowerCase().trim();
@@ -249,8 +269,12 @@ export class DataTransformerUtil {
     }
   }
 
-  static normalizeWorkingHoursData(schedule: WorkingHoursInput[], entityType: string, entityId: string): WorkingHours[] {
-    return schedule.map(hours => ({
+  static normalizeWorkingHoursData(
+    schedule: WorkingHoursInput[],
+    entityType: string,
+    entityId: string,
+  ): WorkingHours[] {
+    return schedule.map((hours) => ({
       entityType: hours.entityType || entityType,
       entityId: new Types.ObjectId(hours.entityId || entityId),
       dayOfWeek: hours.dayOfWeek.toLowerCase(),
@@ -259,7 +283,7 @@ export class DataTransformerUtil {
       closingTime: hours.closingTime,
       breakStartTime: hours.breakStartTime,
       breakEndTime: hours.breakEndTime,
-      isActive: true
+      isActive: true,
     }));
   }
 
@@ -269,7 +293,7 @@ export class DataTransformerUtil {
       crNumber: entityData.crNumber,
       termsConditions: entityData.termsConditions,
       privacyPolicy: entityData.privacyPolicy,
-      googleLocation: entityData.googleLocation
+      googleLocation: entityData.googleLocation,
     };
   }
 
@@ -277,9 +301,15 @@ export class DataTransformerUtil {
     const idMappings: IdMappings = {};
 
     // Generate IDs for each entity type
-    const entityTypes = ['organization', 'complex', 'department', 'clinic', 'service'];
-    
-    entityTypes.forEach(type => {
+    const entityTypes = [
+      'organization',
+      'complex',
+      'department',
+      'clinic',
+      'service',
+    ];
+
+    entityTypes.forEach((type) => {
       if (entityStructure[type]) {
         if (Array.isArray(entityStructure[type])) {
           entityStructure[type].forEach((entity: any, index: number) => {
@@ -298,18 +328,20 @@ export class DataTransformerUtil {
     return idMappings;
   }
 
-  static extractLocationCoordinates(googleLocation: string): Coordinates | null {
+  static extractLocationCoordinates(
+    googleLocation: string,
+  ): Coordinates | null {
     // Extract coordinates from Google Maps location string
     const coordinateRegex = /(-?\d+\.?\d*),(-?\d+\.?\d*)/;
     const match = googleLocation.match(coordinateRegex);
-    
+
     if (match) {
       return {
         latitude: parseFloat(match[1]),
-        longitude: parseFloat(match[2])
+        longitude: parseFloat(match[2]),
       };
     }
-    
+
     return null;
   }
 
@@ -320,18 +352,22 @@ export class DataTransformerUtil {
       address.city,
       address.state,
       address.postalCode,
-      address.country
+      address.country,
     ].filter(Boolean);
-    
+
     return parts.join(', ');
   }
 
-  static transformEntityForDatabase(entityType: string, entityData: any, idMappings: IdMappings): any {
+  static transformEntityForDatabase(
+    entityType: string,
+    entityData: any,
+    idMappings: IdMappings,
+  ): any {
     const transformed = { ...entityData };
 
     // Transform reference fields to ObjectIds
     const referenceFields = this.getReferenceFieldsForEntity(entityType);
-    referenceFields.forEach(field => {
+    referenceFields.forEach((field) => {
       if (transformed[field]) {
         // If it's a string ID, convert to ObjectId
         if (typeof transformed[field] === 'string') {
@@ -339,7 +375,9 @@ export class DataTransformerUtil {
         }
         // If it's a mapped ID, use the mapping
         else if (idMappings[transformed[field]]) {
-          transformed[field] = new Types.ObjectId(idMappings[transformed[field]]);
+          transformed[field] = new Types.ObjectId(
+            idMappings[transformed[field]],
+          );
         }
       }
     });
@@ -362,13 +400,17 @@ export class DataTransformerUtil {
       workingHours: ['entityId'],
       contact: ['entityId'],
       dynamicInfo: ['entityId'],
-      userAccess: ['userId']
+      userAccess: ['userId'],
     };
 
     return referenceFields[entityType] || [];
   }
 
-  static createDynamicInfoEntries(entityType: string, entityId: string, legalInfo: LegalInfo): any[] {
+  static createDynamicInfoEntries(
+    entityType: string,
+    entityId: string,
+    legalInfo: LegalInfo,
+  ): any[] {
     const entries: any[] = [];
 
     if (legalInfo.termsConditions) {
@@ -377,7 +419,7 @@ export class DataTransformerUtil {
         entityId: new Types.ObjectId(entityId),
         infoType: 'terms_conditions',
         infoValue: legalInfo.termsConditions,
-        isActive: true
+        isActive: true,
       });
     }
 
@@ -387,7 +429,7 @@ export class DataTransformerUtil {
         entityId: new Types.ObjectId(entityId),
         infoType: 'privacy_policy',
         infoValue: legalInfo.privacyPolicy,
-        isActive: true
+        isActive: true,
       });
     }
 

@@ -3,7 +3,7 @@ import { Document, Types } from 'mongoose';
 
 @Schema({
   timestamps: true,
-  collection: 'invoices'
+  collection: 'invoices',
 })
 export class Invoice extends Document {
   @Prop({ required: true, unique: true })
@@ -33,9 +33,16 @@ export class Invoice extends Document {
   @Prop({ default: 0, type: Number })
   paidAmount: number;
 
-  @Prop({ 
-    enum: ['draft', 'pending', 'paid', 'partially_paid', 'overdue', 'cancelled'],
-    default: 'pending' 
+  @Prop({
+    enum: [
+      'draft',
+      'pending',
+      'paid',
+      'partially_paid',
+      'overdue',
+      'cancelled',
+    ],
+    default: 'pending',
   })
   status: string;
 
@@ -61,7 +68,7 @@ export class Invoice extends Document {
 export const InvoiceSchema = SchemaFactory.createForClass(Invoice);
 
 // Virtual for outstanding amount
-InvoiceSchema.virtual('outstandingAmount').get(function() {
+InvoiceSchema.virtual('outstandingAmount').get(function () {
   return this.totalAmount - this.paidAmount;
 });
 

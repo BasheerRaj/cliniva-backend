@@ -13,7 +13,7 @@ import { testEnvironment } from '../fixtures/auth.fixtures';
  */
 export const createTestUser = async (
   userModel: Model<User>,
-  userData: Partial<User> = {}
+  userData: Partial<User> = {},
 ): Promise<User> => {
   const defaultUser = {
     email: 'test@example.com',
@@ -34,7 +34,9 @@ export const createTestUser = async (
 /**
  * Clean up test users from database
  */
-export const cleanupTestUsers = async (userModel: Model<User>): Promise<void> => {
+export const cleanupTestUsers = async (
+  userModel: Model<User>,
+): Promise<void> => {
   await userModel.deleteMany({
     email: { $regex: /@(test|example|clinic)\.com$/ },
   });
@@ -43,7 +45,10 @@ export const cleanupTestUsers = async (userModel: Model<User>): Promise<void> =>
 /**
  * Generate JWT token for testing
  */
-export const generateTestToken = (jwtService: JwtService, payload: any): string => {
+export const generateTestToken = (
+  jwtService: JwtService,
+  payload: any,
+): string => {
   return jwtService.sign(payload, {
     secret: testEnvironment.JWT_SECRET,
     expiresIn: testEnvironment.JWT_EXPIRES_IN,
@@ -53,7 +58,10 @@ export const generateTestToken = (jwtService: JwtService, payload: any): string 
 /**
  * Generate expired JWT token for testing
  */
-export const generateExpiredToken = (jwtService: JwtService, payload: any): string => {
+export const generateExpiredToken = (
+  jwtService: JwtService,
+  payload: any,
+): string => {
   return jwtService.sign(payload, {
     secret: testEnvironment.JWT_SECRET,
     expiresIn: '-1h', // Expired 1 hour ago
@@ -66,7 +74,10 @@ export const generateExpiredToken = (jwtService: JwtService, payload: any): stri
 export const createAuthTestModule = async (): Promise<TestingModule> => {
   return Test.createTestingModule({
     imports: [
-      MongooseModule.forRoot(process.env.MONGODB_TEST_URI || 'mongodb://localhost:27017/cliniva_test'),
+      MongooseModule.forRoot(
+        process.env.MONGODB_TEST_URI ||
+          'mongodb://localhost:27017/cliniva_test',
+      ),
       MongooseModule.forFeature([{ name: User.name, schema: UserSchema }]),
     ],
     providers: [
@@ -76,8 +87,12 @@ export const createAuthTestModule = async (): Promise<TestingModule> => {
         useValue: {
           sign: jest.fn().mockReturnValue('mock-token'),
           signAsync: jest.fn().mockResolvedValue('mock-token'),
-          verify: jest.fn().mockReturnValue({ sub: 'user-id', email: 'test@example.com' }),
-          verifyAsync: jest.fn().mockResolvedValue({ sub: 'user-id', email: 'test@example.com' }),
+          verify: jest
+            .fn()
+            .mockReturnValue({ sub: 'user-id', email: 'test@example.com' }),
+          verifyAsync: jest
+            .fn()
+            .mockResolvedValue({ sub: 'user-id', email: 'test@example.com' }),
         },
       },
     ],
@@ -95,7 +110,7 @@ export const setupTestEnvironment = (): void => {
  * Reset test environment
  */
 export const resetTestEnvironment = (): void => {
-  Object.keys(testEnvironment).forEach(key => {
+  Object.keys(testEnvironment).forEach((key) => {
     delete process.env[key];
   });
 };
@@ -134,7 +149,7 @@ export const createMockResponse = (): any => {
  * Sleep utility for async testing
  */
 export const sleep = (ms: number): Promise<void> => {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  return new Promise((resolve) => setTimeout(resolve, ms));
 };
 
 /**
@@ -142,7 +157,7 @@ export const sleep = (ms: number): Promise<void> => {
  */
 export const assertPasswordHashed = async (
   plainPassword: string,
-  hashedPassword: string
+  hashedPassword: string,
 ): Promise<void> => {
   const isValid = await bcrypt.compare(plainPassword, hashedPassword);
   expect(isValid).toBe(true);
@@ -167,15 +182,15 @@ export const assertAuthResponseStructure = (response: any): void => {
   expect(response).toHaveProperty('refresh_token');
   expect(response).toHaveProperty('expires_in');
   expect(response).toHaveProperty('user');
-  
+
   expect(typeof response.access_token).toBe('string');
   expect(typeof response.refresh_token).toBe('string');
   expect(typeof response.expires_in).toBe('number');
   expect(typeof response.user).toBe('object');
-  
+
   assertJwtTokenStructure(response.access_token);
   assertJwtTokenStructure(response.refresh_token);
-  
+
   expect(response.user).toHaveProperty('id');
   expect(response.user).toHaveProperty('email');
   expect(response.user).toHaveProperty('firstName');
@@ -199,7 +214,7 @@ export const assertUserProfileStructure = (profile: any): void => {
   expect(profile).toHaveProperty('twoFactorEnabled');
   expect(profile).toHaveProperty('createdAt');
   expect(profile).toHaveProperty('updatedAt');
-  
+
   expect(typeof profile.id).toBe('string');
   expect(typeof profile.email).toBe('string');
   expect(typeof profile.isActive).toBe('boolean');
@@ -227,7 +242,3 @@ export const testErrorScenarios = {
     await expect(requestFn()).rejects.toThrow('Conflict');
   },
 };
-
-
-
-

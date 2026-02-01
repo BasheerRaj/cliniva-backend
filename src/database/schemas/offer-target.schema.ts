@@ -3,15 +3,15 @@ import { Document, Types } from 'mongoose';
 
 @Schema({
   timestamps: true,
-  collection: 'offer_targets'
+  collection: 'offer_targets',
 })
 export class OfferTarget extends Document {
   @Prop({ type: Types.ObjectId, ref: 'Offer', required: true })
   offerId: Types.ObjectId;
 
-  @Prop({ 
+  @Prop({
     required: true,
-    enum: ['service', 'clinic_service', 'clinic', 'complex_department'] 
+    enum: ['service', 'clinic_service', 'clinic', 'complex_department'],
   })
   scopeType: string;
 

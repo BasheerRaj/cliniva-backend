@@ -3,7 +3,7 @@ import { Document, Types } from 'mongoose';
 
 @Schema({
   timestamps: { createdAt: 'blacklistedAt', updatedAt: false },
-  collection: 'token_blacklist'
+  collection: 'token_blacklist',
 })
 export class TokenBlacklist extends Document {
   @Prop({ required: true, unique: true })
@@ -25,7 +25,8 @@ export class TokenBlacklist extends Document {
   adminId?: Types.ObjectId;
 }
 
-export const TokenBlacklistSchema = SchemaFactory.createForClass(TokenBlacklist);
+export const TokenBlacklistSchema =
+  SchemaFactory.createForClass(TokenBlacklist);
 
 // Indexes
 // Unique index on tokenHash for fast lookup and prevent duplicates

@@ -3,12 +3,12 @@ import { Document, Types } from 'mongoose';
 
 @Schema({
   timestamps: true,
-  collection: 'emergency_contacts'
+  collection: 'emergency_contacts',
 })
 export class EmergencyContact extends Document {
-  @Prop({ 
+  @Prop({
     required: true,
-    enum: ['organization', 'complex', 'clinic', 'patient'] 
+    enum: ['organization', 'complex', 'clinic', 'patient'],
   })
   entityType: string;
 
@@ -37,7 +37,8 @@ export class EmergencyContact extends Document {
   isPrimary: boolean; // Indicates if this is the primary emergency contact
 }
 
-export const EmergencyContactSchema = SchemaFactory.createForClass(EmergencyContact);
+export const EmergencyContactSchema =
+  SchemaFactory.createForClass(EmergencyContact);
 
 // Indexes
 EmergencyContactSchema.index({ entityType: 1, entityId: 1 });

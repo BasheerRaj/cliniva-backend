@@ -101,7 +101,9 @@ describe('SessionService', () => {
       };
 
       // Mock the model constructor
-      (tokenBlacklistModel as any) = jest.fn().mockImplementation(() => mockBlacklistEntry);
+      (tokenBlacklistModel as any) = jest
+        .fn()
+        .mockImplementation(() => mockBlacklistEntry);
       service = new SessionService(tokenBlacklistModel as any, tokenService);
 
       await service.addTokenToBlacklist(
@@ -129,7 +131,9 @@ describe('SessionService', () => {
         save: mockSave,
       };
 
-      (tokenBlacklistModel as any) = jest.fn().mockImplementation(() => mockBlacklistEntry);
+      (tokenBlacklistModel as any) = jest
+        .fn()
+        .mockImplementation(() => mockBlacklistEntry);
       service = new SessionService(tokenBlacklistModel as any, tokenService);
 
       await service.addTokenToBlacklist(
@@ -155,7 +159,9 @@ describe('SessionService', () => {
         save: mockSave,
       };
 
-      (tokenBlacklistModel as any) = jest.fn().mockImplementation(() => mockBlacklistEntry);
+      (tokenBlacklistModel as any) = jest
+        .fn()
+        .mockImplementation(() => mockBlacklistEntry);
       service = new SessionService(tokenBlacklistModel as any, tokenService);
 
       // Should not throw error for duplicate

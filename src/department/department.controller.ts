@@ -11,7 +11,10 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { DepartmentService } from './department.service';
-import { CreateDepartmentDto, AssignDepartmentsDto } from './dto/create-department.dto';
+import {
+  CreateDepartmentDto,
+  AssignDepartmentsDto,
+} from './dto/create-department.dto';
 import { Department } from '../database/schemas/department.schema';
 import { ComplexDepartment } from '../database/schemas/complex-department.schema';
 
@@ -57,7 +60,10 @@ export class DepartmentController {
     @Body(new ValidationPipe({ transform: true, whitelist: true }))
     assignDto: AssignDepartmentsDto,
   ): Promise<ComplexDepartment[]> {
-    return this.departmentService.assignDepartmentsToComplex(complexId, assignDto);
+    return this.departmentService.assignDepartmentsToComplex(
+      complexId,
+      assignDto,
+    );
   }
 
   /**
@@ -89,6 +95,9 @@ export class DepartmentController {
     @Param('complexId') complexId: string,
     @Param('departmentId') departmentId: string,
   ): Promise<ComplexDepartment> {
-    return this.departmentService.createComplexDepartment(complexId, departmentId);
+    return this.departmentService.createComplexDepartment(
+      complexId,
+      departmentId,
+    );
   }
 }

@@ -1,6 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { UserRole } from '../enums/user-role.enum';
-import { DefaultRolePermissions, PermissionsEnum } from '../enums/permissions.enum';
+import {
+  DefaultRolePermissions,
+  PermissionsEnum,
+} from '../enums/permissions.enum';
 
 /**
  * Service for mapping user roles to their corresponding permissions
@@ -22,10 +25,10 @@ export class RoleMappingService {
    */
   getMultipleRolePermissions(roles: UserRole[]): PermissionsEnum[] {
     const allPermissions = new Set<PermissionsEnum>();
-    
-    roles.forEach(role => {
+
+    roles.forEach((role) => {
       const permissions = this.getRolePermissions(role);
-      permissions.forEach(permission => allPermissions.add(permission));
+      permissions.forEach((permission) => allPermissions.add(permission));
     });
 
     return Array.from(allPermissions);
@@ -43,14 +46,18 @@ export class RoleMappingService {
    * Check if a role has any of the specified permissions
    */
   hasAnyPermission(role: UserRole, permissions: PermissionsEnum[]): boolean {
-    return permissions.some(permission => this.hasPermission(role, permission));
+    return permissions.some((permission) =>
+      this.hasPermission(role, permission),
+    );
   }
 
   /**
    * Check if a role has all of the specified permissions
    */
   hasAllPermissions(role: UserRole, permissions: PermissionsEnum[]): boolean {
-    return permissions.every(permission => this.hasPermission(role, permission));
+    return permissions.every((permission) =>
+      this.hasPermission(role, permission),
+    );
   }
 
   /**
@@ -94,18 +101,9 @@ export class RoleMappingService {
         UserRole.STAFF,
         UserRole.PATIENT,
       ],
-      [UserRole.ADMIN]: [
-        UserRole.DOCTOR,
-        UserRole.STAFF,
-        UserRole.PATIENT,
-      ],
-      [UserRole.DOCTOR]: [
-        UserRole.STAFF,
-        UserRole.PATIENT,
-      ],
-      [UserRole.STAFF]: [
-        UserRole.PATIENT,
-      ],
+      [UserRole.ADMIN]: [UserRole.DOCTOR, UserRole.STAFF, UserRole.PATIENT],
+      [UserRole.DOCTOR]: [UserRole.STAFF, UserRole.PATIENT],
+      [UserRole.STAFF]: [UserRole.PATIENT],
       [UserRole.PATIENT]: [],
     };
 
@@ -131,18 +129,9 @@ export class RoleMappingService {
         UserRole.STAFF,
         UserRole.PATIENT,
       ],
-      [UserRole.ADMIN]: [
-        UserRole.DOCTOR,
-        UserRole.STAFF,
-        UserRole.PATIENT,
-      ],
-      [UserRole.DOCTOR]: [
-        UserRole.STAFF,
-        UserRole.PATIENT,
-      ],
-      [UserRole.STAFF]: [
-        UserRole.PATIENT,
-      ],
+      [UserRole.ADMIN]: [UserRole.DOCTOR, UserRole.STAFF, UserRole.PATIENT],
+      [UserRole.DOCTOR]: [UserRole.STAFF, UserRole.PATIENT],
+      [UserRole.STAFF]: [UserRole.PATIENT],
       [UserRole.PATIENT]: [],
     };
 
@@ -167,7 +156,9 @@ export class RoleMappingService {
       case UserRole.PATIENT:
         return 'PATIENT';
       default:
-        this.logger.warn(`Unknown role: ${role}, defaulting to PATIENT permissions`);
+        this.logger.warn(
+          `Unknown role: ${role}, defaulting to PATIENT permissions`,
+        );
         return 'PATIENT';
     }
   }

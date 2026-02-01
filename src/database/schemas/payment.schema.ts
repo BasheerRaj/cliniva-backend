@@ -3,7 +3,7 @@ import { Document, Types } from 'mongoose';
 
 @Schema({
   timestamps: true,
-  collection: 'payments'
+  collection: 'payments',
 })
 export class Payment extends Document {
   @Prop({ required: true, unique: true })
@@ -18,9 +18,16 @@ export class Payment extends Document {
   @Prop({ required: true, type: Number })
   amount: number;
 
-  @Prop({ 
+  @Prop({
     required: true,
-    enum: ['cash', 'card', 'bank_transfer', 'insurance', 'check', 'digital_wallet'] 
+    enum: [
+      'cash',
+      'card',
+      'bank_transfer',
+      'insurance',
+      'check',
+      'digital_wallet',
+    ],
   })
   paymentMethod: string;
 
@@ -30,9 +37,9 @@ export class Payment extends Document {
   @Prop({ required: true })
   paymentDate: Date;
 
-  @Prop({ 
+  @Prop({
     enum: ['pending', 'completed', 'failed', 'refunded'],
-    default: 'completed' 
+    default: 'completed',
   })
   status: string;
 

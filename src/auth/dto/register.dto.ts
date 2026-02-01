@@ -1,4 +1,12 @@
-import { IsEmail, IsNotEmpty, IsString, MinLength, IsEnum, IsOptional, Matches } from 'class-validator';
+import {
+  IsEmail,
+  IsNotEmpty,
+  IsString,
+  MinLength,
+  IsEnum,
+  IsOptional,
+  Matches,
+} from 'class-validator';
 import { UserRole } from '../../common/enums/user-role.enum';
 
 export class RegisterDto {
@@ -9,10 +17,10 @@ export class RegisterDto {
   @IsString({ message: 'Password must be a string' })
   @IsNotEmpty({ message: 'Password is required' })
   @MinLength(8, { message: 'Password must be at least 8 characters long' })
-  @Matches(
-    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/,
-    { message: 'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character' }
-  )
+  @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/, {
+    message:
+      'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character',
+  })
   password: string;
 
   @IsString({ message: 'First name must be a string' })
@@ -24,7 +32,8 @@ export class RegisterDto {
   lastName: string;
 
   @IsEnum(UserRole, {
-    message: 'Role must be one of: super_admin, owner, admin, doctor, staff, patient'
+    message:
+      'Role must be one of: super_admin, owner, admin, doctor, staff, patient',
   })
   @IsNotEmpty({ message: 'Role is required' })
   role: UserRole;
@@ -39,10 +48,7 @@ export class RegisterDto {
 
   @IsOptional()
   @IsEnum(['male', 'female', 'other'], {
-    message: 'Gender must be one of: male, female, other'
+    message: 'Gender must be one of: male, female, other',
   })
   gender?: string;
 }
-
-
-

@@ -13,7 +13,12 @@ jest.mock('crypto', () => ({
 import { Test, TestingModule } from '@nestjs/testing';
 import { JwtService } from '@nestjs/jwt';
 import { getModelToken } from '@nestjs/mongoose';
-import { ConflictException, UnauthorizedException, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  ConflictException,
+  UnauthorizedException,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { Model } from 'mongoose';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
@@ -78,13 +83,15 @@ describe('AuthService', () => {
 
   beforeEach(async () => {
     // Create a constructor function for the model
-    const UserModelConstructor = function(data: any) {
+    const UserModelConstructor = function (data: any) {
       return {
         ...data,
-        save: jest.fn().mockResolvedValue({ ...data, _id: '507f1f77bcf86cd799439011' }),
+        save: jest
+          .fn()
+          .mockResolvedValue({ ...data, _id: '507f1f77bcf86cd799439011' }),
       };
     };
-    
+
     // Add static methods to the constructor
     Object.assign(UserModelConstructor, mockUserModel);
 
@@ -176,8 +183,8 @@ describe('AuthService', () => {
 
       const result = await service.register(registerDto);
 
-      expect(mockUserModel.findOne).toHaveBeenCalledWith({ 
-        email: registerDto.email.toLowerCase() 
+      expect(mockUserModel.findOne).toHaveBeenCalledWith({
+        email: registerDto.email.toLowerCase(),
       });
       expect(result).toHaveProperty('access_token');
       expect(result).toHaveProperty('user');
@@ -195,7 +202,9 @@ describe('AuthService', () => {
     it('should hash password before saving', async () => {
       mockUserModel.findOne.mockResolvedValue(null);
       mockUserModel.findByIdAndUpdate.mockResolvedValue(mockUser);
-      const hashSpy = (bcrypt.hash as jest.Mock).mockResolvedValue('hashedPassword');
+      const hashSpy = (bcrypt.hash as jest.Mock).mockResolvedValue(
+        'hashedPassword',
+      );
 
       await service.register(registerDto);
 
@@ -225,13 +234,13 @@ describe('AuthService', () => {
 
       const result = await service.login(loginDto, ipAddress, userAgent);
 
-      expect(mockUserModel.findOne).toHaveBeenCalledWith({ 
-        email: loginDto.email.toLowerCase() 
+      expect(mockUserModel.findOne).toHaveBeenCalledWith({
+        email: loginDto.email.toLowerCase(),
       });
       expect(result).toHaveProperty('access_token');
       expect(result).toHaveProperty('user');
       expect(result.user.email).toBe(mockUser.email);
-      
+
       // Verify audit logging for successful login
       expect(mockAuditService.logLoginSuccess).toHaveBeenCalledWith(
         mockUser._id.toString(),
@@ -255,10 +264,10 @@ describe('AuthService', () => {
     it('should throw UnauthorizedException for invalid email', async () => {
       mockUserModel.findOne.mockResolvedValue(null);
 
-      await expect(service.login(loginDto, ipAddress, userAgent)).rejects.toThrow(
-        UnauthorizedException,
-      );
-      
+      await expect(
+        service.login(loginDto, ipAddress, userAgent),
+      ).rejects.toThrow(UnauthorizedException);
+
       // Verify audit logging for failed login
       expect(mockAuditService.logLoginFailure).toHaveBeenCalledWith(
         loginDto.email,
@@ -271,10 +280,10 @@ describe('AuthService', () => {
       mockUserModel.findOne.mockResolvedValue(mockUser);
       (bcrypt.compare as jest.Mock).mockResolvedValue(false);
 
-      await expect(service.login(loginDto, ipAddress, userAgent)).rejects.toThrow(
-        UnauthorizedException,
-      );
-      
+      await expect(
+        service.login(loginDto, ipAddress, userAgent),
+      ).rejects.toThrow(UnauthorizedException);
+
       // Verify audit logging for failed login
       expect(mockAuditService.logLoginFailure).toHaveBeenCalledWith(
         loginDto.email,
@@ -287,10 +296,10 @@ describe('AuthService', () => {
       const inactiveUser = { ...mockUser, isActive: false };
       mockUserModel.findOne.mockResolvedValue(inactiveUser);
 
-      await expect(service.login(loginDto, ipAddress, userAgent)).rejects.toThrow(
-        UnauthorizedException,
-      );
-      
+      await expect(
+        service.login(loginDto, ipAddress, userAgent),
+      ).rejects.toThrow(UnauthorizedException);
+
       // Verify audit logging for failed login
       expect(mockAuditService.logLoginFailure).toHaveBeenCalledWith(
         loginDto.email,
@@ -316,19 +325,32 @@ describe('AuthService', () => {
   describe('refreshToken', () => {
     const refreshToken = 'valid-refresh-token';
     // Compute the actual SHA-256 hash that would be generated using real crypto
-    const actualTokenHash = realCrypto.createHash('sha256').update(refreshToken).digest('hex');
+    const actualTokenHash = realCrypto
+      .createHash('sha256')
+      .update(refreshToken)
+      .digest('hex');
 
     it('should successfully refresh valid token', async () => {
-      const payload = { sub: mockUser._id, email: mockUser.email, exp: Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60 };
+      const payload = {
+        sub: mockUser._id,
+        email: mockUser.email,
+        exp: Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60,
+      };
       mockJwtService.verify.mockReturnValue(payload);
       mockUserModel.findById.mockResolvedValue(mockUser);
       mockUserModel.findByIdAndUpdate.mockResolvedValue(mockUser);
-      mockSessionService.isTokenBlacklisted = jest.fn().mockResolvedValue(false);
-      mockSessionService.addTokenToBlacklist = jest.fn().mockResolvedValue(undefined);
+      mockSessionService.isTokenBlacklisted = jest
+        .fn()
+        .mockResolvedValue(false);
+      mockSessionService.addTokenToBlacklist = jest
+        .fn()
+        .mockResolvedValue(undefined);
 
       const result = await service.refreshToken(refreshToken);
 
-      expect(mockSessionService.isTokenBlacklisted).toHaveBeenCalledWith(actualTokenHash);
+      expect(mockSessionService.isTokenBlacklisted).toHaveBeenCalledWith(
+        actualTokenHash,
+      );
       expect(mockJwtService.verify).toHaveBeenCalledWith(refreshToken, {
         secret: 'test-refresh-secret',
       });
@@ -348,13 +370,17 @@ describe('AuthService', () => {
       await expect(service.refreshToken(refreshToken)).rejects.toThrow(
         UnauthorizedException,
       );
-      
-      expect(mockSessionService.isTokenBlacklisted).toHaveBeenCalledWith(actualTokenHash);
+
+      expect(mockSessionService.isTokenBlacklisted).toHaveBeenCalledWith(
+        actualTokenHash,
+      );
       expect(mockJwtService.verify).not.toHaveBeenCalled();
     });
 
     it('should throw UnauthorizedException for invalid token', async () => {
-      mockSessionService.isTokenBlacklisted = jest.fn().mockResolvedValue(false);
+      mockSessionService.isTokenBlacklisted = jest
+        .fn()
+        .mockResolvedValue(false);
       mockJwtService.verify.mockImplementation(() => {
         throw new Error('Invalid token');
       });
@@ -365,7 +391,9 @@ describe('AuthService', () => {
     });
 
     it('should throw UnauthorizedException for expired token', async () => {
-      mockSessionService.isTokenBlacklisted = jest.fn().mockResolvedValue(false);
+      mockSessionService.isTokenBlacklisted = jest
+        .fn()
+        .mockResolvedValue(false);
       mockJwtService.verify.mockImplementation(() => {
         const error: any = new Error('Token expired');
         error.name = 'TokenExpiredError';
@@ -378,8 +406,14 @@ describe('AuthService', () => {
     });
 
     it('should throw UnauthorizedException if user not found', async () => {
-      const payload = { sub: 'nonexistent-id', email: 'test@example.com', exp: Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60 };
-      mockSessionService.isTokenBlacklisted = jest.fn().mockResolvedValue(false);
+      const payload = {
+        sub: 'nonexistent-id',
+        email: 'test@example.com',
+        exp: Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60,
+      };
+      mockSessionService.isTokenBlacklisted = jest
+        .fn()
+        .mockResolvedValue(false);
       mockJwtService.verify.mockReturnValue(payload);
       mockUserModel.findById.mockResolvedValue(null);
 
@@ -389,9 +423,15 @@ describe('AuthService', () => {
     });
 
     it('should throw UnauthorizedException if user is inactive', async () => {
-      const payload = { sub: mockUser._id, email: mockUser.email, exp: Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60 };
+      const payload = {
+        sub: mockUser._id,
+        email: mockUser.email,
+        exp: Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60,
+      };
       const inactiveUser = { ...mockUser, isActive: false };
-      mockSessionService.isTokenBlacklisted = jest.fn().mockResolvedValue(false);
+      mockSessionService.isTokenBlacklisted = jest
+        .fn()
+        .mockResolvedValue(false);
       mockJwtService.verify.mockReturnValue(payload);
       mockUserModel.findById.mockResolvedValue(inactiveUser);
 
@@ -466,9 +506,11 @@ describe('AuthService', () => {
         digest: jest.fn().mockReturnValue(hashedToken),
       };
       (crypto.createHash as jest.Mock).mockReturnValue(mockHashInstance);
-      
+
       // Ensure audit service mock is set up
-      mockAuditService.logPasswordResetRequest = jest.fn().mockResolvedValue(undefined);
+      mockAuditService.logPasswordResetRequest = jest
+        .fn()
+        .mockResolvedValue(undefined);
     });
 
     it('should successfully process password reset for existing user', async () => {
@@ -485,10 +527,17 @@ describe('AuthService', () => {
       const result = await service.forgotPassword(email, ipAddress);
 
       // Assert
-      expect(mockRateLimitService.checkPasswordResetLimit).toHaveBeenCalledWith(ipAddress);
-      expect(mockUserModel.findOne).toHaveBeenCalledWith({ email: email.toLowerCase() });
+      expect(mockRateLimitService.checkPasswordResetLimit).toHaveBeenCalledWith(
+        ipAddress,
+      );
+      expect(mockUserModel.findOne).toHaveBeenCalledWith({
+        email: email.toLowerCase(),
+      });
       expect(userWithSave.save).toHaveBeenCalled();
-      expect(mockAuditService.logPasswordResetRequest).toHaveBeenCalledWith(email, ipAddress);
+      expect(mockAuditService.logPasswordResetRequest).toHaveBeenCalledWith(
+        email,
+        ipAddress,
+      );
       expect(result.success).toBe(true);
       expect(result.message).toHaveProperty('ar');
       expect(result.message).toHaveProperty('en');
@@ -575,7 +624,10 @@ describe('AuthService', () => {
       mockAuditService.logPasswordResetRequest.mockResolvedValue(undefined);
 
       // Act
-      const result = await service.forgotPassword('nonexistent@example.com', ipAddress);
+      const result = await service.forgotPassword(
+        'nonexistent@example.com',
+        ipAddress,
+      );
 
       // Assert
       expect(result.success).toBe(true);
@@ -589,7 +641,9 @@ describe('AuthService', () => {
       mockRateLimitService.checkPasswordResetLimit.mockResolvedValue(false);
 
       // Act & Assert
-      await expect(service.forgotPassword(email, ipAddress)).rejects.toThrow(BadRequestException);
+      await expect(service.forgotPassword(email, ipAddress)).rejects.toThrow(
+        BadRequestException,
+      );
       expect(mockUserModel.findOne).not.toHaveBeenCalled();
     });
 
@@ -607,7 +661,10 @@ describe('AuthService', () => {
       await service.forgotPassword(email, ipAddress);
 
       // Assert
-      expect(mockAuditService.logPasswordResetRequest).toHaveBeenCalledWith(email, ipAddress);
+      expect(mockAuditService.logPasswordResetRequest).toHaveBeenCalledWith(
+        email,
+        ipAddress,
+      );
     });
 
     it('should log audit event for non-existent user', async () => {
@@ -620,7 +677,10 @@ describe('AuthService', () => {
       await service.forgotPassword(email, ipAddress);
 
       // Assert
-      expect(mockAuditService.logPasswordResetRequest).toHaveBeenCalledWith(email, ipAddress);
+      expect(mockAuditService.logPasswordResetRequest).toHaveBeenCalledWith(
+        email,
+        ipAddress,
+      );
     });
 
     it('should return bilingual success message', async () => {
@@ -656,7 +716,10 @@ describe('AuthService', () => {
   describe('resetPassword', () => {
     const resetToken = 'valid-reset-token-32-bytes-long';
     // Compute the actual SHA-256 hash using real crypto
-    const actualHashedToken = realCrypto.createHash('sha256').update(resetToken).digest('hex');
+    const actualHashedToken = realCrypto
+      .createHash('sha256')
+      .update(resetToken)
+      .digest('hex');
     // Keep hashedToken for backward compatibility with other tests
     const hashedToken = actualHashedToken;
     const newPassword = 'NewSecurePass123!';
@@ -666,7 +729,9 @@ describe('AuthService', () => {
       (bcrypt.hash as jest.Mock).mockResolvedValue('hashed-new-password');
 
       // Mock audit service
-      mockAuditService.logPasswordResetComplete = jest.fn().mockResolvedValue(undefined);
+      mockAuditService.logPasswordResetComplete = jest
+        .fn()
+        .mockResolvedValue(undefined);
     });
 
     it('should successfully reset password with valid token', async () => {
@@ -686,7 +751,9 @@ describe('AuthService', () => {
       const result = await service.resetPassword(resetToken, newPassword);
 
       // Assert
-      expect(mockUserModel.findOne).toHaveBeenCalledWith({ passwordResetToken: actualHashedToken });
+      expect(mockUserModel.findOne).toHaveBeenCalledWith({
+        passwordResetToken: actualHashedToken,
+      });
       expect(bcrypt.hash).toHaveBeenCalledWith(newPassword, 12);
       expect(userWithSave.passwordHash).toBe('hashed-new-password');
       expect(userWithSave.passwordResetToken).toBeUndefined();
@@ -695,11 +762,11 @@ describe('AuthService', () => {
       expect(userWithSave.save).toHaveBeenCalled();
       expect(mockSessionService.invalidateUserSessions).toHaveBeenCalledWith(
         '507f1f77bcf86cd799439011',
-        'password_reset'
+        'password_reset',
       );
       expect(mockAuditService.logPasswordResetComplete).toHaveBeenCalledWith(
         '507f1f77bcf86cd799439011',
-        actualHashedToken
+        actualHashedToken,
       );
       expect(result.success).toBe(true);
       expect(result.message).toHaveProperty('ar');
@@ -711,8 +778,12 @@ describe('AuthService', () => {
       mockUserModel.findOne.mockResolvedValue(null);
 
       // Act & Assert
-      await expect(service.resetPassword(resetToken, newPassword)).rejects.toThrow(BadRequestException);
-      await expect(service.resetPassword(resetToken, newPassword)).rejects.toMatchObject({
+      await expect(
+        service.resetPassword(resetToken, newPassword),
+      ).rejects.toThrow(BadRequestException);
+      await expect(
+        service.resetPassword(resetToken, newPassword),
+      ).rejects.toMatchObject({
         response: expect.objectContaining({
           code: 'PASSWORD_RESET_TOKEN_INVALID',
           message: expect.objectContaining({
@@ -735,8 +806,12 @@ describe('AuthService', () => {
       mockUserModel.findOne.mockResolvedValue(userWithSave);
 
       // Act & Assert
-      await expect(service.resetPassword(resetToken, newPassword)).rejects.toThrow(BadRequestException);
-      await expect(service.resetPassword(resetToken, newPassword)).rejects.toMatchObject({
+      await expect(
+        service.resetPassword(resetToken, newPassword),
+      ).rejects.toThrow(BadRequestException);
+      await expect(
+        service.resetPassword(resetToken, newPassword),
+      ).rejects.toMatchObject({
         response: expect.objectContaining({
           code: 'PASSWORD_RESET_TOKEN_EXPIRED',
           message: expect.objectContaining({
@@ -759,8 +834,12 @@ describe('AuthService', () => {
       mockUserModel.findOne.mockResolvedValue(userWithSave);
 
       // Act & Assert
-      await expect(service.resetPassword(resetToken, newPassword)).rejects.toThrow(BadRequestException);
-      await expect(service.resetPassword(resetToken, newPassword)).rejects.toMatchObject({
+      await expect(
+        service.resetPassword(resetToken, newPassword),
+      ).rejects.toThrow(BadRequestException);
+      await expect(
+        service.resetPassword(resetToken, newPassword),
+      ).rejects.toMatchObject({
         response: expect.objectContaining({
           code: 'PASSWORD_RESET_TOKEN_USED',
           message: expect.objectContaining({
@@ -787,7 +866,9 @@ describe('AuthService', () => {
 
       // Assert
       expect(crypto.createHash).toHaveBeenCalledWith('sha256');
-      expect(mockUserModel.findOne).toHaveBeenCalledWith({ passwordResetToken: hashedToken });
+      expect(mockUserModel.findOne).toHaveBeenCalledWith({
+        passwordResetToken: hashedToken,
+      });
     });
 
     it('should hash new password with bcrypt (12 rounds)', async () => {
@@ -888,7 +969,7 @@ describe('AuthService', () => {
       // Assert
       expect(mockSessionService.invalidateUserSessions).toHaveBeenCalledWith(
         '507f1f77bcf86cd799439011',
-        'password_reset'
+        'password_reset',
       );
     });
 
@@ -910,7 +991,7 @@ describe('AuthService', () => {
       // Assert
       expect(mockAuditService.logPasswordResetComplete).toHaveBeenCalledWith(
         '507f1f77bcf86cd799439011',
-        hashedToken
+        hashedToken,
       );
     });
 
@@ -947,7 +1028,9 @@ describe('AuthService', () => {
       mockUserModel.findOne.mockResolvedValue(userWithSave);
 
       // Act & Assert
-      await expect(service.resetPassword(resetToken, newPassword)).rejects.toThrow(BadRequestException);
+      await expect(
+        service.resetPassword(resetToken, newPassword),
+      ).rejects.toThrow(BadRequestException);
     });
   });
 });

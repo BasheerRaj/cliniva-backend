@@ -17,9 +17,15 @@ import {
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
-import { FirstLoginGuard, SkipFirstLoginCheck } from './guards/first-login.guard';
+import {
+  FirstLoginGuard,
+  SkipFirstLoginCheck,
+} from './guards/first-login.guard';
 import { RateLimitGuard } from './guards/rate-limit.guard';
-import { RateLimit, RateLimitType } from '../common/decorators/rate-limit.decorator';
+import {
+  RateLimit,
+  RateLimitType,
+} from '../common/decorators/rate-limit.decorator';
 import {
   LoginDto,
   RegisterDto,
@@ -50,10 +56,10 @@ export class AuthController {
 
   /**
    * Login user
-   * 
+   *
    * Task 12.1: Extract IP address and user agent for audit logging
    * Task 21.1: Apply rate limiting (10 attempts per 15 minutes)
-   * 
+   *
    * Requirements: 9.2
    */
   @Post('login')
@@ -67,19 +73,19 @@ export class AuthController {
   ): Promise<AuthResponseDto> {
     // Extract IP address from request
     const ipAddress = req.ip || req.connection?.remoteAddress || 'unknown';
-    
+
     // Extract user agent from request headers
     const userAgent = req.headers['user-agent'] || 'unknown';
-    
+
     return this.authService.login(loginDto, ipAddress, userAgent);
   }
 
   /**
    * First login password change
-   * 
+   *
    * Task 15.1: Create POST /auth/first-login-password-change endpoint
    * Requirements: 8.1, 8.6
-   * 
+   *
    * This endpoint allows users to change their password on first login.
    * It applies JwtAuthGuard (but not FirstLoginGuard) to allow first-time users to access it.
    * The @SkipFirstLoginCheck decorator ensures FirstLoginGuard doesn't block this endpoint.
@@ -133,7 +139,10 @@ export class AuthController {
         throw error;
       }
 
-      this.logger.error(`First login password change failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `First login password change failed: ${error.message}`,
+        error.stack,
+      );
       throw new BadRequestException({
         message: {
           ar: 'فشل تغيير كلمة المرور',
@@ -146,11 +155,11 @@ export class AuthController {
 
   /**
    * Change password for authenticated users
-   * 
+   *
    * Task 15.2: Create POST /auth/change-password endpoint
    * Task 21.1: Apply rate limiting (3 attempts per hour)
    * Requirements: 8.2, 8.6, 8.8, 9.3
-   * 
+   *
    * This endpoint allows authenticated users to change their password.
    * It applies both JwtAuthGuard and FirstLoginGuard to ensure:
    * 1. User is authenticated (JwtAuthGuard)
@@ -206,7 +215,10 @@ export class AuthController {
         throw error;
       }
 
-      this.logger.error(`Password change failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `Password change failed: ${error.message}`,
+        error.stack,
+      );
       throw new BadRequestException({
         message: {
           ar: 'فشل تغيير كلمة المرور',
@@ -219,11 +231,11 @@ export class AuthController {
 
   /**
    * Forgot password - Request password reset
-   * 
+   *
    * Task 15.3: Create POST /auth/forgot-password endpoint
    * Task 21.1: Apply rate limiting (5 requests per hour)
    * Requirements: 8.3, 8.6, 8.9, 9.1
-   * 
+   *
    * This is a public endpoint (no guards) that allows users to request a password reset.
    * It extracts the IP address from the request for rate limiting and audit logging.
    * Returns the same response whether the email exists or not for security.
@@ -256,8 +268,11 @@ export class AuthController {
         throw error;
       }
 
-      this.logger.error(`Forgot password request failed: ${error.message}`, error.stack);
-      
+      this.logger.error(
+        `Forgot password request failed: ${error.message}`,
+        error.stack,
+      );
+
       // Return generic success message even on error to avoid revealing information
       return {
         success: true,
@@ -271,10 +286,10 @@ export class AuthController {
 
   /**
    * Reset password - Complete password reset with token
-   * 
+   *
    * Task 15.4: Create POST /auth/reset-password endpoint
    * Requirements: 8.4, 8.6, 8.9
-   * 
+   *
    * This is a public endpoint (no guards) that allows users to reset their password
    * using a valid reset token received via email.
    */
@@ -345,7 +360,7 @@ export class AuthController {
 
   /**
    * Logout user and blacklist tokens
-   * 
+   *
    * Requirements: 3.5
    * Task: 18.1
    */
@@ -361,7 +376,7 @@ export class AuthController {
   ): Promise<any> {
     // Extract access token from Authorization header
     const accessToken = authHeader?.replace('Bearer ', '');
-    
+
     if (!accessToken) {
       throw new UnauthorizedException({
         message: {
@@ -390,19 +405,15 @@ export class AuthController {
         message: 'User debug info retrieved',
         data: {
           userFromDatabase: user,
-          timestamp: new Date().toISOString()
-        }
+          timestamp: new Date().toISOString(),
+        },
       };
     } catch (error) {
       return {
         success: false,
         message: `Debug failed: ${error.message}`,
-        error: error.message
+        error: error.message,
       };
     }
   }
 }
-
-
-
-

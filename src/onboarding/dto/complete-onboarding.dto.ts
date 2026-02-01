@@ -1,4 +1,15 @@
-import { IsString, IsNotEmpty, IsOptional, IsArray, ValidateNested, IsEnum, IsNumber, IsBoolean, IsEmail, IsUrl } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsOptional,
+  IsArray,
+  ValidateNested,
+  IsEnum,
+  IsNumber,
+  IsBoolean,
+  IsEmail,
+  IsUrl,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class ContactDto {
@@ -30,7 +41,15 @@ export class WorkingHoursDto {
   entityName?: string; // Human-readable name for mapping (e.g., "Al-Zahra Complex", "Women's Clinic")
 
   @IsString()
-  @IsEnum(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'])
+  @IsEnum([
+    'monday',
+    'tuesday',
+    'wednesday',
+    'thursday',
+    'friday',
+    'saturday',
+    'sunday',
+  ])
   dayOfWeek: string;
 
   @IsBoolean()
