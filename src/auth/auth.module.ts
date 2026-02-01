@@ -18,6 +18,7 @@ import { AuditLog, AuditLogSchema } from '../database/schemas/audit-log.schema';
 import { RateLimitCounter, RateLimitCounterSchema } from '../database/schemas/rate-limit-counter.schema';
 import { SubscriptionModule } from '../subscription/subscription.module';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { FirstLoginGuard } from './guards/first-login.guard';
 import { RateLimitService } from './rate-limit.service';
 
 @Module({
@@ -51,8 +52,8 @@ import { RateLimitService } from './rate-limit.service';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, JwtAuthGuard, TokenService, SessionService, AuditService, RateLimitService],
-  exports: [AuthService, JwtStrategy, PassportModule, JwtAuthGuard, TokenService, SessionService, AuditService, RateLimitService],
+  providers: [AuthService, JwtStrategy, JwtAuthGuard, FirstLoginGuard, TokenService, SessionService, AuditService, RateLimitService],
+  exports: [AuthService, JwtStrategy, PassportModule, JwtAuthGuard, FirstLoginGuard, TokenService, SessionService, AuditService, RateLimitService],
 })
 export class AuthModule {}
 

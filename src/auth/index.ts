@@ -6,6 +6,7 @@ export * from './session.service';
 export * from './audit.service';
 export * from './rate-limit.service';
 export * from './guards/jwt-auth.guard';
+export * from './guards/first-login.guard';
 export * from './strategies/jwt.strategy';
 export * from './dto';
 
