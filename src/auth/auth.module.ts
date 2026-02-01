@@ -10,6 +10,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
 import { TokenService } from './token.service';
 import { SessionService } from './session.service';
 import { AuditService } from './audit.service';
+import { EmailService } from './email.service';
 import { User, UserSchema } from '../database/schemas/user.schema';
 import { Subscription, SubscriptionSchema } from '../database/schemas/subscription.schema';
 import { SubscriptionPlan, SubscriptionPlanSchema } from '../database/schemas/subscription-plan.schema';
@@ -52,8 +53,8 @@ import { RateLimitService } from './rate-limit.service';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, JwtAuthGuard, FirstLoginGuard, TokenService, SessionService, AuditService, RateLimitService],
-  exports: [AuthService, JwtStrategy, PassportModule, JwtAuthGuard, FirstLoginGuard, TokenService, SessionService, AuditService, RateLimitService],
+  providers: [AuthService, JwtStrategy, JwtAuthGuard, FirstLoginGuard, TokenService, SessionService, AuditService, EmailService, RateLimitService],
+  exports: [AuthService, JwtStrategy, PassportModule, JwtAuthGuard, FirstLoginGuard, TokenService, SessionService, AuditService, EmailService, RateLimitService],
 })
 export class AuthModule {}
 
