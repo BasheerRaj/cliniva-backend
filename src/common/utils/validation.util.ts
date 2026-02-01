@@ -1,4 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Model, Types } from 'mongoose';
+import { ERROR_MESSAGES } from './error-messages.constant';
+import { BilingualMessage } from '../types/bilingual-message.type';
 
 export interface ValidationResult {
   isValid: boolean;
@@ -330,5 +333,261 @@ export class ValidationUtil {
     const end = this.parseTime(endTime);
     
     return check >= start && check <= end;
+  }
+
+  // ============================================================================
+  // User Management M1 - New Validation Methods
+  // ============================================================================
+
+  /**
+   * Validates that a string is a valid MongoDB ObjectId format.
+   * Throws BadRequestException if the ID format is invalid.
+   * 
+   * @static
+   * @param {string} id - The ID string to validate
+   * @param {BilingualMessage} entityName - The entity name for error message context
+   * @throws {BadRequestException} When ID format is invalid
+   * 
+   * @example
+   * ValidationUtil.validateObjectId('507f1f77bcf86cd799439011', ERROR_MESSAGES.USER_NOT_FOUND);
+   * // Passes validation
+   * 
+   * @example
+   * ValidationUtil.validateObjectId('invalid-id', ERROR_MESSAGES.USER_NOT_FOUND);
+   * // Throws BadRequestException with bilingual error message
+   */
+  static validateObjectId(id: string, entityName: BilingualMessage): void {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new BadRequestException({
+        message: ERROR_MESSAGES.INVALID_ID_FORMAT,
+        code: 'INVALID_ID_FORMAT',
+        details: { entityName, providedId: id }
+      });
+    }
+  }
+
+  /**
+   * Validates that an entity exists in the database.
+   * First validates the ID format, then queries the database.
+   * Throws NotFoundException if the entity doesn't exist.
+   * 
+   * @static
+   * @template T - The type of the entity document
+   * @param {Model<T>} model - Mongoose model to query
+   * @param {string} id - The entity ID to find
+   * @param {BilingualMessage} notFoundMessage - Error message if entity not found
+   * @returns {Promise<T>} The found entity document
+   * @throws {BadRequestException} When ID format is invalid
+   * @throws {NotFoundException} When entity is not found
+   * 
+   * @example
+   * const user = await ValidationUtil.validateEntityExists(
+   *   userModel,
+   *   '507f1f77bcf86cd799439011',
+   *   ERROR_MESSAGES.USER_NOT_FOUND
+   * );
+   * // Returns the user document if found
+   * 
+   * @example
+   * await ValidationUtil.validateEntityExists(
+   *   userModel,
+   *   'nonexistent-id',
+   *   ERROR_MESSAGES.USER_NOT_FOUND
+   * );
+   * // Throws NotFoundException with bilingual error message
+   */
+  static async validateEntityExists<T>(
+    model: Model<T>,
+    id: string,
+    notFoundMessage: BilingualMessage
+  ): Promise<T> {
+    // First validate ID format
+    this.validateObjectId(id, notFoundMessage);
+    
+    // Query database
+    const entity = await model.findById(id);
+    
+    if (!entity) {
+      throw new NotFoundException({
+        message: notFoundMessage,
+        code: 'ENTITY_NOT_FOUND',
+        details: { id }
+      });
+    }
+    
+    return entity;
+  }
+
+  /**
+   * Validates that a user is not attempting to modify their own account.
+   * Prevents self-deactivation and self-deletion scenarios.
+   * Throws ForbiddenException if user attempts self-modification.
+   * 
+   * Business Rules: BZR-n0c4e9f2 (self-deactivation), BZR-m3d5a8b7 (self-deletion)
+   * 
+   * @static
+   * @param {string} targetUserId - The ID of the user being modified
+   * @param {string} currentUserId - The ID of the user performing the action
+   * @param {'deactivate' | 'delete'} action - The type of modification being attempted
+   * @throws {ForbiddenException} When user attempts to modify their own account
+   * 
+   * @example
+   * ValidationUtil.validateNotSelfModification(
+   *   'user123',
+   *   'user456',
+   *   'deactivate'
+   * );
+   * // Passes validation - different users
+   * 
+   * @example
+   * ValidationUtil.validateNotSelfModification(
+   *   'user123',
+   *   'user123',
+   *   'deactivate'
+   * );
+   * // Throws ForbiddenException - same user attempting self-deactivation
+   */
+  static validateNotSelfModification(
+    targetUserId: string,
+    currentUserId: string,
+    action: 'deactivate' | 'delete'
+  ): void {
+    if (targetUserId === currentUserId) {
+      const message = action === 'deactivate' 
+        ? ERROR_MESSAGES.CANNOT_DEACTIVATE_SELF
+        : ERROR_MESSAGES.CANNOT_DELETE_SELF;
+      
+      throw new ForbiddenException({
+        message,
+        code: 'SELF_MODIFICATION_FORBIDDEN',
+        details: { action, userId: targetUserId }
+      });
+    }
+  }
+
+  /**
+   * Validates that a user is active (not deactivated).
+   * Prevents assignment of deactivated users to entities.
+   * Throws BadRequestException if user is inactive.
+   * 
+   * Business Rule: BZR-q4f3e1b8 (deactivated user restrictions)
+   * 
+   * @static
+   * @param {any} user - The user document to validate (must have isActive property)
+   * @throws {BadRequestException} When user is inactive
+   * 
+   * @example
+   * const user = await userModel.findById(userId);
+   * ValidationUtil.validateUserActive(user);
+   * // Passes if user.isActive === true
+   * 
+   * @example
+   * const inactiveUser = { _id: '123', isActive: false };
+   * ValidationUtil.validateUserActive(inactiveUser);
+   * // Throws BadRequestException - user is inactive
+   */
+  static validateUserActive(user: any): void {
+    if (!user.isActive) {
+      throw new BadRequestException({
+        message: ERROR_MESSAGES.DEACTIVATED_USER_ASSIGNMENT,
+        code: 'USER_INACTIVE',
+        details: { userId: user._id }
+      });
+    }
+  }
+
+  /**
+   * Validates that all clinics belong to the same complex.
+   * Enforces single complex assignment rule for employees.
+   * Throws BadRequestException if clinics belong to different complexes.
+   * 
+   * Business Rule: BZR-5e6f7a8b (single complex assignment validation)
+   * 
+   * @static
+   * @param {string[]} clinicIds - Array of clinic IDs to validate
+   * @param {string} complexId - The expected complex ID
+   * @param {Model<any>} clinicModel - Mongoose model for Clinic collection
+   * @returns {Promise<void>}
+   * @throws {BadRequestException} When clinics belong to different complexes
+   * 
+   * @example
+   * await ValidationUtil.validateSingleComplexAssignment(
+   *   ['clinic1', 'clinic2'],
+   *   'complex1',
+   *   clinicModel
+   * );
+   * // Passes if all clinics belong to complex1
+   * 
+   * @example
+   * await ValidationUtil.validateSingleComplexAssignment(
+   *   ['clinic1', 'clinic2'],
+   *   'complex1',
+   *   clinicModel
+   * );
+   * // Throws BadRequestException if any clinic belongs to a different complex
+   */
+  static async validateSingleComplexAssignment(
+    clinicIds: string[],
+    complexId: string,
+    clinicModel: Model<any>
+  ): Promise<void> {
+    // Skip validation if no clinics provided
+    if (!clinicIds || clinicIds.length === 0) {
+      return;
+    }
+
+    // Query all clinics and get their complex IDs
+    const clinics = await clinicModel.find({
+      _id: { $in: clinicIds }
+    }).select('complexId');
+
+    // Check if any clinic belongs to a different complex
+    const differentComplexes = clinics.some(
+      clinic => clinic.complexId.toString() !== complexId
+    );
+
+    if (differentComplexes) {
+      throw new BadRequestException({
+        message: ERROR_MESSAGES.CLINICS_DIFFERENT_COMPLEXES,
+        code: 'CLINICS_DIFFERENT_COMPLEXES',
+        details: { complexId, clinicIds }
+      });
+    }
+  }
+
+  /**
+   * Validates that an array is not empty.
+   * Throws BadRequestException if array is null, undefined, or has zero length.
+   * 
+   * @static
+   * @template T - The type of items in the array
+   * @param {T[]} array - The array to validate
+   * @param {BilingualMessage} emptyMessage - Error message if array is empty
+   * @throws {BadRequestException} When array is empty
+   * 
+   * @example
+   * ValidationUtil.validateNotEmpty(
+   *   ['item1', 'item2'],
+   *   ERROR_MESSAGES.EMPTY_ARRAY
+   * );
+   * // Passes validation
+   * 
+   * @example
+   * ValidationUtil.validateNotEmpty(
+   *   [],
+   *   ERROR_MESSAGES.EMPTY_ARRAY
+   * );
+   * // Throws BadRequestException - array is empty
+   */
+  static validateNotEmpty<T>(
+    array: T[],
+    emptyMessage: BilingualMessage
+  ): void {
+    if (!array || array.length === 0) {
+      throw new BadRequestException({
+        message: emptyMessage,
+        code: 'EMPTY_ARRAY',
+      });
+    }
   }
 }
