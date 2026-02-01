@@ -31,6 +31,9 @@ import {
   EmployeeAttendanceDto,
   TerminateEmployeeDto
 } from './dto';
+import { ValidationUtil } from '../common/utils/validation.util';
+import { ResponseBuilder } from '../common/utils/response-builder.util';
+import { ERROR_MESSAGES } from '../common/utils/error-messages.constant';
 
 @Injectable()
 export class EmployeeService {
@@ -178,15 +181,169 @@ export class EmployeeService {
   }
 
   /**
+   * Validate single complex assignment
+   * Ensures that all clinics assigned to an employee belong to the same complex.
+   * 
+   * Business Rule: BZR-5e6f7a8b - Single complex assignment validation
+   * Requirements: 3.5
+   * Design: Section 3.3.1
+   * 
+   * @private
+   * @param {Object} employeeDto - Employee data containing complexId and clinicIds
+   * @param {string} [employeeDto.complexId] - The complex ID the employee is assigned to
+   * @param {string[]} [employeeDto.clinicIds] - Array of clinic IDs the employee is assigned to
+   * @returns {Promise<void>}
+   * @throws {BadRequestException} When clinics belong to different complexes
+   * 
+   * @example
+   * // Valid: All clinics belong to the same complex
+   * await this.validateSingleComplexAssignment({
+   *   complexId: 'complex123',
+   *   clinicIds: ['clinic1', 'clinic2']
+   * });
+   * 
+   * @example
+   * // Invalid: Clinics belong to different complexes
+   * await this.validateSingleComplexAssignment({
+   *   complexId: 'complex123',
+   *   clinicIds: ['clinic1', 'clinic2'] // clinic2 belongs to complex456
+   * });
+   * // Throws BadRequestException with bilingual error message
+   */
+  private async validateSingleComplexAssignment(
+    employeeDto: { complexId?: string; clinicIds?: string[] }
+  ): Promise<void> {
+    // Skip validation if no complex or clinics provided
+    if (!employeeDto.complexId || !employeeDto.clinicIds?.length) {
+      return;
+    }
+
+    // Use ValidationUtil to validate single complex assignment
+    await ValidationUtil.validateSingleComplexAssignment(
+      employeeDto.clinicIds,
+      employeeDto.complexId,
+      this.clinicModel
+    );
+  }
+
+  /**
+   * Validate plan-based assignment
+   * Ensures that employee assignments match the subscription plan type.
+   * 
+   * Business Rules:
+   * - BZR-i4c3e2f7: Plan 2 (Complex) - Complex must match subscription
+   * - BZR-j8a9f0d5: Plan 3 (Clinic) - Clinic must match subscription
+   * 
+   * Requirements: 3.6
+   * Design: Section 3.3.1
+   * 
+   * @private
+   * @param {Object} employeeDto - Employee data containing assignment IDs
+   * @param {string} [employeeDto.complexId] - The complex ID the employee is assigned to
+   * @param {string} [employeeDto.clinicId] - The clinic ID the employee is assigned to
+   * @param {Object} subscription - User's subscription information
+   * @param {string} subscription.planType - Plan type: 'company', 'complex', or 'clinic'
+   * @param {Types.ObjectId} [subscription.complexId] - Complex ID from subscription (for Plan 2)
+   * @param {Types.ObjectId} [subscription.clinicId] - Clinic ID from subscription (for Plan 3)
+   * @returns {Promise<void>}
+   * @throws {BadRequestException} When assignment doesn't match subscription plan
+   * 
+   * @example
+   * // Valid: Plan 2 (Complex) - Complex matches subscription
+   * await this.validatePlanBasedAssignment(
+   *   { complexId: 'complex123' },
+   *   { planType: 'complex', complexId: new Types.ObjectId('complex123') }
+   * );
+   * 
+   * @example
+   * // Invalid: Plan 2 (Complex) - Complex doesn't match subscription
+   * await this.validatePlanBasedAssignment(
+   *   { complexId: 'complex456' },
+   *   { planType: 'complex', complexId: new Types.ObjectId('complex123') }
+   * );
+   * // Throws BadRequestException with bilingual error message
+   * 
+   * @example
+   * // Valid: Plan 3 (Clinic) - Clinic matches subscription
+   * await this.validatePlanBasedAssignment(
+   *   { clinicId: 'clinic789' },
+   *   { planType: 'clinic', clinicId: new Types.ObjectId('clinic789') }
+   * );
+   */
+  private async validatePlanBasedAssignment(
+    employeeDto: any,
+    subscription: any
+  ): Promise<void> {
+    // Plan 2: Complex plan - validate complex matches subscription
+    if (subscription.planType === 'complex') {
+      if (employeeDto.complexId && 
+          employeeDto.complexId !== subscription.complexId?.toString()) {
+        throw new BadRequestException({
+          message: {
+            ar: 'يجب أن يتطابق المجمع مع اشتراكك',
+            en: 'Complex must match your subscription'
+          },
+          code: 'COMPLEX_MISMATCH',
+          details: {
+            subscriptionComplexId: subscription.complexId,
+            providedComplexId: employeeDto.complexId
+          }
+        });
+      }
+    } 
+    // Plan 3: Clinic plan - validate clinic matches subscription
+    else if (subscription.planType === 'clinic') {
+      if (employeeDto.clinicId && 
+          employeeDto.clinicId !== subscription.clinicId?.toString()) {
+        throw new BadRequestException({
+          message: {
+            ar: 'يجب أن تتطابق العيادة مع اشتراكك',
+            en: 'Clinic must match your subscription'
+          },
+          code: 'CLINIC_MISMATCH',
+          details: {
+            subscriptionClinicId: subscription.clinicId,
+            providedClinicId: employeeDto.clinicId
+          }
+        });
+      }
+    }
+    // Plan 1: Company plan - no specific validation needed
+    // Employees can be assigned to any organization/complex/clinic within the company
+  }
+
+  /**
    * Create a new employee
+   * 
+   * Business Rules:
+   * - BZR-5e6f7a8b: Single complex assignment validation
+   * - BZR-i4c3e2f7: Plan 2 - Complex must match subscription
+   * - BZR-j8a9f0d5: Plan 3 - Clinic must match subscription
+   * 
+   * Requirements: 3.5, 3.6
+   * Design: Section 3.3.1
    */
   async createEmployee(
     createEmployeeDto: CreateEmployeeDto,
-    createdByUserId?: string
+    createdByUserId?: string,
+    subscription?: any
   ): Promise<any> {
     this.logger.log(`Creating employee: ${createEmployeeDto.email}`);
 
+    // Validate employee data (existing validation)
     await this.validateEmployeeData(createEmployeeDto);
+
+    // Validate single complex assignment
+    // BZR-5e6f7a8b: Ensures all clinics belong to the same complex
+    // Note: Current DTO has clinicId (singular), validation expects clinicIds (array)
+    // This will be fully utilized when DTO is updated to support multiple clinic assignments
+    await this.validateSingleComplexAssignment(createEmployeeDto as any);
+
+    // Validate plan-based assignment if subscription is provided
+    // BZR-i4c3e2f7, BZR-j8a9f0d5: Ensures assignments match subscription plan
+    if (subscription) {
+      await this.validatePlanBasedAssignment(createEmployeeDto, subscription);
+    }
 
     // Hash the password
     const saltRounds = 10;
@@ -495,24 +652,43 @@ export class EmployeeService {
 
   /**
    * Update employee information
+   * 
+   * Business Rules:
+   * - BZR-5e6f7a8b: Single complex assignment validation
+   * - BZR-i4c3e2f7: Plan 2 - Complex must match subscription
+   * - BZR-j8a9f0d5: Plan 3 - Clinic must match subscription
+   * 
+   * Requirements: 3.5, 3.6
+   * Design: Section 3.3.1
    */
   async updateEmployee(
     employeeId: string,
     updateEmployeeDto: UpdateEmployeeDto,
-    updatedByUserId?: string
+    updatedByUserId?: string,
+    subscription?: any
   ): Promise<any> {
-    if (!Types.ObjectId.isValid(employeeId)) {
-      throw new BadRequestException('Invalid employee ID format');
-    }
-
     this.logger.log(`Updating employee: ${employeeId}`);
 
+    // Validate employee exists using ValidationUtil
+    // This replaces the manual ObjectId validation and getEmployeeById check
+    const employee = await ValidationUtil.validateEntityExists(
+      this.userModel,
+      employeeId,
+      ERROR_MESSAGES.EMPLOYEE_NOT_FOUND
+    );
+
+    // Validate employee data (existing validation for uniqueness, dates, etc.)
     await this.validateEmployeeData(updateEmployeeDto, true, employeeId);
 
-    // Get current employee
-    const currentEmployee = await this.getEmployeeById(employeeId);
-    if (!currentEmployee) {
-      throw new NotFoundException('Employee not found');
+    // Validate single complex assignment
+    // BZR-5e6f7a8b: Ensures all clinics belong to the same complex
+    // Note: Current DTO doesn't have complexId/clinicIds, but validation is ready for future use
+    await this.validateSingleComplexAssignment(updateEmployeeDto as any);
+
+    // Validate plan-based assignment if subscription is provided
+    // BZR-i4c3e2f7, BZR-j8a9f0d5: Ensures assignments match subscription plan
+    if (subscription) {
+      await this.validatePlanBasedAssignment(updateEmployeeDto, subscription);
     }
 
     // Separate user updates from profile updates
@@ -559,26 +735,50 @@ export class EmployeeService {
 
     this.logger.log(`Employee updated successfully: ${employeeId}`);
 
-    // Return updated employee
-    return await this.getEmployeeById(employeeId);
+    // Get updated employee data
+    const updatedEmployee = await this.getEmployeeById(employeeId);
+
+    // Return standardized response using ResponseBuilder
+    return ResponseBuilder.success(
+      updatedEmployee,
+      ERROR_MESSAGES.EMPLOYEE_UPDATED
+    );
   }
 
   /**
    * Soft delete employee
+   * 
+   * Business Rule: BZR-m3d5a8b7 - Cannot delete own account
+   * Requirements: 3.1
+   * Design: Section 3.3.1
+   * 
+   * @param {string} employeeId - The ID of the employee to delete
+   * @param {string} deletedByUserId - The ID of the user performing the deletion
+   * @returns {Promise<any>} Standardized response with success message
+   * @throws {BadRequestException} When trying to delete own account
+   * @throws {NotFoundException} When employee is not found
    */
-  async deleteEmployee(employeeId: string, deletedByUserId?: string): Promise<void> {
-    if (!Types.ObjectId.isValid(employeeId)) {
-      throw new BadRequestException('Invalid employee ID format');
-    }
-
+  async deleteEmployee(employeeId: string, deletedByUserId?: string): Promise<any> {
     this.logger.log(`Soft deleting employee: ${employeeId}`);
 
-    const employee = await this.getEmployeeById(employeeId);
-    if (!employee) {
-      throw new NotFoundException('Employee not found');
+    // Validate employee exists using ValidationUtil
+    const employee = await ValidationUtil.validateEntityExists(
+      this.userModel,
+      employeeId,
+      ERROR_MESSAGES.EMPLOYEE_NOT_FOUND
+    );
+
+    // Validate not self-deletion using ValidationUtil
+    // BZR-m3d5a8b7: Prevents users from deleting their own account
+    if (deletedByUserId) {
+      ValidationUtil.validateNotSelfModification(
+        employeeId,
+        deletedByUserId,
+        'delete'
+      );
     }
 
-    // Deactivate user account
+    // Deactivate user account (soft delete)
     await this.userModel.findByIdAndUpdate(
       employeeId,
       { 
@@ -609,6 +809,12 @@ export class EmployeeService {
     );
 
     this.logger.log(`Employee soft deleted successfully: ${employeeId}`);
+
+    // Return standardized response using ResponseBuilder
+    return ResponseBuilder.success(
+      null,
+      ERROR_MESSAGES.EMPLOYEE_DELETED
+    );
   }
 
   /**
@@ -1228,5 +1434,124 @@ export class EmployeeService {
     }
 
     return { success, failed, errors };
+  }
+
+  /**
+   * Get employees for dropdown (only active users)
+   * 
+   * Business Rule: BZR-q4f3e1b8 - Deactivated user restrictions in dropdowns
+   * Requirements: 3.2
+   * Design: Section 3.3.1
+   * 
+   * Returns only active employees for dropdown selection, with optional filtering
+   * by complex, clinic, or role. This ensures deactivated users are automatically
+   * excluded from assignment dropdowns.
+   * 
+   * @param {Object} [filters] - Optional filters for the query
+   * @param {string} [filters.complexId] - Filter by complex ID
+   * @param {string} [filters.clinicId] - Filter by clinic ID
+   * @param {string} [filters.role] - Filter by user role
+   * @returns {Promise<any>} Standardized response with active employees
+   * 
+   * @example
+   * // Get all active employees
+   * const result = await this.getEmployeesForDropdown();
+   * 
+   * @example
+   * // Get active doctors in a specific complex
+   * const result = await this.getEmployeesForDropdown({
+   *   role: 'doctor',
+   *   complexId: 'complex123'
+   * });
+   * 
+   * @example
+   * // Get active employees in a specific clinic
+   * const result = await this.getEmployeesForDropdown({
+   *   clinicId: 'clinic456'
+   * });
+   */
+  async getEmployeesForDropdown(filters?: {
+    complexId?: string;
+    clinicId?: string;
+    role?: string;
+  }): Promise<any> {
+    this.logger.log('Getting employees for dropdown with filters:', filters);
+
+    // Build aggregation pipeline
+    const pipeline: any[] = [
+      // Join with employee profiles
+      {
+        $lookup: {
+          from: 'employee_profiles',
+          localField: '_id',
+          foreignField: 'userId',
+          as: 'employeeProfile'
+        }
+      },
+      // Unwind employee profile (only include users with profiles)
+      {
+        $unwind: {
+          path: '$employeeProfile',
+          preserveNullAndEmptyArrays: false
+        }
+      },
+      // Filter: Only active users and active employee profiles
+      {
+        $match: {
+          isActive: true,
+          'employeeProfile.isActive': true
+        }
+      }
+    ];
+
+    // Apply optional filters
+    const additionalFilters: any = {};
+
+    if (filters?.role) {
+      additionalFilters.role = filters.role;
+    }
+
+    if (filters?.complexId) {
+      additionalFilters.complexId = new Types.ObjectId(filters.complexId);
+    }
+
+    if (filters?.clinicId) {
+      additionalFilters.clinicId = new Types.ObjectId(filters.clinicId);
+    }
+
+    // Add additional filters if any exist
+    if (Object.keys(additionalFilters).length > 0) {
+      pipeline.push({
+        $match: additionalFilters
+      });
+    }
+
+    // Project only necessary fields for dropdown
+    pipeline.push({
+      $project: {
+        _id: 1,
+        firstName: 1,
+        lastName: 1,
+        email: 1,
+        role: 1,
+        phone: 1,
+        employeeNumber: '$employeeProfile.employeeNumber',
+        jobTitle: '$employeeProfile.jobTitle',
+        profilePictureUrl: '$employeeProfile.profilePictureUrl'
+      }
+    });
+
+    // Sort by name
+    pipeline.push({
+      $sort: { firstName: 1, lastName: 1 }
+    });
+
+    // Execute aggregation
+    const employees = await this.userModel.aggregate(pipeline).exec();
+
+    this.logger.log(`Found ${employees.length} active employees for dropdown`);
+
+    // Return standardized response using ResponseBuilder
+    return ResponseBuilder.success(employees);
   }
 } 

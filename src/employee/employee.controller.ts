@@ -153,11 +153,8 @@ export class EmployeeController {
   @HttpCode(HttpStatus.OK)
   async deleteEmployee(@Param('id') id: string, @Request() req: any) {
     try {
-      await this.employeeService.deleteEmployee(id, req.user?.userId);
-      return {
-        success: true,
-        message: 'Employee deleted successfully'
-      };
+      const result = await this.employeeService.deleteEmployee(id, req.user?.userId);
+      return result;
     } catch (error) {
       return {
         success: false,
