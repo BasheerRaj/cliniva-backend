@@ -205,6 +205,54 @@ export class AuthController {
   }
 
   /**
+   * Forgot password - Request password reset
+   * 
+   * Task 15.3: Create POST /auth/forgot-password endpoint
+   * Requirements: 8.3, 8.6, 8.9
+   * 
+   * This is a public endpoint (no guards) that allows users to request a password reset.
+   * It extracts the IP address from the request for rate limiting and audit logging.
+   * Returns the same response whether the email exists or not for security.
+   */
+  @Post('forgot-password')
+  @HttpCode(HttpStatus.OK)
+  async forgotPassword(
+    @Body(new ValidationPipe({ transform: true, whitelist: true }))
+    dto: { email: string },
+    @Request() req,
+  ): Promise<{ success: boolean; message: { ar: string; en: string } }> {
+    try {
+      // Extract IP address from request
+      const ipAddress = req.ip || req.connection?.remoteAddress || 'unknown';
+
+      // Call AuthService.forgotPassword
+      const result = await this.authService.forgotPassword(
+        dto.email,
+        ipAddress,
+      );
+
+      // Return SuccessResponse (same response whether email exists or not)
+      return result;
+    } catch (error) {
+      // Handle errors with bilingual messages
+      if (error.response?.message) {
+        throw error;
+      }
+
+      this.logger.error(`Forgot password request failed: ${error.message}`, error.stack);
+      
+      // Return generic success message even on error to avoid revealing information
+      return {
+        success: true,
+        message: {
+          ar: 'إذا كان البريد الإلكتروني موجوداً في نظامنا، ستتلقى رسالة لإعادة تعيين كلمة المرور',
+          en: 'If the email exists in our system, you will receive a password reset email',
+        },
+      };
+    }
+  }
+
+  /**
    * Refresh access token
    */
   @Post('refresh')
