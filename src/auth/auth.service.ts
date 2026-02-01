@@ -45,7 +45,13 @@ export class AuthService {
       });
 
       if (existingUser) {
-        throw new ConflictException('User with this email already exists');
+        throw new ConflictException({
+          message: {
+            ar: 'مستخدم بهذا البريد الإلكتروني موجود بالفعل',
+            en: 'User with this email already exists',
+          },
+          code: 'EMAIL_ALREADY_EXISTS',
+        });
       }
 
       // Hash password
@@ -96,7 +102,13 @@ export class AuthService {
         throw error;
       }
       this.logger.error(`Registration failed: ${error.message}`, error.stack);
-      throw new BadRequestException('Registration failed');
+      throw new BadRequestException({
+        message: {
+          ar: 'فشل التسجيل',
+          en: 'Registration failed',
+        },
+        code: 'REGISTRATION_FAILED',
+      });
     }
   }
 
@@ -122,7 +134,13 @@ export class AuthService {
             'invalid_credentials',
           );
         }
-        throw new UnauthorizedException('Invalid credentials');
+        throw new UnauthorizedException({
+          message: {
+            ar: 'بيانات الاعتماد غير صحيحة',
+            en: 'Invalid credentials',
+          },
+          code: 'INVALID_CREDENTIALS',
+        });
       }
 
       // Check if user is active
@@ -135,7 +153,13 @@ export class AuthService {
             'account_inactive',
           );
         }
-        throw new UnauthorizedException('Account is inactive');
+        throw new UnauthorizedException({
+          message: {
+            ar: 'الحساب غير نشط',
+            en: 'Account is inactive',
+          },
+          code: 'ACCOUNT_INACTIVE',
+        });
       }
 
       // Validate password
@@ -153,7 +177,13 @@ export class AuthService {
             'invalid_credentials',
           );
         }
-        throw new UnauthorizedException('Invalid credentials');
+        throw new UnauthorizedException({
+          message: {
+            ar: 'بيانات الاعتماد غير صحيحة',
+            en: 'Invalid credentials',
+          },
+          code: 'INVALID_CREDENTIALS',
+        });
       }
 
       const userId = (user._id as any).toString();
@@ -223,7 +253,13 @@ export class AuthService {
         throw error;
       }
       this.logger.error(`Login failed: ${error.message}`, error.stack);
-      throw new UnauthorizedException('Authentication failed');
+      throw new UnauthorizedException({
+        message: {
+          ar: 'فشلت المصادقة',
+          en: 'Authentication failed',
+        },
+        code: 'AUTHENTICATION_FAILED',
+      });
     }
   }
 
@@ -349,7 +385,13 @@ export class AuthService {
   async getProfile(userId: string): Promise<UserProfileDto> {
     const user = await this.userModel.findById(userId);
     if (!user) {
-      throw new NotFoundException('User not found');
+      throw new NotFoundException({
+        message: {
+          ar: 'المستخدم غير موجود',
+          en: 'User not found',
+        },
+        code: 'USER_NOT_FOUND',
+      });
     }
 
     return new UserProfileDto(user);
@@ -463,7 +505,13 @@ export class AuthService {
     try {
       const user = await this.userModel.findById(userId).exec();
       if (!user) {
-        throw new BadRequestException('User not found');
+        throw new BadRequestException({
+          message: {
+            ar: 'المستخدم غير موجود',
+            en: 'User not found',
+          },
+          code: 'USER_NOT_FOUND',
+        });
       }
 
       return {
@@ -488,7 +536,13 @@ export class AuthService {
         timestamp: new Date().toISOString()
       };
     } catch (error) {
-      throw new BadRequestException(`Failed to get user debug info: ${error.message}`);
+      throw new BadRequestException({
+        message: {
+          ar: `فشل الحصول على معلومات تصحيح المستخدم: ${error.message}`,
+          en: `Failed to get user debug info: ${error.message}`,
+        },
+        code: 'DEBUG_INFO_FAILED',
+      });
     }
   }
 

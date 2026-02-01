@@ -3,6 +3,8 @@ import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { AuthService } from '../auth.service';
 import { UserRole } from '../../common/enums/user-role.enum';
+import { AuthErrorCode } from '../../common/enums/auth-error-code.enum';
+import { AUTH_ERROR_MESSAGES } from '../../common/constants/auth-error-messages.constant';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
@@ -22,11 +24,17 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   async validate(payload: any) {
     const user = await this.authService.validateUserById(payload.sub);
     if (!user) {
-      throw new UnauthorizedException('Invalid token');
+      throw new UnauthorizedException({
+        message: AUTH_ERROR_MESSAGES[AuthErrorCode.TOKEN_INVALID],
+        code: AuthErrorCode.TOKEN_INVALID,
+      });
     }
 
     if (!user.isActive) {
-      throw new UnauthorizedException('Account is inactive');
+      throw new UnauthorizedException({
+        message: AUTH_ERROR_MESSAGES[AuthErrorCode.ACCOUNT_DEACTIVATED],
+        code: AuthErrorCode.ACCOUNT_DEACTIVATED,
+      });
     }
 
     // Return user object that will be attached to request

@@ -48,30 +48,60 @@ export class SetupCompletionGuard implements CanActivate {
     const user = request.user;
 
     if (!user || !user.userId) {
-      throw new ForbiddenException('Authentication required');
+      throw new ForbiddenException({
+        message: {
+          ar: 'المصادقة مطلوبة',
+          en: 'Authentication required',
+        },
+        code: 'AUTHENTICATION_REQUIRED',
+      });
     }
 
     try {
       const userDoc = await this.userModel.findById(user.userId).exec();
       if (!userDoc) {
-        throw new ForbiddenException('User not found');
+        throw new ForbiddenException({
+          message: {
+            ar: 'المستخدم غير موجود',
+            en: 'User not found',
+          },
+          code: 'USER_NOT_FOUND',
+        });
       }
 
       // Check onboarding completion requirement
       if (requirements.requireOnboardingComplete && !userDoc.onboardingComplete) {
-        throw new ForbiddenException('Onboarding must be completed to access this resource');
+        throw new ForbiddenException({
+          message: {
+            ar: 'يجب إكمال عملية الإعداد للوصول إلى هذا المورد',
+            en: 'Onboarding must be completed to access this resource',
+          },
+          code: 'ONBOARDING_INCOMPLETE',
+        });
       }
 
       // Check setup completion requirement
       if (requirements.requireSetupComplete && !userDoc.setupComplete) {
-        throw new ForbiddenException('Account setup must be completed to access this resource');
+        throw new ForbiddenException({
+          message: {
+            ar: 'يجب إكمال إعداد الحساب للوصول إلى هذا المورد',
+            en: 'Account setup must be completed to access this resource',
+          },
+          code: 'SETUP_INCOMPLETE',
+        });
       }
 
       // Check active subscription requirement
       if (requirements.requireActiveSubscription) {
         const hasActiveSubscription = await this.verifyActiveSubscription(userDoc);
         if (!hasActiveSubscription) {
-          throw new ForbiddenException('Active subscription required to access this resource');
+          throw new ForbiddenException({
+            message: {
+              ar: 'يتطلب اشتراك نشط للوصول إلى هذا المورد',
+              en: 'Active subscription required to access this resource',
+            },
+            code: 'SUBSCRIPTION_REQUIRED',
+          });
         }
       }
 
@@ -79,7 +109,13 @@ export class SetupCompletionGuard implements CanActivate {
       if (requirements.requireEntitiesForPlan) {
         const hasRequiredEntities = await this.verifyRequiredEntitiesExist(userDoc);
         if (!hasRequiredEntities) {
-          throw new ForbiddenException('Required entities for your subscription plan are missing. Please complete setup.');
+          throw new ForbiddenException({
+            message: {
+              ar: 'الكيانات المطلوبة لخطة الاشتراك الخاصة بك مفقودة. يرجى إكمال الإعداد',
+              en: 'Required entities for your subscription plan are missing. Please complete setup.',
+            },
+            code: 'REQUIRED_ENTITIES_MISSING',
+          });
         }
       }
 
@@ -97,7 +133,13 @@ export class SetupCompletionGuard implements CanActivate {
       if (error instanceof ForbiddenException || error instanceof BadRequestException) {
         throw error;
       }
-      throw new ForbiddenException('Setup verification failed');
+      throw new ForbiddenException({
+        message: {
+          ar: 'فشل التحقق من الإعداد',
+          en: 'Setup verification failed',
+        },
+        code: 'SETUP_VERIFICATION_FAILED',
+      });
     }
   }
 

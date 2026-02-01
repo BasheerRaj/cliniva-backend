@@ -96,14 +96,26 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     const user = request.user;
 
     if (!user || !user.id) {
-      throw new UnauthorizedException('Invalid user context');
+      throw new UnauthorizedException({
+        message: {
+          ar: 'سياق المستخدم غير صالح',
+          en: 'Invalid user context',
+        },
+        code: 'INVALID_USER_CONTEXT',
+      });
     }
 
     try {
       // Fetch complete user data
       const userDoc = await this.userModel.findById(user.id).exec();
       if (!userDoc) {
-        throw new UnauthorizedException('User not found');
+        throw new UnauthorizedException({
+          message: {
+            ar: 'المستخدم غير موجود',
+            en: 'User not found',
+          },
+          code: 'USER_NOT_FOUND',
+        });
       }
 
       // Fetch subscription data if available
