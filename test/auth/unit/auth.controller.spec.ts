@@ -4,6 +4,7 @@ import { ValidationPipe } from '@nestjs/common';
 import { AuthController } from '../../../src/auth/auth.controller';
 import { AuthService } from '../../../src/auth/auth.service';
 import { JwtAuthGuard } from '../../../src/auth/guards/jwt-auth.guard';
+import { FirstLoginGuard } from '../../../src/auth/guards/first-login.guard';
 import { LoginDto, RegisterDto, RefreshTokenDto } from '../../../src/auth/dto';
 import { UserRole } from '../../../src/common/enums/user-role.enum';
 import { mockAuthService, mockAuthResponse, mockUserProfile } from '../mocks/auth.mocks';
@@ -23,6 +24,8 @@ describe('AuthController', () => {
       ],
     })
       .overrideGuard(JwtAuthGuard)
+      .useValue({ canActivate: jest.fn(() => true) })
+      .overrideGuard(FirstLoginGuard)
       .useValue({ canActivate: jest.fn(() => true) })
       .compile();
 
@@ -191,6 +194,89 @@ describe('AuthController', () => {
       await expect(
         controller.firstLoginPasswordChange(firstLoginPasswordChangeDto, mockRequest),
       ).rejects.toThrow();
+    });
+  });
+
+  describe('changePassword', () => {
+    const changePasswordDto = {
+      currentPassword: 'OldPass123!',
+      newPassword: 'NewPass456!',
+      confirmPassword: 'NewPass456!',
+    };
+
+    const mockRequest = {
+      user: { 
+        userId: 'user-id',
+        sub: 'user-id',
+      },
+    };
+
+    const mockSuccessResponse = {
+      success: true,
+      message: {
+        ar: 'تم تغيير كلمة المرور بنجاح',
+        en: 'Password changed successfully',
+      },
+    };
+
+    beforeEach(() => {
+      mockAuthService.changePassword = jest.fn().mockResolvedValue(mockSuccessResponse);
+    });
+
+    it('should change password for authenticated user', async () => {
+      const result = await controller.changePassword(
+        changePasswordDto,
+        mockRequest,
+      );
+      
+      expect(authService.changePassword).toHaveBeenCalledWith(
+        'user-id',
+        'OldPass123!',
+        'NewPass456!',
+      );
+      expect(result).toEqual(mockSuccessResponse);
+    });
+
+    it('should throw error if passwords do not match', async () => {
+      const mismatchDto = {
+        ...changePasswordDto,
+        confirmPassword: 'DifferentPass456!',
+      };
+
+      await expect(
+        controller.changePassword(mismatchDto, mockRequest),
+      ).rejects.toThrow();
+    });
+
+    it('should throw error if user ID not found', async () => {
+      const requestWithoutUser = {
+        user: {},
+      };
+
+      await expect(
+        controller.changePassword(changePasswordDto, requestWithoutUser),
+      ).rejects.toThrow();
+    });
+
+    it('should handle service errors with bilingual messages', async () => {
+      mockAuthService.changePassword.mockRejectedValueOnce(
+        new Error('Service error'),
+      );
+
+      await expect(
+        controller.changePassword(changePasswordDto, mockRequest),
+      ).rejects.toThrow();
+    });
+
+    it('should return bilingual success message', async () => {
+      const result = await controller.changePassword(
+        changePasswordDto,
+        mockRequest,
+      );
+      
+      expect(result.message).toHaveProperty('ar');
+      expect(result.message).toHaveProperty('en');
+      expect(result.success).toBe(true);
     });
   });
 });

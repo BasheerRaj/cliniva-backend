@@ -14,7 +14,7 @@ import {
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
-import { SkipFirstLoginCheck } from './guards/first-login.guard';
+import { FirstLoginGuard, SkipFirstLoginCheck } from './guards/first-login.guard';
 import {
   LoginDto,
   RegisterDto,
@@ -22,6 +22,7 @@ import {
   AuthResponseDto,
   UserProfileDto,
   FirstLoginPasswordChangeDto,
+  ChangePasswordDto,
 } from './dto';
 
 @Controller('auth')
@@ -123,6 +124,76 @@ export class AuthController {
       }
 
       this.logger.error(`First login password change failed: ${error.message}`, error.stack);
+      throw new BadRequestException({
+        message: {
+          ar: 'فشل تغيير كلمة المرور',
+          en: 'Password change failed',
+        },
+        code: 'PASSWORD_CHANGE_FAILED',
+      });
+    }
+  }
+
+  /**
+   * Change password for authenticated users
+   * 
+   * Task 15.2: Create POST /auth/change-password endpoint
+   * Requirements: 8.2, 8.6, 8.8
+   * 
+   * This endpoint allows authenticated users to change their password.
+   * It applies both JwtAuthGuard and FirstLoginGuard to ensure:
+   * 1. User is authenticated (JwtAuthGuard)
+   * 2. User has completed first login password change (FirstLoginGuard)
+   */
+  @Post('change-password')
+  @UseGuards(JwtAuthGuard, FirstLoginGuard)
+  @HttpCode(HttpStatus.OK)
+  async changePassword(
+    @Body(new ValidationPipe({ transform: true, whitelist: true }))
+    dto: ChangePasswordDto,
+    @Request() req,
+  ): Promise<{ success: boolean; message: { ar: string; en: string } }> {
+    try {
+      // Extract userId from JWT payload (populated by JwtAuthGuard)
+      const userId = req.user?.userId || req.user?.sub;
+
+      if (!userId) {
+        throw new BadRequestException({
+          message: {
+            ar: 'معرف المستخدم غير موجود',
+            en: 'User ID not found',
+          },
+          code: 'USER_ID_NOT_FOUND',
+        });
+      }
+
+      // Validate that passwords match
+      if (dto.newPassword !== dto.confirmPassword) {
+        throw new BadRequestException({
+          message: {
+            ar: 'كلمات المرور غير متطابقة',
+            en: 'Passwords do not match',
+          },
+          code: 'PASSWORDS_DO_NOT_MATCH',
+        });
+      }
+
+      // Call AuthService.changePassword
+      const result = await this.authService.changePassword(
+        userId,
+        dto.currentPassword,
+        dto.newPassword,
+      );
+
+      // Return SuccessResponse
+      return result;
+    } catch (error) {
+      // Handle errors with bilingual messages
+      if (error.response?.message) {
+        throw error;
+      }
+
+      this.logger.error(`Password change failed: ${error.message}`, error.stack);
       throw new BadRequestException({
         message: {
           ar: 'فشل تغيير كلمة المرور',
