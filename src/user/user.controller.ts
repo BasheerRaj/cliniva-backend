@@ -1,11 +1,15 @@
-import { Controller, Get, Post, Put, Body, Param, UseGuards, HttpCode, HttpStatus, Request, Logger, HttpException } from '@nestjs/common';
+import { Controller, Get, Post, Put, Patch, Body, Param, Query, UseGuards, HttpCode, HttpStatus, Request, Logger, HttpException } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { UserService } from './user.service';
 import { CheckUserEntitiesDto, UserEntitiesResponseDto } from './dto/check-user-entities.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { UpdateUserStatusDto } from './dto/update-user-status.dto';
+import { DeactivateWithTransferDto } from './dto/deactivate-with-transfer.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AdminGuard } from '../auth/guards/admin.guard';
 import { AuthService } from '../auth/auth.service';
 
+@ApiTags('Users')
 @Controller('users')
 export class UserController {
   private readonly logger = new Logger(UserController.name);
@@ -53,6 +57,222 @@ export class UserController {
   @UseGuards(JwtAuthGuard)
   async getUserEntitiesStatus(@Param('id') userId: string): Promise<UserEntitiesResponseDto> {
     return await this.userService.checkUserEntities(userId);
+  }
+
+  /**
+   * Update user status
+   * BZR-n0c4e9f2: Cannot deactivate own account
+   * 
+   * Task 7.1: Add updateUserStatus endpoint to UserController
+   * Requirements: 3.1
+   * Design: Section 3.6.1
+   * 
+   * This endpoint allows administrators to activate or deactivate a user.
+   * It prevents users from deactivating their own accounts.
+   * 
+   * @param userId - User ID from route params
+   * @param updateStatusDto - Status update data
+   * @param req - Request object containing authenticated admin user
+   * @returns Success response with updated user
+   */
+  @Patch(':id/status')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ 
+    summary: 'Update user status',
+    description: 'Activate or deactivate a user. Cannot deactivate own account.'
+  })
+  @ApiResponse({ status: 200, description: 'User status updated successfully' })
+  @ApiResponse({ status: 403, description: 'Cannot deactivate own account' })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  @HttpCode(HttpStatus.OK)
+  async updateUserStatus(
+    @Param('id') userId: string,
+    @Body() updateStatusDto: UpdateUserStatusDto,
+    @Request() req: any
+  ) {
+    try {
+      // Extract currentUserId from JWT payload
+      const currentUserId = req.user?.userId || req.user?.sub || req.user?.id;
+
+      if (!currentUserId) {
+        this.logger.error('User ID not found in request');
+        throw new HttpException(
+          {
+            message: {
+              ar: 'معرف المستخدم غير موجود',
+              en: 'User ID not found',
+            },
+            code: 'USER_ID_NOT_FOUND',
+          },
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      return await this.userService.updateUserStatus(
+        userId,
+        updateStatusDto,
+        currentUserId,
+        req.ip,
+        req.headers['user-agent']
+      );
+    } catch (error) {
+      // Re-throw if already an HTTP exception
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      this.logger.error(
+        `Update user status failed: ${error.message}`,
+        error.stack,
+      );
+      throw new HttpException(
+        {
+          message: {
+            ar: 'فشل تحديث حالة المستخدم',
+            en: 'Failed to update user status',
+          },
+          code: 'USER_STATUS_UPDATE_FAILED',
+        },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+  }
+
+  /**
+   * Deactivate doctor with appointment transfer
+   * BZR-q0d8a9f1: Doctor appointment transfer on deactivation
+   * 
+   * Task 7.2: Add deactivateDoctorWithTransfer endpoint to UserController
+   * Requirements: 3.3
+   * Design: Section 3.6.1
+   * 
+   * This endpoint allows administrators to deactivate a doctor and transfer
+   * their appointments to another doctor or mark them for rescheduling.
+   * 
+   * @param doctorId - Doctor ID from route params
+   * @param transferDto - Transfer configuration data
+   * @param req - Request object containing authenticated admin user
+   * @returns Success response with transfer details
+   */
+  @Post(':id/deactivate-with-transfer')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ 
+    summary: 'Deactivate doctor with appointment transfer',
+    description: 'Deactivate a doctor and transfer their appointments to another doctor or mark for rescheduling'
+  })
+  @ApiResponse({ status: 200, description: 'Doctor deactivated and appointments transferred' })
+  @ApiResponse({ status: 400, description: 'Invalid transfer data or doctor has appointments' })
+  @ApiResponse({ status: 403, description: 'Cannot deactivate own account' })
+  @ApiResponse({ status: 404, description: 'Doctor not found' })
+  @HttpCode(HttpStatus.OK)
+  async deactivateDoctorWithTransfer(
+    @Param('id') doctorId: string,
+    @Body() transferDto: DeactivateWithTransferDto,
+    @Request() req: any
+  ) {
+    try {
+      // Extract currentUserId from JWT payload
+      const currentUserId = req.user?.userId || req.user?.sub || req.user?.id;
+
+      if (!currentUserId) {
+        this.logger.error('User ID not found in request');
+        throw new HttpException(
+          {
+            message: {
+              ar: 'معرف المستخدم غير موجود',
+              en: 'User ID not found',
+            },
+            code: 'USER_ID_NOT_FOUND',
+          },
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      return await this.userService.deactivateDoctorWithTransfer(
+        doctorId,
+        transferDto,
+        currentUserId,
+        req.ip,
+        req.headers['user-agent']
+      );
+    } catch (error) {
+      // Re-throw if already an HTTP exception
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      this.logger.error(
+        `Deactivate doctor with transfer failed: ${error.message}`,
+        error.stack,
+      );
+      throw new HttpException(
+        {
+          message: {
+            ar: 'فشل إلغاء تفعيل الطبيب مع نقل المواعيد',
+            en: 'Failed to deactivate doctor with appointment transfer',
+          },
+          code: 'DOCTOR_DEACTIVATION_FAILED',
+        },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+  }
+
+  /**
+   * Get users for dropdown
+   * BZR-q4f3e1b8: Deactivated user restrictions in dropdowns
+   * 
+   * Task 7.3: Add getUsersForDropdown endpoint to UserController
+   * Requirements: 3.2
+   * Design: Section 3.6.1
+   * 
+   * This endpoint returns only active users for dropdown selection,
+   * with optional filtering by role, complex, and clinic.
+   * 
+   * @param role - Optional role filter
+   * @param complexId - Optional complex ID filter
+   * @param clinicId - Optional clinic ID filter
+   * @returns List of active users
+   */
+  @Get('dropdown')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ 
+    summary: 'Get users for dropdown',
+    description: 'Get active users for dropdown selection with optional filters'
+  })
+  @ApiResponse({ status: 200, description: 'Users retrieved successfully' })
+  @HttpCode(HttpStatus.OK)
+  async getUsersForDropdown(
+    @Query('role') role?: string,
+    @Query('complexId') complexId?: string,
+    @Query('clinicId') clinicId?: string
+  ) {
+    try {
+      return await this.userService.getUsersForDropdown({ role, complexId, clinicId });
+    } catch (error) {
+      // Re-throw if already an HTTP exception
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      this.logger.error(
+        `Get users for dropdown failed: ${error.message}`,
+        error.stack,
+      );
+      throw new HttpException(
+        {
+          message: {
+            ar: 'فشل جلب قائمة المستخدمين',
+            en: 'Failed to retrieve users list',
+          },
+          code: 'USERS_DROPDOWN_FAILED',
+        },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
   }
 
   /**
