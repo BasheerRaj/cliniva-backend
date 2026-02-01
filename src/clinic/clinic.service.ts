@@ -2,14 +2,19 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Clinic } from '../database/schemas/clinic.schema';
+import { Complex } from '../database/schemas/complex.schema';
 import { CreateClinicDto, UpdateClinicDto, SetupCapacityDto, SetupBusinessProfileDto } from './dto/create-clinic.dto';
+import { ClinicFilterDto } from './dto/clinic-filter.dto';
 import { ValidationUtil } from '../common/utils/validation.util';
+import { ResponseBuilder } from '../common/utils/response-builder.util';
+import { ERROR_MESSAGES } from '../common/utils/error-messages.constant';
 import { SubscriptionService } from '../subscription/subscription.service';
 
 @Injectable()
 export class ClinicService {
   constructor(
     @InjectModel('Clinic') private readonly clinicModel: Model<Clinic>,
+    @InjectModel('Complex') private readonly complexModel: Model<Complex>,
     private readonly subscriptionService: SubscriptionService,
   ) {}
 
@@ -109,18 +114,69 @@ export class ClinicService {
     return clinic;
   }
 
-  async getClinicsByComplex(complexId: string): Promise<Clinic[]> {
-    // Find complex departments first, then clinics
-    return await this.clinicModel
-      .find({})
-      .populate('complexDepartmentId')
-      .exec()
-      .then(clinics => 
-        clinics.filter(clinic => 
-          clinic.complexDepartmentId && 
-          (clinic.complexDepartmentId as any).complexId?.toString() === complexId
-        )
-      );
+  /**
+   * Get clinics by complex with filtering and sorting
+   * BZR-g3e5c9a0: Complex-based clinic filtering endpoint
+   * 
+   * @param complexId - The complex ID to filter clinics by
+   * @param filters - Optional filters (isActive, sortBy, sortOrder)
+   * @returns Standardized response with clinics array
+   */
+  async getClinicsByComplex(
+    complexId: string,
+    filters?: ClinicFilterDto
+  ) {
+    // Validate complex exists
+    await ValidationUtil.validateEntityExists(
+      this.complexModel,
+      complexId,
+      ERROR_MESSAGES.COMPLEX_NOT_FOUND
+    );
+
+    // Build query
+    const query: any = { complexId: new Types.ObjectId(complexId) };
+    
+    if (filters?.isActive !== undefined) {
+      query.isActive = filters.isActive;
+    }
+
+    // Build sort
+    const sortBy = filters?.sortBy || 'name';
+    const sortOrder = filters?.sortOrder === 'desc' ? -1 : 1;
+    const sort: any = { [sortBy]: sortOrder };
+
+    // Execute query
+    const clinics = await this.clinicModel
+      .find(query)
+      .sort(sort)
+      .select('_id name address phoneNumbers email isActive specialization licenseNumber')
+      .lean();
+
+    return ResponseBuilder.success(clinics);
+  }
+
+  /**
+   * Get clinics for dropdown (only active, by complex)
+   * BZR-g3e5c9a0: Complex-based clinic filtering endpoint
+   * BZR-q4f3e1b8: Deactivated user restrictions in dropdowns
+   * 
+   * @param filters - Optional filters (complexId)
+   * @returns Standardized response with active clinics
+   */
+  async getClinicsForDropdown(filters?: { complexId?: string }) {
+    const query: any = { isActive: true };
+    
+    if (filters?.complexId) {
+      query.complexId = new Types.ObjectId(filters.complexId);
+    }
+
+    const clinics = await this.clinicModel
+      .find(query)
+      .select('_id name specialization')
+      .sort({ name: 1 })
+      .lean();
+
+    return ResponseBuilder.success(clinics);
   }
 
   async getClinicBySubscription(subscriptionId: string): Promise<Clinic | null> {
