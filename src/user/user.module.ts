@@ -8,6 +8,7 @@ import { Complex, ComplexSchema } from '../database/schemas/complex.schema';
 import { Clinic, ClinicSchema } from '../database/schemas/clinic.schema';
 import { Subscription, SubscriptionSchema } from '../database/schemas/subscription.schema';
 import { SubscriptionPlan, SubscriptionPlanSchema } from '../database/schemas/subscription-plan.schema';
+import { Appointment, AppointmentSchema } from '../database/schemas/appointment.schema';
 import { AuthModule } from '../auth/auth.module';
 
 @Module({
@@ -19,6 +20,7 @@ import { AuthModule } from '../auth/auth.module';
       { name: Clinic.name, schema: ClinicSchema },
       { name: Subscription.name, schema: SubscriptionSchema },
       { name: SubscriptionPlan.name, schema: SubscriptionPlanSchema },
+      { name: Appointment.name, schema: AppointmentSchema },
     ]),
     forwardRef(() => AuthModule), // Use forwardRef to avoid circular dependency
   ],
