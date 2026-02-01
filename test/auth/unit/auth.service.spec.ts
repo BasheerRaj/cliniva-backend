@@ -18,6 +18,9 @@ import { Model } from 'mongoose';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 
+// Import real crypto for computing expected hashes in tests
+const realCrypto = jest.requireActual('crypto');
+
 import { AuthService } from '../../../src/auth/auth.service';
 import { User } from '../../../src/database/schemas/user.schema';
 import { AuditLog } from '../../../src/database/schemas/audit-log.schema';
@@ -143,6 +146,9 @@ describe('AuthService', () => {
     // Reset JWT service mock implementations
     mockJwtService.verifyAsync.mockReset();
     mockJwtService.verify.mockReset();
+    // Reset bcrypt mocks
+    (bcrypt.hash as jest.Mock).mockClear();
+    (bcrypt.compare as jest.Mock).mockClear();
     // Reset crypto mocks
     (crypto.randomBytes as jest.Mock).mockClear();
     (crypto.createHash as jest.Mock).mockClear();
@@ -189,11 +195,12 @@ describe('AuthService', () => {
     it('should hash password before saving', async () => {
       mockUserModel.findOne.mockResolvedValue(null);
       mockUserModel.findByIdAndUpdate.mockResolvedValue(mockUser);
-      (bcrypt.hash as jest.Mock).mockResolvedValue('hashedPassword');
+      const hashSpy = (bcrypt.hash as jest.Mock).mockResolvedValue('hashedPassword');
 
       await service.register(registerDto);
 
-      expect(bcrypt.hash).toHaveBeenCalledWith(registerDto.password, 12);
+      // The hashPassword method is called internally, which calls bcrypt.hash
+      expect(hashSpy).toHaveBeenCalledWith(registerDto.password, 12);
     });
   });
 
@@ -308,16 +315,8 @@ describe('AuthService', () => {
 
   describe('refreshToken', () => {
     const refreshToken = 'valid-refresh-token';
-    const tokenHash = 'hashed-token';
-
-    beforeEach(() => {
-      // Mock crypto.createHash for token hashing
-      const mockHashInstance = {
-        update: jest.fn().mockReturnThis(),
-        digest: jest.fn().mockReturnValue(tokenHash),
-      };
-      (crypto.createHash as jest.Mock).mockReturnValue(mockHashInstance);
-    });
+    // Compute the actual SHA-256 hash that would be generated using real crypto
+    const actualTokenHash = realCrypto.createHash('sha256').update(refreshToken).digest('hex');
 
     it('should successfully refresh valid token', async () => {
       const payload = { sub: mockUser._id, email: mockUser.email, exp: Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60 };
@@ -329,7 +328,7 @@ describe('AuthService', () => {
 
       const result = await service.refreshToken(refreshToken);
 
-      expect(mockSessionService.isTokenBlacklisted).toHaveBeenCalledWith(tokenHash);
+      expect(mockSessionService.isTokenBlacklisted).toHaveBeenCalledWith(actualTokenHash);
       expect(mockJwtService.verify).toHaveBeenCalledWith(refreshToken, {
         secret: 'test-refresh-secret',
       });
@@ -350,7 +349,7 @@ describe('AuthService', () => {
         UnauthorizedException,
       );
       
-      expect(mockSessionService.isTokenBlacklisted).toHaveBeenCalledWith(tokenHash);
+      expect(mockSessionService.isTokenBlacklisted).toHaveBeenCalledWith(actualTokenHash);
       expect(mockJwtService.verify).not.toHaveBeenCalled();
     });
 
@@ -453,21 +452,23 @@ describe('AuthService', () => {
   describe('forgotPassword', () => {
     const email = 'test@example.com';
     const ipAddress = '192.168.1.1';
-    const resetToken = 'random-reset-token-32-bytes-long';
-    const hashedToken = 'hashed-token';
+    const resetToken = 'a'.repeat(64); // 32 bytes = 64 hex characters
+    const hashedToken = 'b'.repeat(64); // SHA-256 hash = 64 hex characters
 
     beforeEach(() => {
-      // Mock crypto.randomBytes
-      (crypto.randomBytes as jest.Mock).mockReturnValue({
-        toString: jest.fn().mockReturnValue(resetToken),
-      });
+      // Mock crypto.randomBytes to return a Buffer
+      const mockBuffer = Buffer.from(resetToken, 'hex');
+      (crypto.randomBytes as jest.Mock).mockReturnValue(mockBuffer);
 
-      // Mock crypto.createHash
+      // Mock crypto.createHash to return our hashed token
       const mockHashInstance = {
         update: jest.fn().mockReturnThis(),
         digest: jest.fn().mockReturnValue(hashedToken),
       };
       (crypto.createHash as jest.Mock).mockReturnValue(mockHashInstance);
+      
+      // Ensure audit service mock is set up
+      mockAuditService.logPasswordResetRequest = jest.fn().mockResolvedValue(undefined);
     });
 
     it('should successfully process password reset for existing user', async () => {
@@ -654,17 +655,13 @@ describe('AuthService', () => {
 
   describe('resetPassword', () => {
     const resetToken = 'valid-reset-token-32-bytes-long';
-    const hashedToken = 'hashed-token';
+    // Compute the actual SHA-256 hash using real crypto
+    const actualHashedToken = realCrypto.createHash('sha256').update(resetToken).digest('hex');
+    // Keep hashedToken for backward compatibility with other tests
+    const hashedToken = actualHashedToken;
     const newPassword = 'NewSecurePass123!';
 
     beforeEach(() => {
-      // Mock crypto.createHash for token hashing
-      const mockHashInstance = {
-        update: jest.fn().mockReturnThis(),
-        digest: jest.fn().mockReturnValue(hashedToken),
-      };
-      (crypto.createHash as jest.Mock).mockReturnValue(mockHashInstance);
-
       // Mock bcrypt.hash for password hashing
       (bcrypt.hash as jest.Mock).mockResolvedValue('hashed-new-password');
 
@@ -677,7 +674,7 @@ describe('AuthService', () => {
       const userWithSave = {
         ...mockUser,
         _id: '507f1f77bcf86cd799439011',
-        passwordResetToken: hashedToken,
+        passwordResetToken: actualHashedToken,
         passwordResetExpires: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours from now
         passwordResetUsed: false,
         save: jest.fn().mockResolvedValue(mockUser),
@@ -689,7 +686,7 @@ describe('AuthService', () => {
       const result = await service.resetPassword(resetToken, newPassword);
 
       // Assert
-      expect(mockUserModel.findOne).toHaveBeenCalledWith({ passwordResetToken: hashedToken });
+      expect(mockUserModel.findOne).toHaveBeenCalledWith({ passwordResetToken: actualHashedToken });
       expect(bcrypt.hash).toHaveBeenCalledWith(newPassword, 12);
       expect(userWithSave.passwordHash).toBe('hashed-new-password');
       expect(userWithSave.passwordResetToken).toBeUndefined();
@@ -702,7 +699,7 @@ describe('AuthService', () => {
       );
       expect(mockAuditService.logPasswordResetComplete).toHaveBeenCalledWith(
         '507f1f77bcf86cd799439011',
-        hashedToken
+        actualHashedToken
       );
       expect(result.success).toBe(true);
       expect(result.message).toHaveProperty('ar');
