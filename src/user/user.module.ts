@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { UserController } from './user.controller';
 import { UserService } from './user.service';
@@ -8,6 +8,7 @@ import { Complex, ComplexSchema } from '../database/schemas/complex.schema';
 import { Clinic, ClinicSchema } from '../database/schemas/clinic.schema';
 import { Subscription, SubscriptionSchema } from '../database/schemas/subscription.schema';
 import { SubscriptionPlan, SubscriptionPlanSchema } from '../database/schemas/subscription-plan.schema';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { SubscriptionPlan, SubscriptionPlanSchema } from '../database/schemas/su
       { name: Subscription.name, schema: SubscriptionSchema },
       { name: SubscriptionPlan.name, schema: SubscriptionPlanSchema },
     ]),
+    forwardRef(() => AuthModule), // Use forwardRef to avoid circular dependency
   ],
   controllers: [UserController],
   providers: [UserService],
