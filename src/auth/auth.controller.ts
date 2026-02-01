@@ -253,6 +253,59 @@ export class AuthController {
   }
 
   /**
+   * Reset password - Complete password reset with token
+   * 
+   * Task 15.4: Create POST /auth/reset-password endpoint
+   * Requirements: 8.4, 8.6, 8.9
+   * 
+   * This is a public endpoint (no guards) that allows users to reset their password
+   * using a valid reset token received via email.
+   */
+  @Post('reset-password')
+  @HttpCode(HttpStatus.OK)
+  async resetPassword(
+    @Body(new ValidationPipe({ transform: true, whitelist: true }))
+    dto: { token: string; newPassword: string; confirmPassword: string },
+    @Request() req,
+  ): Promise<{ success: boolean; message: { ar: string; en: string } }> {
+    try {
+      // Validate that passwords match
+      if (dto.newPassword !== dto.confirmPassword) {
+        throw new BadRequestException({
+          message: {
+            ar: 'كلمات المرور غير متطابقة',
+            en: 'Passwords do not match',
+          },
+          code: 'PASSWORDS_DO_NOT_MATCH',
+        });
+      }
+
+      // Call AuthService.resetPassword
+      const result = await this.authService.resetPassword(
+        dto.token,
+        dto.newPassword,
+      );
+
+      // Return SuccessResponse
+      return result;
+    } catch (error) {
+      // Handle errors with bilingual messages
+      if (error.response?.message) {
+        throw error;
+      }
+
+      this.logger.error(`Password reset failed: ${error.message}`, error.stack);
+      throw new BadRequestException({
+        message: {
+          ar: 'فشل إعادة تعيين كلمة المرور',
+          en: 'Password reset failed',
+        },
+        code: 'PASSWORD_RESET_FAILED',
+      });
+    }
+  }
+
+  /**
    * Refresh access token
    */
   @Post('refresh')
