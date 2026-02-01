@@ -3,6 +3,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { MongooseModule } from '@nestjs/mongoose';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ScheduleModule as NestScheduleModule } from '@nestjs/schedule';
 
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
@@ -11,6 +12,7 @@ import { TokenService } from './token.service';
 import { SessionService } from './session.service';
 import { AuditService } from './audit.service';
 import { EmailService } from './email.service';
+import { TokenCleanupTask } from './token-cleanup.task';
 import { User, UserSchema } from '../database/schemas/user.schema';
 import { Subscription, SubscriptionSchema } from '../database/schemas/subscription.schema';
 import { SubscriptionPlan, SubscriptionPlanSchema } from '../database/schemas/subscription-plan.schema';
@@ -37,6 +39,9 @@ import { RateLimitService } from './rate-limit.service';
     // Import SubscriptionModule for SubscriptionService
     SubscriptionModule,
     
+    // Import NestJS Schedule Module for cron jobs
+    NestScheduleModule.forRoot(),
+    
     // Passport module
     PassportModule.register({ defaultStrategy: 'jwt' }),
     
@@ -53,8 +58,30 @@ import { RateLimitService } from './rate-limit.service';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, JwtAuthGuard, FirstLoginGuard, TokenService, SessionService, AuditService, EmailService, RateLimitService],
-  exports: [AuthService, JwtStrategy, PassportModule, JwtAuthGuard, FirstLoginGuard, TokenService, SessionService, AuditService, EmailService, RateLimitService],
+  providers: [
+    AuthService,
+    JwtStrategy,
+    JwtAuthGuard,
+    FirstLoginGuard,
+    TokenService,
+    SessionService,
+    AuditService,
+    EmailService,
+    RateLimitService,
+    TokenCleanupTask,
+  ],
+  exports: [
+    AuthService,
+    JwtStrategy,
+    PassportModule,
+    JwtAuthGuard,
+    FirstLoginGuard,
+    TokenService,
+    SessionService,
+    AuditService,
+    EmailService,
+    RateLimitService,
+  ],
 })
 export class AuthModule {}
 
