@@ -228,11 +228,36 @@ export class AuthService {
   }
 
   /**
-   * Refresh access token
+   * Refresh access token with blacklist check
+   * 
+   * Requirements: 7.3, 7.4, 7.5
+   * Task: 19.1
+   * 
+   * @param refreshToken - Refresh token to use for generating new tokens
+   * @returns AuthResponse with new tokens and user data
    */
   async refreshToken(refreshToken: string): Promise<AuthResponseDto> {
     try {
-      // Verify refresh token
+      // Hash token and check if blacklisted - Requirement 7.3
+      const tokenHash = crypto
+        .createHash('sha256')
+        .update(refreshToken)
+        .digest('hex');
+
+      const isBlacklisted = await this.sessionService.isTokenBlacklisted(tokenHash);
+      
+      if (isBlacklisted) {
+        this.logger.warn('Attempted to use blacklisted refresh token');
+        throw new UnauthorizedException({
+          message: {
+            ar: 'الرمز محظور',
+            en: 'Token blacklisted',
+          },
+          code: 'AUTH_012',
+        });
+      }
+
+      // Validate token signature and expiration - Requirement 7.3
       const payload = this.jwtService.verify(refreshToken, {
         secret: process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET + '_refresh',
       });
@@ -240,12 +265,32 @@ export class AuthService {
       // Find user
       const user = await this.userModel.findById(payload.sub);
       if (!user || !user.isActive) {
-        throw new UnauthorizedException('Invalid token');
+        throw new UnauthorizedException({
+          message: {
+            ar: 'رمز غير صالح',
+            en: 'Invalid token',
+          },
+          code: 'AUTH_003',
+        });
       }
 
-      // Generate new tokens
+      // Generate new access and refresh tokens - Requirement 7.4
       const tokens = await this.generateTokens(user);
 
+      // Blacklist old refresh token (single-use) - Requirement 7.5
+      // Get expiration from the old token payload
+      const oldTokenExpiry = new Date(payload.exp * 1000);
+      
+      await this.sessionService.addTokenToBlacklist(
+        refreshToken,
+        (user._id as any).toString(),
+        oldTokenExpiry,
+        'token_refresh',
+      );
+
+      this.logger.log(`Refresh token used and blacklisted for user ${user._id}`);
+
+      // Return new tokens - Requirement 7.4
       return {
         ...tokens,
         user: {
@@ -260,8 +305,41 @@ export class AuthService {
         },
       };
     } catch (error) {
+      if (error instanceof UnauthorizedException) {
+        throw error;
+      }
+      
+      // Handle JWT-specific errors
+      if (error.name === 'TokenExpiredError') {
+        this.logger.warn('Refresh token expired');
+        throw new UnauthorizedException({
+          message: {
+            ar: 'انتهت صلاحية الرمز',
+            en: 'Token expired',
+          },
+          code: 'AUTH_002',
+        });
+      }
+      
+      if (error.name === 'JsonWebTokenError') {
+        this.logger.warn('Invalid refresh token');
+        throw new UnauthorizedException({
+          message: {
+            ar: 'رمز غير صالح',
+            en: 'Invalid token',
+          },
+          code: 'AUTH_003',
+        });
+      }
+
       this.logger.error(`Token refresh failed: ${error.message}`, error.stack);
-      throw new UnauthorizedException('Invalid token');
+      throw new UnauthorizedException({
+        message: {
+          ar: 'فشل تحديث الرمز',
+          en: 'Token refresh failed',
+        },
+        code: 'AUTH_003',
+      });
     }
   }
 

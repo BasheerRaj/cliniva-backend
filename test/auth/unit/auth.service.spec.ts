@@ -20,6 +20,7 @@ import * as crypto from 'crypto';
 
 import { AuthService } from '../../../src/auth/auth.service';
 import { User } from '../../../src/database/schemas/user.schema';
+import { AuditLog } from '../../../src/database/schemas/audit-log.schema';
 import { LoginDto, RegisterDto } from '../../../src/auth/dto';
 import { UserRole } from '../../../src/common/enums/user-role.enum';
 import { mockUser, mockUserModel, mockJwtService } from '../mocks/auth.mocks';
@@ -56,6 +57,17 @@ describe('AuthService', () => {
     getSubscriptionById: jest.fn(),
   };
 
+  const mockAuditLogModel = {
+    create: jest.fn(),
+    find: jest.fn(),
+    findOne: jest.fn(),
+    findById: jest.fn(),
+    findByIdAndUpdate: jest.fn(),
+    findByIdAndDelete: jest.fn(),
+    deleteMany: jest.fn(),
+    countDocuments: jest.fn(),
+  };
+
   beforeAll(() => {
     process.env.JWT_REFRESH_SECRET = 'test-refresh-secret';
     process.env.JWT_SECRET = 'test-secret';
@@ -79,6 +91,10 @@ describe('AuthService', () => {
         {
           provide: getModelToken(User.name),
           useValue: UserModelConstructor,
+        },
+        {
+          provide: getModelToken(AuditLog.name),
+          useValue: mockAuditLogModel,
         },
         {
           provide: JwtService,
@@ -292,23 +308,54 @@ describe('AuthService', () => {
 
   describe('refreshToken', () => {
     const refreshToken = 'valid-refresh-token';
+    const tokenHash = 'hashed-token';
+
+    beforeEach(() => {
+      // Mock crypto.createHash for token hashing
+      const mockHashInstance = {
+        update: jest.fn().mockReturnThis(),
+        digest: jest.fn().mockReturnValue(tokenHash),
+      };
+      (crypto.createHash as jest.Mock).mockReturnValue(mockHashInstance);
+    });
 
     it('should successfully refresh valid token', async () => {
-      const payload = { sub: mockUser._id, email: mockUser.email };
+      const payload = { sub: mockUser._id, email: mockUser.email, exp: Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60 };
       mockJwtService.verify.mockReturnValue(payload);
       mockUserModel.findById.mockResolvedValue(mockUser);
       mockUserModel.findByIdAndUpdate.mockResolvedValue(mockUser);
+      mockSessionService.isTokenBlacklisted = jest.fn().mockResolvedValue(false);
+      mockSessionService.addTokenToBlacklist = jest.fn().mockResolvedValue(undefined);
 
       const result = await service.refreshToken(refreshToken);
 
+      expect(mockSessionService.isTokenBlacklisted).toHaveBeenCalledWith(tokenHash);
       expect(mockJwtService.verify).toHaveBeenCalledWith(refreshToken, {
         secret: 'test-refresh-secret',
       });
+      expect(mockSessionService.addTokenToBlacklist).toHaveBeenCalledWith(
+        refreshToken,
+        mockUser._id.toString(),
+        expect.any(Date),
+        'token_refresh',
+      );
       expect(result).toHaveProperty('access_token');
       expect(result).toHaveProperty('refresh_token');
     });
 
+    it('should throw UnauthorizedException for blacklisted token', async () => {
+      mockSessionService.isTokenBlacklisted = jest.fn().mockResolvedValue(true);
+
+      await expect(service.refreshToken(refreshToken)).rejects.toThrow(
+        UnauthorizedException,
+      );
+      
+      expect(mockSessionService.isTokenBlacklisted).toHaveBeenCalledWith(tokenHash);
+      expect(mockJwtService.verify).not.toHaveBeenCalled();
+    });
+
     it('should throw UnauthorizedException for invalid token', async () => {
+      mockSessionService.isTokenBlacklisted = jest.fn().mockResolvedValue(false);
       mockJwtService.verify.mockImplementation(() => {
         throw new Error('Invalid token');
       });
@@ -318,10 +365,36 @@ describe('AuthService', () => {
       );
     });
 
+    it('should throw UnauthorizedException for expired token', async () => {
+      mockSessionService.isTokenBlacklisted = jest.fn().mockResolvedValue(false);
+      mockJwtService.verify.mockImplementation(() => {
+        const error: any = new Error('Token expired');
+        error.name = 'TokenExpiredError';
+        throw error;
+      });
+
+      await expect(service.refreshToken(refreshToken)).rejects.toThrow(
+        UnauthorizedException,
+      );
+    });
+
     it('should throw UnauthorizedException if user not found', async () => {
-      const payload = { sub: 'nonexistent-id', email: 'test@example.com' };
-      mockJwtService.verifyAsync.mockResolvedValue(payload);
+      const payload = { sub: 'nonexistent-id', email: 'test@example.com', exp: Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60 };
+      mockSessionService.isTokenBlacklisted = jest.fn().mockResolvedValue(false);
+      mockJwtService.verify.mockReturnValue(payload);
       mockUserModel.findById.mockResolvedValue(null);
+
+      await expect(service.refreshToken(refreshToken)).rejects.toThrow(
+        UnauthorizedException,
+      );
+    });
+
+    it('should throw UnauthorizedException if user is inactive', async () => {
+      const payload = { sub: mockUser._id, email: mockUser.email, exp: Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60 };
+      const inactiveUser = { ...mockUser, isActive: false };
+      mockSessionService.isTokenBlacklisted = jest.fn().mockResolvedValue(false);
+      mockJwtService.verify.mockReturnValue(payload);
+      mockUserModel.findById.mockResolvedValue(inactiveUser);
 
       await expect(service.refreshToken(refreshToken)).rejects.toThrow(
         UnauthorizedException,
