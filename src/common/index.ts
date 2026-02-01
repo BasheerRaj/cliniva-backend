@@ -21,3 +21,6 @@ export * from './guards/permissions.guard';
 // Services
 export * from './services/permission-mapping.service';
 export * from './services/role-mapping.service';
+
+// Utils
+export * from './utils/bilingual-message-validator.util';
