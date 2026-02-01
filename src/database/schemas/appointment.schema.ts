@@ -45,6 +45,26 @@ export class Appointment extends Document {
   @Prop()
   cancellationReason?: string;
 
+  // Appointment transfer tracking fields
+  @Prop({ type: Types.ObjectId, ref: 'User' })
+  previousDoctorId?: Types.ObjectId;
+
+  @Prop()
+  transferredAt?: Date;
+
+  @Prop({ type: Types.ObjectId, ref: 'User' })
+  transferredBy?: Types.ObjectId;
+
+  // Rescheduling tracking fields
+  @Prop()
+  reschedulingReason?: string;
+
+  @Prop()
+  markedForReschedulingAt?: Date;
+
+  @Prop({ type: Types.ObjectId, ref: 'User' })
+  markedBy?: Types.ObjectId;
+
   @Prop({ type: Types.ObjectId, ref: 'User', required: true })
   createdBy: Types.ObjectId;
 
@@ -65,3 +85,4 @@ AppointmentSchema.index({ serviceId: 1 });
 AppointmentSchema.index({ status: 1 });
 AppointmentSchema.index({ urgencyLevel: 1 });
 AppointmentSchema.index({ deletedAt: 1 });
+AppointmentSchema.index({ doctorId: 1, status: 1, appointmentDate: 1 }); // Composite index for appointment transfer queries

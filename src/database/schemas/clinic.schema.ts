@@ -148,6 +148,10 @@ export class Clinic extends Document {
 
   @Prop({ default: 30 })
   sessionDuration?: number;
+
+  // Status field for filtering
+  @Prop({ default: true })
+  isActive?: boolean;
 }
 
 export const ClinicSchema = SchemaFactory.createForClass(Clinic);
@@ -167,3 +171,4 @@ ClinicSchema.index({ crNumber: 1 });
 // Compound indexes for clinic lookup within complex
 ClinicSchema.index({ complexId: 1, name: 1 });
 ClinicSchema.index({ complexDepartmentId: 1, name: 1 });
+ClinicSchema.index({ complexId: 1, isActive: 1 }); // Composite index for complex-based filtering

@@ -94,6 +94,13 @@ export class User extends Document {
 
   @Prop({ default: false })
   onboardingComplete: boolean;
+
+  // Deactivation tracking fields
+  @Prop()
+  deactivatedAt?: Date;
+
+  @Prop({ type: Types.ObjectId, ref: 'User' })
+  deactivatedBy?: Types.ObjectId;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);
@@ -103,3 +110,4 @@ UserSchema.index({ role: 1 });
 UserSchema.index({ isActive: 1 });
 UserSchema.index({ emailVerified: 1 });
 UserSchema.index({ phone: 1 });
+UserSchema.index({ isActive: 1, role: 1 }); // Composite index for user management queries
