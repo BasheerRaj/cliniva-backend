@@ -5,6 +5,7 @@ import { AuthController } from '../../../src/auth/auth.controller';
 import { AuthService } from '../../../src/auth/auth.service';
 import { JwtAuthGuard } from '../../../src/auth/guards/jwt-auth.guard';
 import { FirstLoginGuard } from '../../../src/auth/guards/first-login.guard';
+import { RateLimitGuard } from '../../../src/auth/guards/rate-limit.guard';
 import { LoginDto, RegisterDto, RefreshTokenDto } from '../../../src/auth/dto';
 import { UserRole } from '../../../src/common/enums/user-role.enum';
 import { mockAuthService, mockAuthResponse, mockUserProfile } from '../mocks/auth.mocks';
@@ -26,6 +27,8 @@ describe('AuthController', () => {
       .overrideGuard(JwtAuthGuard)
       .useValue({ canActivate: jest.fn(() => true) })
       .overrideGuard(FirstLoginGuard)
+      .useValue({ canActivate: jest.fn(() => true) })
+      .overrideGuard(RateLimitGuard)
       .useValue({ canActivate: jest.fn(() => true) })
       .compile();
 

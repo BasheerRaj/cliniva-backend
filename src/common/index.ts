@@ -13,6 +13,7 @@ export * from './constants/auth-error-messages.constant';
 
 // Decorators
 export * from './decorators/permissions.decorator';
+export * from './decorators/rate-limit.decorator';
 
 // Guards
 export * from './guards/permissions.guard';

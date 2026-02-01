@@ -18,6 +18,8 @@ import {
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { FirstLoginGuard, SkipFirstLoginCheck } from './guards/first-login.guard';
+import { RateLimitGuard } from './guards/rate-limit.guard';
+import { RateLimit, RateLimitType } from '../common/decorators/rate-limit.decorator';
 import {
   LoginDto,
   RegisterDto,
@@ -50,8 +52,13 @@ export class AuthController {
    * Login user
    * 
    * Task 12.1: Extract IP address and user agent for audit logging
+   * Task 21.1: Apply rate limiting (10 attempts per 15 minutes)
+   * 
+   * Requirements: 9.2
    */
   @Post('login')
+  @UseGuards(RateLimitGuard)
+  @RateLimit(RateLimitType.LOGIN_ATTEMPT, 10, 900) // 10 attempts per 15 minutes (900 seconds)
   @HttpCode(HttpStatus.OK)
   async login(
     @Body(new ValidationPipe({ transform: true, whitelist: true }))
@@ -141,15 +148,18 @@ export class AuthController {
    * Change password for authenticated users
    * 
    * Task 15.2: Create POST /auth/change-password endpoint
-   * Requirements: 8.2, 8.6, 8.8
+   * Task 21.1: Apply rate limiting (3 attempts per hour)
+   * Requirements: 8.2, 8.6, 8.8, 9.3
    * 
    * This endpoint allows authenticated users to change their password.
    * It applies both JwtAuthGuard and FirstLoginGuard to ensure:
    * 1. User is authenticated (JwtAuthGuard)
    * 2. User has completed first login password change (FirstLoginGuard)
+   * 3. Rate limiting (3 attempts per hour per user)
    */
   @Post('change-password')
-  @UseGuards(JwtAuthGuard, FirstLoginGuard)
+  @UseGuards(JwtAuthGuard, FirstLoginGuard, RateLimitGuard)
+  @RateLimit(RateLimitType.PASSWORD_CHANGE, 3, 3600) // 3 attempts per hour (3600 seconds)
   @HttpCode(HttpStatus.OK)
   async changePassword(
     @Body(new ValidationPipe({ transform: true, whitelist: true }))
@@ -211,13 +221,17 @@ export class AuthController {
    * Forgot password - Request password reset
    * 
    * Task 15.3: Create POST /auth/forgot-password endpoint
-   * Requirements: 8.3, 8.6, 8.9
+   * Task 21.1: Apply rate limiting (5 requests per hour)
+   * Requirements: 8.3, 8.6, 8.9, 9.1
    * 
    * This is a public endpoint (no guards) that allows users to request a password reset.
    * It extracts the IP address from the request for rate limiting and audit logging.
    * Returns the same response whether the email exists or not for security.
+   * Rate limited to 5 requests per hour per IP address.
    */
   @Post('forgot-password')
+  @UseGuards(RateLimitGuard)
+  @RateLimit(RateLimitType.PASSWORD_RESET, 5, 3600) // 5 requests per hour (3600 seconds)
   @HttpCode(HttpStatus.OK)
   async forgotPassword(
     @Body(new ValidationPipe({ transform: true, whitelist: true }))
