@@ -413,6 +413,134 @@ export class AuthService {
   }
 
   /**
+   * First login password change
+   * 
+   * Requirements: 1.1-1.6, 2.1-2.3
+   * Task: 8.1
+   * 
+   * @param userId - User ID requesting password change
+   * @param currentPassword - Current password for verification
+   * @param newPassword - New password to set
+   * @returns AuthResponse with new tokens and updated user
+   */
+  async firstLoginPasswordChange(
+    userId: string,
+    currentPassword: string,
+    newPassword: string,
+  ): Promise<AuthResponseDto> {
+    try {
+      // Find user
+      const user = await this.userModel.findById(userId);
+      if (!user) {
+        throw new NotFoundException({
+          message: {
+            ar: 'المستخدم غير موجود',
+            en: 'User not found',
+          },
+          code: 'USER_NOT_FOUND',
+        });
+      }
+
+      // Validate current password matches (Requirement 1.3, 2.1)
+      const isCurrentPasswordValid = await this.validatePassword(
+        currentPassword,
+        user.passwordHash,
+      );
+
+      if (!isCurrentPasswordValid) {
+        throw new BadRequestException({
+          message: {
+            ar: 'كلمة المرور الحالية غير صحيحة',
+            en: 'Current password is incorrect',
+          },
+          code: 'INVALID_CURRENT_PASSWORD',
+        });
+      }
+
+      // Validate new password differs from current (Requirement 1.3)
+      const isSamePassword = await this.validatePassword(
+        newPassword,
+        user.passwordHash,
+      );
+
+      if (isSamePassword) {
+        throw new BadRequestException({
+          message: {
+            ar: 'كلمة المرور الجديدة يجب أن تختلف عن الحالية',
+            en: 'New password must differ from current password',
+          },
+          code: 'NEW_PASSWORD_SAME_AS_CURRENT',
+        });
+      }
+
+      // Note: Password complexity validation is handled by DTO validators (Requirement 2.2)
+
+      // Hash new password with bcrypt (12 rounds)
+      const hashedPassword = await this.hashPassword(newPassword);
+
+      // Update user: password, isFirstLogin=false, lastPasswordChange=now (Requirement 1.4)
+      user.passwordHash = hashedPassword;
+      user.isFirstLogin = false;
+      user.lastPasswordChange = new Date();
+      await user.save();
+
+      this.logger.log(`First login password changed for user ${userId}`);
+
+      // Generate new access and refresh tokens (Requirement 1.5)
+      const tokens = await this.generateTokens(user);
+
+      // Call SessionService to invalidate old sessions
+      await this.sessionService.invalidateUserSessions(
+        userId,
+        'first_login_password_change',
+      );
+
+      // Call AuditService to log password change
+      await this.auditService.logPasswordChange(
+        userId,
+        'first_login',
+      );
+
+      // Return new tokens and updated user (Requirement 1.5)
+      return {
+        ...tokens,
+        user: {
+          id: userId,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          role: user.role,
+          isActive: user.isActive,
+          emailVerified: user.emailVerified,
+          // Authentication fields
+          isFirstLogin: user.isFirstLogin, // Now false
+          passwordChangeRequired: false,
+          preferredLanguage: user.preferredLanguage,
+          isOwner: user.role === 'owner',
+        },
+      };
+    } catch (error) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof BadRequestException
+      ) {
+        throw error;
+      }
+      this.logger.error(
+        `First login password change failed for user ${userId}: ${error.message}`,
+        error.stack,
+      );
+      throw new BadRequestException({
+        message: {
+          ar: 'فشل تغيير كلمة المرور',
+          en: 'Password change failed',
+        },
+        code: 'PASSWORD_CHANGE_FAILED',
+      });
+    }
+  }
+
+  /**
    * Change password for authenticated user
    * 
    * Requirements: 2.1-2.4, 9.3

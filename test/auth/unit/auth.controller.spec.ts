@@ -129,6 +129,70 @@ describe('AuthController', () => {
       expect(result).toEqual({ message: 'Successfully logged out' });
     });
   });
+
+  describe('firstLoginPasswordChange', () => {
+    const firstLoginPasswordChangeDto = {
+      currentPassword: 'OldPass123!',
+      newPassword: 'NewPass123!',
+      confirmPassword: 'NewPass123!',
+    };
+
+    const mockRequest = {
+      user: { 
+        userId: 'user-id',
+        sub: 'user-id',
+      },
+    };
+
+    beforeEach(() => {
+      mockAuthService.firstLoginPasswordChange = jest.fn().mockResolvedValue(mockAuthResponse);
+    });
+
+    it('should change password on first login', async () => {
+      const result = await controller.firstLoginPasswordChange(
+        firstLoginPasswordChangeDto,
+        mockRequest,
+      );
+      
+      expect(authService.firstLoginPasswordChange).toHaveBeenCalledWith(
+        'user-id',
+        'OldPass123!',
+        'NewPass123!',
+      );
+      expect(result).toEqual(mockAuthResponse);
+    });
+
+    it('should throw error if passwords do not match', async () => {
+      const mismatchDto = {
+        ...firstLoginPasswordChangeDto,
+        confirmPassword: 'DifferentPass123!',
+      };
+
+      await expect(
+        controller.firstLoginPasswordChange(mismatchDto, mockRequest),
+      ).rejects.toThrow();
+    });
+
+    it('should throw error if user ID not found', async () => {
+      const requestWithoutUser = {
+        user: {},
+      };
+
+      await expect(
+        controller.firstLoginPasswordChange(firstLoginPasswordChangeDto, requestWithoutUser),
+      ).rejects.toThrow();
+    });
+
+    it('should handle service errors with bilingual messages', async () => {
+      mockAuthService.firstLoginPasswordChange.mockRejectedValueOnce(
+        new Error('Service error'),
+      );
+
+      await expect(
+        controller.firstLoginPasswordChange(firstLoginPasswordChangeDto, mockRequest),
+      ).rejects.toThrow();
+    });
+  });
 });
 
 
