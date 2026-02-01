@@ -185,23 +185,12 @@ export class UserService {
     adminId?: string,
   ): Promise<User> {
     try {
-      // Validate userId format
-      if (!Types.ObjectId.isValid(userId)) {
-        throw new BadRequestException({
-          message: ERROR_MESSAGES.INVALID_ID_FORMAT,
-          code: 'INVALID_ID_FORMAT',
-          details: { userId },
-        });
-      }
-
-      // Get current user data
-      const currentUser = await this.userModel.findById(userId).exec();
-      if (!currentUser) {
-        throw new NotFoundException({
-          message: ERROR_MESSAGES.USER_NOT_FOUND,
-          code: 'USER_NOT_FOUND',
-        });
-      }
+      // Use ValidationUtil for consistent validation
+      const currentUser = await ValidationUtil.validateEntityExists(
+        this.userModel,
+        userId,
+        ERROR_MESSAGES.USER_NOT_FOUND,
+      );
 
       // Track what changed for session invalidation
       const emailChanged =

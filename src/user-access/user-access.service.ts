@@ -20,6 +20,7 @@ import {
   DefaultRolePermissions,
 } from '../common/enums/permissions.enum';
 import { ERROR_MESSAGES } from '../common/utils/error-messages.constant';
+import { ValidationUtil } from '../common/utils/validation.util';
 import {
   CreateUserAccessDto,
   UpdateUserAccessDto,
@@ -63,14 +64,12 @@ export class UserAccessService {
   ): Promise<UserAccess> {
     this.logger.log(`Creating user access for user: ${createAccessDto.userId}`);
 
-    // Validate user exists
-    const user = await this.userModel.findById(createAccessDto.userId);
-    if (!user) {
-      throw new NotFoundException({
-        message: ERROR_MESSAGES.USER_NOT_FOUND,
-        code: 'USER_NOT_FOUND',
-      });
-    }
+    // Use ValidationUtil for consistent validation
+    const user = await ValidationUtil.validateEntityExists(
+      this.userModel,
+      createAccessDto.userId,
+      ERROR_MESSAGES.USER_NOT_FOUND,
+    );
 
     // Validate scope entity exists
     await this.validateScopeEntity(
@@ -230,25 +229,18 @@ export class UserAccessService {
    * Get user access by ID
    */
   async getUserAccessById(accessId: string): Promise<UserAccess> {
-    if (!Types.ObjectId.isValid(accessId)) {
-      throw new BadRequestException({
-        message: ERROR_MESSAGES.INVALID_ID_FORMAT,
-        code: 'INVALID_ID_FORMAT',
-      });
-    }
+    // Use ValidationUtil for consistent validation
+    const userAccess = await ValidationUtil.validateEntityExists(
+      this.userAccessModel,
+      accessId,
+      ERROR_MESSAGES.USER_ACCESS_NOT_FOUND,
+    );
 
-    const userAccess = await this.userAccessModel
-      .findById(accessId)
-      .populate('userId', 'firstName lastName email role')
-      .populate('grantedBy', 'firstName lastName')
-      .exec();
-
-    if (!userAccess) {
-      throw new NotFoundException({
-        message: ERROR_MESSAGES.USER_ACCESS_NOT_FOUND,
-        code: 'USER_ACCESS_NOT_FOUND',
-      });
-    }
+    // Populate related fields
+    await userAccess.populate([
+      { path: 'userId', select: 'firstName lastName email role' },
+      { path: 'grantedBy', select: 'firstName lastName' },
+    ]);
 
     return userAccess;
   }
@@ -261,12 +253,8 @@ export class UserAccessService {
     updateAccessDto: UpdateUserAccessDto,
     updatedByUserId?: string,
   ): Promise<UserAccess> {
-    if (!Types.ObjectId.isValid(accessId)) {
-      throw new BadRequestException({
-        message: ERROR_MESSAGES.INVALID_ID_FORMAT,
-        code: 'INVALID_ID_FORMAT',
-      });
-    }
+    // Use ValidationUtil for consistent validation
+    ValidationUtil.validateObjectId(accessId, ERROR_MESSAGES.USER_ACCESS_NOT_FOUND);
 
     this.logger.log(`Updating user access: ${accessId}`);
 
@@ -317,22 +305,14 @@ export class UserAccessService {
     accessId: string,
     deletedByUserId?: string,
   ): Promise<void> {
-    if (!Types.ObjectId.isValid(accessId)) {
-      throw new BadRequestException({
-        message: ERROR_MESSAGES.INVALID_ID_FORMAT,
-        code: 'INVALID_ID_FORMAT',
-      });
-    }
+    // Use ValidationUtil for consistent validation
+    const userAccess = await ValidationUtil.validateEntityExists(
+      this.userAccessModel,
+      accessId,
+      ERROR_MESSAGES.USER_ACCESS_NOT_FOUND,
+    );
 
     this.logger.log(`Deleting user access: ${accessId}`);
-
-    const userAccess = await this.userAccessModel.findById(accessId);
-    if (!userAccess) {
-      throw new NotFoundException({
-        message: ERROR_MESSAGES.USER_ACCESS_NOT_FOUND,
-        code: 'USER_ACCESS_NOT_FOUND',
-      });
-    }
 
     await this.userAccessModel.findByIdAndDelete(accessId);
 
