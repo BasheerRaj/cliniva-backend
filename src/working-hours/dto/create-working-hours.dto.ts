@@ -44,7 +44,7 @@ export class WorkingHourDto {
 
 export class CreateWorkingHoursDto {
   @IsString()
-  @IsEnum(['organization', 'complex', 'clinic'])
+  @IsEnum(['organization', 'complex', 'clinic', 'user'])
   entityType: string;
 
   @IsString()

@@ -8,7 +8,7 @@ import { Document, Types } from 'mongoose';
 export class WorkingHours extends Document {
   @Prop({
     required: true,
-    enum: ['organization', 'complex', 'clinic'],
+    enum: ['organization', 'complex', 'clinic', 'user'],
   })
   entityType: string;
 

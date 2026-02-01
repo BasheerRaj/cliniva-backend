@@ -150,7 +150,7 @@ export class RealTimeValidationDto {
 
   @IsString()
   @IsOptional()
-  entityType?: 'organization' | 'complex' | 'clinic'; // Entity context
+  entityType?: 'organization' | 'complex' | 'clinic' | 'user'; // Entity context
 
   @IsString()
   @IsOptional()

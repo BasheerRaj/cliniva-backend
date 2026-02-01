@@ -28,7 +28,7 @@ export class ContactDto {
 
 export class WorkingHoursDto {
   @IsString()
-  @IsEnum(['organization', 'complex', 'clinic'])
+  @IsEnum(['organization', 'complex', 'clinic', 'user'])
   @IsOptional()
   entityType?: string; // Which entity this schedule belongs to
 
