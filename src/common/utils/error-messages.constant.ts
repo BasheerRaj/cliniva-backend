@@ -447,6 +447,46 @@ export const ERROR_MESSAGES = {
   } as BilingualMessage,
 
   // ============================================================================
+  // Working Hours Errors
+  // ============================================================================
+
+  /**
+   * Error when child entity working hours are outside parent entity hours.
+   * Business Rule: BZR-f1c0a9e4, BZR-u5a0f7d3, BZR-42
+   */
+  WORKING_HOURS_OUTSIDE_PARENT: {
+    ar: 'ساعات العمل يجب أن تكون ضمن ساعات {parentEntity}',
+    en: 'Working hours must be within {parentEntity} hours',
+  } as BilingualMessage,
+
+  /**
+   * Error when child entity is open while parent entity is closed.
+   * Business Rule: BZR-f1c0a9e4, BZR-u5a0f7d3, BZR-42
+   */
+  CHILD_OPEN_PARENT_CLOSED: {
+    ar: 'لا يمكن فتح {childEntity} عندما يكون {parentEntity} مغلقاً',
+    en: 'Cannot open {childEntity} when {parentEntity} is closed',
+  } as BilingualMessage,
+
+  /**
+   * Error when appointment conflicts are detected during working hours update.
+   * Business Rule: BZR-l9e0f1c4, BZR-43
+   */
+  APPOINTMENT_CONFLICTS_DETECTED: {
+    ar: 'تم اكتشاف {count} موعد متعارض',
+    en: '{count} conflicting appointments detected',
+  } as BilingualMessage,
+
+  /**
+   * Error when appointment rescheduling operation fails.
+   * Business Rule: BZR-l9e0f1c4, BZR-43
+   */
+  RESCHEDULING_FAILED: {
+    ar: 'فشلت عملية إعادة الجدولة',
+    en: 'Rescheduling operation failed',
+  } as BilingualMessage,
+
+  // ============================================================================
   // Authorization Errors
   // ============================================================================
 

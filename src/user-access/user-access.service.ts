@@ -254,7 +254,10 @@ export class UserAccessService {
     updatedByUserId?: string,
   ): Promise<UserAccess> {
     // Use ValidationUtil for consistent validation
-    ValidationUtil.validateObjectId(accessId, ERROR_MESSAGES.USER_ACCESS_NOT_FOUND);
+    ValidationUtil.validateObjectId(
+      accessId,
+      ERROR_MESSAGES.USER_ACCESS_NOT_FOUND,
+    );
 
     this.logger.log(`Updating user access: ${accessId}`);
 

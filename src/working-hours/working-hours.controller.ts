@@ -9,16 +9,26 @@ import {
   HttpStatus,
   HttpCode,
 } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBody } from '@nestjs/swagger';
 import { WorkingHoursService } from './working-hours.service';
+import { WorkingHoursValidationService } from './services/working-hours-validation.service';
 import {
   CreateWorkingHoursDto,
   UpdateWorkingHoursDto,
 } from './dto/create-working-hours.dto';
+import {
+  ValidateWorkingHoursDto,
+  ValidateWorkingHoursResponse,
+} from './dto/validate-working-hours.dto';
 import { WorkingHours } from '../database/schemas/working-hours.schema';
 
+@ApiTags('Working Hours')
 @Controller('working-hours')
 export class WorkingHoursController {
-  constructor(private readonly workingHoursService: WorkingHoursService) {}
+  constructor(
+    private readonly workingHoursService: WorkingHoursService,
+    private readonly validationService: WorkingHoursValidationService,
+  ) {}
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
@@ -74,6 +84,176 @@ export class WorkingHoursController {
         success: false,
         message: 'Failed to validate clinic hours',
         error: error.message,
+      };
+    }
+  }
+
+  /**
+   * Validate working hours against parent entity hours
+   *
+   * This endpoint validates child entity working hours against parent entity
+   * constraints according to business rules:
+   * - BZR-f1c0a9e4: Hierarchical validation (complex→clinic, clinic→user)
+   * - BZR-u5a0f7d3: Child hours must be within parent hours
+   * - BZR-42: Child cannot be open when parent is closed
+   *
+   * @param {ValidateWorkingHoursDto} validateDto - Validation request data
+   * @returns {Promise<ValidateWorkingHoursResponse>} Validation result with errors and suggestions
+   *
+   * @example
+   * POST /working-hours/validate
+   * {
+   *   "entityType": "user",
+   *   "entityId": "507f1f77bcf86cd799439011",
+   *   "parentEntityType": "clinic",
+   *   "parentEntityId": "507f1f77bcf86cd799439012",
+   *   "schedule": [
+   *     {
+   *       "dayOfWeek": "monday",
+   *       "isWorkingDay": true,
+   *       "openingTime": "09:00",
+   *       "closingTime": "17:00"
+   *     }
+   *   ]
+   * }
+   */
+  @Post('validate')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Validate working hours against parent entity',
+    description:
+      'Validates child entity working hours against parent entity constraints. ' +
+      'Ensures child hours are within parent hours and child is not open when parent is closed. ' +
+      'Returns validation errors with suggested time ranges.',
+  })
+  @ApiBody({
+    type: ValidateWorkingHoursDto,
+    description: 'Working hours validation request',
+    examples: {
+      'user-clinic': {
+        summary: 'Validate user hours against clinic',
+        value: {
+          entityType: 'user',
+          entityId: '507f1f77bcf86cd799439011',
+          parentEntityType: 'clinic',
+          parentEntityId: '507f1f77bcf86cd799439012',
+          schedule: [
+            {
+              dayOfWeek: 'monday',
+              isWorkingDay: true,
+              openingTime: '09:00',
+              closingTime: '17:00',
+            },
+            {
+              dayOfWeek: 'tuesday',
+              isWorkingDay: true,
+              openingTime: '09:00',
+              closingTime: '17:00',
+            },
+            {
+              dayOfWeek: 'wednesday',
+              isWorkingDay: false,
+            },
+          ],
+        },
+      },
+      'clinic-complex': {
+        summary: 'Validate clinic hours against complex',
+        value: {
+          entityType: 'clinic',
+          entityId: '507f1f77bcf86cd799439013',
+          parentEntityType: 'complex',
+          parentEntityId: '507f1f77bcf86cd799439014',
+          schedule: [
+            {
+              dayOfWeek: 'monday',
+              isWorkingDay: true,
+              openingTime: '08:00',
+              closingTime: '16:00',
+            },
+          ],
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Validation completed successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: true },
+        data: {
+          type: 'object',
+          properties: {
+            isValid: { type: 'boolean', example: false },
+            errors: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  dayOfWeek: { type: 'string', example: 'monday' },
+                  message: {
+                    type: 'object',
+                    properties: {
+                      ar: { type: 'string', example: 'رسالة الخطأ بالعربية' },
+                      en: { type: 'string', example: 'Error message in English' },
+                    },
+                  },
+                  suggestedRange: {
+                    type: 'object',
+                    properties: {
+                      openingTime: { type: 'string', example: '08:00' },
+                      closingTime: { type: 'string', example: '17:00' },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid request data',
+  })
+  async validateWorkingHours(
+    @Body() validateDto: ValidateWorkingHoursDto,
+  ): Promise<ValidateWorkingHoursResponse> {
+    try {
+      // Perform hierarchical validation using the validation service
+      const validationResult = await this.validationService.validateHierarchical(
+        validateDto.schedule,
+        validateDto.parentEntityType,
+        validateDto.parentEntityId,
+        `${validateDto.entityType} ${validateDto.entityId}`,
+      );
+
+      return {
+        success: true,
+        data: {
+          isValid: validationResult.isValid,
+          errors: validationResult.errors,
+        },
+      };
+    } catch (error) {
+      // Return error in standard format
+      return {
+        success: false,
+        data: {
+          isValid: false,
+          errors: [
+            {
+              dayOfWeek: 'general',
+              message: {
+                ar: 'فشل التحقق من صحة ساعات العمل',
+                en: 'Failed to validate working hours',
+              },
+            },
+          ],
+        },
       };
     }
   }

@@ -1,7 +1,10 @@
 import 'reflect-metadata';
 import { validate } from 'class-validator';
 import { plainToClass } from 'class-transformer';
-import { CreateWorkingHoursDto, WorkingHourDto } from './create-working-hours.dto';
+import {
+  CreateWorkingHoursDto,
+  WorkingHourDto,
+} from './create-working-hours.dto';
 
 describe('CreateWorkingHoursDto', () => {
   describe('entityType validation', () => {
