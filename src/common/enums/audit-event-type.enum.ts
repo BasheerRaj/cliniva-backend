@@ -11,4 +11,18 @@ export enum AuditEventType {
   ROLE_CHANGE = 'role_change',
   TOKEN_REFRESH = 'token_refresh',
   UNAUTHORIZED_ACCESS = 'unauthorized_access',
+  // User Management Events
+  USER_STATUS_CHANGE = 'user_status_change',
+  USER_CREATED = 'user_created',
+  USER_UPDATED = 'user_updated',
+  USER_DELETED = 'user_deleted',
+  // Employee Management Events
+  EMPLOYEE_CREATED = 'employee_created',
+  EMPLOYEE_UPDATED = 'employee_updated',
+  EMPLOYEE_DELETED = 'employee_deleted',
+  EMPLOYEE_TERMINATED = 'employee_terminated',
+  // Doctor Management Events
+  DOCTOR_DEACTIVATED = 'doctor_deactivated',
+  APPOINTMENTS_TRANSFERRED = 'appointments_transferred',
+  APPOINTMENTS_RESCHEDULED = 'appointments_rescheduled',
 }

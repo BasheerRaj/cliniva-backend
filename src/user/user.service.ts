@@ -357,13 +357,24 @@ export class UserService {
         this.logger.log(`User ${userId} deactivated and sessions invalidated`);
       }
 
-      // Create audit log entry
-      await this.auditService.logSessionInvalidation(
+      // Create audit log entry for status change
+      await this.auditService.logUserStatusChange(
         userId,
-        updateUserStatusDto.isActive ? 'user_activated' : 'user_deactivated',
-        0, // Token count not tracked in stateless JWT
+        updateUserStatusDto.isActive,
         currentUserId,
+        ipAddress,
+        userAgent,
       );
+
+      // Also log session invalidation if deactivating (for backward compatibility)
+      if (!updateUserStatusDto.isActive) {
+        await this.auditService.logSessionInvalidation(
+          userId,
+          'user_deactivated',
+          0, // Token count not tracked in stateless JWT
+          currentUserId,
+        );
+      }
 
       this.logger.log(
         `User ${userId} status updated: ${previousStatus} -> ${updateUserStatusDto.isActive}`,
@@ -525,7 +536,32 @@ export class UserService {
         currentUserId,
       );
 
-      // Audit log
+      // Audit log for doctor deactivation with transfer details
+      await this.auditService.logDoctorDeactivated(
+        doctorId,
+        currentUserId,
+        ipAddress,
+        userAgent,
+        {
+          appointmentsTransferred: transferredCount,
+          appointmentsRescheduled: rescheduledCount,
+          targetDoctorId: transferData.targetDoctorId,
+        },
+      );
+
+      // Log appointment transfer if any appointments were transferred
+      if (transferredCount > 0 && transferData.targetDoctorId) {
+        await this.auditService.logAppointmentsTransferred(
+          doctorId,
+          transferData.targetDoctorId,
+          transferredCount,
+          currentUserId,
+          ipAddress,
+          userAgent,
+        );
+      }
+
+      // Also log session invalidation (for backward compatibility)
       await this.auditService.logSessionInvalidation(
         doctorId,
         'doctor_deactivated_with_transfer',

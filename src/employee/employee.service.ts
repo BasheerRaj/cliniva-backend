@@ -34,6 +34,7 @@ import {
 import { ValidationUtil } from '../common/utils/validation.util';
 import { ResponseBuilder } from '../common/utils/response-builder.util';
 import { ERROR_MESSAGES } from '../common/utils/error-messages.constant';
+import { AuditService } from '../auth/audit.service';
 
 @Injectable()
 export class EmployeeService {
@@ -51,6 +52,7 @@ export class EmployeeService {
     private readonly organizationModel: Model<Organization>,
     @InjectModel('Complex') private readonly complexModel: Model<Complex>,
     @InjectModel('Clinic') private readonly clinicModel: Model<Clinic>,
+    private readonly auditService: AuditService,
   ) {}
 
   /**
@@ -424,6 +426,22 @@ export class EmployeeService {
     const employeeProfile = new this.employeeProfileModel(profileData);
     const savedProfile = await employeeProfile.save();
 
+    // Audit log for employee creation
+    if (createdByUserId) {
+      await this.auditService.logEmployeeCreated(
+        (savedUser._id as Types.ObjectId).toString(),
+        createdByUserId,
+        '0.0.0.0', // IP address should be passed from controller
+        undefined, // User agent should be passed from controller
+        {
+          email: savedUser.email,
+          role: savedUser.role,
+          employeeNumber,
+          jobTitle: createEmployeeDto.jobTitle,
+        },
+      );
+    }
+
     this.logger.log(
       `Employee created successfully: ${savedUser.email} (ID: ${savedUser._id})`,
     );
@@ -776,6 +794,20 @@ export class EmployeeService {
       );
     }
 
+    // Audit log for employee update
+    if (updatedByUserId) {
+      await this.auditService.logEmployeeUpdated(
+        employeeId,
+        updatedByUserId,
+        '0.0.0.0', // IP address should be passed from controller
+        undefined, // User agent should be passed from controller
+        {
+          userUpdates: Object.keys(userUpdates),
+          profileUpdates: Object.keys(profileUpdates),
+        },
+      );
+    }
+
     this.logger.log(`Employee updated successfully: ${employeeId}`);
 
     // Get updated employee data
@@ -851,6 +883,16 @@ export class EmployeeService {
       },
     );
 
+    // Audit log for employee deletion
+    if (deletedByUserId) {
+      await this.auditService.logEmployeeDeleted(
+        employeeId,
+        deletedByUserId,
+        '0.0.0.0', // IP address should be passed from controller
+        undefined, // User agent should be passed from controller
+      );
+    }
+
     this.logger.log(`Employee soft deleted successfully: ${employeeId}`);
 
     // Return standardized response using ResponseBuilder
@@ -918,6 +960,21 @@ export class EmployeeService {
         },
       },
     );
+
+    // Audit log for employee termination
+    if (terminatedByUserId) {
+      await this.auditService.logEmployeeTerminated(
+        employeeId,
+        terminatedByUserId,
+        '0.0.0.0', // IP address should be passed from controller
+        undefined, // User agent should be passed from controller
+        {
+          terminationType: terminateDto.terminationType,
+          terminationDate: terminationDate,
+          reason: terminateDto.reason,
+        },
+      );
+    }
 
     this.logger.log(`Employee terminated successfully: ${employeeId}`);
 

@@ -70,6 +70,9 @@ describe('UserService - Session Invalidation Hooks', () => {
 
     mockAuditService = {
       logSessionInvalidation: jest.fn().mockResolvedValue(undefined),
+      logUserStatusChange: jest.fn().mockResolvedValue(undefined),
+      logDoctorDeactivated: jest.fn().mockResolvedValue(undefined),
+      logAppointmentsTransferred: jest.fn().mockResolvedValue(undefined),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -561,12 +564,15 @@ describe('UserService - Session Invalidation Hooks', () => {
       expect(result.success).toBe(true);
       expect(result.data).toBeDefined();
       expect(mockSessionService.invalidateUserSessions).not.toHaveBeenCalled();
-      expect(mockAuditService.logSessionInvalidation).toHaveBeenCalledWith(
+      expect(mockAuditService.logUserStatusChange).toHaveBeenCalledWith(
         userId,
-        'user_activated',
-        0,
+        true,
         currentUserId,
+        ipAddress,
+        userAgent,
       );
+      // Should not log session invalidation for activation
+      expect(mockAuditService.logSessionInvalidation).not.toHaveBeenCalled();
     });
 
     it('should successfully deactivate user and invalidate sessions', async () => {

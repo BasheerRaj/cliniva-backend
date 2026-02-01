@@ -295,4 +295,268 @@ export class AuditService {
       throw error;
     }
   }
+
+  /**
+   * Log user status change event
+   * @param userId - User ID whose status was changed
+   * @param isActive - New status (true = activated, false = deactivated)
+   * @param changedBy - User ID who made the change
+   * @param ipAddress - IP address of the request
+   * @param userAgent - User agent string from the request
+   */
+  async logUserStatusChange(
+    userId: string,
+    isActive: boolean,
+    changedBy: string,
+    ipAddress: string,
+    userAgent?: string,
+  ): Promise<void> {
+    try {
+      await this.auditLogModel.create({
+        eventType: AuditEventType.USER_STATUS_CHANGE,
+        userId: new Types.ObjectId(userId),
+        adminId: new Types.ObjectId(changedBy),
+        ipAddress,
+        userAgent,
+        timestamp: new Date(),
+        success: true,
+        details: {
+          action: isActive ? 'User activated' : 'User deactivated',
+          newStatus: isActive,
+        },
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to log user status change for user ${userId}`,
+        error,
+      );
+    }
+  }
+
+  /**
+   * Log employee creation event
+   * @param employeeId - Employee ID that was created
+   * @param createdBy - User ID who created the employee
+   * @param ipAddress - IP address of the request
+   * @param userAgent - User agent string from the request
+   * @param details - Additional details about the employee
+   */
+  async logEmployeeCreated(
+    employeeId: string,
+    createdBy: string,
+    ipAddress: string,
+    userAgent?: string,
+    details?: any,
+  ): Promise<void> {
+    try {
+      await this.auditLogModel.create({
+        eventType: AuditEventType.EMPLOYEE_CREATED,
+        userId: new Types.ObjectId(employeeId),
+        adminId: new Types.ObjectId(createdBy),
+        ipAddress,
+        userAgent,
+        timestamp: new Date(),
+        success: true,
+        details: {
+          action: 'Employee created',
+          ...details,
+        },
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to log employee creation for ${employeeId}`,
+        error,
+      );
+    }
+  }
+
+  /**
+   * Log employee update event
+   * @param employeeId - Employee ID that was updated
+   * @param updatedBy - User ID who updated the employee
+   * @param ipAddress - IP address of the request
+   * @param userAgent - User agent string from the request
+   * @param changes - Fields that were changed
+   */
+  async logEmployeeUpdated(
+    employeeId: string,
+    updatedBy: string,
+    ipAddress: string,
+    userAgent?: string,
+    changes?: any,
+  ): Promise<void> {
+    try {
+      await this.auditLogModel.create({
+        eventType: AuditEventType.EMPLOYEE_UPDATED,
+        userId: new Types.ObjectId(employeeId),
+        adminId: new Types.ObjectId(updatedBy),
+        ipAddress,
+        userAgent,
+        timestamp: new Date(),
+        success: true,
+        details: {
+          action: 'Employee updated',
+          changes,
+        },
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to log employee update for ${employeeId}`,
+        error,
+      );
+    }
+  }
+
+  /**
+   * Log employee deletion event
+   * @param employeeId - Employee ID that was deleted
+   * @param deletedBy - User ID who deleted the employee
+   * @param ipAddress - IP address of the request
+   * @param userAgent - User agent string from the request
+   */
+  async logEmployeeDeleted(
+    employeeId: string,
+    deletedBy: string,
+    ipAddress: string,
+    userAgent?: string,
+  ): Promise<void> {
+    try {
+      await this.auditLogModel.create({
+        eventType: AuditEventType.EMPLOYEE_DELETED,
+        userId: new Types.ObjectId(employeeId),
+        adminId: new Types.ObjectId(deletedBy),
+        ipAddress,
+        userAgent,
+        timestamp: new Date(),
+        success: true,
+        details: {
+          action: 'Employee deleted (soft delete)',
+        },
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to log employee deletion for ${employeeId}`,
+        error,
+      );
+    }
+  }
+
+  /**
+   * Log employee termination event
+   * @param employeeId - Employee ID that was terminated
+   * @param terminatedBy - User ID who terminated the employee
+   * @param ipAddress - IP address of the request
+   * @param userAgent - User agent string from the request
+   * @param terminationDetails - Details about the termination
+   */
+  async logEmployeeTerminated(
+    employeeId: string,
+    terminatedBy: string,
+    ipAddress: string,
+    userAgent?: string,
+    terminationDetails?: any,
+  ): Promise<void> {
+    try {
+      await this.auditLogModel.create({
+        eventType: AuditEventType.EMPLOYEE_TERMINATED,
+        userId: new Types.ObjectId(employeeId),
+        adminId: new Types.ObjectId(terminatedBy),
+        ipAddress,
+        userAgent,
+        timestamp: new Date(),
+        success: true,
+        details: {
+          action: 'Employee terminated',
+          ...terminationDetails,
+        },
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to log employee termination for ${employeeId}`,
+        error,
+      );
+    }
+  }
+
+  /**
+   * Log doctor deactivation with appointment transfer
+   * @param doctorId - Doctor ID that was deactivated
+   * @param deactivatedBy - User ID who deactivated the doctor
+   * @param ipAddress - IP address of the request
+   * @param userAgent - User agent string from the request
+   * @param transferDetails - Details about appointment transfers
+   */
+  async logDoctorDeactivated(
+    doctorId: string,
+    deactivatedBy: string,
+    ipAddress: string,
+    userAgent?: string,
+    transferDetails?: {
+      appointmentsTransferred?: number;
+      appointmentsRescheduled?: number;
+      targetDoctorId?: string;
+    },
+  ): Promise<void> {
+    try {
+      await this.auditLogModel.create({
+        eventType: AuditEventType.DOCTOR_DEACTIVATED,
+        userId: new Types.ObjectId(doctorId),
+        adminId: new Types.ObjectId(deactivatedBy),
+        ipAddress,
+        userAgent,
+        timestamp: new Date(),
+        success: true,
+        details: {
+          action: 'Doctor deactivated with appointment handling',
+          ...transferDetails,
+        },
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to log doctor deactivation for ${doctorId}`,
+        error,
+      );
+    }
+  }
+
+  /**
+   * Log appointment transfer event
+   * @param fromDoctorId - Doctor ID appointments were transferred from
+   * @param toDoctorId - Doctor ID appointments were transferred to
+   * @param appointmentCount - Number of appointments transferred
+   * @param transferredBy - User ID who initiated the transfer
+   * @param ipAddress - IP address of the request
+   * @param userAgent - User agent string from the request
+   */
+  async logAppointmentsTransferred(
+    fromDoctorId: string,
+    toDoctorId: string,
+    appointmentCount: number,
+    transferredBy: string,
+    ipAddress: string,
+    userAgent?: string,
+  ): Promise<void> {
+    try {
+      await this.auditLogModel.create({
+        eventType: AuditEventType.APPOINTMENTS_TRANSFERRED,
+        userId: new Types.ObjectId(fromDoctorId),
+        adminId: new Types.ObjectId(transferredBy),
+        ipAddress,
+        userAgent,
+        timestamp: new Date(),
+        success: true,
+        details: {
+          action: 'Appointments transferred to another doctor',
+          fromDoctorId,
+          toDoctorId,
+          appointmentCount,
+        },
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to log appointment transfer from ${fromDoctorId} to ${toDoctorId}`,
+        error,
+      );
+    }
+  }
 }
