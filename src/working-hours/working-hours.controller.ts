@@ -14,6 +14,7 @@ import { WorkingHoursService } from './working-hours.service';
 import { WorkingHoursValidationService } from './services/working-hours-validation.service';
 import { WorkingHoursSuggestionService } from './services/working-hours-suggestion.service';
 import { AppointmentConflictService } from './services/appointment-conflict.service';
+import { WorkingHoursReschedulingService } from './services/working-hours-rescheduling.service';
 import {
   CreateWorkingHoursDto,
   UpdateWorkingHoursDto,
@@ -30,6 +31,10 @@ import {
   CheckConflictsDto,
   CheckConflictsResponse,
 } from './dto/check-conflicts.dto';
+import {
+  UpdateWithReschedulingDto,
+  UpdateWithReschedulingResponse,
+} from './dto/update-with-rescheduling.dto';
 import { WorkingHours } from '../database/schemas/working-hours.schema';
 
 @ApiTags('Working Hours')
@@ -40,6 +45,7 @@ export class WorkingHoursController {
     private readonly validationService: WorkingHoursValidationService,
     private readonly suggestionService: WorkingHoursSuggestionService,
     private readonly conflictService: AppointmentConflictService,
+    private readonly reschedulingService: WorkingHoursReschedulingService,
   ) {}
 
   @Post()
@@ -661,6 +667,411 @@ export class WorkingHoursController {
         message: {
           ar: 'فشل التحقق من تعارض المواعيد',
           en: 'Failed to check appointment conflicts',
+        },
+      };
+    }
+  }
+
+  /**
+   * Update working hours with automatic appointment rescheduling
+   *
+   * This endpoint updates working hours and automatically handles conflicting
+   * appointments according to the specified strategy. It uses transactions to
+   * ensure data consistency and provides rollback capability on failure.
+   *
+   * Business Rules:
+   * - BZR-l9e0f1c4: Reschedule appointments after modification date
+   * - BZR-43: Only reschedule appointments on modified days
+   * - Mark appointments as "needs_rescheduling" until staff confirms
+   * - Send notifications to affected patients
+   * - Log all rescheduling actions for audit
+   *
+   * @param {string} entityType - Entity type (user for doctors)
+   * @param {string} entityId - Entity ID (user ID for doctors)
+   * @param {UpdateWithReschedulingDto} updateDto - Update request with rescheduling options
+   * @returns {Promise<UpdateWithReschedulingResponse>} Update result with rescheduling summary
+   *
+   * @example
+   * PUT /working-hours/user/507f1f77bcf86cd799439011/with-rescheduling
+   * {
+   *   "schedule": [
+   *     {
+   *       "dayOfWeek": "monday",
+   *       "isWorkingDay": true,
+   *       "openingTime": "09:00",
+   *       "closingTime": "17:00"
+   *     },
+   *     {
+   *       "dayOfWeek": "tuesday",
+   *       "isWorkingDay": false
+   *     }
+   *   ],
+   *   "handleConflicts": "reschedule",
+   *   "notifyPatients": true,
+   *   "reschedulingReason": "Doctor schedule change"
+   * }
+   */
+  @Put(':entityType/:entityId/with-rescheduling')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Update working hours with appointment rescheduling',
+    description:
+      'Updates working hours and automatically handles conflicting appointments. ' +
+      'Supports three strategies: reschedule (automatic), notify (mark for manual rescheduling), or cancel. ' +
+      'Uses transactions to ensure data consistency with rollback on failure. ' +
+      'Sends notifications to affected patients and logs all actions for audit.',
+  })
+  @ApiBody({
+    type: UpdateWithReschedulingDto,
+    description: 'Update request with schedule and rescheduling options',
+    examples: {
+      'reschedule-strategy': {
+        summary: 'Update with automatic rescheduling',
+        value: {
+          schedule: [
+            {
+              dayOfWeek: 'monday',
+              isWorkingDay: true,
+              openingTime: '09:00',
+              closingTime: '17:00',
+            },
+            {
+              dayOfWeek: 'tuesday',
+              isWorkingDay: true,
+              openingTime: '09:00',
+              closingTime: '17:00',
+            },
+            {
+              dayOfWeek: 'wednesday',
+              isWorkingDay: false,
+            },
+            {
+              dayOfWeek: 'thursday',
+              isWorkingDay: true,
+              openingTime: '10:00',
+              closingTime: '18:00',
+            },
+            {
+              dayOfWeek: 'friday',
+              isWorkingDay: false,
+            },
+            {
+              dayOfWeek: 'saturday',
+              isWorkingDay: true,
+              openingTime: '08:00',
+              closingTime: '14:00',
+            },
+            {
+              dayOfWeek: 'sunday',
+              isWorkingDay: false,
+            },
+          ],
+          handleConflicts: 'reschedule',
+          notifyPatients: true,
+          reschedulingReason: 'Doctor schedule change',
+        },
+      },
+      'notify-strategy': {
+        summary: 'Update with manual rescheduling notification',
+        value: {
+          schedule: [
+            {
+              dayOfWeek: 'monday',
+              isWorkingDay: true,
+              openingTime: '10:00',
+              closingTime: '16:00',
+            },
+            {
+              dayOfWeek: 'tuesday',
+              isWorkingDay: true,
+              openingTime: '10:00',
+              closingTime: '16:00',
+            },
+            {
+              dayOfWeek: 'wednesday',
+              isWorkingDay: false,
+            },
+            {
+              dayOfWeek: 'thursday',
+              isWorkingDay: false,
+            },
+            {
+              dayOfWeek: 'friday',
+              isWorkingDay: false,
+            },
+            {
+              dayOfWeek: 'saturday',
+              isWorkingDay: false,
+            },
+            {
+              dayOfWeek: 'sunday',
+              isWorkingDay: false,
+            },
+          ],
+          handleConflicts: 'notify',
+          notifyPatients: true,
+          reschedulingReason: 'Reduced working hours',
+        },
+      },
+      'cancel-strategy': {
+        summary: 'Update with appointment cancellation',
+        value: {
+          schedule: [
+            {
+              dayOfWeek: 'monday',
+              isWorkingDay: true,
+              openingTime: '09:00',
+              closingTime: '17:00',
+            },
+            {
+              dayOfWeek: 'tuesday',
+              isWorkingDay: false,
+            },
+            {
+              dayOfWeek: 'wednesday',
+              isWorkingDay: false,
+            },
+            {
+              dayOfWeek: 'thursday',
+              isWorkingDay: false,
+            },
+            {
+              dayOfWeek: 'friday',
+              isWorkingDay: false,
+            },
+            {
+              dayOfWeek: 'saturday',
+              isWorkingDay: false,
+            },
+            {
+              dayOfWeek: 'sunday',
+              isWorkingDay: false,
+            },
+          ],
+          handleConflicts: 'cancel',
+          notifyPatients: true,
+          reschedulingReason: 'Doctor unavailable',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Working hours updated successfully with rescheduling',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: true },
+        data: {
+          type: 'object',
+          properties: {
+            workingHours: {
+              type: 'array',
+              description: 'Updated working hours records',
+              items: {
+                type: 'object',
+                properties: {
+                  _id: { type: 'string', example: '507f1f77bcf86cd799439011' },
+                  entityType: { type: 'string', example: 'user' },
+                  entityId: { type: 'string', example: '507f1f77bcf86cd799439012' },
+                  dayOfWeek: { type: 'string', example: 'monday' },
+                  isWorkingDay: { type: 'boolean', example: true },
+                  openingTime: { type: 'string', example: '09:00' },
+                  closingTime: { type: 'string', example: '17:00' },
+                },
+              },
+            },
+            appointmentsRescheduled: {
+              type: 'number',
+              example: 3,
+              description: 'Number of appointments automatically rescheduled',
+            },
+            appointmentsMarkedForRescheduling: {
+              type: 'number',
+              example: 2,
+              description: 'Number of appointments marked for manual rescheduling',
+            },
+            appointmentsCancelled: {
+              type: 'number',
+              example: 0,
+              description: 'Number of appointments cancelled',
+            },
+            notificationsSent: {
+              type: 'number',
+              example: 5,
+              description: 'Number of notifications sent to patients',
+            },
+            rescheduledAppointments: {
+              type: 'array',
+              description: 'Details of affected appointments',
+              items: {
+                type: 'object',
+                properties: {
+                  appointmentId: {
+                    type: 'string',
+                    example: '507f1f77bcf86cd799439013',
+                  },
+                  oldDate: { type: 'string', example: '2026-02-15' },
+                  oldTime: { type: 'string', example: '08:30' },
+                  newDate: { type: 'string', example: '2026-02-15' },
+                  newTime: { type: 'string', example: '09:00' },
+                  status: {
+                    type: 'string',
+                    enum: [
+                      'rescheduled',
+                      'marked_for_rescheduling',
+                      'cancelled',
+                    ],
+                    example: 'rescheduled',
+                  },
+                },
+              },
+            },
+          },
+        },
+        message: {
+          type: 'object',
+          properties: {
+            ar: {
+              type: 'string',
+              example: 'تم تحديث ساعات العمل بنجاح. تم إعادة جدولة 3 مواعيد',
+            },
+            en: {
+              type: 'string',
+              example:
+                'Working hours updated successfully. 3 appointments rescheduled',
+            },
+          },
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid request data',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Entity not found',
+  })
+  @ApiResponse({
+    status: 500,
+    description: 'Internal server error - transaction rolled back',
+  })
+  async updateWithRescheduling(
+    @Param('entityType') entityType: string,
+    @Param('entityId') entityId: string,
+    @Body() updateDto: UpdateWithReschedulingDto,
+  ): Promise<UpdateWithReschedulingResponse> {
+    try {
+      // Validate entity type
+      if (entityType !== 'user') {
+        return {
+          success: false,
+          data: {
+            workingHours: [],
+            appointmentsRescheduled: 0,
+            appointmentsMarkedForRescheduling: 0,
+            appointmentsCancelled: 0,
+            notificationsSent: 0,
+            rescheduledAppointments: [],
+          },
+          message: {
+            ar: 'نوع الكيان غير صالح. يدعم فقط "user"',
+            en: 'Invalid entity type. Only "user" is supported',
+          },
+        };
+      }
+
+      // Perform update with rescheduling using the rescheduling service
+      const result = await this.reschedulingService.updateWithRescheduling(
+        entityType,
+        entityId,
+        updateDto.schedule,
+        {
+          handleConflicts: updateDto.handleConflicts,
+          notifyPatients: updateDto.notifyPatients,
+          reschedulingReason: updateDto.reschedulingReason,
+        },
+      );
+
+      // Prepare success message based on results
+      let message;
+      const totalAffected =
+        result.appointmentsRescheduled +
+        result.appointmentsMarkedForRescheduling +
+        result.appointmentsCancelled;
+
+      if (totalAffected === 0) {
+        message = {
+          ar: 'تم تحديث ساعات العمل بنجاح. لا توجد مواعيد متأثرة',
+          en: 'Working hours updated successfully. No appointments affected',
+        };
+      } else {
+        const arParts: string[] = ['تم تحديث ساعات العمل بنجاح.'];
+        const enParts: string[] = ['Working hours updated successfully.'];
+
+        if (result.appointmentsRescheduled > 0) {
+          arParts.push(
+            `تم إعادة جدولة ${result.appointmentsRescheduled} ${result.appointmentsRescheduled === 1 ? 'موعد' : 'مواعيد'}`,
+          );
+          enParts.push(
+            `${result.appointmentsRescheduled} ${result.appointmentsRescheduled === 1 ? 'appointment' : 'appointments'} rescheduled`,
+          );
+        }
+
+        if (result.appointmentsMarkedForRescheduling > 0) {
+          arParts.push(
+            `${result.appointmentsMarkedForRescheduling} ${result.appointmentsMarkedForRescheduling === 1 ? 'موعد يحتاج' : 'مواعيد تحتاج'} إعادة جدولة يدوية`,
+          );
+          enParts.push(
+            `${result.appointmentsMarkedForRescheduling} ${result.appointmentsMarkedForRescheduling === 1 ? 'appointment needs' : 'appointments need'} manual rescheduling`,
+          );
+        }
+
+        if (result.appointmentsCancelled > 0) {
+          arParts.push(
+            `تم إلغاء ${result.appointmentsCancelled} ${result.appointmentsCancelled === 1 ? 'موعد' : 'مواعيد'}`,
+          );
+          enParts.push(
+            `${result.appointmentsCancelled} ${result.appointmentsCancelled === 1 ? 'appointment' : 'appointments'} cancelled`,
+          );
+        }
+
+        message = {
+          ar: arParts.join('. '),
+          en: enParts.join('. '),
+        };
+      }
+
+      return {
+        success: true,
+        data: {
+          workingHours: result.workingHours,
+          appointmentsRescheduled: result.appointmentsRescheduled,
+          appointmentsMarkedForRescheduling:
+            result.appointmentsMarkedForRescheduling,
+          appointmentsCancelled: result.appointmentsCancelled,
+          notificationsSent: result.notificationsSent,
+          rescheduledAppointments: result.rescheduledAppointments,
+        },
+        message,
+      };
+    } catch (error) {
+      // Return error in standard format
+      return {
+        success: false,
+        data: {
+          workingHours: [],
+          appointmentsRescheduled: 0,
+          appointmentsMarkedForRescheduling: 0,
+          appointmentsCancelled: 0,
+          notificationsSent: 0,
+          rescheduledAppointments: [],
+        },
+        message: {
+          ar: 'فشل تحديث ساعات العمل مع إعادة الجدولة',
+          en: 'Failed to update working hours with rescheduling',
         },
       };
     }

@@ -5,10 +5,12 @@ import { WorkingHoursService } from './working-hours.service';
 import { WorkingHoursValidationService } from './services/working-hours-validation.service';
 import { WorkingHoursSuggestionService } from './services/working-hours-suggestion.service';
 import { AppointmentConflictService } from './services/appointment-conflict.service';
+import { WorkingHoursReschedulingService } from './services/working-hours-rescheduling.service';
 import { WorkingHoursSchema } from '../database/schemas/working-hours.schema';
 import { ClinicSchema } from '../database/schemas/clinic.schema';
 import { ComplexSchema } from '../database/schemas/complex.schema';
 import { AppointmentSchema } from '../database/schemas/appointment.schema';
+import { NotificationSchema } from '../database/schemas/notification.schema';
 import { CommonModule } from '../common/common.module';
 
 @Module({
@@ -18,6 +20,7 @@ import { CommonModule } from '../common/common.module';
       { name: 'Clinic', schema: ClinicSchema },
       { name: 'Complex', schema: ComplexSchema },
       { name: 'Appointment', schema: AppointmentSchema },
+      { name: 'Notification', schema: NotificationSchema },
     ]),
     CommonModule,
   ],
@@ -27,12 +30,14 @@ import { CommonModule } from '../common/common.module';
     WorkingHoursValidationService,
     WorkingHoursSuggestionService,
     AppointmentConflictService,
+    WorkingHoursReschedulingService,
   ],
   exports: [
     WorkingHoursService,
     WorkingHoursValidationService,
     WorkingHoursSuggestionService,
     AppointmentConflictService,
+    WorkingHoursReschedulingService,
   ],
 })
 export class WorkingHoursModule {}
