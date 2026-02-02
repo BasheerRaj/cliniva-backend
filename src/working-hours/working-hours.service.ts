@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, Inject, forwardRef } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { WorkingHours } from '../database/schemas/working-hours.schema';
@@ -11,18 +11,34 @@ import {
   ERROR_MESSAGES,
   createDynamicMessage,
 } from '../common/utils/error-messages.constant';
+import { WorkingHoursValidationService } from './services/working-hours-validation.service';
+import {
+  queryCache,
+  WorkingHoursCacheKeys,
+} from './utils/query-cache.util';
 
 @Injectable()
 export class WorkingHoursService {
   constructor(
     @InjectModel('WorkingHours')
     private readonly workingHoursModel: Model<WorkingHours>,
+    @Inject(forwardRef(() => WorkingHoursValidationService))
+    private readonly validationService: WorkingHoursValidationService,
   ) {}
 
+  /**
+   * Creates working hours for an entity.
+   * Validates schedule format and replaces any existing working hours.
+   * Invalidates cache for the entity after creation.
+   * 
+   * @param {CreateWorkingHoursDto} createDto - Working hours creation data
+   * @returns {Promise<WorkingHours[]>} Created working hours records
+   * @throws {BadRequestException} When schedule validation fails
+   */
   async createWorkingHours(
     createDto: CreateWorkingHoursDto,
   ): Promise<WorkingHours[]> {
-    // Validate schedule
+    // Validate schedule using utility (basic format validation)
     const validation = ValidationUtil.validateWorkingHours(createDto.schedule);
     if (!validation.isValid) {
       throw new BadRequestException({
@@ -50,15 +66,31 @@ export class WorkingHoursService {
       isActive: true,
     }));
 
-    return await this.workingHoursModel.insertMany(workingHours);
+    const result = await this.workingHoursModel.insertMany(workingHours);
+
+    // Invalidate cache for this entity
+    this.invalidateEntityCache(createDto.entityType, createDto.entityId);
+
+    return result;
   }
 
+  /**
+   * Updates working hours for an entity.
+   * Validates schedule format and replaces existing working hours.
+   * Invalidates cache for the entity after update.
+   * 
+   * @param {string} entityType - Entity type (organization, complex, clinic, user)
+   * @param {string} entityId - Entity ID
+   * @param {UpdateWorkingHoursDto} updateDto - Working hours update data
+   * @returns {Promise<WorkingHours[]>} Updated working hours records
+   * @throws {BadRequestException} When schedule validation fails
+   */
   async updateWorkingHours(
     entityType: string,
     entityId: string,
     updateDto: UpdateWorkingHoursDto,
   ): Promise<WorkingHours[]> {
-    // Validate schedule
+    // Validate schedule using utility (basic format validation)
     const validation = ValidationUtil.validateWorkingHours(updateDto.schedule);
     if (!validation.isValid) {
       throw new BadRequestException({
@@ -85,7 +117,12 @@ export class WorkingHoursService {
       isActive: true,
     }));
 
-    return await this.workingHoursModel.insertMany(workingHours);
+    const result = await this.workingHoursModel.insertMany(workingHours);
+
+    // Invalidate cache for this entity
+    this.invalidateEntityCache(entityType, entityId);
+
+    return result;
   }
 
   async getWorkingHours(
@@ -101,12 +138,27 @@ export class WorkingHoursService {
       .exec();
   }
 
+  /**
+   * Creates working hours with parent entity validation.
+   * Uses WorkingHoursValidationService for hierarchical validation.
+   * 
+   * Business Rules:
+   * - BZR-f1c0a9e4: Hierarchical validation (complex→clinic, clinic→user)
+   * - BZR-u5a0f7d3: Child hours must be within parent hours
+   * - BZR-42: Child cannot be open when parent is closed
+   * 
+   * @param {CreateWorkingHoursDto} createDto - Working hours creation data
+   * @param {string} parentEntityType - Parent entity type (optional)
+   * @param {string} parentEntityId - Parent entity ID (optional)
+   * @returns {Promise<WorkingHours[]>} Created working hours records
+   * @throws {BadRequestException} When validation fails
+   */
   async createWorkingHoursWithParentValidation(
     createDto: CreateWorkingHoursDto,
     parentEntityType?: string,
     parentEntityId?: string,
   ): Promise<WorkingHours[]> {
-    // Validate schedule individually first
+    // Validate schedule format first
     const validation = ValidationUtil.validateWorkingHours(createDto.schedule);
     if (!validation.isValid) {
       throw new BadRequestException({
@@ -120,42 +172,25 @@ export class WorkingHoursService {
       });
     }
 
-    // If parent entity specified, validate against parent working hours
+    // If parent entity specified, use validation service for hierarchical validation
     if (parentEntityType && parentEntityId) {
-      const parentSchedule = await this.getWorkingHours(
+      const hierarchicalValidation = await this.validationService.validateHierarchical(
+        createDto.schedule,
         parentEntityType,
         parentEntityId,
+        `${createDto.entityType} (${createDto.entityId})`,
       );
 
-      if (parentSchedule.length > 0) {
-        const parentScheduleData = parentSchedule.map((schedule) => ({
-          dayOfWeek: schedule.dayOfWeek,
-          isWorkingDay: schedule.isWorkingDay,
-          openingTime: schedule.openingTime,
-          closingTime: schedule.closingTime,
-          breakStartTime: schedule.breakStartTime,
-          breakEndTime: schedule.breakEndTime,
-        }));
-
-        const hierarchicalValidation =
-          ValidationUtil.validateHierarchicalWorkingHours(
-            parentScheduleData,
-            createDto.schedule,
-            `${parentEntityType} (${parentEntityId})`,
-            `${createDto.entityType} (${createDto.entityId})`,
-          );
-
-        if (!hierarchicalValidation.isValid) {
-          throw new BadRequestException({
-            message: createDynamicMessage(
-              `${ERROR_MESSAGES.HIERARCHICAL_VALIDATION_FAILED.ar}: ${hierarchicalValidation.errors.join(', ')}`,
-              `${ERROR_MESSAGES.HIERARCHICAL_VALIDATION_FAILED.en}: ${hierarchicalValidation.errors.join(', ')}`,
-              {},
-            ),
-            code: 'HIERARCHICAL_VALIDATION_FAILED',
-            details: { errors: hierarchicalValidation.errors },
-          });
-        }
+      if (!hierarchicalValidation.isValid) {
+        throw new BadRequestException({
+          message: createDynamicMessage(
+            ERROR_MESSAGES.HIERARCHICAL_VALIDATION_FAILED.ar,
+            ERROR_MESSAGES.HIERARCHICAL_VALIDATION_FAILED.en,
+            {},
+          ),
+          code: 'HIERARCHICAL_VALIDATION_FAILED',
+          details: { errors: hierarchicalValidation.errors },
+        });
       }
     }
 
@@ -163,34 +198,38 @@ export class WorkingHoursService {
     return await this.createWorkingHours(createDto);
   }
 
+  /**
+   * Validates clinic working hours against complex working hours.
+   * Uses WorkingHoursValidationService for hierarchical validation.
+   * 
+   * @deprecated Use WorkingHoursValidationService.validateHierarchical() instead
+   * @param {string} clinicId - Clinic ID
+   * @param {any[]} clinicSchedule - Clinic schedule to validate
+   * @param {string} complexId - Complex ID
+   * @returns {Promise<{ isValid: boolean; errors: string[] }>} Validation result
+   */
   async validateClinicHoursWithinComplex(
     clinicId: string,
     clinicSchedule: any[],
     complexId: string,
   ): Promise<{ isValid: boolean; errors: string[] }> {
-    // Get complex working hours
-    const complexSchedule = await this.getWorkingHours('complex', complexId);
-
-    if (complexSchedule.length === 0) {
-      // If complex has no working hours set, allow any clinic hours
-      return { isValid: true, errors: [] };
-    }
-
-    const complexScheduleData = complexSchedule.map((schedule) => ({
-      dayOfWeek: schedule.dayOfWeek,
-      isWorkingDay: schedule.isWorkingDay,
-      openingTime: schedule.openingTime,
-      closingTime: schedule.closingTime,
-      breakStartTime: schedule.breakStartTime,
-      breakEndTime: schedule.breakEndTime,
-    }));
-
-    return ValidationUtil.validateHierarchicalWorkingHours(
-      complexScheduleData,
+    // Use validation service for hierarchical validation
+    const result = await this.validationService.validateHierarchical(
       clinicSchedule,
-      `Complex (${complexId})`,
+      'complex',
+      complexId,
       `Clinic (${clinicId})`,
     );
+
+    // Convert ValidationError[] to string[] for backward compatibility
+    const errors = result.errors.map((error) => {
+      // Use English message for backward compatibility
+      return typeof error.message === 'object' 
+        ? error.message.en 
+        : error.message;
+    });
+
+    return { isValid: result.isValid, errors };
   }
 
   async getParentEntityWorkingHours(
@@ -272,5 +311,19 @@ export class WorkingHoursService {
         }
       }
     }
+  }
+
+  /**
+   * Invalidates all cache entries related to an entity.
+   * Called after creating or updating working hours.
+   * 
+   * @private
+   * @param {string} entityType - Entity type
+   * @param {string} entityId - Entity ID
+   */
+  private invalidateEntityCache(entityType: string, entityId: string): void {
+    // Invalidate all cache entries for this entity
+    const pattern = WorkingHoursCacheKeys.invalidateEntity(entityType, entityId);
+    queryCache.invalidatePattern(pattern);
   }
 }

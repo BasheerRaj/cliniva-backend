@@ -39,6 +39,7 @@ describe('AppointmentConflictService', () => {
       populate: jest.fn().mockReturnThis(),
       sort: jest.fn().mockReturnThis(),
       exec: jest.fn(),
+      aggregate: jest.fn().mockReturnThis(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -73,11 +74,39 @@ describe('AppointmentConflictService', () => {
       const mockAppointments = [
         {
           _id: new Types.ObjectId(),
-          doctorId,
-          patientId: {
-            _id: patientId,
+          appointmentDate: futureDate,
+          appointmentTime: '10:00',
+          durationMinutes: 30,
+          patient: {
             firstName: 'John',
             lastName: 'Doe',
+          },
+        },
+      ];
+
+      mockAppointmentModel.aggregate.mockReturnValueOnce({
+        exec: jest.fn().mockResolvedValue(mockAppointments),
+      });
+
+      const newSchedule = [
+        {
+          dayOfWeek: 'monday',
+          isWorkingDay: true,
+          openingTime: '09:00',
+          closingTime: '17:00',
+        },
+      ];
+
+      const result = await service.checkConflicts(
+        doctorId.toString(),
+        newSchedule,
+      );
+
+      expect(result.hasConflicts).toBe(false);
+      expect(result.conflicts).toHaveLength(0);
+      expect(result.affectedAppointments).toBe(0);
+      expect(mockAppointmentModel.aggregate).toHaveBeenCalled();
+    });
           },
           clinicId,
           serviceId,

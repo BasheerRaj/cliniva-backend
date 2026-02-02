@@ -8,6 +8,10 @@ import {
   ERROR_MESSAGES,
   createDynamicMessage,
 } from '../../common/utils/error-messages.constant';
+import {
+  queryCache,
+  WorkingHoursCacheKeys,
+} from '../utils/query-cache.util';
 
 export interface SuggestedSchedule {
   dayOfWeek: string;
@@ -43,6 +47,8 @@ export class WorkingHoursSuggestionService {
 
   /**
    * Get suggested working hours based on role and entity assignment
+   * Uses projection to fetch only required fields for performance.
+   * 
    * @param role - 'doctor' or 'staff'
    * @param clinicId - Clinic ID for doctors
    * @param complexId - Complex ID for staff
@@ -61,13 +67,15 @@ export class WorkingHoursSuggestionService {
         });
       }
 
-      // Get clinic working hours
+      // Get clinic working hours with projection
       const clinicHours = await this.workingHoursModel
         .find({
           entityType: 'clinic',
           entityId: new Types.ObjectId(clinicId),
           isActive: true,
         })
+        .select('dayOfWeek isWorkingDay openingTime closingTime breakStartTime breakEndTime')
+        .lean()
         .exec();
 
       if (clinicHours.length === 0) {
@@ -104,13 +112,15 @@ export class WorkingHoursSuggestionService {
         });
       }
 
-      // Get complex working hours
+      // Get complex working hours with projection
       const complexHours = await this.workingHoursModel
         .find({
           entityType: 'complex',
           entityId: new Types.ObjectId(complexId),
           isActive: true,
         })
+        .select('dayOfWeek isWorkingDay openingTime closingTime breakStartTime breakEndTime')
+        .lean()
         .exec();
 
       if (complexHours.length === 0) {
@@ -153,6 +163,8 @@ export class WorkingHoursSuggestionService {
 
   /**
    * Get entity details (name and ID) for source information
+   * Results are cached for 10 minutes to reduce database load.
+   * 
    * @param entityType - Type of entity ('clinic' or 'complex')
    * @param entityId - Entity ID
    * @returns Entity information
@@ -161,10 +173,21 @@ export class WorkingHoursSuggestionService {
     entityType: string,
     entityId: string,
   ): Promise<EntityInfo> {
+    // Check cache first
+    const cacheKey = WorkingHoursCacheKeys.entityDetails(entityType, entityId);
+    const cached = queryCache.get<EntityInfo>(cacheKey);
+
+    if (cached) {
+      return cached;
+    }
+
+    let entityInfo: EntityInfo;
+
     if (entityType === 'clinic') {
       const clinic = await this.clinicModel
         .findById(new Types.ObjectId(entityId))
         .select('name')
+        .lean()
         .exec();
 
       if (!clinic) {
@@ -174,7 +197,7 @@ export class WorkingHoursSuggestionService {
         });
       }
 
-      return {
+      entityInfo = {
         entityType: 'clinic',
         entityId: entityId,
         entityName: clinic.name,
@@ -183,6 +206,7 @@ export class WorkingHoursSuggestionService {
       const complex = await this.complexModel
         .findById(new Types.ObjectId(entityId))
         .select('name')
+        .lean()
         .exec();
 
       if (!complex) {
@@ -192,20 +216,25 @@ export class WorkingHoursSuggestionService {
         });
       }
 
-      return {
+      entityInfo = {
         entityType: 'complex',
         entityId: entityId,
         entityName: complex.name,
       };
+    } else {
+      throw new NotFoundException({
+        message: createDynamicMessage(
+          'نوع كيان غير صالح',
+          'Invalid entity type',
+          {},
+        ),
+        code: 'INVALID_ENTITY_TYPE',
+      });
     }
 
-    throw new NotFoundException({
-      message: createDynamicMessage(
-        'نوع كيان غير صالح',
-        'Invalid entity type',
-        {},
-      ),
-      code: 'INVALID_ENTITY_TYPE',
-    });
+    // Cache the result (10 minutes TTL)
+    queryCache.set(cacheKey, entityInfo, 10 * 60 * 1000);
+
+    return entityInfo;
   }
 }

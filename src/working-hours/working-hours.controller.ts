@@ -8,6 +8,9 @@ import {
   Query,
   HttpStatus,
   HttpCode,
+  BadRequestException,
+  NotFoundException,
+  InternalServerErrorException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiQuery } from '@nestjs/swagger';
 import { WorkingHoursService } from './working-hours.service';
@@ -36,6 +39,17 @@ import {
   UpdateWithReschedulingResponse,
 } from './dto/update-with-rescheduling.dto';
 import { WorkingHours } from '../database/schemas/working-hours.schema';
+import { BilingualMessage } from '../common/types/bilingual-message.type';
+
+/**
+ * Standard API response format
+ */
+interface StandardResponse<T = any> {
+  success: boolean;
+  data?: T;
+  message?: BilingualMessage | string;
+  error?: string;
+}
 
 @ApiTags('Working Hours')
 @Controller('working-hours')
@@ -48,27 +62,64 @@ export class WorkingHoursController {
     private readonly reschedulingService: WorkingHoursReschedulingService,
   ) {}
 
-  @Post()
-  @HttpCode(HttpStatus.CREATED)
-  async createWorkingHours(@Body() createDto: CreateWorkingHoursDto) {
-    try {
-      const workingHours =
-        await this.workingHoursService.createWorkingHours(createDto);
-
-      return {
-        success: true,
-        message: 'Working hours created successfully',
-        data: workingHours,
-      };
-    } catch (error) {
-      return {
-        success: false,
-        message: 'Failed to create working hours',
-        error: error.message,
-      };
-    }
+  /**
+   * Creates a standardized success response
+   * @private
+   */
+  private createSuccessResponse<T>(
+    data: T,
+    message?: BilingualMessage | string,
+  ): StandardResponse<T> {
+    return {
+      success: true,
+      data,
+      ...(message && { message }),
+    };
   }
 
+  /**
+   * Creates a standardized error response
+   * @private
+   */
+  private createErrorResponse(
+    message: BilingualMessage | string,
+    error?: string,
+  ): StandardResponse {
+    return {
+      success: false,
+      message,
+      ...(error && { error }),
+    };
+  }
+
+  /**
+   * Creates working hours for an entity.
+   * Validates schedule format before creation.
+   * 
+   * @param {CreateWorkingHoursDto} createDto - Working hours creation data
+   * @returns {Promise<StandardResponse<WorkingHours[]>>} Created working hours
+   */
+  @Post()
+  @HttpCode(HttpStatus.CREATED)
+  async createWorkingHours(
+    @Body() createDto: CreateWorkingHoursDto,
+  ): Promise<StandardResponse<WorkingHours[]>> {
+    const workingHours =
+      await this.workingHoursService.createWorkingHours(createDto);
+
+    return this.createSuccessResponse(workingHours, {
+      ar: 'تم إنشاء ساعات العمل بنجاح',
+      en: 'Working hours created successfully',
+    });
+  }
+
+  /**
+   * Validates clinic hours against complex hours.
+   * 
+   * @deprecated Use POST /working-hours/validate endpoint instead
+   * @param {object} body - Validation request body
+   * @returns {Promise<StandardResponse>} Validation result
+   */
   @Post('validate-clinic-hours')
   @HttpCode(HttpStatus.OK)
   async validateClinicHours(
@@ -78,32 +129,29 @@ export class WorkingHoursController {
       clinicSchedule: any[];
       complexId: string;
     },
-  ) {
-    try {
-      const validation =
-        await this.workingHoursService.validateClinicHoursWithinComplex(
-          body.clinicId,
-          body.clinicSchedule,
-          body.complexId,
-        );
+  ): Promise<StandardResponse> {
+    const validation =
+      await this.workingHoursService.validateClinicHoursWithinComplex(
+        body.clinicId,
+        body.clinicSchedule,
+        body.complexId,
+      );
 
-      return {
-        success: validation.isValid,
-        message: validation.isValid
-          ? 'Clinic hours are valid within complex hours'
-          : 'Clinic hours validation failed',
-        data: {
-          isValid: validation.isValid,
-          errors: validation.errors,
-        },
-      };
-    } catch (error) {
-      return {
-        success: false,
-        message: 'Failed to validate clinic hours',
-        error: error.message,
-      };
-    }
+    return this.createSuccessResponse(
+      {
+        isValid: validation.isValid,
+        errors: validation.errors,
+      },
+      validation.isValid
+        ? {
+            ar: 'ساعات العيادة صالحة ضمن ساعات المجمع',
+            en: 'Clinic hours are valid within complex hours',
+          }
+        : {
+            ar: 'فشل التحقق من صحة ساعات العيادة',
+            en: 'Clinic hours validation failed',
+          },
+    );
   }
 
   /**
@@ -257,7 +305,7 @@ export class WorkingHoursController {
         },
       };
     } catch (error) {
-      // Return error in standard format
+      // Handle unexpected errors gracefully
       return {
         success: false,
         data: {
@@ -377,22 +425,17 @@ export class WorkingHoursController {
     @Param('entityId') entityId: string,
     @Query() query: SuggestWorkingHoursQueryDto,
   ): Promise<SuggestWorkingHoursResponse> {
-    try {
-      // Get suggested hours based on role
-      const suggestionResult = await this.suggestionService.getSuggestedHours(
-        query.role,
-        query.clinicId,
-        query.complexId,
-      );
+    // Get suggested hours based on role
+    const suggestionResult = await this.suggestionService.getSuggestedHours(
+      query.role,
+      query.clinicId,
+      query.complexId,
+    );
 
-      return {
-        success: true,
-        data: suggestionResult,
-      };
-    } catch (error) {
-      // Return error in standard format
-      throw error;
-    }
+    return {
+      success: true,
+      data: suggestionResult,
+    };
   }
 
   /**
@@ -622,54 +665,37 @@ export class WorkingHoursController {
   async checkConflicts(
     @Body() checkDto: CheckConflictsDto,
   ): Promise<CheckConflictsResponse> {
-    try {
-      // Check for conflicts using the conflict service
-      const conflictResult = await this.conflictService.checkConflicts(
-        checkDto.userId,
-        checkDto.schedule,
-      );
+    // Check for conflicts using the conflict service
+    const conflictResult = await this.conflictService.checkConflicts(
+      checkDto.userId,
+      checkDto.schedule,
+    );
 
-      // Prepare response message
-      let message;
-      if (conflictResult.hasConflicts) {
-        const count = conflictResult.affectedAppointments;
-        message = {
-          ar: `تم اكتشاف ${count} ${count === 1 ? 'موعد متعارض' : 'مواعيد متعارضة'}`,
-          en: `${count} conflicting ${count === 1 ? 'appointment' : 'appointments'} detected`,
-        };
-      } else {
-        message = {
-          ar: 'لا توجد مواعيد متعارضة',
-          en: 'No conflicting appointments found',
-        };
-      }
-
-      return {
-        success: true,
-        data: {
-          hasConflicts: conflictResult.hasConflicts,
-          conflicts: conflictResult.conflicts,
-          affectedAppointments: conflictResult.affectedAppointments,
-          requiresRescheduling: conflictResult.requiresRescheduling,
-        },
-        message,
+    // Prepare response message
+    let message;
+    if (conflictResult.hasConflicts) {
+      const count = conflictResult.affectedAppointments;
+      message = {
+        ar: `تم اكتشاف ${count} ${count === 1 ? 'موعد متعارض' : 'مواعيد متعارضة'}`,
+        en: `${count} conflicting ${count === 1 ? 'appointment' : 'appointments'} detected`,
       };
-    } catch (error) {
-      // Return error in standard format
-      return {
-        success: false,
-        data: {
-          hasConflicts: false,
-          conflicts: [],
-          affectedAppointments: 0,
-          requiresRescheduling: false,
-        },
-        message: {
-          ar: 'فشل التحقق من تعارض المواعيد',
-          en: 'Failed to check appointment conflicts',
-        },
+    } else {
+      message = {
+        ar: 'لا توجد مواعيد متعارضة',
+        en: 'No conflicting appointments found',
       };
     }
+
+    return {
+      success: true,
+      data: {
+        hasConflicts: conflictResult.hasConflicts,
+        conflicts: conflictResult.conflicts,
+        affectedAppointments: conflictResult.affectedAppointments,
+        requiresRescheduling: conflictResult.requiresRescheduling,
+      },
+      message,
+    };
   }
 
   /**
@@ -963,120 +989,99 @@ export class WorkingHoursController {
     @Param('entityId') entityId: string,
     @Body() updateDto: UpdateWithReschedulingDto,
   ): Promise<UpdateWithReschedulingResponse> {
-    try {
-      // Validate entity type
-      if (entityType !== 'user') {
-        return {
-          success: false,
-          data: {
-            workingHours: [],
-            appointmentsRescheduled: 0,
-            appointmentsMarkedForRescheduling: 0,
-            appointmentsCancelled: 0,
-            notificationsSent: 0,
-            rescheduledAppointments: [],
-          },
-          message: {
-            ar: 'نوع الكيان غير صالح. يدعم فقط "user"',
-            en: 'Invalid entity type. Only "user" is supported',
-          },
-        };
-      }
-
-      // Perform update with rescheduling using the rescheduling service
-      const result = await this.reschedulingService.updateWithRescheduling(
-        entityType,
-        entityId,
-        updateDto.schedule,
-        {
-          handleConflicts: updateDto.handleConflicts,
-          notifyPatients: updateDto.notifyPatients,
-          reschedulingReason: updateDto.reschedulingReason,
-        },
-      );
-
-      // Prepare success message based on results
-      let message;
-      const totalAffected =
-        result.appointmentsRescheduled +
-        result.appointmentsMarkedForRescheduling +
-        result.appointmentsCancelled;
-
-      if (totalAffected === 0) {
-        message = {
-          ar: 'تم تحديث ساعات العمل بنجاح. لا توجد مواعيد متأثرة',
-          en: 'Working hours updated successfully. No appointments affected',
-        };
-      } else {
-        const arParts: string[] = ['تم تحديث ساعات العمل بنجاح.'];
-        const enParts: string[] = ['Working hours updated successfully.'];
-
-        if (result.appointmentsRescheduled > 0) {
-          arParts.push(
-            `تم إعادة جدولة ${result.appointmentsRescheduled} ${result.appointmentsRescheduled === 1 ? 'موعد' : 'مواعيد'}`,
-          );
-          enParts.push(
-            `${result.appointmentsRescheduled} ${result.appointmentsRescheduled === 1 ? 'appointment' : 'appointments'} rescheduled`,
-          );
-        }
-
-        if (result.appointmentsMarkedForRescheduling > 0) {
-          arParts.push(
-            `${result.appointmentsMarkedForRescheduling} ${result.appointmentsMarkedForRescheduling === 1 ? 'موعد يحتاج' : 'مواعيد تحتاج'} إعادة جدولة يدوية`,
-          );
-          enParts.push(
-            `${result.appointmentsMarkedForRescheduling} ${result.appointmentsMarkedForRescheduling === 1 ? 'appointment needs' : 'appointments need'} manual rescheduling`,
-          );
-        }
-
-        if (result.appointmentsCancelled > 0) {
-          arParts.push(
-            `تم إلغاء ${result.appointmentsCancelled} ${result.appointmentsCancelled === 1 ? 'موعد' : 'مواعيد'}`,
-          );
-          enParts.push(
-            `${result.appointmentsCancelled} ${result.appointmentsCancelled === 1 ? 'appointment' : 'appointments'} cancelled`,
-          );
-        }
-
-        message = {
-          ar: arParts.join('. '),
-          en: enParts.join('. '),
-        };
-      }
-
-      return {
-        success: true,
-        data: {
-          workingHours: result.workingHours,
-          appointmentsRescheduled: result.appointmentsRescheduled,
-          appointmentsMarkedForRescheduling:
-            result.appointmentsMarkedForRescheduling,
-          appointmentsCancelled: result.appointmentsCancelled,
-          notificationsSent: result.notificationsSent,
-          rescheduledAppointments: result.rescheduledAppointments,
-        },
-        message,
-      };
-    } catch (error) {
-      // Return error in standard format
-      return {
-        success: false,
-        data: {
-          workingHours: [],
-          appointmentsRescheduled: 0,
-          appointmentsMarkedForRescheduling: 0,
-          appointmentsCancelled: 0,
-          notificationsSent: 0,
-          rescheduledAppointments: [],
-        },
+    // Validate entity type
+    if (entityType !== 'user') {
+      throw new BadRequestException({
         message: {
-          ar: 'فشل تحديث ساعات العمل مع إعادة الجدولة',
-          en: 'Failed to update working hours with rescheduling',
+          ar: 'نوع الكيان غير صالح. يدعم فقط "user"',
+          en: 'Invalid entity type. Only "user" is supported',
         },
+        code: 'INVALID_ENTITY_TYPE',
+      });
+    }
+
+    // Perform update with rescheduling using the rescheduling service
+    const result = await this.reschedulingService.updateWithRescheduling(
+      entityType,
+      entityId,
+      updateDto.schedule,
+      {
+        handleConflicts: updateDto.handleConflicts,
+        notifyPatients: updateDto.notifyPatients,
+        reschedulingReason: updateDto.reschedulingReason,
+      },
+    );
+
+    // Prepare success message based on results
+    let message;
+    const totalAffected =
+      result.appointmentsRescheduled +
+      result.appointmentsMarkedForRescheduling +
+      result.appointmentsCancelled;
+
+    if (totalAffected === 0) {
+      message = {
+        ar: 'تم تحديث ساعات العمل بنجاح. لا توجد مواعيد متأثرة',
+        en: 'Working hours updated successfully. No appointments affected',
+      };
+    } else {
+      const arParts: string[] = ['تم تحديث ساعات العمل بنجاح.'];
+      const enParts: string[] = ['Working hours updated successfully.'];
+
+      if (result.appointmentsRescheduled > 0) {
+        arParts.push(
+          `تم إعادة جدولة ${result.appointmentsRescheduled} ${result.appointmentsRescheduled === 1 ? 'موعد' : 'مواعيد'}`,
+        );
+        enParts.push(
+          `${result.appointmentsRescheduled} ${result.appointmentsRescheduled === 1 ? 'appointment' : 'appointments'} rescheduled`,
+        );
+      }
+
+      if (result.appointmentsMarkedForRescheduling > 0) {
+        arParts.push(
+          `${result.appointmentsMarkedForRescheduling} ${result.appointmentsMarkedForRescheduling === 1 ? 'موعد يحتاج' : 'مواعيد تحتاج'} إعادة جدولة يدوية`,
+        );
+        enParts.push(
+          `${result.appointmentsMarkedForRescheduling} ${result.appointmentsMarkedForRescheduling === 1 ? 'appointment needs' : 'appointments need'} manual rescheduling`,
+        );
+      }
+
+      if (result.appointmentsCancelled > 0) {
+        arParts.push(
+          `تم إلغاء ${result.appointmentsCancelled} ${result.appointmentsCancelled === 1 ? 'موعد' : 'مواعيد'}`,
+        );
+        enParts.push(
+          `${result.appointmentsCancelled} ${result.appointmentsCancelled === 1 ? 'appointment' : 'appointments'} cancelled`,
+        );
+      }
+
+      message = {
+        ar: arParts.join('. '),
+        en: enParts.join('. '),
       };
     }
+
+    return {
+      success: true,
+      data: {
+        workingHours: result.workingHours,
+        appointmentsRescheduled: result.appointmentsRescheduled,
+        appointmentsMarkedForRescheduling:
+          result.appointmentsMarkedForRescheduling,
+        appointmentsCancelled: result.appointmentsCancelled,
+        notificationsSent: result.notificationsSent,
+        rescheduledAppointments: result.rescheduledAppointments,
+      },
+      message,
+    };
   }
 
+  /**
+   * Creates working hours with parent entity validation.
+   * 
+   * @param {object} body - Request body with working hours and parent entity info
+   * @returns {Promise<StandardResponse<WorkingHours[]>>} Created working hours
+   */
   @Post('with-parent-validation')
   @HttpCode(HttpStatus.CREATED)
   async createWorkingHoursWithParentValidation(
@@ -1086,72 +1091,72 @@ export class WorkingHoursController {
       parentEntityType?: string;
       parentEntityId?: string;
     },
-  ) {
-    try {
-      const workingHours =
-        await this.workingHoursService.createWorkingHoursWithParentValidation(
-          body.workingHours,
-          body.parentEntityType,
-          body.parentEntityId,
-        );
+  ): Promise<StandardResponse<WorkingHours[]>> {
+    const workingHours =
+      await this.workingHoursService.createWorkingHoursWithParentValidation(
+        body.workingHours,
+        body.parentEntityType,
+        body.parentEntityId,
+      );
 
-      return {
-        success: true,
-        message: 'Working hours created successfully with parent validation',
-        data: workingHours,
-      };
-    } catch (error) {
-      return {
-        success: false,
-        message: 'Failed to create working hours with parent validation',
-        error: error.message,
-      };
-    }
+    return this.createSuccessResponse(workingHours, {
+      ar: 'تم إنشاء ساعات العمل بنجاح مع التحقق من الكيان الأصلي',
+      en: 'Working hours created successfully with parent validation',
+    });
   }
 
+  /**
+   * Retrieves working hours for an entity.
+   * 
+   * @param {string} entityType - Entity type
+   * @param {string} entityId - Entity ID
+   * @returns {Promise<StandardResponse<WorkingHours[]>>} Working hours records
+   */
   @Get(':entityType/:entityId')
   async getWorkingHours(
     @Param('entityType') entityType: string,
     @Param('entityId') entityId: string,
-  ) {
-    try {
-      const workingHours = await this.workingHoursService.getWorkingHours(
-        entityType,
-        entityId,
-      );
+  ): Promise<StandardResponse<WorkingHours[]>> {
+    const workingHours = await this.workingHoursService.getWorkingHours(
+      entityType,
+      entityId,
+    );
 
-      return {
-        success: true,
-        message: 'Working hours retrieved successfully',
-        data: workingHours,
-      };
-    } catch (error) {
-      return {
-        success: false,
-        message: 'Failed to retrieve working hours',
-        error: error.message,
-      };
-    }
+    return this.createSuccessResponse(workingHours, {
+      ar: 'تم استرجاع ساعات العمل بنجاح',
+      en: 'Working hours retrieved successfully',
+    });
   }
 
+  /**
+   * Retrieves complex working hours.
+   * 
+   * @param {string} complexId - Complex ID
+   * @returns {Promise<StandardResponse>} Complex working hours
+   */
   @Get('complex/:complexId')
-  async getComplexWorkingHours(@Param('complexId') complexId: string) {
-    try {
-      // For now, return a simple response until the service method exists
-      return {
-        success: true,
-        message: 'Complex working hours retrieved successfully',
-        data: [],
-      };
-    } catch (error) {
-      return {
-        success: false,
-        message: 'Failed to retrieve complex working hours',
-        data: [],
-      };
-    }
+  async getComplexWorkingHours(
+    @Param('complexId') complexId: string,
+  ): Promise<StandardResponse> {
+    // For now, return a simple response until the service method exists
+    return this.createSuccessResponse([], {
+      ar: 'تم استرجاع ساعات عمل المجمع بنجاح',
+      en: 'Complex working hours retrieved successfully',
+    });
   }
 
+  /**
+   * Updates working hours for an entity.
+   * Optionally validates against parent entity.
+   * 
+   * @param {string} entityType - Entity type
+   * @param {string} entityId - Entity ID
+   * @param {UpdateWorkingHoursDto} updateDto - Update data
+   * @param {string} validateWithParent - Whether to validate with parent
+   * @param {string} parentEntityType - Parent entity type (if validating)
+   * @param {string} parentEntityId - Parent entity ID (if validating)
+   * @returns {Promise<StandardResponse<WorkingHours[]>>} Updated working hours
+   */
   @Put(':entityType/:entityId')
   @HttpCode(HttpStatus.OK)
   async updateWorkingHours(
@@ -1161,42 +1166,33 @@ export class WorkingHoursController {
     @Query('validateWithParent') validateWithParent?: string,
     @Query('parentEntityType') parentEntityType?: string,
     @Query('parentEntityId') parentEntityId?: string,
-  ) {
-    try {
-      let workingHours;
+  ): Promise<StandardResponse<WorkingHours[]>> {
+    let workingHours;
 
-      if (validateWithParent === 'true' && parentEntityType && parentEntityId) {
-        // Use parent validation
-        workingHours =
-          await this.workingHoursService.createWorkingHoursWithParentValidation(
-            {
-              entityType,
-              entityId,
-              schedule: updateDto.schedule,
-            },
-            parentEntityType,
-            parentEntityId,
-          );
-      } else {
-        // Standard update
-        workingHours = await this.workingHoursService.updateWorkingHours(
-          entityType,
-          entityId,
-          updateDto,
+    if (validateWithParent === 'true' && parentEntityType && parentEntityId) {
+      // Use parent validation
+      workingHours =
+        await this.workingHoursService.createWorkingHoursWithParentValidation(
+          {
+            entityType,
+            entityId,
+            schedule: updateDto.schedule,
+          },
+          parentEntityType,
+          parentEntityId,
         );
-      }
-
-      return {
-        success: true,
-        message: 'Working hours updated successfully',
-        data: workingHours,
-      };
-    } catch (error) {
-      return {
-        success: false,
-        message: 'Failed to update working hours',
-        error: error.message,
-      };
+    } else {
+      // Standard update
+      workingHours = await this.workingHoursService.updateWorkingHours(
+        entityType,
+        entityId,
+        updateDto,
+      );
     }
+
+    return this.createSuccessResponse(workingHours, {
+      ar: 'تم تحديث ساعات العمل بنجاح',
+      en: 'Working hours updated successfully',
+    });
   }
 }

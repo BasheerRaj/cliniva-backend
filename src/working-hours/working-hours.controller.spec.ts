@@ -4,6 +4,7 @@ import { WorkingHoursService } from './working-hours.service';
 import { WorkingHoursValidationService } from './services/working-hours-validation.service';
 import { WorkingHoursSuggestionService } from './services/working-hours-suggestion.service';
 import { AppointmentConflictService } from './services/appointment-conflict.service';
+import { WorkingHoursReschedulingService } from './services/working-hours-rescheduling.service';
 import { ValidateWorkingHoursDto } from './dto/validate-working-hours.dto';
 
 describe('WorkingHoursController - Validation Endpoint', () => {
@@ -23,6 +24,13 @@ describe('WorkingHoursController - Validation Endpoint', () => {
     checkConflicts: jest.fn(),
     getAppointmentsByDay: jest.fn(),
     isAppointmentWithinHours: jest.fn(),
+  };
+
+  const mockReschedulingService = {
+    updateWithRescheduling: jest.fn(),
+    rescheduleAppointments: jest.fn(),
+    markForRescheduling: jest.fn(),
+    notifyPatients: jest.fn(),
   };
 
   const mockWorkingHoursService = {
@@ -52,6 +60,10 @@ describe('WorkingHoursController - Validation Endpoint', () => {
         {
           provide: AppointmentConflictService,
           useValue: mockConflictService,
+        },
+        {
+          provide: WorkingHoursReschedulingService,
+          useValue: mockReschedulingService,
         },
       ],
     }).compile();

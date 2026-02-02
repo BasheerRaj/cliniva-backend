@@ -54,6 +54,8 @@ export class AppointmentConflictService {
    * the new working hours schedule. It provides detailed information about
    * each conflicting appointment to support rescheduling decisions.
    *
+   * Uses aggregation pipeline for optimized performance with large datasets.
+   *
    * @param {string} userId - Doctor's user ID
    * @param {WorkingHoursSchedule[]} newSchedule - New working hours schedule
    * @returns {Promise<ConflictResult>} Conflict detection result with details
@@ -86,19 +88,49 @@ export class AppointmentConflictService {
       scheduleMap.set(schedule.dayOfWeek.toLowerCase(), schedule);
     });
 
-    // Get all future appointments for this doctor
+    // Get all future appointments for this doctor using aggregation pipeline
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
+    // Use aggregation pipeline for optimized query
     const futureAppointments = await this.appointmentModel
-      .find({
-        doctorId: new Types.ObjectId(userId),
-        appointmentDate: { $gte: today },
-        status: { $in: ['scheduled', 'confirmed'] },
-        deletedAt: null,
-      })
-      .populate('patientId', 'firstName lastName')
-      .sort({ appointmentDate: 1, appointmentTime: 1 })
+      .aggregate([
+        {
+          $match: {
+            doctorId: new Types.ObjectId(userId),
+            appointmentDate: { $gte: today },
+            status: { $in: ['scheduled', 'confirmed'] },
+            deletedAt: null,
+          },
+        },
+        {
+          $lookup: {
+            from: 'patients',
+            localField: 'patientId',
+            foreignField: '_id',
+            as: 'patient',
+          },
+        },
+        {
+          $unwind: {
+            path: '$patient',
+            preserveNullAndEmptyArrays: true,
+          },
+        },
+        {
+          $project: {
+            _id: 1,
+            appointmentDate: 1,
+            appointmentTime: 1,
+            durationMinutes: 1,
+            'patient.firstName': 1,
+            'patient.lastName': 1,
+          },
+        },
+        {
+          $sort: { appointmentDate: 1, appointmentTime: 1 },
+        },
+      ])
       .exec();
 
     // Check each appointment against the new schedule
@@ -109,13 +141,13 @@ export class AppointmentConflictService {
 
       // Check if appointment conflicts with new schedule
       if (!this.isAppointmentWithinHours(appointment, workingHours)) {
-        const patient = appointment.patientId as any;
+        const patient = appointment.patient;
         const patientName = patient
           ? `${patient.firstName} ${patient.lastName}`
           : 'Unknown Patient';
 
         conflicts.push({
-          appointmentId: (appointment._id as Types.ObjectId).toString(),
+          appointmentId: appointment._id.toString(),
           patientName,
           appointmentDate: appointmentDate.toISOString().split('T')[0],
           appointmentTime: appointment.appointmentTime,
@@ -141,7 +173,7 @@ export class AppointmentConflictService {
    *
    * This method fetches all future appointments for a doctor that fall on
    * a specific day of the week (e.g., all Mondays). Useful for analyzing
-   * day-specific conflicts.
+   * day-specific conflicts. Uses aggregation pipeline for optimized performance.
    *
    * @param {string} userId - Doctor's user ID
    * @param {string} dayOfWeek - Day of week (e.g., 'monday', 'tuesday')
@@ -160,25 +192,51 @@ export class AppointmentConflictService {
     dayOfWeek: string,
     fromDate: Date,
   ): Promise<Appointment[]> {
-    // Get all future appointments for this doctor
+    const targetDay = dayOfWeek.toLowerCase();
+    const dayIndex = this.getDayIndex(targetDay);
+
+    // Use aggregation pipeline to filter by day of week efficiently
     const appointments = await this.appointmentModel
-      .find({
-        doctorId: new Types.ObjectId(userId),
-        appointmentDate: { $gte: fromDate },
-        status: { $in: ['scheduled', 'confirmed'] },
-        deletedAt: null,
-      })
-      .populate('patientId', 'firstName lastName')
-      .sort({ appointmentDate: 1, appointmentTime: 1 })
+      .aggregate([
+        {
+          $match: {
+            doctorId: new Types.ObjectId(userId),
+            appointmentDate: { $gte: fromDate },
+            status: { $in: ['scheduled', 'confirmed'] },
+            deletedAt: null,
+          },
+        },
+        {
+          $addFields: {
+            dayOfWeek: { $dayOfWeek: '$appointmentDate' },
+          },
+        },
+        {
+          $match: {
+            dayOfWeek: dayIndex,
+          },
+        },
+        {
+          $lookup: {
+            from: 'patients',
+            localField: 'patientId',
+            foreignField: '_id',
+            as: 'patientId',
+          },
+        },
+        {
+          $unwind: {
+            path: '$patientId',
+            preserveNullAndEmptyArrays: true,
+          },
+        },
+        {
+          $sort: { appointmentDate: 1, appointmentTime: 1 },
+        },
+      ])
       .exec();
 
-    // Filter appointments by day of week
-    const targetDay = dayOfWeek.toLowerCase();
-    return appointments.filter((appointment) => {
-      const appointmentDate = new Date(appointment.appointmentDate);
-      const appointmentDay = this.getDayOfWeek(appointmentDate);
-      return appointmentDay === targetDay;
-    });
+    return appointments as Appointment[];
   }
 
   /**
@@ -274,6 +332,27 @@ export class AppointmentConflictService {
       'saturday',
     ];
     return days[date.getDay()];
+  }
+
+  /**
+   * Gets the day index (1-7) for MongoDB $dayOfWeek operator.
+   * MongoDB uses 1 for Sunday, 2 for Monday, etc.
+   *
+   * @private
+   * @param {string} dayName - Day name in lowercase (e.g., 'monday', 'tuesday')
+   * @returns {number} Day index (1-7)
+   */
+  private getDayIndex(dayName: string): number {
+    const days = [
+      'sunday',
+      'monday',
+      'tuesday',
+      'wednesday',
+      'thursday',
+      'friday',
+      'saturday',
+    ];
+    return days.indexOf(dayName.toLowerCase()) + 1;
   }
 
   /**

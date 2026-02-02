@@ -8,6 +8,10 @@ import {
   createDynamicMessage,
 } from '../../common/utils/error-messages.constant';
 import { BilingualMessage } from '../../common/types/bilingual-message.type';
+import {
+  queryCache,
+  WorkingHoursCacheKeys,
+} from '../utils/query-cache.util';
 
 /**
  * Interface for working hours schedule data
@@ -167,6 +171,8 @@ export class WorkingHoursValidationService {
 
   /**
    * Retrieves parent entity working hours from the database.
+   * Uses projection to fetch only required fields for performance.
+   * Results are cached for 5 minutes to reduce database load.
    *
    * @param {string} entityType - Entity type (e.g., 'complex', 'clinic', 'user')
    * @param {string} entityId - Entity ID
@@ -182,13 +188,29 @@ export class WorkingHoursValidationService {
     entityType: string,
     entityId: string,
   ): Promise<WorkingHours[]> {
-    return await this.workingHoursModel
+    // Check cache first
+    const cacheKey = WorkingHoursCacheKeys.parentHours(entityType, entityId);
+    const cached = queryCache.get<WorkingHours[]>(cacheKey);
+
+    if (cached) {
+      return cached;
+    }
+
+    // Fetch from database
+    const hours = await this.workingHoursModel
       .find({
         entityType,
         entityId: new Types.ObjectId(entityId),
         isActive: true,
       })
+      .select('dayOfWeek isWorkingDay openingTime closingTime breakStartTime breakEndTime')
+      .lean()
       .exec();
+
+    // Cache the result (5 minutes TTL)
+    queryCache.set(cacheKey, hours, 5 * 60 * 1000);
+
+    return hours;
   }
 
   /**

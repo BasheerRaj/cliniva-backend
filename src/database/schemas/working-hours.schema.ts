@@ -56,3 +56,17 @@ WorkingHoursSchema.index(
   { entityType: 1, entityId: 1, dayOfWeek: 1 },
   { unique: true },
 );
+
+// Optimized indexes for hierarchical validation and suggestions
+WorkingHoursSchema.index({ 
+  entityType: 1, 
+  entityId: 1, 
+  isActive: 1 
+}); // Composite index for active working hours queries
+
+WorkingHoursSchema.index({ 
+  entityType: 1, 
+  entityId: 1, 
+  dayOfWeek: 1, 
+  isActive: 1 
+}); // Composite index for day-specific queries
