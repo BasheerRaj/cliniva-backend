@@ -107,16 +107,6 @@ describe('AppointmentConflictService', () => {
       expect(result.affectedAppointments).toBe(0);
       expect(mockAppointmentModel.aggregate).toHaveBeenCalled();
     });
-          },
-          clinicId,
-          serviceId,
-          appointmentDate: futureDate,
-          appointmentTime: '10:00',
-          durationMinutes: 30,
-          status: 'scheduled',
-          deletedAt: null,
-        },
-      ];
 
       mockAppointmentModel.exec.mockResolvedValue(mockAppointments);
 
