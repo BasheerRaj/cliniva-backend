@@ -22,6 +22,10 @@ export class CreateComplexDto {
 
   @IsString()
   @IsOptional()
+  personInChargeId?: string;
+
+  @IsString()
+  @IsOptional()
   address?: string;
 
   @IsString()
@@ -80,6 +84,10 @@ export class UpdateComplexDto {
 
   @IsString()
   @IsOptional()
+  personInChargeId?: string;
+
+  @IsString()
+  @IsOptional()
   address?: string;
 
   @IsString()
@@ -129,6 +137,9 @@ export class UpdateComplexDto {
   @IsString()
   @IsOptional()
   crNumber?: string;
+
+  @IsOptional()
+  departmentIds?: string[];
 }
 
 export class SetupBusinessProfileDto {

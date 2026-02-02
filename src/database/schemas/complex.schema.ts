@@ -124,6 +124,30 @@ export class Complex extends Document {
 
   @Prop()
   privacyPolicyUrl?: string;
+
+  // Status management
+  @Prop({
+    type: String,
+    enum: ['active', 'inactive', 'suspended'],
+    default: 'active',
+  })
+  status: string;
+
+  @Prop({ type: Types.ObjectId, ref: 'User' })
+  personInChargeId?: Types.ObjectId;
+
+  @Prop()
+  deactivatedAt?: Date;
+
+  @Prop({ type: Types.ObjectId, ref: 'User' })
+  deactivatedBy?: Types.ObjectId;
+
+  @Prop()
+  deactivationReason?: string;
+
+  // Soft delete
+  @Prop()
+  deletedAt?: Date;
 }
 
 export const ComplexSchema = SchemaFactory.createForClass(Complex);
@@ -138,3 +162,7 @@ ComplexSchema.index({ vatNumber: 1 });
 ComplexSchema.index({ crNumber: 1 });
 // Compound index for complex lookup within organization
 ComplexSchema.index({ organizationId: 1, name: 1 });
+// Status management indexes
+ComplexSchema.index({ status: 1 });
+ComplexSchema.index({ personInChargeId: 1 });
+ComplexSchema.index({ organizationId: 1, status: 1 });
