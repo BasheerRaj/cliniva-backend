@@ -486,6 +486,22 @@ export const ERROR_MESSAGES = {
     en: 'Rescheduling operation failed',
   } as BilingualMessage,
 
+  /**
+   * Error when clinic ID is required but not provided.
+   */
+  CLINIC_ID_REQUIRED: {
+    ar: 'معرف العيادة مطلوب',
+    en: 'Clinic ID is required',
+  } as BilingualMessage,
+
+  /**
+   * Error when complex ID is required but not provided.
+   */
+  COMPLEX_ID_REQUIRED: {
+    ar: 'معرف المجمع مطلوب',
+    en: 'Complex ID is required',
+  } as BilingualMessage,
+
   // ============================================================================
   // Authorization Errors
   // ============================================================================

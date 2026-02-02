@@ -9,9 +9,11 @@ import {
   HttpStatus,
   HttpCode,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBody } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiQuery } from '@nestjs/swagger';
 import { WorkingHoursService } from './working-hours.service';
 import { WorkingHoursValidationService } from './services/working-hours-validation.service';
+import { WorkingHoursSuggestionService } from './services/working-hours-suggestion.service';
+import { AppointmentConflictService } from './services/appointment-conflict.service';
 import {
   CreateWorkingHoursDto,
   UpdateWorkingHoursDto,
@@ -20,6 +22,14 @@ import {
   ValidateWorkingHoursDto,
   ValidateWorkingHoursResponse,
 } from './dto/validate-working-hours.dto';
+import {
+  SuggestWorkingHoursQueryDto,
+  SuggestWorkingHoursResponse,
+} from './dto/suggest-working-hours.dto';
+import {
+  CheckConflictsDto,
+  CheckConflictsResponse,
+} from './dto/check-conflicts.dto';
 import { WorkingHours } from '../database/schemas/working-hours.schema';
 
 @ApiTags('Working Hours')
@@ -28,6 +38,8 @@ export class WorkingHoursController {
   constructor(
     private readonly workingHoursService: WorkingHoursService,
     private readonly validationService: WorkingHoursValidationService,
+    private readonly suggestionService: WorkingHoursSuggestionService,
+    private readonly conflictService: AppointmentConflictService,
   ) {}
 
   @Post()
@@ -253,6 +265,402 @@ export class WorkingHoursController {
               },
             },
           ],
+        },
+      };
+    }
+  }
+
+  /**
+   * Get suggested working hours based on role and entity assignment
+   *
+   * This endpoint provides auto-fill suggestions for working hours based on
+   * the user's role and assigned entity according to business rules:
+   * - BZR-h5e4c7a0: Doctors auto-fill from assigned clinic
+   * - BZR-r2b4e5c7: Staff auto-fill from assigned complex
+   * - Auto-filled hours are editable within constraints
+   *
+   * @param {string} entityType - Entity type (user)
+   * @param {string} entityId - Entity ID
+   * @param {SuggestWorkingHoursQueryDto} query - Query parameters (role, clinicId/complexId)
+   * @returns {Promise<SuggestWorkingHoursResponse>} Suggested schedule with source information
+   *
+   * @example
+   * GET /working-hours/suggest/user/507f1f77bcf86cd799439011?role=doctor&clinicId=507f1f77bcf86cd799439012
+   *
+   * @example
+   * GET /working-hours/suggest/user/507f1f77bcf86cd799439011?role=staff&complexId=507f1f77bcf86cd799439013
+   */
+  @Get('suggest/:entityType/:entityId')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Get suggested working hours based on role',
+    description:
+      'Provides auto-fill suggestions for working hours based on user role and entity assignment. ' +
+      'Doctors get suggestions from assigned clinic, staff get suggestions from assigned complex. ' +
+      'Suggested hours can be modified within parent entity constraints.',
+  })
+  @ApiQuery({
+    name: 'role',
+    enum: ['doctor', 'staff'],
+    description: 'User role to determine suggestion source',
+    required: true,
+    example: 'doctor',
+  })
+  @ApiQuery({
+    name: 'clinicId',
+    type: String,
+    description: 'Clinic ID for doctor role (required for doctors)',
+    required: false,
+    example: '507f1f77bcf86cd799439011',
+  })
+  @ApiQuery({
+    name: 'complexId',
+    type: String,
+    description: 'Complex ID for staff role (required for staff)',
+    required: false,
+    example: '507f1f77bcf86cd799439012',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Suggestions retrieved successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: true },
+        data: {
+          type: 'object',
+          properties: {
+            suggestedSchedule: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  dayOfWeek: { type: 'string', example: 'monday' },
+                  isWorkingDay: { type: 'boolean', example: true },
+                  openingTime: { type: 'string', example: '08:00' },
+                  closingTime: { type: 'string', example: '17:00' },
+                  breakStartTime: { type: 'string', example: '12:00' },
+                  breakEndTime: { type: 'string', example: '13:00' },
+                },
+              },
+            },
+            source: {
+              type: 'object',
+              properties: {
+                entityType: { type: 'string', example: 'clinic' },
+                entityId: { type: 'string', example: '507f1f77bcf86cd799439011' },
+                entityName: { type: 'string', example: 'Main Clinic' },
+              },
+            },
+            canModify: { type: 'boolean', example: true },
+          },
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid request parameters',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Entity or working hours not found',
+  })
+  async getSuggestedWorkingHours(
+    @Param('entityType') entityType: string,
+    @Param('entityId') entityId: string,
+    @Query() query: SuggestWorkingHoursQueryDto,
+  ): Promise<SuggestWorkingHoursResponse> {
+    try {
+      // Get suggested hours based on role
+      const suggestionResult = await this.suggestionService.getSuggestedHours(
+        query.role,
+        query.clinicId,
+        query.complexId,
+      );
+
+      return {
+        success: true,
+        data: suggestionResult,
+      };
+    } catch (error) {
+      // Return error in standard format
+      throw error;
+    }
+  }
+
+  /**
+   * Check for appointment conflicts when updating doctor working hours
+   *
+   * This endpoint identifies appointments that would fall outside new working hours
+   * when a doctor's schedule is updated. It provides detailed conflict information
+   * to support rescheduling decisions according to business rules:
+   * - BZR-l9e0f1c4: Detect appointments outside new working hours
+   * - BZR-43: Identify appointments requiring rescheduling
+   *
+   * @param {CheckConflictsDto} checkDto - Conflict check request data
+   * @returns {Promise<CheckConflictsResponse>} Conflict detection result with details
+   *
+   * @example
+   * POST /working-hours/check-conflicts
+   * {
+   *   "userId": "507f1f77bcf86cd799439011",
+   *   "schedule": [
+   *     {
+   *       "dayOfWeek": "monday",
+   *       "isWorkingDay": true,
+   *       "openingTime": "09:00",
+   *       "closingTime": "17:00"
+   *     },
+   *     {
+   *       "dayOfWeek": "tuesday",
+   *       "isWorkingDay": false
+   *     }
+   *   ]
+   * }
+   */
+  @Post('check-conflicts')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Check for appointment conflicts',
+    description:
+      'Identifies appointments that would fall outside new working hours when updating a doctor\'s schedule. ' +
+      'Returns detailed conflict information including patient names, appointment times, and conflict reasons. ' +
+      'Used to inform rescheduling decisions before applying working hours changes.',
+  })
+  @ApiBody({
+    type: CheckConflictsDto,
+    description: 'Conflict check request with user ID and new schedule',
+    examples: {
+      'doctor-schedule-change': {
+        summary: 'Check conflicts for doctor schedule change',
+        value: {
+          userId: '507f1f77bcf86cd799439011',
+          schedule: [
+            {
+              dayOfWeek: 'monday',
+              isWorkingDay: true,
+              openingTime: '09:00',
+              closingTime: '17:00',
+            },
+            {
+              dayOfWeek: 'tuesday',
+              isWorkingDay: true,
+              openingTime: '09:00',
+              closingTime: '17:00',
+            },
+            {
+              dayOfWeek: 'wednesday',
+              isWorkingDay: false,
+            },
+            {
+              dayOfWeek: 'thursday',
+              isWorkingDay: true,
+              openingTime: '10:00',
+              closingTime: '18:00',
+            },
+            {
+              dayOfWeek: 'friday',
+              isWorkingDay: false,
+            },
+            {
+              dayOfWeek: 'saturday',
+              isWorkingDay: true,
+              openingTime: '08:00',
+              closingTime: '14:00',
+            },
+            {
+              dayOfWeek: 'sunday',
+              isWorkingDay: false,
+            },
+          ],
+        },
+      },
+      'reduced-hours': {
+        summary: 'Check conflicts when reducing working hours',
+        value: {
+          userId: '507f1f77bcf86cd799439012',
+          schedule: [
+            {
+              dayOfWeek: 'monday',
+              isWorkingDay: true,
+              openingTime: '10:00',
+              closingTime: '15:00',
+            },
+            {
+              dayOfWeek: 'tuesday',
+              isWorkingDay: true,
+              openingTime: '10:00',
+              closingTime: '15:00',
+            },
+            {
+              dayOfWeek: 'wednesday',
+              isWorkingDay: false,
+            },
+            {
+              dayOfWeek: 'thursday',
+              isWorkingDay: false,
+            },
+            {
+              dayOfWeek: 'friday',
+              isWorkingDay: false,
+            },
+            {
+              dayOfWeek: 'saturday',
+              isWorkingDay: false,
+            },
+            {
+              dayOfWeek: 'sunday',
+              isWorkingDay: false,
+            },
+          ],
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Conflict check completed successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: true },
+        data: {
+          type: 'object',
+          properties: {
+            hasConflicts: {
+              type: 'boolean',
+              example: true,
+              description: 'Whether any conflicts were detected',
+            },
+            conflicts: {
+              type: 'array',
+              description: 'Array of conflicting appointments with details',
+              items: {
+                type: 'object',
+                properties: {
+                  appointmentId: {
+                    type: 'string',
+                    example: '507f1f77bcf86cd799439013',
+                    description: 'Unique identifier of the conflicting appointment',
+                  },
+                  patientName: {
+                    type: 'string',
+                    example: 'John Doe',
+                    description: 'Full name of the patient',
+                  },
+                  appointmentDate: {
+                    type: 'string',
+                    example: '2026-02-15',
+                    description: 'Date of the appointment (YYYY-MM-DD)',
+                  },
+                  appointmentTime: {
+                    type: 'string',
+                    example: '08:30',
+                    description: 'Time of the appointment (HH:mm)',
+                  },
+                  conflictReason: {
+                    type: 'object',
+                    description: 'Bilingual explanation of the conflict',
+                    properties: {
+                      ar: {
+                        type: 'string',
+                        example: 'الموعد في 08:30 قبل وقت الفتح الجديد 09:00',
+                      },
+                      en: {
+                        type: 'string',
+                        example:
+                          'Appointment at 08:30 is before new opening time 09:00',
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            affectedAppointments: {
+              type: 'number',
+              example: 3,
+              description: 'Total number of appointments affected',
+            },
+            requiresRescheduling: {
+              type: 'boolean',
+              example: true,
+              description: 'Whether rescheduling action is required',
+            },
+          },
+        },
+        message: {
+          type: 'object',
+          properties: {
+            ar: {
+              type: 'string',
+              example: 'تم اكتشاف 3 مواعيد متعارضة',
+            },
+            en: {
+              type: 'string',
+              example: '3 conflicting appointments detected',
+            },
+          },
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid request data',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'User not found',
+  })
+  async checkConflicts(
+    @Body() checkDto: CheckConflictsDto,
+  ): Promise<CheckConflictsResponse> {
+    try {
+      // Check for conflicts using the conflict service
+      const conflictResult = await this.conflictService.checkConflicts(
+        checkDto.userId,
+        checkDto.schedule,
+      );
+
+      // Prepare response message
+      let message;
+      if (conflictResult.hasConflicts) {
+        const count = conflictResult.affectedAppointments;
+        message = {
+          ar: `تم اكتشاف ${count} ${count === 1 ? 'موعد متعارض' : 'مواعيد متعارضة'}`,
+          en: `${count} conflicting ${count === 1 ? 'appointment' : 'appointments'} detected`,
+        };
+      } else {
+        message = {
+          ar: 'لا توجد مواعيد متعارضة',
+          en: 'No conflicting appointments found',
+        };
+      }
+
+      return {
+        success: true,
+        data: {
+          hasConflicts: conflictResult.hasConflicts,
+          conflicts: conflictResult.conflicts,
+          affectedAppointments: conflictResult.affectedAppointments,
+          requiresRescheduling: conflictResult.requiresRescheduling,
+        },
+        message,
+      };
+    } catch (error) {
+      // Return error in standard format
+      return {
+        success: false,
+        data: {
+          hasConflicts: false,
+          conflicts: [],
+          affectedAppointments: 0,
+          requiresRescheduling: false,
+        },
+        message: {
+          ar: 'فشل التحقق من تعارض المواعيد',
+          en: 'Failed to check appointment conflicts',
         },
       };
     }

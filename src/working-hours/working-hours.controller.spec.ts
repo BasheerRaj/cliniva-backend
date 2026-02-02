@@ -2,6 +2,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { WorkingHoursController } from './working-hours.controller';
 import { WorkingHoursService } from './working-hours.service';
 import { WorkingHoursValidationService } from './services/working-hours-validation.service';
+import { WorkingHoursSuggestionService } from './services/working-hours-suggestion.service';
+import { AppointmentConflictService } from './services/appointment-conflict.service';
 import { ValidateWorkingHoursDto } from './dto/validate-working-hours.dto';
 
 describe('WorkingHoursController - Validation Endpoint', () => {
@@ -10,6 +12,17 @@ describe('WorkingHoursController - Validation Endpoint', () => {
 
   const mockValidationService = {
     validateHierarchical: jest.fn(),
+  };
+
+  const mockSuggestionService = {
+    getSuggestedHours: jest.fn(),
+    getEntityDetails: jest.fn(),
+  };
+
+  const mockConflictService = {
+    checkConflicts: jest.fn(),
+    getAppointmentsByDay: jest.fn(),
+    isAppointmentWithinHours: jest.fn(),
   };
 
   const mockWorkingHoursService = {
@@ -31,6 +44,14 @@ describe('WorkingHoursController - Validation Endpoint', () => {
         {
           provide: WorkingHoursValidationService,
           useValue: mockValidationService,
+        },
+        {
+          provide: WorkingHoursSuggestionService,
+          useValue: mockSuggestionService,
+        },
+        {
+          provide: AppointmentConflictService,
+          useValue: mockConflictService,
         },
       ],
     }).compile();
