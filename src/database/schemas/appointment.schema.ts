@@ -107,3 +107,9 @@ AppointmentSchema.index({
   appointmentDate: 1,
   appointmentTime: 1,
 }); // Index for time-based queries
+
+// Composite index for clinic capacity patient count queries
+AppointmentSchema.index({
+  clinicId: 1,
+  deletedAt: 1,
+}); // Optimized for patient aggregation in capacity calculations

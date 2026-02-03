@@ -559,4 +559,93 @@ export class AuditService {
       );
     }
   }
+
+  /**
+   * Log clinic status change event
+   * @param clinicId - Clinic ID whose status was changed
+   * @param oldStatus - Previous status
+   * @param newStatus - New status
+   * @param reason - Reason for status change
+   * @param changedBy - User ID who made the change
+   * @param ipAddress - IP address of the request
+   * @param userAgent - User agent string from the request
+   */
+  async logClinicStatusChange(
+    clinicId: string,
+    oldStatus: string,
+    newStatus: string,
+    reason: string | undefined,
+    changedBy: string,
+    ipAddress: string,
+    userAgent?: string,
+  ): Promise<void> {
+    try {
+      await this.auditLogModel.create({
+        eventType: AuditEventType.CLINIC_STATUS_CHANGED,
+        userId: new Types.ObjectId(changedBy),
+        adminId: new Types.ObjectId(changedBy),
+        ipAddress,
+        userAgent,
+        timestamp: new Date(),
+        success: true,
+        details: {
+          action: 'Clinic status changed',
+          clinicId,
+          oldStatus,
+          newStatus,
+          reason: reason || 'No reason provided',
+        },
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to log clinic status change for clinic ${clinicId}`,
+        error,
+      );
+    }
+  }
+
+  /**
+   * Log clinic staff transfer event
+   * @param fromClinicId - Source clinic ID
+   * @param toClinicId - Target clinic ID
+   * @param doctorsTransferred - Number of doctors transferred
+   * @param staffTransferred - Number of staff transferred
+   * @param transferredBy - User ID who initiated the transfer
+   * @param ipAddress - IP address of the request
+   * @param userAgent - User agent string from the request
+   */
+  async logClinicStaffTransfer(
+    fromClinicId: string,
+    toClinicId: string,
+    doctorsTransferred: number,
+    staffTransferred: number,
+    transferredBy: string,
+    ipAddress: string,
+    userAgent?: string,
+  ): Promise<void> {
+    try {
+      await this.auditLogModel.create({
+        eventType: AuditEventType.CLINIC_STAFF_TRANSFERRED,
+        userId: new Types.ObjectId(transferredBy),
+        adminId: new Types.ObjectId(transferredBy),
+        ipAddress,
+        userAgent,
+        timestamp: new Date(),
+        success: true,
+        details: {
+          action: 'Staff transferred between clinics',
+          fromClinicId,
+          toClinicId,
+          doctorsTransferred,
+          staffTransferred,
+          totalTransferred: doctorsTransferred + staffTransferred,
+        },
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to log staff transfer from clinic ${fromClinicId} to ${toClinicId}`,
+        error,
+      );
+    }
+  }
 }

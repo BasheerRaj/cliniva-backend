@@ -7,11 +7,13 @@ import { ComplexSchema } from '../database/schemas/complex.schema';
 import { UserSchema } from '../database/schemas/user.schema';
 import { AppointmentSchema } from '../database/schemas/appointment.schema';
 import { WorkingHoursSchema } from '../database/schemas/working-hours.schema';
+import { AuditLogSchema } from '../database/schemas/audit-log.schema';
 import { SubscriptionModule } from '../subscription/subscription.module';
 import { CommonModule } from '../common/common.module';
 import { ClinicCapacityService } from './services/clinic-capacity.service';
 import { ClinicWorkingHoursService } from './services/clinic-working-hours.service';
 import { ClinicStatusService } from './services/clinic-status.service';
+import { AuditService } from '../auth/audit.service';
 
 @Module({
   imports: [
@@ -21,6 +23,7 @@ import { ClinicStatusService } from './services/clinic-status.service';
       { name: 'User', schema: UserSchema },
       { name: 'Appointment', schema: AppointmentSchema },
       { name: 'WorkingHours', schema: WorkingHoursSchema },
+      { name: 'AuditLog', schema: AuditLogSchema },
     ]),
     SubscriptionModule,
     CommonModule,
@@ -31,6 +34,7 @@ import { ClinicStatusService } from './services/clinic-status.service';
     ClinicCapacityService,
     ClinicWorkingHoursService,
     ClinicStatusService,
+    AuditService,
   ],
   exports: [
     ClinicService,

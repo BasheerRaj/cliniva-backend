@@ -26,6 +26,7 @@ describe('ClinicCapacityService', () => {
     // Create mocks
     mockClinicModel = {
       findById: jest.fn(),
+      aggregate: jest.fn(),
     };
 
     mockUserModel = {
@@ -92,19 +93,21 @@ describe('ClinicCapacityService', () => {
         },
       ];
 
-      mockClinicModel.findById.mockResolvedValue(mockClinic);
-
-      mockUserModel.find.mockReturnValueOnce({
-        select: jest.fn().mockReturnThis(),
-        lean: jest.fn().mockResolvedValue(mockDoctors),
-      });
-
-      mockUserModel.find.mockReturnValueOnce({
-        select: jest.fn().mockReturnThis(),
-        lean: jest.fn().mockResolvedValue(mockStaff),
-      });
-
-      mockAppointmentModel.aggregate.mockResolvedValue([{ total: 50 }]);
+      // Mock aggregation pipeline response
+      mockClinicModel.aggregate.mockResolvedValue([
+        {
+          _id: new Types.ObjectId(mockClinicId),
+          name: 'Test Clinic',
+          maxDoctors: 10,
+          maxStaff: 20,
+          maxPatients: 100,
+          doctors: mockDoctors,
+          staff: mockStaff,
+          currentDoctors: 2,
+          currentStaff: 1,
+          currentPatients: 50,
+        },
+      ]);
 
       // Act
       const result = await service.getCapacityStatus(mockClinicId);
@@ -153,19 +156,21 @@ describe('ClinicCapacityService', () => {
         role: 'doctor',
       }));
 
-      mockClinicModel.findById.mockResolvedValue(mockClinic);
-
-      mockUserModel.find.mockReturnValueOnce({
-        select: jest.fn().mockReturnThis(),
-        lean: jest.fn().mockResolvedValue(mockDoctors),
-      });
-
-      mockUserModel.find.mockReturnValueOnce({
-        select: jest.fn().mockReturnThis(),
-        lean: jest.fn().mockResolvedValue([]),
-      });
-
-      mockAppointmentModel.aggregate.mockResolvedValue([{ total: 50 }]);
+      // Mock aggregation pipeline response
+      mockClinicModel.aggregate.mockResolvedValue([
+        {
+          _id: new Types.ObjectId(mockClinicId),
+          name: 'Test Clinic',
+          maxDoctors: 10,
+          maxStaff: 20,
+          maxPatients: 100,
+          doctors: mockDoctors,
+          staff: [],
+          currentDoctors: 12,
+          currentStaff: 0,
+          currentPatients: 50,
+        },
+      ]);
 
       // Act
       const result = await service.getCapacityStatus(mockClinicId);
@@ -191,19 +196,21 @@ describe('ClinicCapacityService', () => {
         role: 'nurse',
       }));
 
-      mockClinicModel.findById.mockResolvedValue(mockClinic);
-
-      mockUserModel.find.mockReturnValueOnce({
-        select: jest.fn().mockReturnThis(),
-        lean: jest.fn().mockResolvedValue([]),
-      });
-
-      mockUserModel.find.mockReturnValueOnce({
-        select: jest.fn().mockReturnThis(),
-        lean: jest.fn().mockResolvedValue(mockStaff),
-      });
-
-      mockAppointmentModel.aggregate.mockResolvedValue([{ total: 50 }]);
+      // Mock aggregation pipeline response
+      mockClinicModel.aggregate.mockResolvedValue([
+        {
+          _id: new Types.ObjectId(mockClinicId),
+          name: 'Test Clinic',
+          maxDoctors: 10,
+          maxStaff: 20,
+          maxPatients: 100,
+          doctors: [],
+          staff: mockStaff,
+          currentDoctors: 0,
+          currentStaff: 25,
+          currentPatients: 50,
+        },
+      ]);
 
       // Act
       const result = await service.getCapacityStatus(mockClinicId);
@@ -221,19 +228,21 @@ describe('ClinicCapacityService', () => {
 
     it('should detect exceeded patient capacity', async () => {
       // Arrange
-      mockClinicModel.findById.mockResolvedValue(mockClinic);
-
-      mockUserModel.find.mockReturnValueOnce({
-        select: jest.fn().mockReturnThis(),
-        lean: jest.fn().mockResolvedValue([]),
-      });
-
-      mockUserModel.find.mockReturnValueOnce({
-        select: jest.fn().mockReturnThis(),
-        lean: jest.fn().mockResolvedValue([]),
-      });
-
-      mockAppointmentModel.aggregate.mockResolvedValue([{ total: 120 }]);
+      // Mock aggregation pipeline response
+      mockClinicModel.aggregate.mockResolvedValue([
+        {
+          _id: new Types.ObjectId(mockClinicId),
+          name: 'Test Clinic',
+          maxDoctors: 10,
+          maxStaff: 20,
+          maxPatients: 100,
+          doctors: [],
+          staff: [],
+          currentDoctors: 0,
+          currentStaff: 0,
+          currentPatients: 120,
+        },
+      ]);
 
       // Act
       const result = await service.getCapacityStatus(mockClinicId);
@@ -267,19 +276,21 @@ describe('ClinicCapacityService', () => {
         role: 'nurse',
       }));
 
-      mockClinicModel.findById.mockResolvedValue(mockClinic);
-
-      mockUserModel.find.mockReturnValueOnce({
-        select: jest.fn().mockReturnThis(),
-        lean: jest.fn().mockResolvedValue(mockDoctors),
-      });
-
-      mockUserModel.find.mockReturnValueOnce({
-        select: jest.fn().mockReturnThis(),
-        lean: jest.fn().mockResolvedValue(mockStaff),
-      });
-
-      mockAppointmentModel.aggregate.mockResolvedValue([{ total: 120 }]);
+      // Mock aggregation pipeline response
+      mockClinicModel.aggregate.mockResolvedValue([
+        {
+          _id: new Types.ObjectId(mockClinicId),
+          name: 'Test Clinic',
+          maxDoctors: 10,
+          maxStaff: 20,
+          maxPatients: 100,
+          doctors: mockDoctors,
+          staff: mockStaff,
+          currentDoctors: 12,
+          currentStaff: 25,
+          currentPatients: 120,
+        },
+      ]);
 
       // Act
       const result = await service.getCapacityStatus(mockClinicId);
@@ -299,7 +310,7 @@ describe('ClinicCapacityService', () => {
 
     it('should throw NotFoundException for invalid clinic', async () => {
       // Arrange
-      mockClinicModel.findById.mockResolvedValue(null);
+      mockClinicModel.aggregate.mockResolvedValue([]);
 
       // Act & Assert
       await expect(service.getCapacityStatus(mockClinicId)).rejects.toThrow(
@@ -309,26 +320,21 @@ describe('ClinicCapacityService', () => {
 
     it('should handle zero capacity limits', async () => {
       // Arrange
-      const clinicWithZeroLimits = {
-        ...mockClinic,
-        maxDoctors: 0,
-        maxStaff: 0,
-        maxPatients: 0,
-      };
-
-      mockClinicModel.findById.mockResolvedValue(clinicWithZeroLimits);
-
-      mockUserModel.find.mockReturnValueOnce({
-        select: jest.fn().mockReturnThis(),
-        lean: jest.fn().mockResolvedValue([]),
-      });
-
-      mockUserModel.find.mockReturnValueOnce({
-        select: jest.fn().mockReturnThis(),
-        lean: jest.fn().mockResolvedValue([]),
-      });
-
-      mockAppointmentModel.aggregate.mockResolvedValue([]);
+      // Mock aggregation pipeline response
+      mockClinicModel.aggregate.mockResolvedValue([
+        {
+          _id: new Types.ObjectId(mockClinicId),
+          name: 'Test Clinic',
+          maxDoctors: 0,
+          maxStaff: 0,
+          maxPatients: 0,
+          doctors: [],
+          staff: [],
+          currentDoctors: 0,
+          currentStaff: 0,
+          currentPatients: 0,
+        },
+      ]);
 
       // Act
       const result = await service.getCapacityStatus(mockClinicId);
@@ -341,19 +347,21 @@ describe('ClinicCapacityService', () => {
 
     it('should handle empty patient aggregation result', async () => {
       // Arrange
-      mockClinicModel.findById.mockResolvedValue(mockClinic);
-
-      mockUserModel.find.mockReturnValueOnce({
-        select: jest.fn().mockReturnThis(),
-        lean: jest.fn().mockResolvedValue([]),
-      });
-
-      mockUserModel.find.mockReturnValueOnce({
-        select: jest.fn().mockReturnThis(),
-        lean: jest.fn().mockResolvedValue([]),
-      });
-
-      mockAppointmentModel.aggregate.mockResolvedValue([]);
+      // Mock aggregation pipeline response with no patients
+      mockClinicModel.aggregate.mockResolvedValue([
+        {
+          _id: new Types.ObjectId(mockClinicId),
+          name: 'Test Clinic',
+          maxDoctors: 10,
+          maxStaff: 20,
+          maxPatients: 100,
+          doctors: [],
+          staff: [],
+          currentDoctors: 0,
+          currentStaff: 0,
+          currentPatients: 0,
+        },
+      ]);
 
       // Act
       const result = await service.getCapacityStatus(mockClinicId);
@@ -367,33 +375,45 @@ describe('ClinicCapacityService', () => {
   describe('Cache functionality', () => {
     it('should cache capacity results', async () => {
       // Arrange
-      mockClinicModel.findById.mockResolvedValue(mockClinic);
-
-      mockUserModel.find.mockReturnValue({
-        select: jest.fn().mockReturnThis(),
-        lean: jest.fn().mockResolvedValue([]),
-      });
-
-      mockAppointmentModel.aggregate.mockResolvedValue([{ total: 50 }]);
+      mockClinicModel.aggregate.mockResolvedValue([
+        {
+          _id: new Types.ObjectId(mockClinicId),
+          name: 'Test Clinic',
+          maxDoctors: 10,
+          maxStaff: 20,
+          maxPatients: 100,
+          doctors: [],
+          staff: [],
+          currentDoctors: 0,
+          currentStaff: 0,
+          currentPatients: 50,
+        },
+      ]);
 
       // Act
       await service.getCapacityStatus(mockClinicId);
       await service.getCapacityStatus(mockClinicId);
 
       // Assert - should only call database once due to caching
-      expect(mockClinicModel.findById).toHaveBeenCalledTimes(1);
+      expect(mockClinicModel.aggregate).toHaveBeenCalledTimes(1);
     });
 
     it('should invalidate cache for specific clinic', async () => {
       // Arrange
-      mockClinicModel.findById.mockResolvedValue(mockClinic);
-
-      mockUserModel.find.mockReturnValue({
-        select: jest.fn().mockReturnThis(),
-        lean: jest.fn().mockResolvedValue([]),
-      });
-
-      mockAppointmentModel.aggregate.mockResolvedValue([{ total: 50 }]);
+      mockClinicModel.aggregate.mockResolvedValue([
+        {
+          _id: new Types.ObjectId(mockClinicId),
+          name: 'Test Clinic',
+          maxDoctors: 10,
+          maxStaff: 20,
+          maxPatients: 100,
+          doctors: [],
+          staff: [],
+          currentDoctors: 0,
+          currentStaff: 0,
+          currentPatients: 50,
+        },
+      ]);
 
       // Act
       await service.getCapacityStatus(mockClinicId);
@@ -401,7 +421,7 @@ describe('ClinicCapacityService', () => {
       await service.getCapacityStatus(mockClinicId);
 
       // Assert - should call database twice after cache invalidation
-      expect(mockClinicModel.findById).toHaveBeenCalledTimes(2);
+      expect(mockClinicModel.aggregate).toHaveBeenCalledTimes(2);
     });
 
     it('should clear all cache', async () => {
@@ -409,14 +429,20 @@ describe('ClinicCapacityService', () => {
       const clinicId1 = new Types.ObjectId().toString();
       const clinicId2 = new Types.ObjectId().toString();
 
-      mockClinicModel.findById.mockResolvedValue(mockClinic);
-
-      mockUserModel.find.mockReturnValue({
-        select: jest.fn().mockReturnThis(),
-        lean: jest.fn().mockResolvedValue([]),
-      });
-
-      mockAppointmentModel.aggregate.mockResolvedValue([{ total: 50 }]);
+      mockClinicModel.aggregate.mockResolvedValue([
+        {
+          _id: new Types.ObjectId(mockClinicId),
+          name: 'Test Clinic',
+          maxDoctors: 10,
+          maxStaff: 20,
+          maxPatients: 100,
+          doctors: [],
+          staff: [],
+          currentDoctors: 0,
+          currentStaff: 0,
+          currentPatients: 50,
+        },
+      ]);
 
       // Act
       await service.getCapacityStatus(clinicId1);
@@ -426,7 +452,7 @@ describe('ClinicCapacityService', () => {
       await service.getCapacityStatus(clinicId2);
 
       // Assert - should call database 4 times (2 before clear, 2 after)
-      expect(mockClinicModel.findById).toHaveBeenCalledTimes(4);
+      expect(mockClinicModel.aggregate).toHaveBeenCalledTimes(4);
     });
   });
 });

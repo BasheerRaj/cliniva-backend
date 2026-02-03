@@ -25,4 +25,7 @@ export enum AuditEventType {
   DOCTOR_DEACTIVATED = 'doctor_deactivated',
   APPOINTMENTS_TRANSFERRED = 'appointments_transferred',
   APPOINTMENTS_RESCHEDULED = 'appointments_rescheduled',
+  // Clinic Management Events
+  CLINIC_STATUS_CHANGED = 'clinic_status_changed',
+  CLINIC_STAFF_TRANSFERRED = 'clinic_staff_transferred',
 }

@@ -111,3 +111,4 @@ UserSchema.index({ isActive: 1 });
 UserSchema.index({ emailVerified: 1 });
 UserSchema.index({ phone: 1 });
 UserSchema.index({ isActive: 1, role: 1 }); // Composite index for user management queries
+UserSchema.index({ clinicId: 1, role: 1, isActive: 1 }); // Composite index for clinic capacity queries

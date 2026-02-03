@@ -9,6 +9,7 @@ import { Clinic } from '../../database/schemas/clinic.schema';
 import { User } from '../../database/schemas/user.schema';
 import { Appointment } from '../../database/schemas/appointment.schema';
 import { ERROR_CODES } from '../constants/error-codes.constant';
+import { AuditService } from '../../auth/audit.service';
 
 /**
  * Options for changing clinic status
@@ -74,6 +75,7 @@ export class ClinicStatusService {
     @InjectModel('User') private userModel: Model<User>,
     @InjectModel('Appointment') private appointmentModel: Model<Appointment>,
     @InjectConnection() private connection: Connection,
+    private readonly auditService: AuditService,
   ) {}
 
   /**
@@ -98,6 +100,9 @@ export class ClinicStatusService {
         message: ERROR_CODES.CLINIC_007.message,
       });
     }
+
+    // Store old status for audit logging
+    const oldStatus = clinic.status;
 
     // 2. Check for active appointments and staff
     const activeAppointments = await this.appointmentModel.countDocuments({
@@ -172,6 +177,7 @@ export class ClinicStatusService {
             handleConflicts: 'reschedule',
           },
           session,
+          userId,
         );
 
         doctorsTransferred = transferResult.doctorsTransferred;
@@ -199,7 +205,17 @@ export class ClinicStatusService {
       // 8. Commit transaction
       await session.commitTransaction();
 
-      // 9. Send notifications (outside transaction)
+      // 9. Log audit event for status change
+      await this.auditService.logClinicStatusChange(
+        clinicId,
+        oldStatus,
+        options.status,
+        options.reason,
+        userId,
+        '0.0.0.0', // IP address should be passed from controller
+      );
+
+      // 10. Send notifications (outside transaction)
       const notificationsSent = await this.sendNotifications(clinic, options, {
         doctorsTransferred,
         staffTransferred,
@@ -229,12 +245,14 @@ export class ClinicStatusService {
    * @param fromClinicId - Source clinic ID
    * @param options - Transfer options
    * @param session - MongoDB session for transaction
+   * @param userId - User ID who initiated the transfer
    * @returns Transfer result
    */
   async transferStaff(
     fromClinicId: string,
     options: TransferOptions,
     session?: any,
+    userId?: string,
   ): Promise<TransferResult> {
     // 1. Validate target clinic exists
     const targetClinic = await this.clinicModel.findById(
@@ -334,6 +352,22 @@ export class ClinicStatusService {
       );
 
       staffTransferred = result.modifiedCount;
+    }
+
+    // 4. Log audit event for staff transfer (if userId provided and transfer occurred)
+    if (userId && (doctorsTransferred > 0 || staffTransferred > 0)) {
+      // Log after transaction commits, so we do it outside the session
+      // This will be called after the transaction in changeStatus
+      setImmediate(() => {
+        this.auditService.logClinicStaffTransfer(
+          fromClinicId,
+          options.targetClinicId,
+          doctorsTransferred,
+          staffTransferred,
+          userId,
+          '0.0.0.0', // IP address should be passed from controller
+        );
+      });
     }
 
     return {

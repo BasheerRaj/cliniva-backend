@@ -111,29 +111,118 @@ export class ClinicCapacityService {
   /**
    * Calculate capacity without caching
    * Private method used by getCapacityStatus
+   * OPTIMIZED: Uses aggregation pipeline to reduce database round trips
    */
   private async calculateCapacity(
     clinicId: string,
   ): Promise<CapacityStatusResponse> {
-    // 1. Validate clinic exists
-    const clinic = await this.clinicModel.findById(clinicId);
-    if (!clinic) {
+    // Use aggregation pipeline to fetch clinic and all capacity data in one query
+    const capacityAggregation = await this.clinicModel.aggregate([
+      {
+        $match: { _id: new Types.ObjectId(clinicId) },
+      },
+      {
+        $lookup: {
+          from: 'users',
+          let: { clinicId: '$_id' },
+          pipeline: [
+            {
+              $match: {
+                $expr: { $eq: ['$clinicId', '$$clinicId'] },
+                isActive: true,
+                role: 'doctor',
+              },
+            },
+            {
+              $project: {
+                _id: 1,
+                firstName: 1,
+                lastName: 1,
+                email: 1,
+                role: 1,
+              },
+            },
+          ],
+          as: 'doctors',
+        },
+      },
+      {
+        $lookup: {
+          from: 'users',
+          let: { clinicId: '$_id' },
+          pipeline: [
+            {
+              $match: {
+                $expr: { $eq: ['$clinicId', '$$clinicId'] },
+                isActive: true,
+                role: { $nin: ['doctor', 'patient'] },
+              },
+            },
+            {
+              $project: {
+                _id: 1,
+                firstName: 1,
+                lastName: 1,
+                email: 1,
+                role: 1,
+              },
+            },
+          ],
+          as: 'staff',
+        },
+      },
+      {
+        $lookup: {
+          from: 'appointments',
+          let: { clinicId: '$_id' },
+          pipeline: [
+            {
+              $match: {
+                $expr: { $eq: ['$clinicId', '$$clinicId'] },
+                deletedAt: null,
+              },
+            },
+            {
+              $group: {
+                _id: '$patientId',
+              },
+            },
+          ],
+          as: 'uniquePatients',
+        },
+      },
+      {
+        $project: {
+          _id: 1,
+          name: 1,
+          maxDoctors: 1,
+          maxStaff: 1,
+          maxPatients: 1,
+          doctors: 1,
+          staff: 1,
+          currentDoctors: { $size: '$doctors' },
+          currentStaff: { $size: '$staff' },
+          currentPatients: { $size: '$uniquePatients' },
+        },
+      },
+    ]);
+
+    // Check if clinic exists
+    if (!capacityAggregation || capacityAggregation.length === 0) {
       throw new NotFoundException({
         code: 'CLINIC_007',
         message: ERROR_CODES.CLINIC_007.message,
       });
     }
 
-    // 2. Calculate doctors capacity with personnel list
-    const doctors = await this.calculateDoctorsCapacity(clinicId, clinic);
+    const result = capacityAggregation[0];
 
-    // 3. Calculate staff capacity with personnel list
-    const staff = await this.calculateStaffCapacity(clinicId, clinic);
+    // Build capacity breakdown from aggregation result
+    const doctors = this.buildDoctorsCapacity(result);
+    const staff = this.buildStaffCapacity(result);
+    const patients = this.buildPatientsCapacity(result);
 
-    // 4. Calculate patients capacity
-    const patients = await this.calculatePatientsCapacity(clinicId, clinic);
-
-    // 5. Generate recommendations
+    // Generate recommendations
     const recommendations = this.generateRecommendations({
       doctors,
       staff,
@@ -141,39 +230,27 @@ export class ClinicCapacityService {
     });
 
     return {
-      clinicId,
-      clinicName: clinic.name,
+      clinicId: result._id.toString(),
+      clinicName: result.name,
       capacity: { doctors, staff, patients },
       recommendations,
     };
   }
 
   /**
-   * Calculate doctors capacity with personnel list
+   * Build doctors capacity from aggregation result
    */
-  private async calculateDoctorsCapacity(
-    clinicId: string,
-    clinic: Clinic,
-  ): Promise<CapacityMetrics & { list: PersonnelList[] }> {
-    const maxDoctors = clinic.maxDoctors || 0;
-
-    // Get all active doctors assigned to this clinic
-    const doctorsList = await this.userModel
-      .find({
-        clinicId: new Types.ObjectId(clinicId),
-        role: 'doctor',
-        isActive: true,
-      })
-      .select('_id firstName lastName email role')
-      .lean();
-
-    const currentDoctors = doctorsList.length;
+  private buildDoctorsCapacity(result: any): CapacityMetrics & {
+    list: PersonnelList[];
+  } {
+    const maxDoctors = result.maxDoctors || 0;
+    const currentDoctors = result.currentDoctors || 0;
     const available = maxDoctors - currentDoctors;
     const percentage =
       maxDoctors > 0 ? Math.round((currentDoctors / maxDoctors) * 100) : 0;
     const isExceeded = currentDoctors > maxDoctors;
 
-    const list: PersonnelList[] = doctorsList.map((doc) => ({
+    const list: PersonnelList[] = (result.doctors || []).map((doc: any) => ({
       id: doc._id.toString(),
       name: `${doc.firstName} ${doc.lastName}`,
       role: doc.role,
@@ -191,31 +268,19 @@ export class ClinicCapacityService {
   }
 
   /**
-   * Calculate staff capacity with personnel list
+   * Build staff capacity from aggregation result
    */
-  private async calculateStaffCapacity(
-    clinicId: string,
-    clinic: Clinic,
-  ): Promise<CapacityMetrics & { list: PersonnelList[] }> {
-    const maxStaff = clinic.maxStaff || 0;
-
-    // Get all active staff (non-doctor, non-patient roles)
-    const staffList = await this.userModel
-      .find({
-        clinicId: new Types.ObjectId(clinicId),
-        role: { $nin: ['doctor', 'patient'] },
-        isActive: true,
-      })
-      .select('_id firstName lastName email role')
-      .lean();
-
-    const currentStaff = staffList.length;
+  private buildStaffCapacity(result: any): CapacityMetrics & {
+    list: PersonnelList[];
+  } {
+    const maxStaff = result.maxStaff || 0;
+    const currentStaff = result.currentStaff || 0;
     const available = maxStaff - currentStaff;
     const percentage =
       maxStaff > 0 ? Math.round((currentStaff / maxStaff) * 100) : 0;
     const isExceeded = currentStaff > maxStaff;
 
-    const list: PersonnelList[] = staffList.map((staff) => ({
+    const list: PersonnelList[] = (result.staff || []).map((staff: any) => ({
       id: staff._id.toString(),
       name: `${staff.firstName} ${staff.lastName}`,
       role: staff.role,
@@ -233,35 +298,13 @@ export class ClinicCapacityService {
   }
 
   /**
-   * Calculate patients capacity using aggregation
+   * Build patients capacity from aggregation result
    */
-  private async calculatePatientsCapacity(
-    clinicId: string,
-    clinic: Clinic,
-  ): Promise<CapacityMetrics & { count: number }> {
-    const maxPatients = clinic.maxPatients || 0;
-
-    // Count unique patients with appointments at this clinic using aggregation
-    const patientAggregation = await this.appointmentModel.aggregate([
-      {
-        $match: {
-          clinicId: new Types.ObjectId(clinicId),
-          deletedAt: null,
-        },
-      },
-      {
-        $group: {
-          _id: '$patientId',
-        },
-      },
-      {
-        $count: 'total',
-      },
-    ]);
-
-    const currentPatients =
-      patientAggregation.length > 0 ? patientAggregation[0].total : 0;
-
+  private buildPatientsCapacity(result: any): CapacityMetrics & {
+    count: number;
+  } {
+    const maxPatients = result.maxPatients || 0;
+    const currentPatients = result.currentPatients || 0;
     const available = maxPatients - currentPatients;
     const percentage =
       maxPatients > 0 ? Math.round((currentPatients / maxPatients) * 100) : 0;

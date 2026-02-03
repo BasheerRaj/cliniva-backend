@@ -6,6 +6,7 @@ import { ClinicStatusService } from './clinic-status.service';
 import { Clinic } from '../../database/schemas/clinic.schema';
 import { User } from '../../database/schemas/user.schema';
 import { Appointment } from '../../database/schemas/appointment.schema';
+import { AuditService } from '../../auth/audit.service';
 
 describe('ClinicStatusService', () => {
   let service: ClinicStatusService;
@@ -14,6 +15,7 @@ describe('ClinicStatusService', () => {
   let mockAppointmentModel: any;
   let mockConnection: any;
   let mockSession: any;
+  let mockAuditService: any;
 
   const mockClinicId = new Types.ObjectId().toString();
   const mockTargetClinicId = new Types.ObjectId().toString();
@@ -24,6 +26,9 @@ describe('ClinicStatusService', () => {
     name: 'Test Clinic',
     status: 'active',
     isActive: true,
+    deactivatedAt: undefined,
+    deactivatedBy: undefined,
+    deactivationReason: undefined,
     save: jest.fn(),
   };
 
@@ -64,6 +69,12 @@ describe('ClinicStatusService', () => {
       updateMany: jest.fn(),
     };
 
+    // Create audit service mock
+    mockAuditService = {
+      logClinicStatusChange: jest.fn().mockResolvedValue(undefined),
+      logClinicStaffTransfer: jest.fn().mockResolvedValue(undefined),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ClinicStatusService,
@@ -82,6 +93,10 @@ describe('ClinicStatusService', () => {
         {
           provide: getConnectionToken(),
           useValue: mockConnection,
+        },
+        {
+          provide: AuditService,
+          useValue: mockAuditService,
         },
       ],
     }).compile();
@@ -480,6 +495,191 @@ describe('ClinicStatusService', () => {
       expect(result.appointmentsAffected).toBe(5);
       expect(mockUserModel.updateMany).toHaveBeenCalledTimes(2);
       expect(mockSession.commitTransaction).toHaveBeenCalled();
+    });
+
+    // Additional transaction rollback tests for Task 13.3
+    it('should rollback transaction on status update failure', async () => {
+      // Arrange
+      mockClinicModel.findById.mockResolvedValue(mockClinic);
+      mockAppointmentModel.countDocuments.mockResolvedValue(0);
+      mockUserModel.countDocuments.mockResolvedValueOnce(0); // doctors
+      mockUserModel.countDocuments.mockResolvedValueOnce(0); // staff
+
+      // Mock save to fail
+      mockClinic.save.mockRejectedValue(new Error('Save failed'));
+
+      const options = {
+        status: 'inactive' as const,
+        reason: 'Test failure',
+      };
+
+      // Act & Assert
+      await expect(
+        service.changeStatus(mockClinicId, options, mockUserId),
+      ).rejects.toThrow('Save failed');
+
+      expect(mockSession.startTransaction).toHaveBeenCalled();
+      expect(mockSession.abortTransaction).toHaveBeenCalled();
+      expect(mockSession.endSession).toHaveBeenCalled();
+      expect(mockSession.commitTransaction).not.toHaveBeenCalled();
+    });
+
+    it('should rollback transaction on appointment rescheduling failure', async () => {
+      // Arrange
+      mockClinicModel.findById.mockResolvedValue(mockClinic);
+      mockAppointmentModel.countDocuments.mockResolvedValue(0); // No active appointments initially
+      mockUserModel.countDocuments.mockResolvedValueOnce(0); // doctors
+      mockUserModel.countDocuments.mockResolvedValueOnce(0); // staff
+
+      // Mock appointment update to fail (this would be called if there were appointments)
+      mockAppointmentModel.updateMany.mockRejectedValue(
+        new Error('Appointment update failed'),
+      );
+
+      // Mock clinic save to succeed initially, but we'll test the rollback path
+      mockClinic.save.mockRejectedValue(new Error('Save failed after appointment update'));
+
+      const options = {
+        status: 'inactive' as const,
+      };
+
+      // Act & Assert
+      await expect(
+        service.changeStatus(mockClinicId, options, mockUserId),
+      ).rejects.toThrow();
+
+      expect(mockSession.abortTransaction).toHaveBeenCalled();
+      expect(mockSession.endSession).toHaveBeenCalled();
+      expect(mockSession.commitTransaction).not.toHaveBeenCalled();
+    });
+
+    it('should verify data consistency after rollback on transfer failure', async () => {
+      // Arrange
+      const originalStatus = 'active';
+      mockClinic.status = originalStatus;
+
+      mockClinicModel.findById.mockResolvedValueOnce(mockClinic);
+      mockClinicModel.findById.mockResolvedValueOnce(mockTargetClinic);
+      mockAppointmentModel.countDocuments.mockResolvedValue(0);
+      mockUserModel.countDocuments.mockResolvedValueOnce(2); // doctors
+      mockUserModel.countDocuments.mockResolvedValueOnce(0); // staff
+
+      // Mock transfer to fail
+      mockUserModel.updateMany.mockRejectedValue(
+        new Error('Transfer failed'),
+      );
+
+      const options = {
+        status: 'inactive' as const,
+        transferDoctors: true,
+        targetClinicId: mockTargetClinicId,
+      };
+
+      // Act & Assert
+      await expect(
+        service.changeStatus(mockClinicId, options, mockUserId),
+      ).rejects.toThrow('Transfer failed');
+
+      // Verify rollback was called
+      expect(mockSession.abortTransaction).toHaveBeenCalled();
+      expect(mockSession.endSession).toHaveBeenCalled();
+
+      // Verify clinic status was not changed (data consistency)
+      expect(mockClinic.status).toBe(originalStatus);
+      expect(mockClinic.save).not.toHaveBeenCalled();
+    });
+
+    it('should rollback transaction when target clinic validation fails during transfer', async () => {
+      // Arrange
+      mockClinicModel.findById.mockResolvedValueOnce(mockClinic);
+      mockClinicModel.findById.mockResolvedValueOnce(null); // target clinic not found
+      mockAppointmentModel.countDocuments.mockResolvedValue(0);
+      mockUserModel.countDocuments.mockResolvedValueOnce(2); // doctors
+      mockUserModel.countDocuments.mockResolvedValueOnce(0); // staff
+
+      const options = {
+        status: 'inactive' as const,
+        transferDoctors: true,
+        targetClinicId: mockTargetClinicId,
+      };
+
+      // Act & Assert
+      await expect(
+        service.changeStatus(mockClinicId, options, mockUserId),
+      ).rejects.toThrow(NotFoundException);
+
+      expect(mockSession.abortTransaction).toHaveBeenCalled();
+      expect(mockSession.endSession).toHaveBeenCalled();
+      expect(mockSession.commitTransaction).not.toHaveBeenCalled();
+    });
+
+    it('should ensure session is always ended even on unexpected errors', async () => {
+      // Arrange
+      mockClinicModel.findById.mockResolvedValue(mockClinic);
+      mockAppointmentModel.countDocuments.mockResolvedValue(0);
+      mockUserModel.countDocuments.mockResolvedValueOnce(0);
+      mockUserModel.countDocuments.mockResolvedValueOnce(0);
+
+      // Mock an unexpected error
+      mockClinic.save.mockRejectedValue(new Error('Unexpected error'));
+
+      const options = {
+        status: 'inactive' as const,
+      };
+
+      // Act & Assert
+      await expect(
+        service.changeStatus(mockClinicId, options, mockUserId),
+      ).rejects.toThrow('Unexpected error');
+
+      // Verify session cleanup happened
+      expect(mockSession.endSession).toHaveBeenCalled();
+    });
+
+    it('should rollback all operations when multiple operations fail', async () => {
+      // Arrange
+      mockClinicModel.findById.mockResolvedValueOnce(mockClinic);
+      mockClinicModel.findById.mockResolvedValueOnce(mockTargetClinic);
+      mockAppointmentModel.countDocuments.mockResolvedValue(5);
+      mockUserModel.countDocuments.mockResolvedValueOnce(3); // doctors
+      mockUserModel.countDocuments.mockResolvedValueOnce(2); // staff
+
+      // Mock successful doctor transfer
+      mockUserModel.updateMany.mockResolvedValueOnce({ modifiedCount: 3 }); // doctors
+      mockUserModel.find.mockReturnValue({
+        select: jest
+          .fn()
+          .mockResolvedValue([
+            { _id: new Types.ObjectId() },
+            { _id: new Types.ObjectId() },
+            { _id: new Types.ObjectId() },
+          ]),
+      });
+
+      // Mock appointment transfer to fail
+      mockAppointmentModel.updateMany.mockRejectedValue(
+        new Error('Appointment transfer failed'),
+      );
+
+      const options = {
+        status: 'inactive' as const,
+        transferDoctors: true,
+        transferStaff: true,
+        targetClinicId: mockTargetClinicId,
+      };
+
+      // Act & Assert
+      await expect(
+        service.changeStatus(mockClinicId, options, mockUserId),
+      ).rejects.toThrow('Appointment transfer failed');
+
+      // Verify rollback was called
+      expect(mockSession.abortTransaction).toHaveBeenCalled();
+      expect(mockSession.endSession).toHaveBeenCalled();
+      expect(mockSession.commitTransaction).not.toHaveBeenCalled();
+
+      // Verify clinic was not saved (all operations rolled back)
+      expect(mockClinic.save).not.toHaveBeenCalled();
     });
   });
 

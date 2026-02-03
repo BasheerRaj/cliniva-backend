@@ -30,6 +30,9 @@ import { ChangeStatusDto } from './dto/change-status.dto';
 import { AssignPICDto } from './dto/assign-pic.dto';
 import { TransferStaffDto } from './dto/transfer-staff.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../common/guards/roles.guard';
+import { Roles } from '../common/decorators/roles.decorator';
+import { UserRole } from '../common/enums/user-role.enum';
 import { ClinicCapacityService } from './services/clinic-capacity.service';
 import { ClinicWorkingHoursService } from './services/clinic-working-hours.service';
 import { ClinicStatusService } from './services/clinic-status.service';
@@ -953,12 +956,13 @@ export class ClinicController {
    * @returns Status change result with transfer counts and notifications
    */
   @Patch(':id/status')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.OWNER, UserRole.ADMIN)
   @ApiBearerAuth()
   @ApiOperation({
     summary: 'Change clinic status',
     description:
-      'Change clinic status with optional staff transfer, appointment rescheduling, and notifications. Requires transfer decision when deactivating with active resources.',
+      'Change clinic status with optional staff transfer, appointment rescheduling, and notifications. Requires transfer decision when deactivating with active resources. Restricted to owners and admins.',
   })
   @ApiResponse({
     status: 200,
@@ -1080,6 +1084,35 @@ export class ClinicController {
   @ApiResponse({
     status: 401,
     description: 'Unauthorized - JWT token required',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Requires owner or admin role',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: false },
+        error: {
+          type: 'object',
+          properties: {
+            code: { type: 'string', example: 'INSUFFICIENT_PERMISSIONS' },
+            message: {
+              type: 'object',
+              properties: {
+                ar: {
+                  type: 'string',
+                  example: 'ليس لديك صلاحية للوصول إلى هذا المورد',
+                },
+                en: {
+                  type: 'string',
+                  example: 'You do not have permission to access this resource',
+                },
+              },
+            },
+          },
+        },
+      },
+    },
   })
   @HttpCode(HttpStatus.OK)
   async changeStatus(
@@ -1354,12 +1387,13 @@ export class ClinicController {
    * @returns Transfer result with counts and any errors
    */
   @Post(':id/transfer-staff')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.OWNER, UserRole.ADMIN)
   @ApiBearerAuth()
   @ApiOperation({
     summary: 'Transfer staff and doctors between clinics',
     description:
-      'Transfer doctors and staff from one clinic to another with configurable conflict handling. Supports transferring all or specific personnel.',
+      'Transfer doctors and staff from one clinic to another with configurable conflict handling. Supports transferring all or specific personnel. Restricted to owners and admins.',
   })
   @ApiResponse({
     status: 200,
@@ -1475,6 +1509,35 @@ export class ClinicController {
   @ApiResponse({
     status: 401,
     description: 'Unauthorized - JWT token required',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Requires owner or admin role',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: false },
+        error: {
+          type: 'object',
+          properties: {
+            code: { type: 'string', example: 'INSUFFICIENT_PERMISSIONS' },
+            message: {
+              type: 'object',
+              properties: {
+                ar: {
+                  type: 'string',
+                  example: 'ليس لديك صلاحية للوصول إلى هذا المورد',
+                },
+                en: {
+                  type: 'string',
+                  example: 'You do not have permission to access this resource',
+                },
+              },
+            },
+          },
+        },
+      },
+    },
   })
   @HttpCode(HttpStatus.OK)
   async transferStaff(

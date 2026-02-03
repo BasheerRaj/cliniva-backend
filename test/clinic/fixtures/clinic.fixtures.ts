@@ -20,6 +20,42 @@ export const adminUserData = {
   isActive: true,
 };
 
+export const ownerUserData = {
+  email: 'clinicowner@test.com',
+  password: 'ClinicOwner123!',
+  firstName: 'Clinic',
+  lastName: 'Owner',
+  role: 'owner',
+  phone: '+1234567910',
+  nationality: 'US',
+  gender: 'male',
+  isActive: true,
+};
+
+export const doctorUserData = {
+  email: 'clinicdoctor@test.com',
+  password: 'ClinicDoctor123!',
+  firstName: 'Clinic',
+  lastName: 'Doctor',
+  role: 'doctor',
+  phone: '+1234567911',
+  nationality: 'US',
+  gender: 'male',
+  isActive: true,
+};
+
+export const staffUserData = {
+  email: 'clinicstaff@test.com',
+  password: 'ClinicStaff123!',
+  firstName: 'Clinic',
+  lastName: 'Staff',
+  role: 'staff',
+  phone: '+1234567912',
+  nationality: 'US',
+  gender: 'male',
+  isActive: true,
+};
+
 export const testComplexData = {
   name: { ar: 'مجمع الاختبار', en: 'Test Complex' },
   address: 'Test Complex Address',
