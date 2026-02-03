@@ -4,20 +4,39 @@ import { ClinicService } from './clinic.service';
 import { ClinicController } from './clinic.controller';
 import { ClinicSchema } from '../database/schemas/clinic.schema';
 import { ComplexSchema } from '../database/schemas/complex.schema';
+import { UserSchema } from '../database/schemas/user.schema';
+import { AppointmentSchema } from '../database/schemas/appointment.schema';
+import { WorkingHoursSchema } from '../database/schemas/working-hours.schema';
 import { SubscriptionModule } from '../subscription/subscription.module';
 import { CommonModule } from '../common/common.module';
+import { ClinicCapacityService } from './services/clinic-capacity.service';
+import { ClinicWorkingHoursService } from './services/clinic-working-hours.service';
+import { ClinicStatusService } from './services/clinic-status.service';
 
 @Module({
   imports: [
     MongooseModule.forFeature([
       { name: 'Clinic', schema: ClinicSchema },
       { name: 'Complex', schema: ComplexSchema },
+      { name: 'User', schema: UserSchema },
+      { name: 'Appointment', schema: AppointmentSchema },
+      { name: 'WorkingHours', schema: WorkingHoursSchema },
     ]),
     SubscriptionModule,
     CommonModule,
   ],
   controllers: [ClinicController],
-  providers: [ClinicService],
-  exports: [ClinicService],
+  providers: [
+    ClinicService,
+    ClinicCapacityService,
+    ClinicWorkingHoursService,
+    ClinicStatusService,
+  ],
+  exports: [
+    ClinicService,
+    ClinicCapacityService,
+    ClinicWorkingHoursService,
+    ClinicStatusService,
+  ],
 })
 export class ClinicModule {}

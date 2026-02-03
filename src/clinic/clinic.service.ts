@@ -26,6 +26,9 @@ export class ClinicService {
   constructor(
     @InjectModel('Clinic') private readonly clinicModel: Model<Clinic>,
     @InjectModel('Complex') private readonly complexModel: Model<Complex>,
+    @InjectModel('User') private readonly userModel: Model<any>,
+    @InjectModel('Appointment')
+    private readonly appointmentModel: Model<any>,
     private readonly subscriptionService: SubscriptionService,
   ) {}
 
@@ -42,6 +45,197 @@ export class ClinicService {
       console.error('Error finding clinic by subscription:', error);
       return null;
     }
+  }
+
+  /**
+   * Get clinics with optional capacity calculation
+   * Task 10.1: Enhance GET /clinics endpoint
+   * Requirements: 5.1 (Enhanced Endpoints)
+   * Design: Section 5.1 (Enhanced Clinic List Endpoint)
+   *
+   * This method returns a paginated list of clinics with optional capacity calculations.
+   * When includeCounts=true, it calculates:
+   * - Doctors capacity (current vs max)
+   * - Staff capacity (current vs max)
+   * - Patients capacity (current vs max)
+   * - Scheduled appointments count
+   * - Exceeded capacity flags
+   *
+   * @param options - Query options including filters, pagination, and includeCounts flag
+   * @returns Paginated list of clinics with optional capacity information
+   */
+  async getClinics(options: {
+    subscriptionId?: string;
+    complexId?: string;
+    status?: string;
+    search?: string;
+    includeCounts?: boolean;
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+  }): Promise<{
+    data: any[];
+    meta: { page: number; limit: number; total: number; totalPages: number };
+  }> {
+    const {
+      subscriptionId,
+      complexId,
+      status,
+      search,
+      includeCounts = false,
+      page = 1,
+      limit = 10,
+      sortBy = 'name',
+      sortOrder = 'asc',
+    } = options;
+
+    // Build query
+    const query: any = {};
+
+    if (subscriptionId) {
+      query.subscriptionId = new Types.ObjectId(subscriptionId);
+    }
+
+    if (complexId) {
+      query.complexId = new Types.ObjectId(complexId);
+    }
+
+    if (status) {
+      query.status = status;
+    }
+
+    if (search) {
+      query.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } },
+        { licenseNumber: { $regex: search, $options: 'i' } },
+      ];
+    }
+
+    // Build sort
+    const sort: any = { [sortBy]: sortOrder === 'desc' ? -1 : 1 };
+
+    // Calculate pagination
+    const skip = (page - 1) * limit;
+
+    // Execute query
+    const [clinics, total] = await Promise.all([
+      this.clinicModel
+        .find(query)
+        .sort(sort)
+        .skip(skip)
+        .limit(limit)
+        .populate('personInChargeId', 'firstName lastName email role')
+        .lean()
+        .exec(),
+      this.clinicModel.countDocuments(query).exec(),
+    ]);
+
+    // Add capacity calculations if requested
+    let enrichedClinics = clinics;
+    if (includeCounts) {
+      enrichedClinics = await Promise.all(
+        clinics.map(async (clinic) => {
+          // Calculate doctors capacity
+          const doctorsCount = await this.userModel.countDocuments({
+            clinicId: clinic._id,
+            role: 'doctor',
+            isActive: true,
+          });
+
+          const doctorsCapacity = {
+            max: clinic.maxDoctors || 0,
+            current: doctorsCount,
+            isExceeded: doctorsCount > (clinic.maxDoctors || 0),
+            percentage:
+              (clinic.maxDoctors || 0) > 0
+                ? Math.round((doctorsCount / (clinic.maxDoctors || 0)) * 100)
+                : 0,
+          };
+
+          // Calculate staff capacity
+          const staffCount = await this.userModel.countDocuments({
+            clinicId: clinic._id,
+            role: { $nin: ['doctor', 'patient'] },
+            isActive: true,
+          });
+
+          const staffCapacity = {
+            max: clinic.maxStaff || 0,
+            current: staffCount,
+            isExceeded: staffCount > (clinic.maxStaff || 0),
+            percentage:
+              (clinic.maxStaff || 0) > 0
+                ? Math.round((staffCount / (clinic.maxStaff || 0)) * 100)
+                : 0,
+          };
+
+          // Calculate patients capacity
+          const patientsAggregation = await this.appointmentModel.aggregate([
+            {
+              $match: {
+                clinicId: clinic._id,
+                deletedAt: null,
+              },
+            },
+            {
+              $group: {
+                _id: '$patientId',
+              },
+            },
+            {
+              $count: 'total',
+            },
+          ]);
+
+          const patientsCount =
+            patientsAggregation.length > 0 ? patientsAggregation[0].total : 0;
+
+          const patientsCapacity = {
+            max: clinic.maxPatients || 0,
+            current: patientsCount,
+            isExceeded: patientsCount > (clinic.maxPatients || 0),
+            percentage:
+              (clinic.maxPatients || 0) > 0
+                ? Math.round((patientsCount / (clinic.maxPatients || 0)) * 100)
+                : 0,
+          };
+
+          // Calculate scheduled appointments count
+          const scheduledAppointmentsCount =
+            await this.appointmentModel.countDocuments({
+              clinicId: clinic._id,
+              status: { $in: ['scheduled', 'confirmed'] },
+              appointmentDate: { $gte: new Date() },
+              deletedAt: null,
+            });
+
+          return {
+            ...clinic,
+            capacity: {
+              doctors: doctorsCapacity,
+              staff: staffCapacity,
+              patients: patientsCapacity,
+            },
+            scheduledAppointmentsCount,
+          };
+        }),
+      );
+    }
+
+    // Calculate meta
+    const totalPages = Math.ceil(total / limit);
+
+    return {
+      data: enrichedClinics,
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages,
+      },
+    };
   }
 
   async findClinicByUser(userId: string): Promise<Clinic | null> {
@@ -155,6 +349,167 @@ export class ClinicService {
       throw new NotFoundException('Clinic not found');
     }
     return clinic;
+  }
+
+  /**
+   * Get clinic with complete details including capacity
+   * Task 10.2: Enhance GET /clinics/:id endpoint
+   * Requirements: 5.2 (Enhanced Endpoints)
+   * Design: Section 5.2 (Enhanced Clinic Details Endpoint)
+   *
+   * This method returns complete clinic details including:
+   * - All clinic fields
+   * - Populated personInCharge relationship
+   * - Capacity breakdown with personnel lists
+   * - Scheduled appointments count
+   * - Recommendations when capacity is exceeded
+   *
+   * @param clinicId - The clinic ID
+   * @returns Complete clinic details with capacity information
+   * @throws NotFoundException if clinic not found
+   */
+  async getClinicWithDetails(clinicId: string): Promise<any> {
+    // 1. Get clinic with populated relationships
+    const clinic = await this.clinicModel
+      .findById(clinicId)
+      .populate('personInChargeId', 'firstName lastName email role')
+      .lean()
+      .exec();
+
+    if (!clinic) {
+      throw new NotFoundException({
+        message: {
+          ar: 'العيادة غير موجودة',
+          en: 'Clinic not found',
+        },
+        code: 'CLINIC_007',
+      });
+    }
+
+    // 2. Calculate doctors capacity with personnel list
+    const doctorsList = await this.userModel
+      .find({
+        clinicId: new Types.ObjectId(clinicId),
+        role: 'doctor',
+        isActive: true,
+      })
+      .select('_id firstName lastName email role')
+      .lean();
+
+    const doctorsCount = doctorsList.length;
+    const maxDoctors = clinic.maxDoctors || 0;
+    const doctorsCapacity = {
+      max: maxDoctors,
+      current: doctorsCount,
+      available: maxDoctors - doctorsCount,
+      percentage:
+        maxDoctors > 0 ? Math.round((doctorsCount / maxDoctors) * 100) : 0,
+      isExceeded: doctorsCount > maxDoctors,
+      list: doctorsList.map((doc: any) => ({
+        id: doc._id.toString(),
+        name: `${doc.firstName} ${doc.lastName}`,
+        role: doc.role,
+        email: doc.email,
+      })),
+    };
+
+    // 3. Calculate staff capacity with personnel list
+    const staffList = await this.userModel
+      .find({
+        clinicId: new Types.ObjectId(clinicId),
+        role: { $nin: ['doctor', 'patient'] },
+        isActive: true,
+      })
+      .select('_id firstName lastName email role')
+      .lean();
+
+    const staffCount = staffList.length;
+    const maxStaff = clinic.maxStaff || 0;
+    const staffCapacity = {
+      max: maxStaff,
+      current: staffCount,
+      available: maxStaff - staffCount,
+      percentage:
+        maxStaff > 0 ? Math.round((staffCount / maxStaff) * 100) : 0,
+      isExceeded: staffCount > maxStaff,
+      list: staffList.map((staff: any) => ({
+        id: staff._id.toString(),
+        name: `${staff.firstName} ${staff.lastName}`,
+        role: staff.role,
+        email: staff.email,
+      })),
+    };
+
+    // 4. Calculate patients capacity
+    const patientsAggregation = await this.appointmentModel.aggregate([
+      {
+        $match: {
+          clinicId: new Types.ObjectId(clinicId),
+          deletedAt: null,
+        },
+      },
+      {
+        $group: {
+          _id: '$patientId',
+        },
+      },
+      {
+        $count: 'total',
+      },
+    ]);
+
+    const patientsCount =
+      patientsAggregation.length > 0 ? patientsAggregation[0].total : 0;
+    const maxPatients = clinic.maxPatients || 0;
+    const patientsCapacity = {
+      max: maxPatients,
+      current: patientsCount,
+      available: maxPatients - patientsCount,
+      percentage:
+        maxPatients > 0 ? Math.round((patientsCount / maxPatients) * 100) : 0,
+      isExceeded: patientsCount > maxPatients,
+      count: patientsCount,
+    };
+
+    // 5. Calculate scheduled appointments count
+    const scheduledAppointmentsCount =
+      await this.appointmentModel.countDocuments({
+        clinicId: new Types.ObjectId(clinicId),
+        status: { $in: ['scheduled', 'confirmed'] },
+        appointmentDate: { $gte: new Date() },
+        deletedAt: null,
+      });
+
+    // 6. Generate recommendations
+    const recommendations: string[] = [];
+    if (doctorsCapacity.isExceeded) {
+      recommendations.push(
+        'Doctor capacity exceeded. Consider increasing maxDoctors or redistributing workload.',
+      );
+    }
+    if (staffCapacity.isExceeded) {
+      recommendations.push(
+        'Staff capacity exceeded. Consider hiring more staff or increasing maxStaff limit.',
+      );
+    }
+    if (patientsCapacity.isExceeded) {
+      recommendations.push(
+        'Patient capacity exceeded. Consider expanding facilities or limiting patient intake.',
+      );
+    }
+
+    // 7. Return complete clinic details
+    return {
+      ...clinic,
+      personInCharge: clinic.personInChargeId || null,
+      capacity: {
+        doctors: doctorsCapacity,
+        staff: staffCapacity,
+        patients: patientsCapacity,
+      },
+      scheduledAppointmentsCount,
+      recommendations,
+    };
   }
 
   /**
@@ -392,10 +747,19 @@ export class ClinicService {
     await clinic.save();
 
     // 6. Return updated clinic with populated PIC
-    return await this.clinicModel
+    const updatedClinic = await this.clinicModel
       .findById(clinicId)
       .populate('personInChargeId', 'firstName lastName email role')
       .exec();
+
+    if (!updatedClinic) {
+      throw new NotFoundException({
+        code: ERROR_CODES.CLINIC_007.code,
+        message: ERROR_CODES.CLINIC_007.message,
+      });
+    }
+
+    return updatedClinic;
   }
 
   // ======== VALIDATION METHODS ========

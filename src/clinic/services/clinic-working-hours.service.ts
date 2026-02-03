@@ -13,6 +13,18 @@ import { User } from '../../database/schemas/user.schema';
 import { ERROR_CODES } from '../constants/error-codes.constant';
 
 /**
+ * Interface for working hours schedule (simplified for validation)
+ */
+export interface WorkingHoursSchedule {
+  dayOfWeek: string;
+  isWorkingDay: boolean;
+  openingTime?: string;
+  closingTime?: string;
+  breakStartTime?: string;
+  breakEndTime?: string;
+}
+
+/**
  * Interface for working hours validation errors
  */
 export interface WorkingHoursValidationError {
@@ -90,7 +102,7 @@ export class ClinicWorkingHoursService {
    */
   async validateWorkingHours(
     clinicId: string,
-    proposedHours: WorkingHours[],
+    proposedHours: WorkingHoursSchedule[],
   ): Promise<WorkingHoursValidationResult> {
     // 1. Get clinic and validate it exists
     const clinic = await this.clinicModel.findById(clinicId);
@@ -146,7 +158,7 @@ export class ClinicWorkingHoursService {
    * BZR-42: Working hours validation
    */
   private validateAgainstComplexHours(
-    clinicHours: WorkingHours[],
+    clinicHours: WorkingHoursSchedule[],
     complexHours: WorkingHours[],
   ): WorkingHoursValidationError[] {
     const errors: WorkingHoursValidationError[] = [];
@@ -218,7 +230,7 @@ export class ClinicWorkingHoursService {
    */
   private async detectConflicts(
     clinicId: string,
-    proposedHours: WorkingHours[],
+    proposedHours: WorkingHoursSchedule[],
   ): Promise<{
     appointments: ConflictDetail[];
     doctors: ConflictDetail[];
@@ -229,7 +241,7 @@ export class ClinicWorkingHoursService {
     const staffConflicts: ConflictDetail[] = [];
 
     // Create a map of proposed hours by day
-    const hoursMap = new Map<string, WorkingHours>();
+    const hoursMap = new Map<string, WorkingHoursSchedule>();
     proposedHours.forEach((h) => {
       hoursMap.set(h.dayOfWeek, h);
     });
