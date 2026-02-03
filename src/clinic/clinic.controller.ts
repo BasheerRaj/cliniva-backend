@@ -21,6 +21,7 @@ import {
   ApiOperation,
   ApiResponse,
   ApiBearerAuth,
+  ApiBody,
 } from '@nestjs/swagger';
 import { ClinicService } from './clinic.service';
 import { CreateClinicDto, UpdateClinicDto } from './dto/create-clinic.dto';
@@ -200,7 +201,103 @@ export class ClinicController {
     }
   }
 
+  /**
+   * Create a new clinic
+   * Requirements: 5 (API Endpoints)
+   * Design: Section 6 (Controller Layer)
+   *
+   * This endpoint creates a new clinic with validation of plan limits,
+   * business profile, and capacity settings.
+   *
+   * @param createClinicDto - Clinic creation data
+   * @returns Created clinic object
+   */
   @Post()
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Create a new clinic',
+    description:
+      'Create a new clinic with validation of plan limits, business profile, and capacity settings',
+  })
+  @ApiBody({
+    type: CreateClinicDto,
+    description: 'Clinic creation data',
+    examples: {
+      basic: {
+        summary: 'Basic clinic creation',
+        value: {
+          name: 'Cardiology Clinic',
+          complexId: '507f1f77bcf86cd799439011',
+          subscriptionId: '507f1f77bcf86cd799439012',
+          maxDoctors: 10,
+          maxStaff: 15,
+          maxPatients: 100,
+          sessionDuration: 30,
+          email: 'cardiology@example.com',
+          phone: '+966501234567',
+        },
+      },
+      withPIC: {
+        summary: 'Clinic with person-in-charge',
+        value: {
+          name: 'Pediatrics Clinic',
+          complexId: '507f1f77bcf86cd799439011',
+          subscriptionId: '507f1f77bcf86cd799439012',
+          personInChargeId: '507f1f77bcf86cd799439013',
+          maxDoctors: 8,
+          maxStaff: 12,
+          maxPatients: 80,
+          sessionDuration: 20,
+          email: 'pediatrics@example.com',
+          phone: '+966501234568',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Clinic created successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: true },
+        message: { type: 'string', example: 'Clinic created successfully' },
+        data: {
+          type: 'object',
+          properties: {
+            _id: { type: 'string' },
+            name: { type: 'string' },
+            status: { type: 'string', example: 'active' },
+            complexId: { type: 'string' },
+            subscriptionId: { type: 'string' },
+            maxDoctors: { type: 'number' },
+            maxStaff: { type: 'number' },
+            maxPatients: { type: 'number' },
+            createdAt: { type: 'string', format: 'date-time' },
+            updatedAt: { type: 'string', format: 'date-time' },
+          },
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad request - validation failed or plan limit exceeded',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: false },
+        message: { type: 'string', example: 'Failed to create clinic' },
+        error: { type: 'string' },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - JWT token required',
+  })
+  @HttpCode(HttpStatus.CREATED)
   async createClinic(@Body() createClinicDto: CreateClinicDto) {
     try {
       const clinic = await this.clinicService.createClinic(createClinicDto);
@@ -362,7 +459,99 @@ export class ClinicController {
     }
   }
 
+  /**
+   * Update an existing clinic
+   * Requirements: 5 (API Endpoints)
+   * Design: Section 6 (Controller Layer)
+   *
+   * This endpoint updates clinic information including name, capacity,
+   * working hours, and other settings.
+   *
+   * @param id - Clinic ID from route params
+   * @param updateClinicDto - Clinic update data
+   * @returns Updated clinic object
+   */
   @Put(':id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Update an existing clinic',
+    description:
+      'Update clinic information including name, capacity, working hours, and other settings',
+  })
+  @ApiBody({
+    type: UpdateClinicDto,
+    description: 'Clinic update data (all fields optional)',
+    examples: {
+      updateName: {
+        summary: 'Update clinic name',
+        value: {
+          name: 'Advanced Cardiology Clinic',
+        },
+      },
+      updateCapacity: {
+        summary: 'Update capacity limits',
+        value: {
+          maxDoctors: 15,
+          maxStaff: 20,
+          maxPatients: 150,
+        },
+      },
+      updateContact: {
+        summary: 'Update contact information',
+        value: {
+          email: 'newemail@example.com',
+          phone: '+966501234569',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Clinic updated successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: true },
+        message: { type: 'string', example: 'Clinic updated successfully' },
+        data: {
+          type: 'object',
+          properties: {
+            _id: { type: 'string' },
+            name: { type: 'string' },
+            status: { type: 'string', example: 'active' },
+            complexId: { type: 'string' },
+            subscriptionId: { type: 'string' },
+            maxDoctors: { type: 'number' },
+            maxStaff: { type: 'number' },
+            maxPatients: { type: 'number' },
+            updatedAt: { type: 'string', format: 'date-time' },
+          },
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad request - validation failed',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: false },
+        message: { type: 'string', example: 'Failed to update clinic' },
+        error: { type: 'string' },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Clinic not found',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - JWT token required',
+  })
+  @HttpCode(HttpStatus.OK)
   async updateClinic(
     @Param('id') id: string,
     @Body() updateClinicDto: UpdateClinicDto,
@@ -383,7 +572,70 @@ export class ClinicController {
     }
   }
 
+  /**
+   * Get clinic by subscription
+   * Requirements: 5 (API Endpoints)
+   * Design: Section 6 (Controller Layer)
+   *
+   * This endpoint retrieves the clinic associated with a specific subscription.
+   * Used primarily for clinic plan subscriptions where one subscription = one clinic.
+   *
+   * @param subscriptionId - Subscription ID from route params
+   * @returns Clinic object if found, null otherwise
+   */
   @Get('subscription/:subscriptionId')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Get clinic by subscription',
+    description:
+      'Retrieve the clinic associated with a specific subscription (primarily for clinic plan subscriptions)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Clinic retrieved successfully or not found',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: true },
+        message: {
+          type: 'string',
+          example: 'Clinic found',
+        },
+        data: {
+          type: 'object',
+          nullable: true,
+          properties: {
+            _id: { type: 'string' },
+            name: { type: 'string' },
+            status: { type: 'string', example: 'active' },
+            subscriptionId: { type: 'string' },
+            complexId: { type: 'string' },
+          },
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad request',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: false },
+        message: {
+          type: 'string',
+          example: 'Failed to retrieve clinic by subscription',
+        },
+        error: { type: 'string' },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - JWT token required',
+  })
+  @HttpCode(HttpStatus.OK)
   async getClinicBySubscription(
     @Param('subscriptionId') subscriptionId: string,
   ) {
@@ -716,6 +968,102 @@ export class ClinicController {
     description:
       'Validate proposed working hours against complex hours and detect conflicts with appointments and staff schedules',
   })
+  @ApiBody({
+    type: ValidateWorkingHoursDto,
+    description: 'Proposed working hours schedule to validate',
+    examples: {
+      fullWeek: {
+        summary: 'Full week schedule',
+        value: {
+          workingHours: [
+            {
+              dayOfWeek: 'monday',
+              isWorkingDay: true,
+              openingTime: '09:00',
+              closingTime: '17:00',
+            },
+            {
+              dayOfWeek: 'tuesday',
+              isWorkingDay: true,
+              openingTime: '09:00',
+              closingTime: '17:00',
+              breakStartTime: '12:00',
+              breakEndTime: '13:00',
+            },
+            {
+              dayOfWeek: 'wednesday',
+              isWorkingDay: true,
+              openingTime: '09:00',
+              closingTime: '17:00',
+            },
+            {
+              dayOfWeek: 'thursday',
+              isWorkingDay: true,
+              openingTime: '09:00',
+              closingTime: '17:00',
+            },
+            {
+              dayOfWeek: 'friday',
+              isWorkingDay: true,
+              openingTime: '09:00',
+              closingTime: '14:00',
+            },
+            {
+              dayOfWeek: 'saturday',
+              isWorkingDay: false,
+            },
+            {
+              dayOfWeek: 'sunday',
+              isWorkingDay: false,
+            },
+          ],
+        },
+      },
+      partialWeek: {
+        summary: 'Partial week schedule (weekdays only)',
+        value: {
+          workingHours: [
+            {
+              dayOfWeek: 'monday',
+              isWorkingDay: true,
+              openingTime: '08:00',
+              closingTime: '16:00',
+            },
+            {
+              dayOfWeek: 'tuesday',
+              isWorkingDay: true,
+              openingTime: '08:00',
+              closingTime: '16:00',
+            },
+            {
+              dayOfWeek: 'wednesday',
+              isWorkingDay: true,
+              openingTime: '08:00',
+              closingTime: '16:00',
+            },
+            {
+              dayOfWeek: 'thursday',
+              isWorkingDay: true,
+              openingTime: '08:00',
+              closingTime: '16:00',
+            },
+            {
+              dayOfWeek: 'friday',
+              isWorkingDay: false,
+            },
+            {
+              dayOfWeek: 'saturday',
+              isWorkingDay: false,
+            },
+            {
+              dayOfWeek: 'sunday',
+              isWorkingDay: false,
+            },
+          ],
+        },
+      },
+    },
+  })
   @ApiResponse({
     status: 200,
     description: 'Validation completed successfully',
@@ -963,6 +1311,50 @@ export class ClinicController {
     summary: 'Change clinic status',
     description:
       'Change clinic status with optional staff transfer, appointment rescheduling, and notifications. Requires transfer decision when deactivating with active resources. Restricted to owners and admins.',
+  })
+  @ApiBody({
+    type: ChangeStatusDto,
+    description: 'Status change options including transfer settings',
+    examples: {
+      deactivateWithTransfer: {
+        summary: 'Deactivate clinic and transfer all staff',
+        value: {
+          status: 'inactive',
+          reason: 'Temporary closure for renovation',
+          transferDoctors: true,
+          transferStaff: true,
+          targetClinicId: '507f1f77bcf86cd799439011',
+          notifyStaff: true,
+          notifyPatients: true,
+        },
+      },
+      activate: {
+        summary: 'Activate clinic',
+        value: {
+          status: 'active',
+        },
+      },
+      suspend: {
+        summary: 'Suspend clinic without transfer',
+        value: {
+          status: 'suspended',
+          reason: 'Pending license renewal',
+        },
+      },
+      deactivateWithDepartment: {
+        summary: 'Deactivate and transfer to specific department',
+        value: {
+          status: 'inactive',
+          reason: 'Merging with main clinic',
+          transferDoctors: true,
+          transferStaff: true,
+          targetClinicId: '507f1f77bcf86cd799439011',
+          targetDepartmentId: '507f1f77bcf86cd799439012',
+          notifyStaff: true,
+          notifyPatients: false,
+        },
+      },
+    },
   })
   @ApiResponse({
     status: 200,
@@ -1212,6 +1604,24 @@ export class ClinicController {
     description:
       'Assign a person-in-charge (PIC) to a clinic. The PIC must be selected from the parent complex PICs.',
   })
+  @ApiBody({
+    type: AssignPICDto,
+    description: 'Person-in-charge assignment data',
+    examples: {
+      assignPIC: {
+        summary: 'Assign PIC to clinic',
+        value: {
+          personInChargeId: '507f1f77bcf86cd799439011',
+        },
+      },
+      updatePIC: {
+        summary: 'Update existing PIC',
+        value: {
+          personInChargeId: '507f1f77bcf86cd799439012',
+        },
+      },
+    },
+  })
   @ApiResponse({
     status: 200,
     description: 'PIC assigned successfully',
@@ -1394,6 +1804,52 @@ export class ClinicController {
     summary: 'Transfer staff and doctors between clinics',
     description:
       'Transfer doctors and staff from one clinic to another with configurable conflict handling. Supports transferring all or specific personnel. Restricted to owners and admins.',
+  })
+  @ApiBody({
+    type: TransferStaffDto,
+    description: 'Staff transfer options including target clinic and personnel',
+    examples: {
+      transferAll: {
+        summary: 'Transfer all doctors and staff',
+        value: {
+          targetClinicId: '507f1f77bcf86cd799439011',
+          transferDoctors: true,
+          transferStaff: true,
+          handleConflicts: 'reschedule',
+        },
+      },
+      transferSpecificDoctors: {
+        summary: 'Transfer specific doctors only',
+        value: {
+          targetClinicId: '507f1f77bcf86cd799439011',
+          targetDepartmentId: '507f1f77bcf86cd799439012',
+          transferDoctors: true,
+          transferStaff: false,
+          doctorIds: ['507f1f77bcf86cd799439013', '507f1f77bcf86cd799439014'],
+          handleConflicts: 'notify',
+        },
+      },
+      transferStaffOnly: {
+        summary: 'Transfer staff members only',
+        value: {
+          targetClinicId: '507f1f77bcf86cd799439011',
+          transferDoctors: false,
+          transferStaff: true,
+          staffIds: ['507f1f77bcf86cd799439015', '507f1f77bcf86cd799439016'],
+          handleConflicts: 'cancel',
+        },
+      },
+      transferWithDepartment: {
+        summary: 'Transfer all to specific department',
+        value: {
+          targetClinicId: '507f1f77bcf86cd799439011',
+          targetDepartmentId: '507f1f77bcf86cd799439012',
+          transferDoctors: true,
+          transferStaff: true,
+          handleConflicts: 'reschedule',
+        },
+      },
+    },
   })
   @ApiResponse({
     status: 200,
@@ -1591,8 +2047,69 @@ export class ClinicController {
     }
   }
 
-  // Legacy endpoint - kept for backward compatibility
+  /**
+   * Get clinics by complex (legacy endpoint)
+   * Kept for backward compatibility
+   *
+   * @deprecated Use GET /clinics/by-complex/:complexId instead
+   * @param complexId - Complex ID from route params
+   * @returns List of clinics for the complex
+   */
   @Get('complex/:complexId')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Get clinics by complex (legacy)',
+    description:
+      'Legacy endpoint for retrieving clinics by complex. Use GET /clinics/by-complex/:complexId instead.',
+    deprecated: true,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Clinics retrieved successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: true },
+        message: {
+          type: 'string',
+          example: 'Clinics retrieved successfully',
+        },
+        data: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              _id: { type: 'string' },
+              name: { type: 'string' },
+              status: { type: 'string', example: 'active' },
+              complexId: { type: 'string' },
+            },
+          },
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad request',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: false },
+        message: {
+          type: 'string',
+          example: 'Failed to retrieve clinics by complex',
+        },
+        error: { type: 'string' },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - JWT token required',
+  })
+  @HttpCode(HttpStatus.OK)
   async getClinicsByComplexLegacy(@Param('complexId') complexId: string) {
     try {
       const clinics = await this.clinicService.getClinicsByComplex(complexId);
