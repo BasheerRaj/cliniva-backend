@@ -380,6 +380,7 @@ export const errorResponseFixtures = {
 
 // Test environment variables
 export const testEnvironment = {
-  MONGODB_TEST_URI: process.env.MONGODB_TEST_URI || 'mongodb://localhost:27017/cliniva_test',
+  MONGODB_TEST_URI:
+    process.env.MONGODB_TEST_URI || 'mongodb://localhost:27017/cliniva_test',
   NODE_ENV: 'test',
 };

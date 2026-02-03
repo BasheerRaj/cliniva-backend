@@ -12,7 +12,13 @@ import {
   NotFoundException,
   InternalServerErrorException,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiQuery } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBody,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { WorkingHoursService } from './working-hours.service';
 import { WorkingHoursValidationService } from './services/working-hours-validation.service';
 import { WorkingHoursSuggestionService } from './services/working-hours-suggestion.service';
@@ -95,7 +101,7 @@ export class WorkingHoursController {
   /**
    * Creates working hours for an entity.
    * Validates schedule format before creation.
-   * 
+   *
    * @param {CreateWorkingHoursDto} createDto - Working hours creation data
    * @returns {Promise<StandardResponse<WorkingHours[]>>} Created working hours
    */
@@ -115,7 +121,7 @@ export class WorkingHoursController {
 
   /**
    * Validates clinic hours against complex hours.
-   * 
+   *
    * @deprecated Use POST /working-hours/validate endpoint instead
    * @param {object} body - Validation request body
    * @returns {Promise<StandardResponse>} Validation result
@@ -263,7 +269,10 @@ export class WorkingHoursController {
                     type: 'object',
                     properties: {
                       ar: { type: 'string', example: 'رسالة الخطأ بالعربية' },
-                      en: { type: 'string', example: 'Error message in English' },
+                      en: {
+                        type: 'string',
+                        example: 'Error message in English',
+                      },
                     },
                   },
                   suggestedRange: {
@@ -290,12 +299,13 @@ export class WorkingHoursController {
   ): Promise<ValidateWorkingHoursResponse> {
     try {
       // Perform hierarchical validation using the validation service
-      const validationResult = await this.validationService.validateHierarchical(
-        validateDto.schedule,
-        validateDto.parentEntityType,
-        validateDto.parentEntityId,
-        `${validateDto.entityType} ${validateDto.entityId}`,
-      );
+      const validationResult =
+        await this.validationService.validateHierarchical(
+          validateDto.schedule,
+          validateDto.parentEntityType,
+          validateDto.parentEntityId,
+          `${validateDto.entityType} ${validateDto.entityId}`,
+        );
 
       return {
         success: true,
@@ -402,7 +412,10 @@ export class WorkingHoursController {
               type: 'object',
               properties: {
                 entityType: { type: 'string', example: 'clinic' },
-                entityId: { type: 'string', example: '507f1f77bcf86cd799439011' },
+                entityId: {
+                  type: 'string',
+                  example: '507f1f77bcf86cd799439011',
+                },
                 entityName: { type: 'string', example: 'Main Clinic' },
               },
             },
@@ -473,7 +486,7 @@ export class WorkingHoursController {
   @ApiOperation({
     summary: 'Check for appointment conflicts',
     description:
-      'Identifies appointments that would fall outside new working hours when updating a doctor\'s schedule. ' +
+      "Identifies appointments that would fall outside new working hours when updating a doctor's schedule. " +
       'Returns detailed conflict information including patient names, appointment times, and conflict reasons. ' +
       'Used to inform rescheduling decisions before applying working hours changes.',
   })
@@ -591,7 +604,8 @@ export class WorkingHoursController {
                   appointmentId: {
                     type: 'string',
                     example: '507f1f77bcf86cd799439013',
-                    description: 'Unique identifier of the conflicting appointment',
+                    description:
+                      'Unique identifier of the conflicting appointment',
                   },
                   patientName: {
                     type: 'string',
@@ -899,7 +913,10 @@ export class WorkingHoursController {
                 properties: {
                   _id: { type: 'string', example: '507f1f77bcf86cd799439011' },
                   entityType: { type: 'string', example: 'user' },
-                  entityId: { type: 'string', example: '507f1f77bcf86cd799439012' },
+                  entityId: {
+                    type: 'string',
+                    example: '507f1f77bcf86cd799439012',
+                  },
                   dayOfWeek: { type: 'string', example: 'monday' },
                   isWorkingDay: { type: 'boolean', example: true },
                   openingTime: { type: 'string', example: '09:00' },
@@ -915,7 +932,8 @@ export class WorkingHoursController {
             appointmentsMarkedForRescheduling: {
               type: 'number',
               example: 2,
-              description: 'Number of appointments marked for manual rescheduling',
+              description:
+                'Number of appointments marked for manual rescheduling',
             },
             appointmentsCancelled: {
               type: 'number',
@@ -1078,7 +1096,7 @@ export class WorkingHoursController {
 
   /**
    * Creates working hours with parent entity validation.
-   * 
+   *
    * @param {object} body - Request body with working hours and parent entity info
    * @returns {Promise<StandardResponse<WorkingHours[]>>} Created working hours
    */
@@ -1107,7 +1125,7 @@ export class WorkingHoursController {
 
   /**
    * Retrieves working hours for an entity.
-   * 
+   *
    * @param {string} entityType - Entity type
    * @param {string} entityId - Entity ID
    * @returns {Promise<StandardResponse<WorkingHours[]>>} Working hours records
@@ -1130,7 +1148,7 @@ export class WorkingHoursController {
 
   /**
    * Retrieves complex working hours.
-   * 
+   *
    * @param {string} complexId - Complex ID
    * @returns {Promise<StandardResponse>} Complex working hours
    */
@@ -1148,7 +1166,7 @@ export class WorkingHoursController {
   /**
    * Updates working hours for an entity.
    * Optionally validates against parent entity.
-   * 
+   *
    * @param {string} entityType - Entity type
    * @param {string} entityId - Entity ID
    * @param {UpdateWorkingHoursDto} updateDto - Update data

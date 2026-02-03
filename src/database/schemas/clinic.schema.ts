@@ -157,8 +157,32 @@ export class Clinic extends Document {
   sessionDuration?: number;
 
   // Status field for filtering
+  // NOTE: Keep isActive for backward compatibility
+  // Service layer should sync isActive with status field:
+  // - status 'active' => isActive = true
+  // - status 'inactive' or 'suspended' => isActive = false
   @Prop({ default: true })
   isActive?: boolean;
+
+  // NEW: Status management fields (BZR-44)
+  @Prop({
+    enum: ['active', 'inactive', 'suspended'],
+    default: 'active',
+    index: true,
+  })
+  status: string;
+
+  @Prop({ type: Types.ObjectId, ref: 'User' })
+  personInChargeId?: Types.ObjectId;
+
+  @Prop()
+  deactivatedAt?: Date;
+
+  @Prop({ type: Types.ObjectId, ref: 'User' })
+  deactivatedBy?: Types.ObjectId;
+
+  @Prop()
+  deactivationReason?: string;
 }
 
 export const ClinicSchema = SchemaFactory.createForClass(Clinic);
@@ -179,3 +203,9 @@ ClinicSchema.index({ crNumber: 1 });
 ClinicSchema.index({ complexId: 1, name: 1 });
 ClinicSchema.index({ complexDepartmentId: 1, name: 1 });
 ClinicSchema.index({ complexId: 1, isActive: 1 }); // Composite index for complex-based filtering
+
+// NEW: Status management indexes
+ClinicSchema.index({ status: 1 });
+ClinicSchema.index({ personInChargeId: 1 });
+ClinicSchema.index({ complexId: 1, status: 1 });
+ClinicSchema.index({ subscriptionId: 1, status: 1 });

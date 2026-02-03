@@ -1,5 +1,25 @@
-import { Controller, Post, Get, Body, Param, Put, Query, Delete, Patch, NotFoundException, BadRequestException, HttpStatus } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery, ApiBody } from '@nestjs/swagger';
+import {
+  Controller,
+  Post,
+  Get,
+  Body,
+  Param,
+  Put,
+  Query,
+  Delete,
+  Patch,
+  NotFoundException,
+  BadRequestException,
+  HttpStatus,
+} from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiParam,
+  ApiQuery,
+  ApiBody,
+} from '@nestjs/swagger';
 import { ComplexService } from './complex.service';
 import { CreateComplexDto, UpdateComplexDto } from './dto/create-complex.dto';
 import { ListComplexesQueryDto } from './dto/list-complexes-query.dto';
@@ -9,7 +29,7 @@ import { TransferClinicsDto } from './dto/transfer-clinics.dto';
 
 /**
  * Complex Management Controller
- * 
+ *
  * Provides comprehensive endpoints for managing medical complexes including:
  * - Paginated listing with filters and calculated metrics
  * - Detailed complex retrieval with relationships
@@ -18,7 +38,7 @@ import { TransferClinicsDto } from './dto/transfer-clinics.dto';
  * - Capacity calculations and tracking
  * - Person-in-Charge (PIC) assignment
  * - Clinic transfers between complexes
- * 
+ *
  * All endpoints support bilingual error messages (Arabic/English)
  * and follow consistent response structures.
  */
@@ -30,7 +50,7 @@ export class ComplexController {
   /**
    * List complexes with pagination, filters, and optional counts
    * GET /complexes
-   * 
+   *
    * Requirements: 1.1, 1.11
    */
   @Get()
@@ -55,15 +75,69 @@ export class ComplexController {
       **Requirements:** 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 1.10, 1.11
     `,
   })
-  @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number (default: 1, min: 1)', example: 1 })
-  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Items per page (default: 10, min: 1, max: 100)', example: 10 })
-  @ApiQuery({ name: 'organizationId', required: false, type: String, description: 'Filter by organization ID', example: '507f1f77bcf86cd799439011' })
-  @ApiQuery({ name: 'subscriptionId', required: false, type: String, description: 'Filter by subscription ID', example: '507f1f77bcf86cd799439012' })
-  @ApiQuery({ name: 'status', required: false, enum: ['active', 'inactive', 'suspended'], description: 'Filter by status', example: 'active' })
-  @ApiQuery({ name: 'search', required: false, type: String, description: 'Search by complex name (case-insensitive)', example: 'Medical Center' })
-  @ApiQuery({ name: 'sortBy', required: false, type: String, description: 'Field to sort by', example: 'createdAt' })
-  @ApiQuery({ name: 'sortOrder', required: false, enum: ['asc', 'desc'], description: 'Sort order', example: 'desc' })
-  @ApiQuery({ name: 'includeCounts', required: false, type: Boolean, description: 'Include calculated counts (appointments, clinics, capacity)', example: true })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    type: Number,
+    description: 'Page number (default: 1, min: 1)',
+    example: 1,
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    description: 'Items per page (default: 10, min: 1, max: 100)',
+    example: 10,
+  })
+  @ApiQuery({
+    name: 'organizationId',
+    required: false,
+    type: String,
+    description: 'Filter by organization ID',
+    example: '507f1f77bcf86cd799439011',
+  })
+  @ApiQuery({
+    name: 'subscriptionId',
+    required: false,
+    type: String,
+    description: 'Filter by subscription ID',
+    example: '507f1f77bcf86cd799439012',
+  })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    enum: ['active', 'inactive', 'suspended'],
+    description: 'Filter by status',
+    example: 'active',
+  })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    type: String,
+    description: 'Search by complex name (case-insensitive)',
+    example: 'Medical Center',
+  })
+  @ApiQuery({
+    name: 'sortBy',
+    required: false,
+    type: String,
+    description: 'Field to sort by',
+    example: 'createdAt',
+  })
+  @ApiQuery({
+    name: 'sortOrder',
+    required: false,
+    enum: ['asc', 'desc'],
+    description: 'Sort order',
+    example: 'desc',
+  })
+  @ApiQuery({
+    name: 'includeCounts',
+    required: false,
+    type: Boolean,
+    description: 'Include calculated counts (appointments, clinics, capacity)',
+    example: true,
+  })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Complexes retrieved successfully',
@@ -134,7 +208,10 @@ export class ComplexController {
       return await this.complexService.listComplexes(query);
     } catch (error) {
       // Handle specific error types
-      if (error instanceof BadRequestException || error instanceof NotFoundException) {
+      if (
+        error instanceof BadRequestException ||
+        error instanceof NotFoundException
+      ) {
         const errorResponse = error.getResponse() as any;
         return {
           success: false,
@@ -204,7 +281,10 @@ export class ComplexController {
             country: 'Saudi Arabia',
           },
           personInChargeId: '507f1f77bcf86cd799439014',
-          departmentIds: ['507f1f77bcf86cd799439015', '507f1f77bcf86cd799439016'],
+          departmentIds: [
+            '507f1f77bcf86cd799439015',
+            '507f1f77bcf86cd799439016',
+          ],
         },
         summary: 'Create complex for company plan with organization',
       },
@@ -399,7 +479,10 @@ export class ComplexController {
       };
     } catch (error) {
       // Handle specific error types
-      if (error instanceof BadRequestException || error instanceof NotFoundException) {
+      if (
+        error instanceof BadRequestException ||
+        error instanceof NotFoundException
+      ) {
         const errorResponse = error.getResponse() as any;
         return {
           success: false,
@@ -446,7 +529,10 @@ export class ComplexController {
       };
     } catch (error) {
       // Handle specific error types
-      if (error instanceof BadRequestException || error instanceof NotFoundException) {
+      if (
+        error instanceof BadRequestException ||
+        error instanceof NotFoundException
+      ) {
         const errorResponse = error.getResponse() as any;
         return {
           success: false,
@@ -479,7 +565,7 @@ export class ComplexController {
   /**
    * Get complex details with all relationships and calculated metrics
    * GET /complexes/:id
-   * 
+   *
    * Requirements: 2.1, 2.9
    */
   @Get(':id')
@@ -662,7 +748,7 @@ export class ComplexController {
   /**
    * Update complex with validation for department restrictions and PIC
    * PUT /complexes/:id
-   * 
+   *
    * Requirements: 4.9
    */
   @Put(':id')
@@ -805,7 +891,7 @@ export class ComplexController {
         id,
         updateComplexDto,
       );
-      
+
       // Return the result which includes departmentRestrictions if any
       return result;
     } catch (error) {
@@ -860,7 +946,7 @@ export class ComplexController {
   /**
    * Soft delete a complex
    * DELETE /complexes/:id
-   * 
+   *
    * Requirements: 5.6
    */
   @Delete(':id')
@@ -989,7 +1075,7 @@ export class ComplexController {
   /**
    * Update complex status with cascading effects
    * PATCH /complexes/:id/status
-   * 
+   *
    * Requirements: 6.10
    */
   @Patch(':id/status')
@@ -1187,7 +1273,7 @@ export class ComplexController {
   /**
    * Get complex capacity with breakdown and utilization
    * GET /complexes/:id/capacity
-   * 
+   *
    * Requirements: 7.6
    */
   @Get(':id/capacity')
@@ -1341,7 +1427,7 @@ export class ComplexController {
   /**
    * Assign person-in-charge to a complex
    * PATCH /complexes/:id/pic
-   * 
+   *
    * Requirements: 8.6
    */
   @Patch(':id/pic')
@@ -1499,7 +1585,7 @@ export class ComplexController {
   /**
    * Remove person-in-charge from a complex
    * DELETE /complexes/:id/pic
-   * 
+   *
    * Requirements: 9.4
    */
   @Delete(':id/pic')
@@ -1610,7 +1696,7 @@ export class ComplexController {
   /**
    * Transfer clinics from source complex to target complex
    * POST /complexes/:id/transfer-clinics
-   * 
+   *
    * Requirements: 10.10
    */
   @Post(':id/transfer-clinics')
@@ -1683,7 +1769,8 @@ export class ComplexController {
               clinicId: '507f1f77bcf86cd799439020',
               clinicName: 'Cardiology Clinic',
               conflictType: 'working_hours_mismatch',
-              details: 'Source complex operates 8AM-8PM, target complex operates 9AM-5PM',
+              details:
+                'Source complex operates 8AM-8PM, target complex operates 9AM-5PM',
             },
           ],
         },

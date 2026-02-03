@@ -56,7 +56,8 @@ export const AUTH_ERROR_CODES = {
   BAD_REQUEST: 'ERR_400',
 } as const;
 
-export type AuthErrorCode = (typeof AUTH_ERROR_CODES)[keyof typeof AUTH_ERROR_CODES];
+export type AuthErrorCode =
+  (typeof AUTH_ERROR_CODES)[keyof typeof AUTH_ERROR_CODES];
 
 /**
  * Error Messages (Bilingual)

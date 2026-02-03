@@ -315,7 +315,11 @@ describe('WorkingHoursSuggestionService', () => {
   describe('getSuggestedHours - Invalid Role', () => {
     it('should throw NotFoundException for invalid role', async () => {
       await expect(
-        service.getSuggestedHours('invalid' as any, clinicId.toString(), undefined),
+        service.getSuggestedHours(
+          'invalid' as any,
+          clinicId.toString(),
+          undefined,
+        ),
       ).rejects.toThrow(NotFoundException);
     });
   });
@@ -329,7 +333,10 @@ describe('WorkingHoursSuggestionService', () => {
 
       mockClinicModel.exec.mockResolvedValue(mockClinic);
 
-      const result = await service.getEntityDetails('clinic', clinicId.toString());
+      const result = await service.getEntityDetails(
+        'clinic',
+        clinicId.toString(),
+      );
 
       expect(result).toEqual({
         entityType: 'clinic',
@@ -351,7 +358,10 @@ describe('WorkingHoursSuggestionService', () => {
 
       mockComplexModel.exec.mockResolvedValue(mockComplex);
 
-      const result = await service.getEntityDetails('complex', complexId.toString());
+      const result = await service.getEntityDetails(
+        'complex',
+        complexId.toString(),
+      );
 
       expect(result).toEqual({
         entityType: 'complex',

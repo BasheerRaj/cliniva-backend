@@ -8,10 +8,7 @@ import {
   createDynamicMessage,
 } from '../../common/utils/error-messages.constant';
 import { BilingualMessage } from '../../common/types/bilingual-message.type';
-import {
-  queryCache,
-  WorkingHoursCacheKeys,
-} from '../utils/query-cache.util';
+import { queryCache, WorkingHoursCacheKeys } from '../utils/query-cache.util';
 
 /**
  * Interface for working hours schedule data
@@ -203,7 +200,9 @@ export class WorkingHoursValidationService {
         entityId: new Types.ObjectId(entityId),
         isActive: true,
       })
-      .select('dayOfWeek isWorkingDay openingTime closingTime breakStartTime breakEndTime')
+      .select(
+        'dayOfWeek isWorkingDay openingTime closingTime breakStartTime breakEndTime',
+      )
       .lean()
       .exec();
 

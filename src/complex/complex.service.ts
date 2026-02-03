@@ -33,10 +33,10 @@ export class ComplexService {
 
   /**
    * List complexes with pagination, filters, and optional counts
-   * 
+   *
    * @param query - Query parameters for filtering, sorting, and pagination
    * @returns Promise<PaginatedResponse<Complex>> - Paginated list of complexes
-   * 
+   *
    * Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 1.10
    */
   async listComplexes(
@@ -332,10 +332,10 @@ export class ComplexService {
 
   /**
    * Get complete complex details with all relationships and calculated metrics
-   * 
+   *
    * @param complexId - The complex ID
    * @returns Promise<ComplexDetailsResponse> - Complete complex details
-   * 
+   *
    * Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8
    */
   async getComplexDetails(complexId: string): Promise<any> {
@@ -398,7 +398,7 @@ export class ComplexService {
   /**
    * Get complex by ID (simple version for internal use)
    * Used by update and setup methods
-   * 
+   *
    * @param complexId - The complex ID
    * @returns Promise<Complex> - Complex document
    */
@@ -429,11 +429,11 @@ export class ComplexService {
 
   /**
    * Update complex with validation for department restrictions and PIC
-   * 
+   *
    * @param complexId - The complex ID
    * @param updateComplexDto - Update data
    * @returns Promise<UpdateComplexResponse> - Updated complex with restrictions if any
-   * 
+   *
    * Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 4.8
    */
   async updateComplex(
@@ -661,10 +661,10 @@ export class ComplexService {
   /**
    * Calculate the number of scheduled appointments for a complex
    * Counts appointments with status 'scheduled' or 'confirmed' that are not deleted
-   * 
+   *
    * @param complexId - The complex ID
    * @returns Promise<number> - Count of scheduled appointments
-   * 
+   *
    * Requirements: 1.2, 2.3
    */
   private async calculateScheduledAppointments(
@@ -728,10 +728,10 @@ export class ComplexService {
   /**
    * Calculate the number of active clinics assigned to a complex
    * Counts clinics that are active and not deleted
-   * 
+   *
    * @param complexId - The complex ID
    * @returns Promise<number> - Count of active clinics
-   * 
+   *
    * Requirements: 1.3, 2.4
    */
   private async calculateClinicsAssigned(complexId: string): Promise<number> {
@@ -749,10 +749,10 @@ export class ComplexService {
   /**
    * Calculate capacity breakdown for a complex
    * Aggregates capacity from all active clinics and calculates utilization
-   * 
+   *
    * @param complexId - The complex ID
    * @returns Promise<CapacityBreakdown> - Complete capacity breakdown
-   * 
+   *
    * Requirements: 1.4, 2.6, 2.7, 7.1, 7.2, 7.3, 7.4, 7.5
    */
   private async calculateCapacity(
@@ -838,9 +838,7 @@ export class ComplexService {
         ? Math.round((currentDoctors / totalMaxDoctors) * 100)
         : 0;
     const staffUtilization =
-      totalMaxStaff > 0
-        ? Math.round((currentStaff / totalMaxStaff) * 100)
-        : 0;
+      totalMaxStaff > 0 ? Math.round((currentStaff / totalMaxStaff) * 100) : 0;
     const patientUtilization =
       totalMaxPatients > 0
         ? Math.round((currentPatients / totalMaxPatients) * 100)
@@ -948,11 +946,11 @@ export class ComplexService {
   /**
    * Validate that a user is eligible to be person-in-charge of a complex
    * Checks: user exists, role is not 'patient', and user's complexId matches
-   * 
+   *
    * @param userId - The user ID to validate
    * @param complexId - The complex ID
    * @returns Promise<boolean> - True if valid, false otherwise
-   * 
+   *
    * Requirements: 3.3, 4.5, 8.2, 8.3
    */
   private async validatePersonInCharge(
@@ -961,11 +959,9 @@ export class ComplexService {
   ): Promise<boolean> {
     try {
       // Check if user exists
-      const user = await this.complexModel.db
-        .collection('users')
-        .findOne({
-          _id: new Types.ObjectId(userId),
-        });
+      const user = await this.complexModel.db.collection('users').findOne({
+        _id: new Types.ObjectId(userId),
+      });
 
       if (!user) {
         return false;
@@ -994,11 +990,11 @@ export class ComplexService {
   /**
    * Check if departments are linked to active clinics
    * Returns restrictions for departments that cannot be removed
-   * 
+   *
    * @param complexId - The complex ID
    * @param departmentIds - Array of department IDs to check
    * @returns Promise<DepartmentRestriction[]> - Array of restrictions
-   * 
+   *
    * Requirements: 4.2, 4.3
    */
   private async checkDepartmentRestrictions(
@@ -1055,10 +1051,10 @@ export class ComplexService {
    * Soft delete a complex
    * Sets deletedAt timestamp without physically removing the record
    * Prevents deletion if complex has active clinics
-   * 
+   *
    * @param complexId - The complex ID to soft delete
    * @returns Promise<SuccessResponse> - Success response with bilingual message
-   * 
+   *
    * Requirements: 5.1, 5.2, 5.3, 5.4, 5.5
    */
   async softDeleteComplex(complexId: string): Promise<any> {
@@ -1100,12 +1096,12 @@ export class ComplexService {
    * Update complex status with cascading effects
    * Handles deactivation with clinic transfers and appointment rescheduling
    * Uses MongoDB transactions for atomicity
-   * 
+   *
    * @param complexId - The complex ID
    * @param dto - Status update data
    * @param userId - User ID performing the status change (for audit trail)
    * @returns Promise<StatusChangeResponse> - Status change result with counts
-   * 
+   *
    * Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.8, 6.9
    */
   async updateComplexStatus(
@@ -1244,7 +1240,8 @@ export class ComplexService {
         data: {
           complex: populatedComplex!,
           servicesDeactivated,
-          clinicsTransferred: clinicsTransferred > 0 ? clinicsTransferred : undefined,
+          clinicsTransferred:
+            clinicsTransferred > 0 ? clinicsTransferred : undefined,
           appointmentsMarkedForRescheduling:
             appointmentsMarkedForRescheduling > 0
               ? appointmentsMarkedForRescheduling
@@ -1269,11 +1266,11 @@ export class ComplexService {
   /**
    * Deactivate all services linked to a complex
    * Updates isActive to false for all services linked via complexDepartmentId or clinicId
-   * 
+   *
    * @param complexId - The complex ID
    * @param session - MongoDB session for transaction support
    * @returns Promise<number> - Count of services deactivated
-   * 
+   *
    * Requirements: 6.2
    */
   private async deactivateComplexServices(
@@ -1307,20 +1304,18 @@ export class ComplexService {
     const complexDepartmentIds = complexDepartments.map((cd) => cd._id);
 
     // Update all services linked to these clinics or complex departments
-    const result = await this.complexModel.db
-      .collection('services')
-      .updateMany(
-        {
-          $or: [
-            { clinicId: { $in: clinicIds } },
-            { complexDepartmentId: { $in: complexDepartmentIds } },
-          ],
-        },
-        {
-          $set: { isActive: false },
-        },
-        { session },
-      );
+    const result = await this.complexModel.db.collection('services').updateMany(
+      {
+        $or: [
+          { clinicId: { $in: clinicIds } },
+          { complexDepartmentId: { $in: complexDepartmentIds } },
+        ],
+      },
+      {
+        $set: { isActive: false },
+      },
+      { session },
+    );
 
     return result.modifiedCount;
   }
@@ -1328,12 +1323,12 @@ export class ComplexService {
   /**
    * Transfer clinics to a target complex
    * Updates all clinic records with new complexId
-   * 
+   *
    * @param clinicIds - Array of clinic IDs to transfer
    * @param targetComplexId - The target complex ID
    * @param session - MongoDB session for transaction support
    * @returns Promise<number> - Count of clinics transferred
-   * 
+   *
    * Requirements: 6.3, 6.4
    */
   private async transferClinicsToComplex(
@@ -1342,17 +1337,15 @@ export class ComplexService {
     session: any,
   ): Promise<number> {
     // Update all clinic records with new complexId
-    const result = await this.complexModel.db
-      .collection('clinics')
-      .updateMany(
-        {
-          _id: { $in: clinicIds },
-        },
-        {
-          $set: { complexId: new Types.ObjectId(targetComplexId) },
-        },
-        { session },
-      );
+    const result = await this.complexModel.db.collection('clinics').updateMany(
+      {
+        _id: { $in: clinicIds },
+      },
+      {
+        $set: { complexId: new Types.ObjectId(targetComplexId) },
+      },
+      { session },
+    );
 
     return result.modifiedCount;
   }
@@ -1360,13 +1353,13 @@ export class ComplexService {
   /**
    * Mark appointments for rescheduling
    * Sets reschedulingReason, markedForReschedulingAt, and markedBy fields
-   * 
+   *
    * @param clinicIds - Array of clinic IDs whose appointments need rescheduling
    * @param reason - Reason for rescheduling
    * @param markedBy - User ID who marked for rescheduling
    * @param session - MongoDB session for transaction support
    * @returns Promise<number> - Count of appointments marked
-   * 
+   *
    * Requirements: 6.5
    */
   private async markAppointmentsForRescheduling(
@@ -1402,10 +1395,10 @@ export class ComplexService {
   /**
    * Get complex capacity with breakdown and utilization
    * Public endpoint for capacity calculation
-   * 
+   *
    * @param complexId - The complex ID
    * @returns Promise<CapacityResponse> - Capacity breakdown with bilingual message
-   * 
+   *
    * Requirements: 7.1, 7.2, 7.3, 7.4, 7.5
    */
   async getComplexCapacity(complexId: string): Promise<any> {
@@ -1437,17 +1430,14 @@ export class ComplexService {
   /**
    * Assign a person-in-charge to a complex
    * Validates user exists, is an employee of the complex, and has appropriate role
-   * 
+   *
    * @param complexId - The complex ID
    * @param userId - The user ID to assign as PIC
    * @returns Promise<Complex> - Complex with populated personInCharge
-   * 
+   *
    * Requirements: 8.1, 8.2, 8.3, 8.4, 8.5
    */
-  async assignPersonInCharge(
-    complexId: string,
-    userId: string,
-  ): Promise<any> {
+  async assignPersonInCharge(complexId: string, userId: string): Promise<any> {
     // Validate complex exists (throw COMPLEX_006 if not) - Requirement 8.1
     const complex = await this.complexModel.findById(complexId).exec();
     if (!complex) {
@@ -1458,11 +1448,9 @@ export class ComplexService {
     }
 
     // Validate user exists (throw COMPLEX_002 if not) - Requirement 8.1
-    const user = await this.complexModel.db
-      .collection('users')
-      .findOne({
-        _id: new Types.ObjectId(userId),
-      });
+    const user = await this.complexModel.db.collection('users').findOne({
+      _id: new Types.ObjectId(userId),
+    });
 
     if (!user) {
       throw new BadRequestException({
@@ -1507,10 +1495,10 @@ export class ComplexService {
   /**
    * Remove person-in-charge from a complex
    * Sets personInChargeId to null
-   * 
+   *
    * @param complexId - The complex ID
    * @returns Promise<SuccessResponse> - Success response with bilingual message
-   * 
+   *
    * Requirements: 9.1, 9.2, 9.3
    */
   async removePersonInCharge(complexId: string): Promise<any> {
@@ -1542,12 +1530,12 @@ export class ComplexService {
   /**
    * Check for working hours conflicts between source and target complexes
    * Compares schedules and identifies conflicts
-   * 
+   *
    * @param sourceComplexId - The source complex ID
    * @param targetComplexId - The target complex ID
    * @param clinicIds - Array of clinic IDs being transferred
    * @returns Promise<WorkingHoursConflict[]> - Array of conflicts with details
-   * 
+   *
    * Requirements: 10.6
    */
   private async checkWorkingHoursConflicts(
@@ -1599,15 +1587,20 @@ export class ComplexService {
           .toArray();
 
         // Check if there are any working hours defined
-        const hasSourceHours = sourceWorkingHours.length > 0 || clinicWorkingHours.length > 0;
+        const hasSourceHours =
+          sourceWorkingHours.length > 0 || clinicWorkingHours.length > 0;
         const hasTargetHours = targetWorkingHours.length > 0;
 
         if (hasSourceHours && hasTargetHours) {
           // Compare day availability
           const sourceDays = new Set(
-            [...sourceWorkingHours, ...clinicWorkingHours].map((wh) => wh.dayOfWeek),
+            [...sourceWorkingHours, ...clinicWorkingHours].map(
+              (wh) => wh.dayOfWeek,
+            ),
           );
-          const targetDays = new Set(targetWorkingHours.map((wh) => wh.dayOfWeek));
+          const targetDays = new Set(
+            targetWorkingHours.map((wh) => wh.dayOfWeek),
+          );
 
           // Check for days that exist in source but not in target
           const missingDays = Array.from(sourceDays).filter(
@@ -1624,7 +1617,10 @@ export class ComplexService {
           }
 
           // Check for time conflicts (simplified - checks if target has shorter hours)
-          for (const sourceWH of [...sourceWorkingHours, ...clinicWorkingHours]) {
+          for (const sourceWH of [
+            ...sourceWorkingHours,
+            ...clinicWorkingHours,
+          ]) {
             const targetWH = targetWorkingHours.find(
               (twh) => twh.dayOfWeek === sourceWH.dayOfWeek,
             );
@@ -1669,12 +1665,12 @@ export class ComplexService {
   /**
    * Update staff assignments when clinics are transferred
    * Updates complexId for all users assigned to the transferred clinics
-   * 
+   *
    * @param clinicIds - Array of clinic IDs being transferred
    * @param targetComplexId - The target complex ID
    * @param session - MongoDB session for transaction support
    * @returns Promise<number> - Count of staff updated
-   * 
+   *
    * Requirements: 10.5
    */
   private async updateStaffAssignments(
@@ -1684,18 +1680,16 @@ export class ComplexService {
   ): Promise<number> {
     // Query users with clinicId in transferred clinics
     // Update their complexId to target complex
-    const result = await this.complexModel.db
-      .collection('users')
-      .updateMany(
-        {
-          clinicId: { $in: clinicIds },
-          isActive: true,
-        },
-        {
-          $set: { complexId: new Types.ObjectId(targetComplexId) },
-        },
-        { session },
-      );
+    const result = await this.complexModel.db.collection('users').updateMany(
+      {
+        clinicId: { $in: clinicIds },
+        isActive: true,
+      },
+      {
+        $set: { complexId: new Types.ObjectId(targetComplexId) },
+      },
+      { session },
+    );
 
     return result.modifiedCount;
   }
@@ -1703,12 +1697,12 @@ export class ComplexService {
   /**
    * Transfer clinics from source complex to target complex
    * Handles all related data updates atomically using transactions
-   * 
+   *
    * @param sourceComplexId - The source complex ID
    * @param targetComplexId - The target complex ID
    * @param clinicIds - Array of clinic IDs to transfer
    * @returns Promise<TransferResponse> - Transfer result with counts and conflicts
-   * 
+   *
    * Requirements: 10.1, 10.2, 10.3, 10.4, 10.5, 10.6, 10.7, 10.9
    */
   async transferClinics(

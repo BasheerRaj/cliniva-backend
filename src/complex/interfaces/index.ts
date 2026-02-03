@@ -1,6 +1,6 @@
 /**
  * Complex Module Interfaces
- * 
+ *
  * Barrel export for all complex-related interfaces
  */
 

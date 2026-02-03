@@ -1910,7 +1910,7 @@ export class OnboardingService {
 
       return {
         success: true,
-        entityId: (updatedComplex._id as any).toString(),
+        entityId: updatedComplex._id.toString(),
         canProceed: true,
         nextStep: 'complex_legal',
         data: updatedComplex,
@@ -1981,7 +1981,7 @@ export class OnboardingService {
 
       return {
         success: true,
-        entityId: (updatedComplex._id as any).toString(),
+        entityId: updatedComplex._id.toString(),
         canProceed: true,
         nextStep,
         data: updatedComplex,

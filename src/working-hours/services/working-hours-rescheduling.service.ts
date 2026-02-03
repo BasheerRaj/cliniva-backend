@@ -149,8 +149,10 @@ export class WorkingHoursReschedulingService {
 
       if (entityType === 'user') {
         // Get conflicting appointments
-        const conflictingAppointments =
-          await this.getConflictingAppointments(entityId, schedule);
+        const conflictingAppointments = await this.getConflictingAppointments(
+          entityId,
+          schedule,
+        );
 
         this.logger.log(
           `Found ${conflictingAppointments.length} conflicting appointments`,
@@ -271,10 +273,7 @@ export class WorkingHoursReschedulingService {
 
       // Try to find a suitable time within the same day
       if (workingHours && workingHours.isWorkingDay) {
-        const newTime = this.findSuitableTime(
-          appointment,
-          workingHours,
-        );
+        const newTime = this.findSuitableTime(appointment, workingHours);
 
         if (newTime) {
           // Update appointment with new time
@@ -283,7 +282,8 @@ export class WorkingHoursReschedulingService {
             {
               $set: {
                 appointmentTime: newTime,
-                reschedulingReason: 'Automatically rescheduled due to working hours change',
+                reschedulingReason:
+                  'Automatically rescheduled due to working hours change',
                 updatedAt: new Date(),
               },
             },
@@ -309,7 +309,8 @@ export class WorkingHoursReschedulingService {
             {
               $set: {
                 status: 'needs_rescheduling',
-                reschedulingReason: 'No suitable time slot available - requires manual rescheduling',
+                reschedulingReason:
+                  'No suitable time slot available - requires manual rescheduling',
                 markedForReschedulingAt: new Date(),
                 updatedAt: new Date(),
               },
@@ -618,10 +619,7 @@ export class WorkingHoursReschedulingService {
 
     // Try to keep the appointment at the same time if possible
     const currentTime = this.parseTime(appointment.appointmentTime);
-    if (
-      currentTime >= openingTime &&
-      currentTime + duration <= closingTime
-    ) {
+    if (currentTime >= openingTime && currentTime + duration <= closingTime) {
       // Check if it conflicts with break time
       if (workingHours.breakStartTime && workingHours.breakEndTime) {
         const breakStart = this.parseTime(workingHours.breakStartTime);
@@ -644,11 +642,7 @@ export class WorkingHoursReschedulingService {
 
     // Try to find the nearest available time slot
     // Start from opening time and check every 15 minutes
-    for (
-      let time = openingTime;
-      time + duration <= closingTime;
-      time += 15
-    ) {
+    for (let time = openingTime; time + duration <= closingTime; time += 15) {
       // Skip break time
       if (workingHours.breakStartTime && workingHours.breakEndTime) {
         const breakStart = this.parseTime(workingHours.breakStartTime);

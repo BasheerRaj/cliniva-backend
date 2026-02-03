@@ -14,9 +14,11 @@ import {
   SetupBusinessProfileDto,
 } from './dto/create-clinic.dto';
 import { ClinicFilterDto } from './dto/clinic-filter.dto';
+import { AssignPICDto } from './dto/assign-pic.dto';
 import { ValidationUtil } from '../common/utils/validation.util';
 import { ResponseBuilder } from '../common/utils/response-builder.util';
 import { ERROR_MESSAGES } from '../common/utils/error-messages.constant';
+import { ERROR_CODES } from './constants/error-codes.constant';
 import { SubscriptionService } from '../subscription/subscription.service';
 
 @Injectable()
@@ -315,6 +317,85 @@ export class ClinicService {
       data.vatNumber ||
       data.crNumber
     );
+  }
+
+  /**
+   * Assign person-in-charge to a clinic
+   * BZR-41: PIC selection from complex PICs
+   *
+   * Business Rule:
+   * - The person-in-charge must be selected from those previously assigned
+   *   as PICs for the complex to which the clinic belongs
+   * - System validates that the selected user is a PIC of the parent complex
+   * - Throws CLINIC_002 error if user is not a PIC of the parent complex
+   *
+   * @param clinicId - The clinic ID
+   * @param assignPICDto - DTO containing personInChargeId
+   * @returns Updated clinic with populated PIC
+   * @throws NotFoundException if clinic not found (CLINIC_007)
+   * @throws BadRequestException if clinic has no parent complex
+   * @throws BadRequestException if PIC is not from parent complex (CLINIC_002)
+   */
+  async assignPersonInCharge(
+    clinicId: string,
+    assignPICDto: AssignPICDto,
+  ): Promise<Clinic> {
+    // 1. Validate clinic exists
+    const clinic = await this.clinicModel.findById(clinicId).exec();
+    if (!clinic) {
+      throw new NotFoundException({
+        code: ERROR_CODES.CLINIC_007.code,
+        message: ERROR_CODES.CLINIC_007.message,
+      });
+    }
+
+    // 2. Check if clinic has a parent complex
+    if (!clinic.complexId) {
+      throw new BadRequestException({
+        message: {
+          ar: 'العيادة غير مرتبطة بمجمع',
+          en: 'Clinic is not associated with a complex',
+        },
+        code: 'CLINIC_NO_COMPLEX',
+      });
+    }
+
+    // 3. Get complex and validate PIC is from parent complex
+    const complex = await this.complexModel
+      .findById(clinic.complexId)
+      .select('personInChargeId')
+      .exec();
+
+    if (!complex) {
+      throw new NotFoundException({
+        message: {
+          ar: 'المجمع غير موجود',
+          en: 'Complex not found',
+        },
+        code: 'COMPLEX_NOT_FOUND',
+      });
+    }
+
+    // 4. Validate that the selected PIC is the PIC of the parent complex
+    if (
+      !complex.personInChargeId ||
+      complex.personInChargeId.toString() !== assignPICDto.personInChargeId
+    ) {
+      throw new BadRequestException({
+        code: ERROR_CODES.CLINIC_002.code,
+        message: ERROR_CODES.CLINIC_002.message,
+      });
+    }
+
+    // 5. Update clinic with personInChargeId
+    clinic.personInChargeId = new Types.ObjectId(assignPICDto.personInChargeId);
+    await clinic.save();
+
+    // 6. Return updated clinic with populated PIC
+    return await this.clinicModel
+      .findById(clinicId)
+      .populate('personInChargeId', 'firstName lastName email role')
+      .exec();
   }
 
   // ======== VALIDATION METHODS ========

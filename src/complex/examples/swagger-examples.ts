@@ -1,6 +1,6 @@
 /**
  * Swagger Examples for Complex Management API
- * 
+ *
  * This file contains reusable examples for API documentation.
  * All examples include bilingual messages and follow the standard response format.
  */
@@ -243,7 +243,8 @@ export const SUCCESS_EXAMPLES = {
           clinicId: '507f1f77bcf86cd799439020',
           clinicName: 'Cardiology Clinic',
           conflictType: 'working_hours_mismatch',
-          details: 'Source complex operates 8AM-8PM, target complex operates 9AM-5PM',
+          details:
+            'Source complex operates 8AM-8PM, target complex operates 9AM-5PM',
         },
       ],
     },

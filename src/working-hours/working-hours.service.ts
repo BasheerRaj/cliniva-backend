@@ -1,4 +1,9 @@
-import { Injectable, BadRequestException, Inject, forwardRef } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  Inject,
+  forwardRef,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { WorkingHours } from '../database/schemas/working-hours.schema';
@@ -12,10 +17,7 @@ import {
   createDynamicMessage,
 } from '../common/utils/error-messages.constant';
 import { WorkingHoursValidationService } from './services/working-hours-validation.service';
-import {
-  queryCache,
-  WorkingHoursCacheKeys,
-} from './utils/query-cache.util';
+import { queryCache, WorkingHoursCacheKeys } from './utils/query-cache.util';
 
 @Injectable()
 export class WorkingHoursService {
@@ -30,7 +32,7 @@ export class WorkingHoursService {
    * Creates working hours for an entity.
    * Validates schedule format and replaces any existing working hours.
    * Invalidates cache for the entity after creation.
-   * 
+   *
    * @param {CreateWorkingHoursDto} createDto - Working hours creation data
    * @returns {Promise<WorkingHours[]>} Created working hours records
    * @throws {BadRequestException} When schedule validation fails
@@ -78,7 +80,7 @@ export class WorkingHoursService {
    * Updates working hours for an entity.
    * Validates schedule format and replaces existing working hours.
    * Invalidates cache for the entity after update.
-   * 
+   *
    * @param {string} entityType - Entity type (organization, complex, clinic, user)
    * @param {string} entityId - Entity ID
    * @param {UpdateWorkingHoursDto} updateDto - Working hours update data
@@ -141,12 +143,12 @@ export class WorkingHoursService {
   /**
    * Creates working hours with parent entity validation.
    * Uses WorkingHoursValidationService for hierarchical validation.
-   * 
+   *
    * Business Rules:
    * - BZR-f1c0a9e4: Hierarchical validation (complex→clinic, clinic→user)
    * - BZR-u5a0f7d3: Child hours must be within parent hours
    * - BZR-42: Child cannot be open when parent is closed
-   * 
+   *
    * @param {CreateWorkingHoursDto} createDto - Working hours creation data
    * @param {string} parentEntityType - Parent entity type (optional)
    * @param {string} parentEntityId - Parent entity ID (optional)
@@ -174,12 +176,13 @@ export class WorkingHoursService {
 
     // If parent entity specified, use validation service for hierarchical validation
     if (parentEntityType && parentEntityId) {
-      const hierarchicalValidation = await this.validationService.validateHierarchical(
-        createDto.schedule,
-        parentEntityType,
-        parentEntityId,
-        `${createDto.entityType} (${createDto.entityId})`,
-      );
+      const hierarchicalValidation =
+        await this.validationService.validateHierarchical(
+          createDto.schedule,
+          parentEntityType,
+          parentEntityId,
+          `${createDto.entityType} (${createDto.entityId})`,
+        );
 
       if (!hierarchicalValidation.isValid) {
         throw new BadRequestException({
@@ -201,7 +204,7 @@ export class WorkingHoursService {
   /**
    * Validates clinic working hours against complex working hours.
    * Uses WorkingHoursValidationService for hierarchical validation.
-   * 
+   *
    * @deprecated Use WorkingHoursValidationService.validateHierarchical() instead
    * @param {string} clinicId - Clinic ID
    * @param {any[]} clinicSchedule - Clinic schedule to validate
@@ -224,8 +227,8 @@ export class WorkingHoursService {
     // Convert ValidationError[] to string[] for backward compatibility
     const errors = result.errors.map((error) => {
       // Use English message for backward compatibility
-      return typeof error.message === 'object' 
-        ? error.message.en 
+      return typeof error.message === 'object'
+        ? error.message.en
         : error.message;
     });
 
@@ -316,14 +319,17 @@ export class WorkingHoursService {
   /**
    * Invalidates all cache entries related to an entity.
    * Called after creating or updating working hours.
-   * 
+   *
    * @private
    * @param {string} entityType - Entity type
    * @param {string} entityId - Entity ID
    */
   private invalidateEntityCache(entityType: string, entityId: string): void {
     // Invalidate all cache entries for this entity
-    const pattern = WorkingHoursCacheKeys.invalidateEntity(entityType, entityId);
+    const pattern = WorkingHoursCacheKeys.invalidateEntity(
+      entityType,
+      entityId,
+    );
     queryCache.invalidatePattern(pattern);
   }
 }

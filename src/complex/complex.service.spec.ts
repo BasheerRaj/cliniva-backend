@@ -104,7 +104,10 @@ describe('ComplexService - Create Complex Enhancement', () => {
         personInChargeId: null,
       }));
 
-      mockComplexModel = Object.assign(MockComplexConstructor, mockComplexModel);
+      mockComplexModel = Object.assign(
+        MockComplexConstructor,
+        mockComplexModel,
+      );
 
       // Re-create service with updated mock
       const module: TestingModule = await Test.createTestingModule({

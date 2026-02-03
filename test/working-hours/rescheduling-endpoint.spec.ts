@@ -40,7 +40,8 @@ describe('WorkingHoursController - Rescheduling Endpoint (e2e)', () => {
           envFilePath: '.env.test',
         }),
         MongooseModule.forRoot(
-          process.env.MONGODB_TEST_URI || 'mongodb://localhost:27017/cliniva_test',
+          process.env.MONGODB_TEST_URI ||
+            'mongodb://localhost:27017/cliniva_test',
         ),
         DatabaseModule,
         WorkingHoursModule,
@@ -268,7 +269,9 @@ describe('WorkingHoursController - Rescheduling Endpoint (e2e)', () => {
       expect(response.body.success).toBe(true);
       expect(response.body.data).toBeDefined();
       expect(response.body.data.workingHours).toHaveLength(7);
-      expect(response.body.data.appointmentsRescheduled).toBeGreaterThanOrEqual(0);
+      expect(response.body.data.appointmentsRescheduled).toBeGreaterThanOrEqual(
+        0,
+      );
       expect(response.body.message).toBeDefined();
       expect(response.body.message.ar).toBeDefined();
       expect(response.body.message.en).toBeDefined();
@@ -332,7 +335,9 @@ describe('WorkingHoursController - Rescheduling Endpoint (e2e)', () => {
         .expect(200);
 
       expect(response.body.success).toBe(true);
-      expect(response.body.data.appointmentsMarkedForRescheduling).toBeGreaterThanOrEqual(0);
+      expect(
+        response.body.data.appointmentsMarkedForRescheduling,
+      ).toBeGreaterThanOrEqual(0);
       expect(response.body.data.notificationsSent).toBeGreaterThanOrEqual(0);
     });
 
@@ -381,7 +386,9 @@ describe('WorkingHoursController - Rescheduling Endpoint (e2e)', () => {
         .expect(200);
 
       expect(response.body.success).toBe(true);
-      expect(response.body.data.appointmentsCancelled).toBeGreaterThanOrEqual(0);
+      expect(response.body.data.appointmentsCancelled).toBeGreaterThanOrEqual(
+        0,
+      );
     });
 
     it('should handle case with no conflicting appointments', async () => {
@@ -549,7 +556,9 @@ describe('WorkingHoursController - Rescheduling Endpoint (e2e)', () => {
 
       expect(response.body.success).toBe(true);
       expect(response.body.data.rescheduledAppointments).toBeDefined();
-      expect(Array.isArray(response.body.data.rescheduledAppointments)).toBe(true);
+      expect(Array.isArray(response.body.data.rescheduledAppointments)).toBe(
+        true,
+      );
 
       if (response.body.data.rescheduledAppointments.length > 0) {
         const appointment = response.body.data.rescheduledAppointments[0];
@@ -557,9 +566,11 @@ describe('WorkingHoursController - Rescheduling Endpoint (e2e)', () => {
         expect(appointment.oldDate).toBeDefined();
         expect(appointment.oldTime).toBeDefined();
         expect(appointment.status).toBeDefined();
-        expect(['rescheduled', 'marked_for_rescheduling', 'cancelled']).toContain(
-          appointment.status,
-        );
+        expect([
+          'rescheduled',
+          'marked_for_rescheduling',
+          'cancelled',
+        ]).toContain(appointment.status);
       }
     });
 
@@ -615,7 +626,7 @@ describe('WorkingHoursController - Rescheduling Endpoint (e2e)', () => {
         .expect(200);
 
       expect(response.body.success).toBe(true);
-      
+
       // Check if notifications were created
       const notifications = await connection
         .collection('notifications')

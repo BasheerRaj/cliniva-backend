@@ -101,7 +101,10 @@ describe('Complex Management (e2e)', () => {
     });
 
     it('should filter by status', async () => {
-      await createTestComplex(complexModel, { ...validComplexData, status: 'active' });
+      await createTestComplex(complexModel, {
+        ...validComplexData,
+        status: 'active',
+      });
       await createTestComplex(complexModel, {
         ...validComplexData,
         email: 'inactive@test.com',
@@ -113,7 +116,9 @@ describe('Complex Management (e2e)', () => {
         .query({ status: 'active' })
         .expect(200);
 
-      expect(response.body.data.every((c: any) => c.status === 'active')).toBe(true);
+      expect(response.body.data.every((c: any) => c.status === 'active')).toBe(
+        true,
+      );
     });
 
     it('should include counts when requested', async () => {
@@ -125,14 +130,19 @@ describe('Complex Management (e2e)', () => {
         .expect(200);
 
       if (response.body.data.length > 0) {
-        expect(response.body.data[0]).toHaveProperty('scheduledAppointmentsCount');
+        expect(response.body.data[0]).toHaveProperty(
+          'scheduledAppointmentsCount',
+        );
         expect(response.body.data[0]).toHaveProperty('clinicsAssignedCount');
         expect(response.body.data[0]).toHaveProperty('capacity');
       }
     });
 
     it('should sort results correctly', async () => {
-      await createTestComplex(complexModel, { ...validComplexData, name: 'Zebra' });
+      await createTestComplex(complexModel, {
+        ...validComplexData,
+        name: 'Zebra',
+      });
       await createTestComplex(complexModel, {
         ...validComplexData,
         name: 'Alpha',
@@ -333,13 +343,20 @@ describe('Complex Management (e2e)', () => {
     });
 
     it('should transfer clinics when deactivating', async () => {
-      const sourceComplex = await createTestComplex(complexModel, validComplexData);
+      const sourceComplex = await createTestComplex(
+        complexModel,
+        validComplexData,
+      );
       const targetComplex = await createTestComplex(complexModel, {
         ...validComplexData,
         email: 'target@test.com',
         name: 'Target Complex',
       });
-      await createClinicsForComplex(clinicModel, sourceComplex._id.toString(), 2);
+      await createClinicsForComplex(
+        clinicModel,
+        sourceComplex._id.toString(),
+        2,
+      );
 
       const response = await request(app.getHttpServer())
         .patch(`/complexes/${sourceComplex._id}/status`)
@@ -520,7 +537,10 @@ describe('Complex Management (e2e)', () => {
    */
   describe('POST /complexes/:id/transfer-clinics', () => {
     it('should transfer clinics between complexes', async () => {
-      const sourceComplex = await createTestComplex(complexModel, validComplexData);
+      const sourceComplex = await createTestComplex(
+        complexModel,
+        validComplexData,
+      );
       const targetComplex = await createTestComplex(complexModel, {
         ...validComplexData,
         email: 'target@test.com',
@@ -547,7 +567,10 @@ describe('Complex Management (e2e)', () => {
     });
 
     it('should validate clinic ownership', async () => {
-      const sourceComplex = await createTestComplex(complexModel, validComplexData);
+      const sourceComplex = await createTestComplex(
+        complexModel,
+        validComplexData,
+      );
       const targetComplex = await createTestComplex(complexModel, {
         ...validComplexData,
         email: 'target@test.com',
@@ -574,7 +597,10 @@ describe('Complex Management (e2e)', () => {
     });
 
     it('should require at least one clinic ID', async () => {
-      const sourceComplex = await createTestComplex(complexModel, validComplexData);
+      const sourceComplex = await createTestComplex(
+        complexModel,
+        validComplexData,
+      );
       const targetComplex = await createTestComplex(complexModel, {
         ...validComplexData,
         email: 'target@test.com',
@@ -593,7 +619,10 @@ describe('Complex Management (e2e)', () => {
     });
 
     it('should validate target complex exists and is active', async () => {
-      const sourceComplex = await createTestComplex(complexModel, validComplexData);
+      const sourceComplex = await createTestComplex(
+        complexModel,
+        validComplexData,
+      );
       const clinics = await createClinicsForComplex(
         clinicModel,
         sourceComplex._id.toString(),

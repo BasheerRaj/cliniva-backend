@@ -95,15 +95,15 @@ AppointmentSchema.index({ deletedAt: 1 });
 AppointmentSchema.index({ doctorId: 1, status: 1, appointmentDate: 1 }); // Composite index for appointment transfer queries
 
 // Optimized indexes for conflict detection and rescheduling
-AppointmentSchema.index({ 
-  doctorId: 1, 
-  appointmentDate: 1, 
-  status: 1, 
-  deletedAt: 1 
+AppointmentSchema.index({
+  doctorId: 1,
+  appointmentDate: 1,
+  status: 1,
+  deletedAt: 1,
 }); // Composite index for efficient conflict detection queries
 
-AppointmentSchema.index({ 
-  doctorId: 1, 
-  appointmentDate: 1, 
-  appointmentTime: 1 
+AppointmentSchema.index({
+  doctorId: 1,
+  appointmentDate: 1,
+  appointmentTime: 1,
 }); // Index for time-based queries

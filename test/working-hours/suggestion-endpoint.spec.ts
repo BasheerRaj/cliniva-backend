@@ -44,7 +44,8 @@ describe('Working Hours Suggestion Endpoint (e2e)', () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [
         MongooseModule.forRoot(
-          process.env.MONGODB_TEST_URI || 'mongodb://localhost:27017/cliniva_test',
+          process.env.MONGODB_TEST_URI ||
+            'mongodb://localhost:27017/cliniva_test',
         ),
         MongooseModule.forFeature([
           { name: 'WorkingHours', schema: WorkingHoursSchema },

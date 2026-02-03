@@ -146,7 +146,10 @@ describe('GET /complexes (e2e)', () => {
   describe('Filters', () => {
     it('should filter by status', async () => {
       // Arrange: Create complexes with different statuses
-      await createTestComplex(complexModel, { ...validComplexData, status: 'active' });
+      await createTestComplex(complexModel, {
+        ...validComplexData,
+        status: 'active',
+      });
       await createTestComplex(complexModel, {
         ...validComplexData,
         email: 'inactive@test.com',
@@ -167,7 +170,10 @@ describe('GET /complexes (e2e)', () => {
 
     it('should filter by search term (name)', async () => {
       // Arrange
-      await createTestComplex(complexModel, { ...validComplexData, name: 'Cardiology Complex' });
+      await createTestComplex(complexModel, {
+        ...validComplexData,
+        name: 'Cardiology Complex',
+      });
       await createTestComplex(complexModel, {
         ...validComplexData,
         name: 'Neurology Center',
@@ -188,7 +194,10 @@ describe('GET /complexes (e2e)', () => {
 
     it('should perform case-insensitive search', async () => {
       // Arrange
-      await createTestComplex(complexModel, { ...validComplexData, name: 'Medical Complex' });
+      await createTestComplex(complexModel, {
+        ...validComplexData,
+        name: 'Medical Complex',
+      });
 
       // Act
       const response = await request(app.getHttpServer())
@@ -232,7 +241,10 @@ describe('GET /complexes (e2e)', () => {
   describe('Sorting', () => {
     it('should sort by name ascending', async () => {
       // Arrange
-      await createTestComplex(complexModel, { ...validComplexData, name: 'Zebra Complex' });
+      await createTestComplex(complexModel, {
+        ...validComplexData,
+        name: 'Zebra Complex',
+      });
       await createTestComplex(complexModel, {
         ...validComplexData,
         name: 'Alpha Complex',
@@ -253,7 +265,10 @@ describe('GET /complexes (e2e)', () => {
 
     it('should sort by name descending', async () => {
       // Arrange
-      await createTestComplex(complexModel, { ...validComplexData, name: 'Zebra Complex' });
+      await createTestComplex(complexModel, {
+        ...validComplexData,
+        name: 'Zebra Complex',
+      });
       await createTestComplex(complexModel, {
         ...validComplexData,
         name: 'Alpha Complex',
@@ -311,7 +326,9 @@ describe('GET /complexes (e2e)', () => {
       // Assert
       expect(response.body.success).toBe(true);
       expect(response.body.data.length).toBeGreaterThan(0);
-      expect(response.body.data[0]).toHaveProperty('scheduledAppointmentsCount');
+      expect(response.body.data[0]).toHaveProperty(
+        'scheduledAppointmentsCount',
+      );
       expect(response.body.data[0]).toHaveProperty('clinicsAssignedCount');
       expect(response.body.data[0]).toHaveProperty('capacity');
     });
@@ -329,7 +346,9 @@ describe('GET /complexes (e2e)', () => {
       // Assert
       expect(response.body.success).toBe(true);
       expect(response.body.data.length).toBeGreaterThan(0);
-      expect(response.body.data[0]).not.toHaveProperty('scheduledAppointmentsCount');
+      expect(response.body.data[0]).not.toHaveProperty(
+        'scheduledAppointmentsCount',
+      );
       expect(response.body.data[0]).not.toHaveProperty('clinicsAssignedCount');
       expect(response.body.data[0]).not.toHaveProperty('capacity');
     });

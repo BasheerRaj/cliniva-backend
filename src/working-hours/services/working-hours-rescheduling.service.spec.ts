@@ -382,7 +382,9 @@ describe('WorkingHoursReschedulingService', () => {
     it('should reschedule appointment to same time if within new hours', async () => {
       // Get next Monday
       const nextMonday = new Date();
-      nextMonday.setDate(nextMonday.getDate() + ((1 + 7 - nextMonday.getDay()) % 7 || 7));
+      nextMonday.setDate(
+        nextMonday.getDate() + ((1 + 7 - nextMonday.getDay()) % 7 || 7),
+      );
 
       const appointment = {
         _id: new Types.ObjectId(),
@@ -419,7 +421,9 @@ describe('WorkingHoursReschedulingService', () => {
     it('should find alternative time when current time conflicts', async () => {
       // Get next Monday
       const nextMonday = new Date();
-      nextMonday.setDate(nextMonday.getDate() + ((1 + 7 - nextMonday.getDay()) % 7 || 7));
+      nextMonday.setDate(
+        nextMonday.getDate() + ((1 + 7 - nextMonday.getDay()) % 7 || 7),
+      );
 
       const appointment = {
         _id: new Types.ObjectId(),
@@ -456,7 +460,9 @@ describe('WorkingHoursReschedulingService', () => {
     it('should mark for manual rescheduling when day is not working', async () => {
       // Get next Monday
       const nextMonday = new Date();
-      nextMonday.setDate(nextMonday.getDate() + ((1 + 7 - nextMonday.getDay()) % 7 || 7));
+      nextMonday.setDate(
+        nextMonday.getDate() + ((1 + 7 - nextMonday.getDay()) % 7 || 7),
+      );
 
       const appointment = {
         _id: new Types.ObjectId(),
@@ -499,7 +505,9 @@ describe('WorkingHoursReschedulingService', () => {
     it('should mark for manual rescheduling when no suitable time found', async () => {
       // Get next Monday
       const nextMonday = new Date();
-      nextMonday.setDate(nextMonday.getDate() + ((1 + 7 - nextMonday.getDay()) % 7 || 7));
+      nextMonday.setDate(
+        nextMonday.getDate() + ((1 + 7 - nextMonday.getDay()) % 7 || 7),
+      );
 
       const appointment = {
         _id: new Types.ObjectId(),
@@ -535,7 +543,9 @@ describe('WorkingHoursReschedulingService', () => {
     it('should handle appointments during break time', async () => {
       // Get next Monday
       const nextMonday = new Date();
-      nextMonday.setDate(nextMonday.getDate() + ((1 + 7 - nextMonday.getDay()) % 7 || 7));
+      nextMonday.setDate(
+        nextMonday.getDate() + ((1 + 7 - nextMonday.getDay()) % 7 || 7),
+      );
 
       const appointment = {
         _id: new Types.ObjectId(),
@@ -574,16 +584,18 @@ describe('WorkingHoursReschedulingService', () => {
         const timeInMinutes = hours * 60 + minutes;
         const breakStart = 12 * 60;
         const breakEnd = 13 * 60;
-        expect(
-          timeInMinutes < breakStart || timeInMinutes >= breakEnd,
-        ).toBe(true);
+        expect(timeInMinutes < breakStart || timeInMinutes >= breakEnd).toBe(
+          true,
+        );
       }
     });
 
     it('should handle multiple appointments', async () => {
       // Get next Monday
       const nextMonday = new Date();
-      nextMonday.setDate(nextMonday.getDate() + ((1 + 7 - nextMonday.getDay()) % 7 || 7));
+      nextMonday.setDate(
+        nextMonday.getDate() + ((1 + 7 - nextMonday.getDay()) % 7 || 7),
+      );
 
       const appointments = [
         {

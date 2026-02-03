@@ -1,9 +1,9 @@
 /**
  * Bilingual Error Codes for Complex Management
- * 
+ *
  * All error codes follow the format COMPLEX_XXX where XXX is a three-digit number.
  * Each error code contains both Arabic (ar) and English (en) messages.
- * 
+ *
  * Requirements: 11.1, 11.2
  */
 
@@ -19,7 +19,7 @@ export interface ErrorCode {
 
 /**
  * Complex Management Error Codes
- * 
+ *
  * COMPLEX_001: Plan limit exceeded for Complex plan
  * COMPLEX_002: Invalid person-in-charge
  * COMPLEX_003: Cannot delete complex with active clinics

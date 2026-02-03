@@ -14,7 +14,8 @@ async function bootstrap() {
   // Swagger API Documentation Configuration
   const config = new DocumentBuilder()
     .setTitle('Cliniva Healthcare Management API')
-    .setDescription(`
+    .setDescription(
+      `
       Comprehensive API for managing healthcare operations including:
       - Complex Management (medical complexes with full lifecycle operations)
       - Clinic Management
@@ -24,7 +25,8 @@ async function bootstrap() {
       - Authentication & Authorization
       
       All endpoints support bilingual error messages (Arabic/English).
-    `)
+    `,
+    )
     .setVersion('1.0')
     .addTag('Complex Management', 'Endpoints for managing medical complexes')
     .addTag('Authentication', 'User authentication and authorization')

@@ -378,4 +378,176 @@ describe('ClinicService', () => {
       expect(clinicModel.find).toHaveBeenCalledWith({ isActive: true });
     });
   });
+
+  // ============================================================================
+  // assignPersonInCharge Tests
+  // ============================================================================
+  describe('assignPersonInCharge', () => {
+    const clinicId = '507f1f77bcf86cd799439012';
+    const complexId = '507f1f77bcf86cd799439011';
+    const personInChargeId = '507f1f77bcf86cd799439020';
+
+    const mockClinic = {
+      _id: clinicId,
+      name: 'Test Clinic',
+      complexId: new Types.ObjectId(complexId),
+      personInChargeId: null,
+      save: jest.fn(),
+    };
+
+    const mockComplex = {
+      _id: complexId,
+      name: 'Test Complex',
+      personInChargeId: new Types.ObjectId(personInChargeId),
+    };
+
+    const mockUpdatedClinic = {
+      ...mockClinic,
+      personInChargeId: new Types.ObjectId(personInChargeId),
+    };
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+    });
+
+    it('should successfully assign PIC when valid', async () => {
+      // Mock clinic findById - first call
+      const execMock1 = jest.fn().mockResolvedValue(mockClinic);
+      clinicModel.findById = jest.fn().mockReturnValue({
+        exec: execMock1,
+      } as any);
+
+      // Mock complex findById
+      const selectMock = jest.fn().mockReturnThis();
+      const execMock2 = jest.fn().mockResolvedValue(mockComplex);
+      complexModel.findById = jest.fn().mockReturnValue({
+        select: selectMock,
+        exec: execMock2,
+      } as any);
+
+      // Mock save
+      mockClinic.save = jest.fn().mockResolvedValue(mockUpdatedClinic);
+
+      // Mock final findById with populate - second call
+      const populateMock = jest.fn().mockReturnThis();
+      const execMock3 = jest.fn().mockResolvedValue({
+        ...mockUpdatedClinic,
+        personInChargeId: {
+          _id: personInChargeId,
+          firstName: 'John',
+          lastName: 'Doe',
+          email: 'john@test.com',
+          role: 'admin',
+        },
+      });
+
+      // Override findById for the second call
+      clinicModel.findById = jest
+        .fn()
+        .mockReturnValueOnce({
+          exec: execMock1,
+        } as any)
+        .mockReturnValueOnce({
+          populate: populateMock,
+          exec: execMock3,
+        } as any);
+
+      const result = await service.assignPersonInCharge(clinicId, {
+        personInChargeId,
+      });
+
+      // Verify clinic was found
+      expect(clinicModel.findById).toHaveBeenCalledWith(clinicId);
+
+      // Verify complex was queried
+      expect(complexModel.findById).toHaveBeenCalledWith(mockClinic.complexId);
+
+      // Verify clinic was saved
+      expect(mockClinic.save).toHaveBeenCalled();
+
+      // Verify result has populated PIC
+      expect(result.personInChargeId).toBeDefined();
+    });
+
+    it('should throw NotFoundException when clinic not found', async () => {
+      clinicModel.findById = jest.fn().mockReturnValue({
+        exec: jest.fn().mockResolvedValue(null),
+      } as any);
+
+      await expect(
+        service.assignPersonInCharge(clinicId, { personInChargeId }),
+      ).rejects.toThrow(NotFoundException);
+
+      expect(clinicModel.findById).toHaveBeenCalledWith(clinicId);
+    });
+
+    it('should throw BadRequestException when clinic has no complex', async () => {
+      const clinicWithoutComplex = {
+        ...mockClinic,
+        complexId: null,
+      };
+
+      clinicModel.findById = jest.fn().mockReturnValue({
+        exec: jest.fn().mockResolvedValue(clinicWithoutComplex),
+      } as any);
+
+      await expect(
+        service.assignPersonInCharge(clinicId, { personInChargeId }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw NotFoundException when complex not found', async () => {
+      clinicModel.findById = jest.fn().mockReturnValue({
+        exec: jest.fn().mockResolvedValue(mockClinic),
+      } as any);
+
+      complexModel.findById = jest.fn().mockReturnValue({
+        select: jest.fn().mockReturnThis(),
+        exec: jest.fn().mockResolvedValue(null),
+      } as any);
+
+      await expect(
+        service.assignPersonInCharge(clinicId, { personInChargeId }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw BadRequestException when PIC not from complex (CLINIC_002)', async () => {
+      const differentPICId = '507f1f77bcf86cd799439099';
+
+      clinicModel.findById = jest.fn().mockReturnValue({
+        exec: jest.fn().mockResolvedValue(mockClinic),
+      } as any);
+
+      complexModel.findById = jest.fn().mockReturnValue({
+        select: jest.fn().mockReturnThis(),
+        exec: jest.fn().mockResolvedValue(mockComplex),
+      } as any);
+
+      await expect(
+        service.assignPersonInCharge(clinicId, {
+          personInChargeId: differentPICId,
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw BadRequestException when complex has no PIC', async () => {
+      const complexWithoutPIC = {
+        ...mockComplex,
+        personInChargeId: null,
+      };
+
+      clinicModel.findById = jest.fn().mockReturnValue({
+        exec: jest.fn().mockResolvedValue(mockClinic),
+      } as any);
+
+      complexModel.findById = jest.fn().mockReturnValue({
+        select: jest.fn().mockReturnThis(),
+        exec: jest.fn().mockResolvedValue(complexWithoutPIC),
+      } as any);
+
+      await expect(
+        service.assignPersonInCharge(clinicId, { personInChargeId }),
+      ).rejects.toThrow(BadRequestException);
+    });
+  });
 });

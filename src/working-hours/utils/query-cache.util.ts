@@ -1,14 +1,14 @@
 /**
  * Simple in-memory cache for query results
- * 
+ *
  * This utility provides basic caching functionality for working hours queries
  * to reduce database load for frequently accessed data.
- * 
+ *
  * Features:
  * - TTL-based expiration
  * - Automatic cleanup of expired entries
  * - Type-safe cache keys
- * 
+ *
  * Note: This is a simple in-memory cache. For production with multiple
  * instances, consider using Redis or similar distributed cache.
  */

@@ -8,10 +8,7 @@ import {
   ERROR_MESSAGES,
   createDynamicMessage,
 } from '../../common/utils/error-messages.constant';
-import {
-  queryCache,
-  WorkingHoursCacheKeys,
-} from '../utils/query-cache.util';
+import { queryCache, WorkingHoursCacheKeys } from '../utils/query-cache.util';
 
 export interface SuggestedSchedule {
   dayOfWeek: string;
@@ -48,7 +45,7 @@ export class WorkingHoursSuggestionService {
   /**
    * Get suggested working hours based on role and entity assignment
    * Uses projection to fetch only required fields for performance.
-   * 
+   *
    * @param role - 'doctor' or 'staff'
    * @param clinicId - Clinic ID for doctors
    * @param complexId - Complex ID for staff
@@ -74,7 +71,9 @@ export class WorkingHoursSuggestionService {
           entityId: new Types.ObjectId(clinicId),
           isActive: true,
         })
-        .select('dayOfWeek isWorkingDay openingTime closingTime breakStartTime breakEndTime')
+        .select(
+          'dayOfWeek isWorkingDay openingTime closingTime breakStartTime breakEndTime',
+        )
         .lean()
         .exec();
 
@@ -119,7 +118,9 @@ export class WorkingHoursSuggestionService {
           entityId: new Types.ObjectId(complexId),
           isActive: true,
         })
-        .select('dayOfWeek isWorkingDay openingTime closingTime breakStartTime breakEndTime')
+        .select(
+          'dayOfWeek isWorkingDay openingTime closingTime breakStartTime breakEndTime',
+        )
         .lean()
         .exec();
 
@@ -152,11 +153,7 @@ export class WorkingHoursSuggestionService {
     }
 
     throw new NotFoundException({
-      message: createDynamicMessage(
-        'دور غير صالح',
-        'Invalid role',
-        {},
-      ),
+      message: createDynamicMessage('دور غير صالح', 'Invalid role', {}),
       code: 'INVALID_ROLE',
     });
   }
@@ -164,7 +161,7 @@ export class WorkingHoursSuggestionService {
   /**
    * Get entity details (name and ID) for source information
    * Results are cached for 10 minutes to reduce database load.
-   * 
+   *
    * @param entityType - Type of entity ('clinic' or 'complex')
    * @param entityId - Entity ID
    * @returns Entity information
