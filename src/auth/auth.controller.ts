@@ -15,6 +15,15 @@ import {
   Headers,
   Ip,
 } from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBody,
+  ApiBearerAuth,
+  ApiHeader,
+  ApiParam,
+} from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import {
@@ -35,7 +44,39 @@ import {
   FirstLoginPasswordChangeDto,
   ChangePasswordDto,
 } from './dto';
+import {
+  REGISTER_REQUEST_EXAMPLE,
+  REGISTER_RESPONSE_EXAMPLE,
+  LOGIN_REQUEST_EXAMPLE,
+  LOGIN_RESPONSE_EXAMPLE,
+  LOGIN_FIRST_TIME_RESPONSE_EXAMPLE,
+  FIRST_LOGIN_PASSWORD_CHANGE_REQUEST_EXAMPLE,
+  FIRST_LOGIN_PASSWORD_CHANGE_RESPONSE_EXAMPLE,
+  CHANGE_PASSWORD_REQUEST_EXAMPLE,
+  CHANGE_PASSWORD_RESPONSE_EXAMPLE,
+  FORGOT_PASSWORD_REQUEST_EXAMPLE,
+  FORGOT_PASSWORD_RESPONSE_EXAMPLE,
+  RESET_PASSWORD_REQUEST_EXAMPLE,
+  RESET_PASSWORD_RESPONSE_EXAMPLE,
+  REFRESH_TOKEN_REQUEST_EXAMPLE,
+  REFRESH_TOKEN_RESPONSE_EXAMPLE,
+  GET_PROFILE_RESPONSE_EXAMPLE,
+  LOGOUT_RESPONSE_EXAMPLE,
+  ERROR_INVALID_CREDENTIALS_EXAMPLE,
+  ERROR_EMAIL_EXISTS_EXAMPLE,
+  ERROR_ACCOUNT_INACTIVE_EXAMPLE,
+  ERROR_PASSWORDS_DO_NOT_MATCH_EXAMPLE,
+  ERROR_INVALID_CURRENT_PASSWORD_EXAMPLE,
+  ERROR_RATE_LIMIT_EXCEEDED_EXAMPLE,
+  ERROR_TOKEN_EXPIRED_EXAMPLE,
+  ERROR_TOKEN_BLACKLISTED_EXAMPLE,
+  ERROR_PASSWORD_RESET_TOKEN_INVALID_EXAMPLE,
+  ERROR_PASSWORD_RESET_TOKEN_EXPIRED_EXAMPLE,
+  ERROR_UNAUTHORIZED_EXAMPLE,
+  ERROR_VALIDATION_EXAMPLE,
+} from './examples/swagger-examples';
 
+@ApiTags('Authentication')
 @Controller('auth')
 export class AuthController {
   private readonly logger = new Logger(AuthController.name);
@@ -47,6 +88,42 @@ export class AuthController {
    */
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({
+    summary: 'Register a new user',
+    description:
+      'Create a new user account with email and password. Returns access and refresh tokens upon successful registration.',
+  })
+  @ApiBody({
+    type: RegisterDto,
+    description: 'User registration details',
+    examples: {
+      default: {
+        summary: 'Register as owner',
+        value: REGISTER_REQUEST_EXAMPLE,
+      },
+    },
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'User registered successfully',
+    schema: {
+      example: REGISTER_RESPONSE_EXAMPLE,
+    },
+  })
+  @ApiResponse({
+    status: 409,
+    description: 'Email already exists',
+    schema: {
+      example: ERROR_EMAIL_EXISTS_EXAMPLE,
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Validation error',
+    schema: {
+      example: ERROR_VALIDATION_EXAMPLE,
+    },
+  })
   async register(
     @Body(new ValidationPipe({ transform: true, whitelist: true }))
     registerDto: RegisterDto,
@@ -66,10 +143,58 @@ export class AuthController {
   @UseGuards(RateLimitGuard)
   @RateLimit(RateLimitType.LOGIN_ATTEMPT, 10, 900) // 10 attempts per 15 minutes (900 seconds)
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Login user',
+    description:
+      'Authenticate user with email and password. Returns access and refresh tokens. Rate limited to 10 attempts per 15 minutes per IP address.',
+  })
+  @ApiBody({
+    type: LoginDto,
+    description: 'User login credentials',
+    examples: {
+      default: {
+        summary: 'Login with credentials',
+        value: LOGIN_REQUEST_EXAMPLE,
+      },
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Login successful',
+    schema: {
+      oneOf: [
+        {
+          description: 'Regular login',
+          example: LOGIN_RESPONSE_EXAMPLE,
+        },
+        {
+          description: 'First time login (password change required)',
+          example: LOGIN_FIRST_TIME_RESPONSE_EXAMPLE,
+        },
+      ],
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Invalid credentials or account inactive',
+    schema: {
+      oneOf: [
+        { example: ERROR_INVALID_CREDENTIALS_EXAMPLE },
+        { example: ERROR_ACCOUNT_INACTIVE_EXAMPLE },
+      ],
+    },
+  })
+  @ApiResponse({
+    status: 429,
+    description: 'Rate limit exceeded',
+    schema: {
+      example: ERROR_RATE_LIMIT_EXCEEDED_EXAMPLE,
+    },
+  })
   async login(
     @Body(new ValidationPipe({ transform: true, whitelist: true }))
     loginDto: LoginDto,
-    @Request() req,
+    @Request() req: any,
   ): Promise<AuthResponseDto> {
     // Extract IP address from request
     const ipAddress = req.ip || req.connection?.remoteAddress || 'unknown';
@@ -94,10 +219,50 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @SkipFirstLoginCheck()
   @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Change password on first login',
+    description:
+      'Allows users with isFirstLogin=true to change their password. Returns new tokens with isFirstLogin=false. Requires JWT authentication.',
+  })
+  @ApiBody({
+    type: FirstLoginPasswordChangeDto,
+    description: 'Password change details',
+    examples: {
+      default: {
+        summary: 'Change password on first login',
+        value: FIRST_LOGIN_PASSWORD_CHANGE_REQUEST_EXAMPLE,
+      },
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Password changed successfully',
+    schema: {
+      example: FIRST_LOGIN_PASSWORD_CHANGE_RESPONSE_EXAMPLE,
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad request - validation error or password mismatch',
+    schema: {
+      oneOf: [
+        { example: ERROR_PASSWORDS_DO_NOT_MATCH_EXAMPLE },
+        { example: ERROR_INVALID_CURRENT_PASSWORD_EXAMPLE },
+      ],
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - invalid or missing token',
+    schema: {
+      example: ERROR_UNAUTHORIZED_EXAMPLE,
+    },
+  })
   async firstLoginPasswordChange(
     @Body(new ValidationPipe({ transform: true, whitelist: true }))
     dto: FirstLoginPasswordChangeDto,
-    @Request() req,
+    @Request() req: any,
   ): Promise<AuthResponseDto> {
     try {
       // Extract userId from JWT payload (populated by JwtAuthGuard)
@@ -170,10 +335,57 @@ export class AuthController {
   @UseGuards(JwtAuthGuard, FirstLoginGuard, RateLimitGuard)
   @RateLimit(RateLimitType.PASSWORD_CHANGE, 3, 3600) // 3 attempts per hour (3600 seconds)
   @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Change password',
+    description:
+      'Change password for authenticated users. Rate limited to 3 attempts per hour per user. Requires JWT authentication and completed first login.',
+  })
+  @ApiBody({
+    type: ChangePasswordDto,
+    description: 'Password change details',
+    examples: {
+      default: {
+        summary: 'Change password',
+        value: CHANGE_PASSWORD_REQUEST_EXAMPLE,
+      },
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Password changed successfully',
+    schema: {
+      example: CHANGE_PASSWORD_RESPONSE_EXAMPLE,
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad request - validation error or password mismatch',
+    schema: {
+      oneOf: [
+        { example: ERROR_PASSWORDS_DO_NOT_MATCH_EXAMPLE },
+        { example: ERROR_INVALID_CURRENT_PASSWORD_EXAMPLE },
+      ],
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - invalid or missing token',
+    schema: {
+      example: ERROR_UNAUTHORIZED_EXAMPLE,
+    },
+  })
+  @ApiResponse({
+    status: 429,
+    description: 'Rate limit exceeded',
+    schema: {
+      example: ERROR_RATE_LIMIT_EXCEEDED_EXAMPLE,
+    },
+  })
   async changePassword(
     @Body(new ValidationPipe({ transform: true, whitelist: true }))
     dto: ChangePasswordDto,
-    @Request() req,
+    @Request() req: any,
   ): Promise<{ success: boolean; message: { ar: string; en: string } }> {
     try {
       // Extract userId from JWT payload (populated by JwtAuthGuard)
@@ -245,10 +457,50 @@ export class AuthController {
   @UseGuards(RateLimitGuard)
   @RateLimit(RateLimitType.PASSWORD_RESET, 5, 3600) // 5 requests per hour (3600 seconds)
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Request password reset',
+    description:
+      'Request a password reset email. Returns the same response whether the email exists or not for security. Rate limited to 5 requests per hour per IP address.',
+  })
+  @ApiBody({
+    description: 'Email address for password reset',
+    examples: {
+      default: {
+        summary: 'Request password reset',
+        value: FORGOT_PASSWORD_REQUEST_EXAMPLE,
+      },
+    },
+    schema: {
+      type: 'object',
+      properties: {
+        email: {
+          type: 'string',
+          format: 'email',
+          example: 'john.doe@example.com',
+        },
+      },
+      required: ['email'],
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description:
+      'Request processed (same response whether email exists or not)',
+    schema: {
+      example: FORGOT_PASSWORD_RESPONSE_EXAMPLE,
+    },
+  })
+  @ApiResponse({
+    status: 429,
+    description: 'Rate limit exceeded',
+    schema: {
+      example: ERROR_RATE_LIMIT_EXCEEDED_EXAMPLE,
+    },
+  })
   async forgotPassword(
     @Body(new ValidationPipe({ transform: true, whitelist: true }))
     dto: { email: string },
-    @Request() req,
+    @Request() req: any,
   ): Promise<{ success: boolean; message: { ar: string; en: string } }> {
     try {
       // Extract IP address from request
@@ -295,10 +547,64 @@ export class AuthController {
    */
   @Post('reset-password')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Reset password with token',
+    description:
+      'Reset password using the token received via email. Token is valid for 24 hours and can only be used once.',
+  })
+  @ApiBody({
+    description: 'Password reset details',
+    examples: {
+      default: {
+        summary: 'Reset password',
+        value: RESET_PASSWORD_REQUEST_EXAMPLE,
+      },
+    },
+    schema: {
+      type: 'object',
+      properties: {
+        token: {
+          type: 'string',
+          description: '64-character hex token from email',
+          example: 'a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0u1v2w3x4y5z6',
+        },
+        newPassword: {
+          type: 'string',
+          minLength: 8,
+          description: 'New password (min 8 chars, complexity required)',
+          example: 'NewSecurePass123!',
+        },
+        confirmPassword: {
+          type: 'string',
+          description: 'Confirmation of new password',
+          example: 'NewSecurePass123!',
+        },
+      },
+      required: ['token', 'newPassword', 'confirmPassword'],
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Password reset successfully',
+    schema: {
+      example: RESET_PASSWORD_RESPONSE_EXAMPLE,
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad request - invalid, expired, or used token',
+    schema: {
+      oneOf: [
+        { example: ERROR_PASSWORD_RESET_TOKEN_INVALID_EXAMPLE },
+        { example: ERROR_PASSWORD_RESET_TOKEN_EXPIRED_EXAMPLE },
+        { example: ERROR_PASSWORDS_DO_NOT_MATCH_EXAMPLE },
+      ],
+    },
+  })
   async resetPassword(
     @Body(new ValidationPipe({ transform: true, whitelist: true }))
     dto: { token: string; newPassword: string; confirmPassword: string },
-    @Request() req,
+    @Request() req: any,
   ): Promise<{ success: boolean; message: { ar: string; en: string } }> {
     try {
       // Validate that passwords match
@@ -342,6 +648,39 @@ export class AuthController {
    */
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Refresh access token',
+    description:
+      'Obtain new access and refresh tokens using a valid refresh token. Old refresh token is blacklisted (single-use).',
+  })
+  @ApiBody({
+    type: RefreshTokenDto,
+    description: 'Refresh token',
+    examples: {
+      default: {
+        summary: 'Refresh token',
+        value: REFRESH_TOKEN_REQUEST_EXAMPLE,
+      },
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Token refreshed successfully',
+    schema: {
+      example: REFRESH_TOKEN_RESPONSE_EXAMPLE,
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - invalid, expired, or blacklisted token',
+    schema: {
+      oneOf: [
+        { example: ERROR_TOKEN_EXPIRED_EXAMPLE },
+        { example: ERROR_TOKEN_BLACKLISTED_EXAMPLE },
+        { example: ERROR_UNAUTHORIZED_EXAMPLE },
+      ],
+    },
+  })
   async refresh(
     @Body(new ValidationPipe({ transform: true, whitelist: true }))
     refreshTokenDto: RefreshTokenDto,
@@ -354,7 +693,27 @@ export class AuthController {
    */
   @Get('profile')
   @UseGuards(JwtAuthGuard)
-  async getProfile(@Request() req): Promise<UserProfileDto> {
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Get user profile',
+    description:
+      'Retrieve the authenticated user profile information. Requires JWT authentication.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Profile retrieved successfully',
+    schema: {
+      example: GET_PROFILE_RESPONSE_EXAMPLE,
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - invalid or missing token',
+    schema: {
+      example: ERROR_UNAUTHORIZED_EXAMPLE,
+    },
+  })
+  async getProfile(@Request() req: any): Promise<UserProfileDto> {
     return this.authService.getProfile(req.user.id);
   }
 
@@ -367,8 +726,37 @@ export class AuthController {
   @Post('logout')
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Logout user',
+    description:
+      'Logout the authenticated user and blacklist their tokens. Optionally provide refresh token in x-refresh-token header to blacklist it as well.',
+  })
+  @ApiHeader({
+    name: 'x-refresh-token',
+    description: 'Refresh token to blacklist (optional)',
+    required: false,
+    schema: {
+      type: 'string',
+      example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Logout successful',
+    schema: {
+      example: LOGOUT_RESPONSE_EXAMPLE,
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - invalid or missing token',
+    schema: {
+      example: ERROR_UNAUTHORIZED_EXAMPLE,
+    },
+  })
   async logout(
-    @Request() req,
+    @Request() req: any,
     @Headers('authorization') authHeader?: string,
     @Headers('x-refresh-token') refreshToken?: string,
     @Ip() ipAddress?: string,
@@ -397,6 +785,15 @@ export class AuthController {
   }
 
   @Get('debug/user/:userId')
+  @ApiOperation({
+    summary: 'Debug user information',
+    description: 'Get detailed user information for debugging purposes',
+  })
+  @ApiParam({
+    name: 'userId',
+    description: 'User ID',
+    example: '507f1f77bcf86cd799439011',
+  })
   async debugUser(@Param('userId') userId: string) {
     try {
       const user = await this.authService.getUserWithSubscriptionInfo(userId);
