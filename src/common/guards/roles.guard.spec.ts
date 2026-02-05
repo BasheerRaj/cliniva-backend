@@ -204,7 +204,11 @@ describe('RolesGuard', () => {
       // Mock reflector to return required roles including SUPER_ADMIN
       jest
         .spyOn(reflector, 'getAllAndOverride')
-        .mockReturnValue([UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN]);
+        .mockReturnValue([
+          UserRole.SUPER_ADMIN,
+          UserRole.OWNER,
+          UserRole.ADMIN,
+        ]);
 
       // Update user role to SUPER_ADMIN
       const contextWithSuperAdmin = {

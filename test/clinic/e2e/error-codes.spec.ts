@@ -21,7 +21,7 @@ import {
 
 /**
  * Comprehensive Error Code Testing for Clinic Management
- * 
+ *
  * Tests all 8 error codes:
  * - CLINIC_001: Plan limit exceeded
  * - CLINIC_002: Invalid PIC
@@ -31,7 +31,7 @@ import {
  * - CLINIC_006: Hours conflict
  * - CLINIC_007: Clinic not found
  * - CLINIC_008: Target clinic not found
- * 
+ *
  * Requirements: Task 17.1 - Test all error codes
  */
 describe('Clinic Error Codes (e2e)', () => {
@@ -71,9 +71,9 @@ describe('Clinic Error Codes (e2e)', () => {
     workingHoursModel = moduleFixture.get(getModelToken('WorkingHours'));
 
     // Clean up before tests
-    await cleanupTestData({ 
-      userModel, 
-      complexModel, 
+    await cleanupTestData({
+      userModel,
+      complexModel,
       clinicModel,
       subscriptionModel,
       appointmentModel,
@@ -87,9 +87,9 @@ describe('Clinic Error Codes (e2e)', () => {
   });
 
   afterAll(async () => {
-    await cleanupTestData({ 
-      userModel, 
-      complexModel, 
+    await cleanupTestData({
+      userModel,
+      complexModel,
       clinicModel,
       subscriptionModel,
       appointmentModel,
@@ -104,7 +104,10 @@ describe('Clinic Error Codes (e2e)', () => {
 
     beforeEach(async () => {
       // Create test complex
-      const testComplex = await createTestComplex(complexModel, testComplexData);
+      const testComplex = await createTestComplex(
+        complexModel,
+        testComplexData,
+      );
       testComplexId = testComplex._id.toString();
 
       // Create subscription with clinic plan (max 1 clinic)
@@ -156,9 +159,11 @@ describe('Clinic Error Codes (e2e)', () => {
       expect(response.body.success).toBe(false);
       expect(response.body.error).toBeDefined();
       expect(response.body.error.code).toBe('CLINIC_001');
-      
+
       verifyBilingualMessage(response.body.error.message);
-      expect(response.body.error.message.ar).toBe('تم تجاوز الحد الأقصى للعيادات المسموح به في الخطة');
+      expect(response.body.error.message.ar).toBe(
+        'تم تجاوز الحد الأقصى للعيادات المسموح به في الخطة',
+      );
       expect(response.body.error.message.en).toBe('Plan clinic limit exceeded');
     });
   });
@@ -214,10 +219,14 @@ describe('Clinic Error Codes (e2e)', () => {
       expect(response.body.success).toBe(false);
       expect(response.body.error).toBeDefined();
       expect(response.body.error.code).toBe('CLINIC_002');
-      
+
       verifyBilingualMessage(response.body.error.message);
-      expect(response.body.error.message.ar).toBe('يجب أن يكون الشخص المسؤول من المسؤولين عن المجمع');
-      expect(response.body.error.message.en).toBe('Person in charge must be from complex PICs');
+      expect(response.body.error.message.ar).toBe(
+        'يجب أن يكون الشخص المسؤول من المسؤولين عن المجمع',
+      );
+      expect(response.body.error.message.en).toBe(
+        'Person in charge must be from complex PICs',
+      );
     });
   });
 
@@ -228,7 +237,10 @@ describe('Clinic Error Codes (e2e)', () => {
 
     beforeEach(async () => {
       // Create test complex
-      const testComplex = await createTestComplex(complexModel, testComplexData);
+      const testComplex = await createTestComplex(
+        complexModel,
+        testComplexData,
+      );
       testComplexId = testComplex._id.toString();
 
       // Create test clinic
@@ -267,10 +279,14 @@ describe('Clinic Error Codes (e2e)', () => {
       expect(response.body.success).toBe(false);
       expect(response.body.error).toBeDefined();
       expect(response.body.error.code).toBe('CLINIC_003');
-      
+
       verifyBilingualMessage(response.body.error.message);
-      expect(response.body.error.message.ar).toBe('لا يمكن حذف العيادة لوجود مواعيد نشطة');
-      expect(response.body.error.message.en).toBe('Cannot delete clinic with active appointments');
+      expect(response.body.error.message.ar).toBe(
+        'لا يمكن حذف العيادة لوجود مواعيد نشطة',
+      );
+      expect(response.body.error.message.en).toBe(
+        'Cannot delete clinic with active appointments',
+      );
     });
   });
 
@@ -281,7 +297,10 @@ describe('Clinic Error Codes (e2e)', () => {
 
     beforeEach(async () => {
       // Create test complex
-      const testComplex = await createTestComplex(complexModel, testComplexData);
+      const testComplex = await createTestComplex(
+        complexModel,
+        testComplexData,
+      );
       testComplexId = testComplex._id.toString();
 
       // Create test clinic
@@ -325,11 +344,15 @@ describe('Clinic Error Codes (e2e)', () => {
       expect(response.body.success).toBe(false);
       expect(response.body.error).toBeDefined();
       expect(response.body.error.code).toBe('CLINIC_004');
-      
+
       verifyBilingualMessage(response.body.error.message);
-      expect(response.body.error.message.ar).toBe('يرجى اختيار ما إذا كنت تريد الاحتفاظ بالأطباء أو نقلهم');
-      expect(response.body.error.message.en).toBe('Must transfer doctors/staff before deactivation');
-      
+      expect(response.body.error.message.ar).toBe(
+        'يرجى اختيار ما إذا كنت تريد الاحتفاظ بالأطباء أو نقلهم',
+      );
+      expect(response.body.error.message.en).toBe(
+        'Must transfer doctors/staff before deactivation',
+      );
+
       // Verify additional context
       expect(response.body.error.requiresTransfer).toBe(true);
       expect(response.body.error.assignedDoctors).toBeGreaterThan(0);
@@ -342,7 +365,10 @@ describe('Clinic Error Codes (e2e)', () => {
 
     beforeEach(async () => {
       // Create test complex
-      const testComplex = await createTestComplex(complexModel, testComplexData);
+      const testComplex = await createTestComplex(
+        complexModel,
+        testComplexData,
+      );
       testComplexId = testComplex._id.toString();
 
       // Create complex working hours (8:00 - 17:00)
@@ -392,12 +418,16 @@ describe('Clinic Error Codes (e2e)', () => {
       expect(response.body.data.isValid).toBe(false);
       expect(response.body.data.errors).toBeDefined();
       expect(response.body.data.errors.length).toBeGreaterThan(0);
-      
+
       // Verify error contains bilingual message about hours outside complex
       const error = response.body.data.errors[0];
       verifyBilingualMessage(error.message);
-      expect(error.message.ar).toContain('ساعات العيادة يجب أن تكون ضمن ساعات المجمع');
-      expect(error.message.en).toContain('Clinic hours must be within complex hours');
+      expect(error.message.ar).toContain(
+        'ساعات العيادة يجب أن تكون ضمن ساعات المجمع',
+      );
+      expect(error.message.en).toContain(
+        'Clinic hours must be within complex hours',
+      );
     });
 
     it('should return CLINIC_005 when clinic open and complex closed', async () => {
@@ -429,7 +459,7 @@ describe('Clinic Error Codes (e2e)', () => {
       expect(response.body.success).toBe(true);
       expect(response.body.data.isValid).toBe(false);
       expect(response.body.data.errors.length).toBeGreaterThan(0);
-      
+
       // Verify error message
       const error = response.body.data.errors[0];
       verifyBilingualMessage(error.message);
@@ -448,7 +478,10 @@ describe('Clinic Error Codes (e2e)', () => {
 
     beforeEach(async () => {
       // Create test complex
-      const testComplex = await createTestComplex(complexModel, testComplexData);
+      const testComplex = await createTestComplex(
+        complexModel,
+        testComplexData,
+      );
       testComplexId = testComplex._id.toString();
 
       // Create complex working hours
@@ -531,16 +564,20 @@ describe('Clinic Error Codes (e2e)', () => {
       expect(response.body.data).toBeDefined();
       expect(response.body.data.conflicts).toBeDefined();
       expect(response.body.data.conflicts.appointments).toBeDefined();
-      expect(response.body.data.conflicts.appointments.length).toBeGreaterThan(0);
-      
+      expect(response.body.data.conflicts.appointments.length).toBeGreaterThan(
+        0,
+      );
+
       // Verify conflict details
       const conflict = response.body.data.conflicts.appointments[0];
       expect(conflict.type).toBe('appointment');
       expect(conflict.time).toBe('18:00');
       verifyBilingualMessage(conflict.reason);
       expect(conflict.reason.ar).toContain('الموعد خارج ساعات العمل');
-      expect(conflict.reason.en).toContain('Appointment outside new working hours');
-      
+      expect(conflict.reason.en).toContain(
+        'Appointment outside new working hours',
+      );
+
       // Verify requires rescheduling flag
       expect(response.body.data.requiresRescheduling).toBe(true);
       expect(response.body.data.affectedAppointments).toBeGreaterThan(0);
@@ -560,7 +597,7 @@ describe('Clinic Error Codes (e2e)', () => {
       expect(response.body.success).toBe(false);
       expect(response.body.error).toBeDefined();
       expect(response.body.error.code).toBe('CLINIC_007');
-      
+
       verifyBilingualMessage(response.body.error.message);
       expect(response.body.error.message.ar).toBe('العيادة غير موجودة');
       expect(response.body.error.message.en).toBe('Clinic not found');
@@ -588,7 +625,7 @@ describe('Clinic Error Codes (e2e)', () => {
       expect(response.body.success).toBe(false);
       expect(response.body.error).toBeDefined();
       expect(response.body.error.code).toBe('CLINIC_007');
-      
+
       verifyBilingualMessage(response.body.error.message);
       expect(response.body.error.message.ar).toBe('العيادة غير موجودة');
       expect(response.body.error.message.en).toBe('Clinic not found');
@@ -610,7 +647,7 @@ describe('Clinic Error Codes (e2e)', () => {
       expect(response.body.success).toBe(false);
       expect(response.body.error).toBeDefined();
       expect(response.body.error.code).toBe('CLINIC_007');
-      
+
       verifyBilingualMessage(response.body.error.message);
       expect(response.body.error.message.ar).toBe('العيادة غير موجودة');
       expect(response.body.error.message.en).toBe('Clinic not found');
@@ -631,7 +668,7 @@ describe('Clinic Error Codes (e2e)', () => {
       expect(response.body.success).toBe(false);
       expect(response.body.error).toBeDefined();
       expect(response.body.error.code).toBe('CLINIC_007');
-      
+
       verifyBilingualMessage(response.body.error.message);
       expect(response.body.error.message.ar).toBe('العيادة غير موجودة');
       expect(response.body.error.message.en).toBe('Clinic not found');
@@ -645,7 +682,10 @@ describe('Clinic Error Codes (e2e)', () => {
 
     beforeEach(async () => {
       // Create test complex
-      const testComplex = await createTestComplex(complexModel, testComplexData);
+      const testComplex = await createTestComplex(
+        complexModel,
+        testComplexData,
+      );
       testComplexId = testComplex._id.toString();
 
       // Create test clinic
@@ -693,9 +733,11 @@ describe('Clinic Error Codes (e2e)', () => {
       expect(response.body.success).toBe(false);
       expect(response.body.error).toBeDefined();
       expect(response.body.error.code).toBe('CLINIC_008');
-      
+
       verifyBilingualMessage(response.body.error.message);
-      expect(response.body.error.message.ar).toBe('العيادة المستهدفة غير موجودة');
+      expect(response.body.error.message.ar).toBe(
+        'العيادة المستهدفة غير موجودة',
+      );
       expect(response.body.error.message.en).toBe('Target clinic not found');
     });
 
@@ -717,9 +759,11 @@ describe('Clinic Error Codes (e2e)', () => {
       expect(response.body.success).toBe(false);
       expect(response.body.error).toBeDefined();
       expect(response.body.error.code).toBe('CLINIC_008');
-      
+
       verifyBilingualMessage(response.body.error.message);
-      expect(response.body.error.message.ar).toBe('العيادة المستهدفة غير موجودة');
+      expect(response.body.error.message.ar).toBe(
+        'العيادة المستهدفة غير موجودة',
+      );
       expect(response.body.error.message.en).toBe('Target clinic not found');
     });
   });

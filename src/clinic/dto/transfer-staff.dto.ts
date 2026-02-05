@@ -182,8 +182,7 @@ export class TransferStaffDto {
   staffIds?: string[];
 
   @ApiProperty({
-    description:
-      'Strategy for handling appointment conflicts during transfer',
+    description: 'Strategy for handling appointment conflicts during transfer',
     enum: ['reschedule', 'notify', 'cancel'],
     example: 'reschedule',
     required: true,
@@ -193,8 +192,7 @@ export class TransferStaffDto {
     message: 'handleConflicts is required',
   })
   @IsEnum(['reschedule', 'notify', 'cancel'], {
-    message:
-      'handleConflicts must be one of: reschedule, notify, cancel',
+    message: 'handleConflicts must be one of: reschedule, notify, cancel',
   })
   handleConflicts: 'reschedule' | 'notify' | 'cancel';
 }

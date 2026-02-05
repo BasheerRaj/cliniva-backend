@@ -107,7 +107,9 @@ describe('Clinic PIC Assignment Endpoint (e2e)', () => {
       // Clean up test data
       await clinicModel.deleteMany({});
       await complexModel.deleteMany({});
-      await userModel.deleteMany({ _id: { $ne: new Types.ObjectId(adminUserId) } });
+      await userModel.deleteMany({
+        _id: { $ne: new Types.ObjectId(adminUserId) },
+      });
     });
 
     it('should successfully assign PIC to clinic', async () => {

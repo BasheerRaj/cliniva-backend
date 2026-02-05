@@ -18,6 +18,7 @@ import { DynamicInfoModule } from '../dynamic-info/dynamic-info.module';
 import { UserAccessModule } from '../user-access/user-access.module';
 import { UserModule } from '../user/user.module';
 import { CommonModule } from '../common/common.module';
+import { AuthModule } from '../auth/auth.module';
 
 // Schemas
 import { UserSchema } from '../database/schemas/user.schema';
@@ -48,6 +49,7 @@ import { SubscriptionPlanSchema } from '../database/schemas/subscription-plan.sc
     UserAccessModule,
     UserModule,
     CommonModule,
+    AuthModule,
   ],
   controllers: [OnboardingController],
   providers: [OnboardingService],

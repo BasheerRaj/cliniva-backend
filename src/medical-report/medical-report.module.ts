@@ -11,6 +11,7 @@ import { SubscriptionPlanSchema } from '../database/schemas/subscription-plan.sc
 import { SubscriptionModule } from '../subscription/subscription.module';
 import { PatientModule } from '../patient/patient.module';
 import { AppointmentModule } from '../appointment/appointment.module';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { AppointmentModule } from '../appointment/appointment.module';
     SubscriptionModule,
     PatientModule,
     AppointmentModule,
+    AuthModule,
   ],
   controllers: [MedicalReportController],
   providers: [MedicalReportService],

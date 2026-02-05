@@ -568,176 +568,173 @@ describe('Clinic Management (e2e)', () => {
   });
 });
 
-  describe('GET /clinics/:id/capacity - Get Clinic Capacity Status', () => {
-    let testComplexId: string;
-    let testClinicId: string;
+describe('GET /clinics/:id/capacity - Get Clinic Capacity Status', () => {
+  let testComplexId: string;
+  let testClinicId: string;
 
-    beforeEach(async () => {
-      // Create test complex
-      const testComplex = await createTestComplex(
-        complexModel,
-        testComplexData,
-      );
-      testComplexId = testComplex._id.toString();
+  beforeEach(async () => {
+    // Create test complex
+    const testComplex = await createTestComplex(complexModel, testComplexData);
+    testComplexId = testComplex._id.toString();
 
-      // Create test clinic with capacity limits
-      const testClinic = await createTestClinic(clinicModel, {
-        ...testClinicData,
-        complexId: testComplexId,
-        maxDoctors: 10,
-        maxStaff: 20,
-        maxPatients: 100,
-        isActive: true,
-      });
-      testClinicId = testClinic._id.toString();
+    // Create test clinic with capacity limits
+    const testClinic = await createTestClinic(clinicModel, {
+      ...testClinicData,
+      complexId: testComplexId,
+      maxDoctors: 10,
+      maxStaff: 20,
+      maxPatients: 100,
+      isActive: true,
+    });
+    testClinicId = testClinic._id.toString();
+  });
+
+  afterEach(async () => {
+    // Clean up test data
+    await clinicModel.deleteMany({});
+    await complexModel.deleteMany({});
+  });
+
+  it('should return capacity status for a valid clinic', async () => {
+    const response = await request(app.getHttpServer())
+      .get(`/clinics/${testClinicId}/capacity`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+
+    // Verify response structure
+    verifyApiResponse(response.body, true);
+    expect(response.body.data).toBeDefined();
+
+    // Verify capacity data structure
+    const { data } = response.body;
+    expect(data.clinicId).toBe(testClinicId);
+    expect(data.clinicName).toBeDefined();
+    expect(data.capacity).toBeDefined();
+    expect(data.recommendations).toBeDefined();
+    expect(Array.isArray(data.recommendations)).toBe(true);
+
+    // Verify doctors capacity
+    expect(data.capacity.doctors).toBeDefined();
+    expect(data.capacity.doctors.max).toBe(10);
+    expect(data.capacity.doctors.current).toBeDefined();
+    expect(data.capacity.doctors.available).toBeDefined();
+    expect(data.capacity.doctors.percentage).toBeDefined();
+    expect(data.capacity.doctors.isExceeded).toBeDefined();
+    expect(Array.isArray(data.capacity.doctors.list)).toBe(true);
+
+    // Verify staff capacity
+    expect(data.capacity.staff).toBeDefined();
+    expect(data.capacity.staff.max).toBe(20);
+    expect(data.capacity.staff.current).toBeDefined();
+    expect(data.capacity.staff.available).toBeDefined();
+    expect(data.capacity.staff.percentage).toBeDefined();
+    expect(data.capacity.staff.isExceeded).toBeDefined();
+    expect(Array.isArray(data.capacity.staff.list)).toBe(true);
+
+    // Verify patients capacity
+    expect(data.capacity.patients).toBeDefined();
+    expect(data.capacity.patients.max).toBe(100);
+    expect(data.capacity.patients.current).toBeDefined();
+    expect(data.capacity.patients.available).toBeDefined();
+    expect(data.capacity.patients.percentage).toBeDefined();
+    expect(data.capacity.patients.isExceeded).toBeDefined();
+    expect(data.capacity.patients.count).toBeDefined();
+
+    // Verify bilingual message
+    verifyBilingualMessage(response.body.message);
+    expect(response.body.message.ar).toBe('تم جلب حالة السعة بنجاح');
+    expect(response.body.message.en).toBe(
+      'Capacity status retrieved successfully',
+    );
+  });
+
+  it('should return 404 when clinic not found', async () => {
+    const nonExistentClinicId = generateObjectId();
+
+    const response = await request(app.getHttpServer())
+      .get(`/clinics/${nonExistentClinicId}/capacity`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(404);
+
+    // Verify error response structure
+    expect(response.body.success).toBe(false);
+    expect(response.body.error).toBeDefined();
+    expect(response.body.error.code).toBe('CLINIC_007');
+
+    // Verify bilingual error message
+    verifyBilingualMessage(response.body.error.message);
+    expect(response.body.error.message.ar).toBe('العيادة غير موجودة');
+    expect(response.body.error.message.en).toBe('Clinic not found');
+  });
+
+  it('should return 401 when no authentication token provided', async () => {
+    await request(app.getHttpServer())
+      .get(`/clinics/${testClinicId}/capacity`)
+      .expect(401);
+  });
+
+  it('should return 401 when invalid authentication token provided', async () => {
+    await request(app.getHttpServer())
+      .get(`/clinics/${testClinicId}/capacity`)
+      .set('Authorization', 'Bearer invalid-token-12345')
+      .expect(401);
+  });
+
+  it('should calculate capacity correctly with zero limits', async () => {
+    // Create clinic with zero capacity limits
+    const zeroCapacityClinic = await createTestClinic(clinicModel, {
+      ...testClinicData,
+      name: { ar: 'عيادة بدون سعة', en: 'Zero Capacity Clinic' },
+      email: 'zerocapacity@test.com',
+      complexId: testComplexId,
+      maxDoctors: 0,
+      maxStaff: 0,
+      maxPatients: 0,
+      isActive: true,
     });
 
-    afterEach(async () => {
-      // Clean up test data
-      await clinicModel.deleteMany({});
-      await complexModel.deleteMany({});
+    const response = await request(app.getHttpServer())
+      .get(`/clinics/${zeroCapacityClinic._id}/capacity`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+
+    // Verify response structure
+    verifyApiResponse(response.body, true);
+    const { data } = response.body;
+
+    // Verify zero capacity
+    expect(data.capacity.doctors.max).toBe(0);
+    expect(data.capacity.staff.max).toBe(0);
+    expect(data.capacity.patients.max).toBe(0);
+
+    // Clean up
+    await clinicModel.findByIdAndDelete(zeroCapacityClinic._id);
+  });
+
+  it('should include personnel lists in capacity breakdown', async () => {
+    const response = await request(app.getHttpServer())
+      .get(`/clinics/${testClinicId}/capacity`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+
+    // Verify response structure
+    verifyApiResponse(response.body, true);
+    const { data } = response.body;
+
+    // Verify doctors list structure
+    expect(Array.isArray(data.capacity.doctors.list)).toBe(true);
+    data.capacity.doctors.list.forEach((doctor: any) => {
+      expect(doctor.id).toBeDefined();
+      expect(doctor.name).toBeDefined();
+      expect(doctor.role).toBeDefined();
     });
 
-    it('should return capacity status for a valid clinic', async () => {
-      const response = await request(app.getHttpServer())
-        .get(`/clinics/${testClinicId}/capacity`)
-        .set('Authorization', `Bearer ${adminToken}`)
-        .expect(200);
-
-      // Verify response structure
-      verifyApiResponse(response.body, true);
-      expect(response.body.data).toBeDefined();
-
-      // Verify capacity data structure
-      const { data } = response.body;
-      expect(data.clinicId).toBe(testClinicId);
-      expect(data.clinicName).toBeDefined();
-      expect(data.capacity).toBeDefined();
-      expect(data.recommendations).toBeDefined();
-      expect(Array.isArray(data.recommendations)).toBe(true);
-
-      // Verify doctors capacity
-      expect(data.capacity.doctors).toBeDefined();
-      expect(data.capacity.doctors.max).toBe(10);
-      expect(data.capacity.doctors.current).toBeDefined();
-      expect(data.capacity.doctors.available).toBeDefined();
-      expect(data.capacity.doctors.percentage).toBeDefined();
-      expect(data.capacity.doctors.isExceeded).toBeDefined();
-      expect(Array.isArray(data.capacity.doctors.list)).toBe(true);
-
-      // Verify staff capacity
-      expect(data.capacity.staff).toBeDefined();
-      expect(data.capacity.staff.max).toBe(20);
-      expect(data.capacity.staff.current).toBeDefined();
-      expect(data.capacity.staff.available).toBeDefined();
-      expect(data.capacity.staff.percentage).toBeDefined();
-      expect(data.capacity.staff.isExceeded).toBeDefined();
-      expect(Array.isArray(data.capacity.staff.list)).toBe(true);
-
-      // Verify patients capacity
-      expect(data.capacity.patients).toBeDefined();
-      expect(data.capacity.patients.max).toBe(100);
-      expect(data.capacity.patients.current).toBeDefined();
-      expect(data.capacity.patients.available).toBeDefined();
-      expect(data.capacity.patients.percentage).toBeDefined();
-      expect(data.capacity.patients.isExceeded).toBeDefined();
-      expect(data.capacity.patients.count).toBeDefined();
-
-      // Verify bilingual message
-      verifyBilingualMessage(response.body.message);
-      expect(response.body.message.ar).toBe('تم جلب حالة السعة بنجاح');
-      expect(response.body.message.en).toBe(
-        'Capacity status retrieved successfully',
-      );
-    });
-
-    it('should return 404 when clinic not found', async () => {
-      const nonExistentClinicId = generateObjectId();
-
-      const response = await request(app.getHttpServer())
-        .get(`/clinics/${nonExistentClinicId}/capacity`)
-        .set('Authorization', `Bearer ${adminToken}`)
-        .expect(404);
-
-      // Verify error response structure
-      expect(response.body.success).toBe(false);
-      expect(response.body.error).toBeDefined();
-      expect(response.body.error.code).toBe('CLINIC_007');
-
-      // Verify bilingual error message
-      verifyBilingualMessage(response.body.error.message);
-      expect(response.body.error.message.ar).toBe('العيادة غير موجودة');
-      expect(response.body.error.message.en).toBe('Clinic not found');
-    });
-
-    it('should return 401 when no authentication token provided', async () => {
-      await request(app.getHttpServer())
-        .get(`/clinics/${testClinicId}/capacity`)
-        .expect(401);
-    });
-
-    it('should return 401 when invalid authentication token provided', async () => {
-      await request(app.getHttpServer())
-        .get(`/clinics/${testClinicId}/capacity`)
-        .set('Authorization', 'Bearer invalid-token-12345')
-        .expect(401);
-    });
-
-    it('should calculate capacity correctly with zero limits', async () => {
-      // Create clinic with zero capacity limits
-      const zeroCapacityClinic = await createTestClinic(clinicModel, {
-        ...testClinicData,
-        name: { ar: 'عيادة بدون سعة', en: 'Zero Capacity Clinic' },
-        email: 'zerocapacity@test.com',
-        complexId: testComplexId,
-        maxDoctors: 0,
-        maxStaff: 0,
-        maxPatients: 0,
-        isActive: true,
-      });
-
-      const response = await request(app.getHttpServer())
-        .get(`/clinics/${zeroCapacityClinic._id}/capacity`)
-        .set('Authorization', `Bearer ${adminToken}`)
-        .expect(200);
-
-      // Verify response structure
-      verifyApiResponse(response.body, true);
-      const { data } = response.body;
-
-      // Verify zero capacity
-      expect(data.capacity.doctors.max).toBe(0);
-      expect(data.capacity.staff.max).toBe(0);
-      expect(data.capacity.patients.max).toBe(0);
-
-      // Clean up
-      await clinicModel.findByIdAndDelete(zeroCapacityClinic._id);
-    });
-
-    it('should include personnel lists in capacity breakdown', async () => {
-      const response = await request(app.getHttpServer())
-        .get(`/clinics/${testClinicId}/capacity`)
-        .set('Authorization', `Bearer ${adminToken}`)
-        .expect(200);
-
-      // Verify response structure
-      verifyApiResponse(response.body, true);
-      const { data } = response.body;
-
-      // Verify doctors list structure
-      expect(Array.isArray(data.capacity.doctors.list)).toBe(true);
-      data.capacity.doctors.list.forEach((doctor: any) => {
-        expect(doctor.id).toBeDefined();
-        expect(doctor.name).toBeDefined();
-        expect(doctor.role).toBeDefined();
-      });
-
-      // Verify staff list structure
-      expect(Array.isArray(data.capacity.staff.list)).toBe(true);
-      data.capacity.staff.list.forEach((staff: any) => {
-        expect(staff.id).toBeDefined();
-        expect(staff.name).toBeDefined();
-        expect(staff.role).toBeDefined();
-      });
+    // Verify staff list structure
+    expect(Array.isArray(data.capacity.staff.list)).toBe(true);
+    data.capacity.staff.list.forEach((staff: any) => {
+      expect(staff.id).toBeDefined();
+      expect(staff.name).toBeDefined();
+      expect(staff.role).toBeDefined();
     });
   });
+});

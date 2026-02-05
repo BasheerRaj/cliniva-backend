@@ -429,8 +429,7 @@ export class ClinicService {
       max: maxStaff,
       current: staffCount,
       available: maxStaff - staffCount,
-      percentage:
-        maxStaff > 0 ? Math.round((staffCount / maxStaff) * 100) : 0,
+      percentage: maxStaff > 0 ? Math.round((staffCount / maxStaff) * 100) : 0,
       isExceeded: staffCount > maxStaff,
       list: staffList.map((staff: any) => ({
         id: staff._id.toString(),

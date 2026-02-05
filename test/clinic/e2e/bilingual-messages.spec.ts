@@ -22,14 +22,14 @@ import {
 
 /**
  * Comprehensive Bilingual Message Testing
- * 
+ *
  * Task 17.2: Test bilingual messages
- * 
+ *
  * This test suite verifies that ALL messages (error and success) are bilingual:
  * - All error messages have both Arabic (ar) and English (en) translations
  * - All success messages have both Arabic (ar) and English (en) translations
  * - Message structure is consistent across all endpoints
- * 
+ *
  * Requirements: Task 17.2 - Verify all messages are bilingual
  */
 describe('Bilingual Messages (e2e)', () => {
@@ -69,9 +69,9 @@ describe('Bilingual Messages (e2e)', () => {
     workingHoursModel = moduleFixture.get(getModelToken('WorkingHours'));
 
     // Clean up before tests
-    await cleanupTestData({ 
-      userModel, 
-      complexModel, 
+    await cleanupTestData({
+      userModel,
+      complexModel,
       clinicModel,
     });
 
@@ -82,9 +82,9 @@ describe('Bilingual Messages (e2e)', () => {
   });
 
   afterAll(async () => {
-    await cleanupTestData({ 
-      userModel, 
-      complexModel, 
+    await cleanupTestData({
+      userModel,
+      complexModel,
       clinicModel,
     });
     await app.close();
@@ -93,27 +93,27 @@ describe('Bilingual Messages (e2e)', () => {
   describe('Error Code Constants Verification', () => {
     it('should have bilingual messages for all error codes in constants', () => {
       const errorCodeKeys = Object.keys(ERROR_CODES);
-      
+
       expect(errorCodeKeys.length).toBeGreaterThan(0);
-      
+
       errorCodeKeys.forEach((key) => {
         const errorCode = ERROR_CODES[key];
-        
+
         // Verify structure
         expect(errorCode).toHaveProperty('code');
         expect(errorCode).toHaveProperty('message');
         expect(errorCode.message).toHaveProperty('ar');
         expect(errorCode.message).toHaveProperty('en');
-        
+
         // Verify types
         expect(typeof errorCode.code).toBe('string');
         expect(typeof errorCode.message.ar).toBe('string');
         expect(typeof errorCode.message.en).toBe('string');
-        
+
         // Verify not empty
         expect(errorCode.message.ar.length).toBeGreaterThan(0);
         expect(errorCode.message.en.length).toBeGreaterThan(0);
-        
+
         // Verify code format
         expect(errorCode.code).toMatch(/^CLINIC_\d{3}$/);
       });
@@ -134,7 +134,9 @@ describe('Bilingual Messages (e2e)', () => {
       ];
 
       expectedCodes.forEach((code) => {
-        const errorCode = Object.values(ERROR_CODES).find((ec) => ec.code === code);
+        const errorCode = Object.values(ERROR_CODES).find(
+          (ec) => ec.code === code,
+        );
         expect(errorCode).toBeDefined();
         expect(errorCode?.message).toHaveProperty('ar');
         expect(errorCode?.message).toHaveProperty('en');
@@ -189,9 +191,11 @@ describe('Bilingual Messages (e2e)', () => {
       expect(response.body.success).toBe(true);
       expect(response.body.message).toBeDefined();
       verifyBilingualMessage(response.body.message);
-      
+
       expect(response.body.message.ar).toBe('تم استرجاع تفاصيل العيادة بنجاح');
-      expect(response.body.message.en).toBe('Clinic details retrieved successfully');
+      expect(response.body.message.en).toBe(
+        'Clinic details retrieved successfully',
+      );
     });
 
     it('GET /clinics/:id/capacity - should return bilingual success message', async () => {
@@ -203,9 +207,11 @@ describe('Bilingual Messages (e2e)', () => {
       expect(response.body.success).toBe(true);
       expect(response.body.message).toBeDefined();
       verifyBilingualMessage(response.body.message);
-      
+
       expect(response.body.message.ar).toBe('تم جلب حالة السعة بنجاح');
-      expect(response.body.message.en).toBe('Capacity status retrieved successfully');
+      expect(response.body.message.en).toBe(
+        'Capacity status retrieved successfully',
+      );
     });
 
     it('POST /clinics/:id/validate-working-hours - should return bilingual success message', async () => {
@@ -227,9 +233,11 @@ describe('Bilingual Messages (e2e)', () => {
       expect(response.body.success).toBe(true);
       expect(response.body.message).toBeDefined();
       verifyBilingualMessage(response.body.message);
-      
+
       expect(response.body.message.ar).toBe('تم التحقق من ساعات العمل بنجاح');
-      expect(response.body.message.en).toBe('Working hours validated successfully');
+      expect(response.body.message.en).toBe(
+        'Working hours validated successfully',
+      );
     });
 
     it('PATCH /clinics/:id/status - should return bilingual success message', async () => {
@@ -245,9 +253,11 @@ describe('Bilingual Messages (e2e)', () => {
       expect(response.body.success).toBe(true);
       expect(response.body.message).toBeDefined();
       verifyBilingualMessage(response.body.message);
-      
+
       expect(response.body.message.ar).toBe('تم تغيير حالة العيادة بنجاح');
-      expect(response.body.message.en).toBe('Clinic status changed successfully');
+      expect(response.body.message.en).toBe(
+        'Clinic status changed successfully',
+      );
     });
 
     it('PATCH /clinics/:id/pic - should return bilingual success message', async () => {
@@ -262,9 +272,11 @@ describe('Bilingual Messages (e2e)', () => {
       expect(response.body.success).toBe(true);
       expect(response.body.message).toBeDefined();
       verifyBilingualMessage(response.body.message);
-      
+
       expect(response.body.message.ar).toBe('تم تعيين الشخص المسؤول بنجاح');
-      expect(response.body.message.en).toBe('Person-in-charge assigned successfully');
+      expect(response.body.message.en).toBe(
+        'Person-in-charge assigned successfully',
+      );
     });
 
     it('POST /clinics/:id/transfer-staff - should return bilingual success message', async () => {
@@ -290,7 +302,7 @@ describe('Bilingual Messages (e2e)', () => {
       expect(response.body.success).toBe(true);
       expect(response.body.message).toBeDefined();
       verifyBilingualMessage(response.body.message);
-      
+
       expect(response.body.message.ar).toBe('تم نقل الموظفين بنجاح');
       expect(response.body.message.en).toBe('Staff transferred successfully');
     });
@@ -309,7 +321,10 @@ describe('Bilingual Messages (e2e)', () => {
         currentClinics: 1, // Limit reached
       });
 
-      const testComplex = await createTestComplex(complexModel, testComplexData);
+      const testComplex = await createTestComplex(
+        complexModel,
+        testComplexData,
+      );
 
       const response = await request(app.getHttpServer())
         .post('/clinics')
@@ -324,8 +339,10 @@ describe('Bilingual Messages (e2e)', () => {
       expect(response.body.success).toBe(false);
       expect(response.body.error.code).toBe('CLINIC_001');
       verifyBilingualMessage(response.body.error.message);
-      
-      expect(response.body.error.message.ar).toBe('تم تجاوز الحد الأقصى للعيادات المسموح به في الخطة');
+
+      expect(response.body.error.message.ar).toBe(
+        'تم تجاوز الحد الأقصى للعيادات المسموح به في الخطة',
+      );
       expect(response.body.error.message.en).toBe('Plan clinic limit exceeded');
 
       // Cleanup
@@ -357,9 +374,13 @@ describe('Bilingual Messages (e2e)', () => {
       expect(response.body.success).toBe(false);
       expect(response.body.error.code).toBe('CLINIC_002');
       verifyBilingualMessage(response.body.error.message);
-      
-      expect(response.body.error.message.ar).toBe('يجب أن يكون الشخص المسؤول من المسؤولين عن المجمع');
-      expect(response.body.error.message.en).toBe('Person in charge must be from complex PICs');
+
+      expect(response.body.error.message.ar).toBe(
+        'يجب أن يكون الشخص المسؤول من المسؤولين عن المجمع',
+      );
+      expect(response.body.error.message.en).toBe(
+        'Person in charge must be from complex PICs',
+      );
 
       // Cleanup
       await clinicModel.deleteMany({});
@@ -377,13 +398,16 @@ describe('Bilingual Messages (e2e)', () => {
       expect(response.body.success).toBe(false);
       expect(response.body.error.code).toBe('CLINIC_007');
       verifyBilingualMessage(response.body.error.message);
-      
+
       expect(response.body.error.message.ar).toBe('العيادة غير موجودة');
       expect(response.body.error.message.en).toBe('Clinic not found');
     });
 
     it('CLINIC_008 - should have bilingual error message', async () => {
-      const testComplex = await createTestComplex(complexModel, testComplexData);
+      const testComplex = await createTestComplex(
+        complexModel,
+        testComplexData,
+      );
       const testClinic = await createTestClinic(clinicModel, {
         ...testClinicData,
         complexId: testComplex._id.toString(),
@@ -405,8 +429,10 @@ describe('Bilingual Messages (e2e)', () => {
       expect(response.body.success).toBe(false);
       expect(response.body.error.code).toBe('CLINIC_008');
       verifyBilingualMessage(response.body.error.message);
-      
-      expect(response.body.error.message.ar).toBe('العيادة المستهدفة غير موجودة');
+
+      expect(response.body.error.message.ar).toBe(
+        'العيادة المستهدفة غير موجودة',
+      );
       expect(response.body.error.message.en).toBe('Target clinic not found');
 
       // Cleanup
@@ -420,7 +446,10 @@ describe('Bilingual Messages (e2e)', () => {
     let testClinicId: string;
 
     beforeEach(async () => {
-      const testComplex = await createTestComplex(complexModel, testComplexData);
+      const testComplex = await createTestComplex(
+        complexModel,
+        testComplexData,
+      );
       testComplexId = testComplex._id.toString();
 
       const testClinic = await createTestClinic(clinicModel, {

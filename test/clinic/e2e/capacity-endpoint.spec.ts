@@ -97,7 +97,9 @@ describe('Clinic Capacity Endpoint (e2e)', () => {
       await appointmentModel?.deleteMany({});
       await clinicModel.deleteMany({});
       await complexModel.deleteMany({});
-      await userModel.deleteMany({ _id: { $ne: new Types.ObjectId(adminUserId) } });
+      await userModel.deleteMany({
+        _id: { $ne: new Types.ObjectId(adminUserId) },
+      });
     });
 
     it('should return capacity status for a valid clinic', async () => {
@@ -232,7 +234,9 @@ describe('Clinic Capacity Endpoint (e2e)', () => {
       // Verify recommendations include staff capacity warning
       expect(data.recommendations.length).toBeGreaterThan(0);
       expect(
-        data.recommendations.some((r: string) => r.toLowerCase().includes('staff')),
+        data.recommendations.some((r: string) =>
+          r.toLowerCase().includes('staff'),
+        ),
       ).toBe(true);
     });
 

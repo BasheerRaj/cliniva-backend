@@ -11,6 +11,7 @@ import { OrganizationSchema } from '../database/schemas/organization.schema';
 import { ComplexSchema } from '../database/schemas/complex.schema';
 import { ClinicSchema } from '../database/schemas/clinic.schema';
 import { CommonModule } from '../common/common.module';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { CommonModule } from '../common/common.module';
       { name: 'Clinic', schema: ClinicSchema },
     ]),
     CommonModule,
+    AuthModule,
   ],
   controllers: [EmergencyContactsController],
   providers: [EmergencyContactsService],

@@ -8,6 +8,7 @@ import { SpecialtySchema } from '../database/schemas/specialty.schema';
 import { SubscriptionSchema } from '../database/schemas/subscription.schema';
 import { SubscriptionPlanSchema } from '../database/schemas/subscription-plan.schema';
 import { CommonModule } from '../common/common.module';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { CommonModule } from '../common/common.module';
       { name: 'SubscriptionPlan', schema: SubscriptionPlanSchema },
     ]),
     CommonModule,
+    AuthModule,
   ],
   controllers: [DoctorSpecialtiesController],
   providers: [DoctorSpecialtiesService],

@@ -226,8 +226,12 @@ describe('Clinic Working Hours Validation Endpoint (e2e)', () => {
       expect(error.dayOfWeek).toBe('monday');
       expect(error.message).toBeDefined();
       verifyBilingualMessage(error.message);
-      expect(error.message.ar).toContain('ساعات العيادة يجب أن تكون ضمن ساعات المجمع');
-      expect(error.message.en).toContain('Clinic hours must be within complex hours');
+      expect(error.message.ar).toContain(
+        'ساعات العيادة يجب أن تكون ضمن ساعات المجمع',
+      );
+      expect(error.message.en).toContain(
+        'Clinic hours must be within complex hours',
+      );
       expect(error.complexHours).toBeDefined();
       expect(error.clinicHours).toBeDefined();
     });
@@ -344,8 +348,12 @@ describe('Clinic Working Hours Validation Endpoint (e2e)', () => {
         verifyBilingualMessage(conflict.reason);
       }
 
-      expect(data.requiresRescheduling).toBe(data.conflicts.appointments.length > 0);
-      expect(data.affectedAppointments).toBe(data.conflicts.appointments.length);
+      expect(data.requiresRescheduling).toBe(
+        data.conflicts.appointments.length > 0,
+      );
+      expect(data.affectedAppointments).toBe(
+        data.conflicts.appointments.length,
+      );
     });
 
     it('should validate multiple days correctly', async () => {

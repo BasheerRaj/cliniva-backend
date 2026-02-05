@@ -537,7 +537,9 @@ describe('ClinicStatusService', () => {
       );
 
       // Mock clinic save to succeed initially, but we'll test the rollback path
-      mockClinic.save.mockRejectedValue(new Error('Save failed after appointment update'));
+      mockClinic.save.mockRejectedValue(
+        new Error('Save failed after appointment update'),
+      );
 
       const options = {
         status: 'inactive' as const,
@@ -565,9 +567,7 @@ describe('ClinicStatusService', () => {
       mockUserModel.countDocuments.mockResolvedValueOnce(0); // staff
 
       // Mock transfer to fail
-      mockUserModel.updateMany.mockRejectedValue(
-        new Error('Transfer failed'),
-      );
+      mockUserModel.updateMany.mockRejectedValue(new Error('Transfer failed'));
 
       const options = {
         status: 'inactive' as const,

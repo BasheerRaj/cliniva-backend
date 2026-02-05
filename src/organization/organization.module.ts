@@ -8,6 +8,7 @@ import { SubscriptionSchema } from '../database/schemas/subscription.schema';
 import { SubscriptionPlanSchema } from '../database/schemas/subscription-plan.schema';
 import { SubscriptionModule } from '../subscription/subscription.module';
 import { CommonModule } from '../common/common.module';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { CommonModule } from '../common/common.module';
     ]),
     SubscriptionModule,
     CommonModule,
+    AuthModule,
   ],
   controllers: [OrganizationController],
   providers: [OrganizationService],

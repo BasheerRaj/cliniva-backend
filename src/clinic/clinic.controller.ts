@@ -180,10 +180,7 @@ export class ClinicController {
         throw error;
       }
 
-      this.logger.error(
-        `Get clinics failed: ${error.message}`,
-        error.stack,
-      );
+      this.logger.error(`Get clinics failed: ${error.message}`, error.stack);
 
       throw new HttpException(
         {
@@ -1433,11 +1430,13 @@ export class ClinicController {
               properties: {
                 ar: {
                   type: 'string',
-                  example: 'يرجى اختيار ما إذا كنت تريد الاحتفاظ بالأطباء أو نقلهم',
+                  example:
+                    'يرجى اختيار ما إذا كنت تريد الاحتفاظ بالأطباء أو نقلهم',
                 },
                 en: {
                   type: 'string',
-                  example: 'Please choose whether to keep or transfer doctors/staff',
+                  example:
+                    'Please choose whether to keep or transfer doctors/staff',
                 },
               },
             },
@@ -1942,7 +1941,8 @@ export class ClinicController {
             code: {
               type: 'string',
               example: 'CLINIC_007',
-              description: 'CLINIC_007 for source clinic, CLINIC_008 for target clinic',
+              description:
+                'CLINIC_007 for source clinic, CLINIC_008 for target clinic',
             },
             message: {
               type: 'object',
