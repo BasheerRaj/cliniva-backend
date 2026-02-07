@@ -27,7 +27,9 @@
     "db:init": "npm run db:cli init",
     "db:seed": "npm run db:cli seed",
     "db:reset": "npm run db:cli reset",
-    "db:migrate:super-admin": "ts-node -r tsconfig-paths/register scripts/migrations/add-super-admin-role.ts"
+    "db:migrate:super-admin": "ts-node -r tsconfig-paths/register scripts/migrations/add-super-admin-role.ts",
+    "swagger:audit": "ts-node -r tsconfig-paths/register scripts/audit-swagger.ts",
+    "swagger:validate": "ts-node -r tsconfig-paths/register scripts/validate-swagger.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",

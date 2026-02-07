@@ -3,6 +3,10 @@
  *
  * This file contains reusable examples for API documentation.
  * All examples include bilingual messages and follow the standard response format.
+ *
+ * Subtask 1.3.1: Create complex Swagger examples file
+ * Subtask 1.3.12: Document geographic data (coordinates) examples
+ * Subtask 1.3.13: Document working hours inheritance
  */
 
 /**
