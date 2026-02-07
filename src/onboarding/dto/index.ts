@@ -11,3 +11,5 @@ export * from './step-progress.dto';
 // M2 Refactor DTOs
 export * from './skip-complex.dto';
 export * from './validate-step.dto';
+export * from './get-inherited-working-hours.dto';
+export * from './validate-plan-limits.dto';

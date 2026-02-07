@@ -183,6 +183,10 @@ export class Clinic extends Document {
 
   @Prop()
   deactivationReason?: string;
+
+  // Soft delete
+  @Prop()
+  deletedAt?: Date;
 }
 
 export const ClinicSchema = SchemaFactory.createForClass(Clinic);
@@ -209,3 +213,5 @@ ClinicSchema.index({ status: 1 });
 ClinicSchema.index({ personInChargeId: 1 });
 ClinicSchema.index({ complexId: 1, status: 1 });
 ClinicSchema.index({ subscriptionId: 1, status: 1 });
+// Composite index for onboarding plan limit queries (excludes soft-deleted)
+ClinicSchema.index({ subscriptionId: 1, deletedAt: 1 });

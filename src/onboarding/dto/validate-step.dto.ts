@@ -3,10 +3,10 @@ import { ApiProperty } from '@nestjs/swagger';
 
 /**
  * Validate Step DTO
- * 
+ *
  * Data Transfer Object for validating step dependencies in onboarding.
  * Ensures users complete prerequisites before accessing dependent steps.
- * 
+ *
  * BZR-27: Clinic details require complex details first
  */
 export class ValidateStepDto {

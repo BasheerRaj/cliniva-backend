@@ -24,6 +24,18 @@ import { AuthModule } from '../auth/auth.module';
 import { UserSchema } from '../database/schemas/user.schema';
 import { SubscriptionSchema } from '../database/schemas/subscription.schema';
 import { SubscriptionPlanSchema } from '../database/schemas/subscription-plan.schema';
+import { OrganizationSchema } from '../database/schemas/organization.schema';
+import { ComplexSchema } from '../database/schemas/complex.schema';
+import { ClinicSchema } from '../database/schemas/clinic.schema';
+import { WorkingHoursSchema } from '../database/schemas/working-hours.schema';
+
+// Services
+import { OnboardingValidationService } from './services/onboarding-validation.service';
+import { OnboardingProgressService } from './services/onboarding-progress.service';
+import { OnboardingPlanLimitService } from './services/onboarding-plan-limit.service';
+import { OnboardingSkipLogicService } from './services/onboarding-skip-logic.service';
+import { OnboardingWorkingHoursService } from './services/onboarding-working-hours.service';
+import { OnboardingEntityFactoryService } from './services/onboarding-entity-factory.service';
 
 @Module({
   imports: [
@@ -32,6 +44,10 @@ import { SubscriptionPlanSchema } from '../database/schemas/subscription-plan.sc
       { name: 'User', schema: UserSchema },
       { name: 'Subscription', schema: SubscriptionSchema },
       { name: 'SubscriptionPlan', schema: SubscriptionPlanSchema },
+      { name: 'Organization', schema: OrganizationSchema },
+      { name: 'Complex', schema: ComplexSchema },
+      { name: 'Clinic', schema: ClinicSchema },
+      { name: 'WorkingHours', schema: WorkingHoursSchema },
     ]),
 
     // Core entity modules
@@ -52,7 +68,23 @@ import { SubscriptionPlanSchema } from '../database/schemas/subscription-plan.sc
     AuthModule,
   ],
   controllers: [OnboardingController],
-  providers: [OnboardingService],
-  exports: [OnboardingService],
+  providers: [
+    OnboardingService,
+    OnboardingValidationService,
+    OnboardingProgressService,
+    OnboardingPlanLimitService,
+    OnboardingSkipLogicService,
+    OnboardingWorkingHoursService,
+    OnboardingEntityFactoryService,
+  ],
+  exports: [
+    OnboardingService,
+    OnboardingValidationService,
+    OnboardingProgressService,
+    OnboardingPlanLimitService,
+    OnboardingSkipLogicService,
+    OnboardingWorkingHoursService,
+    OnboardingEntityFactoryService,
+  ],
 })
 export class OnboardingModule {}

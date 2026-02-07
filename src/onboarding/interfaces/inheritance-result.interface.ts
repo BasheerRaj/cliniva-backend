@@ -2,7 +2,7 @@ import { BilingualMessage } from './bilingual-message.interface';
 
 /**
  * Working Hours Interface
- * 
+ *
  * Represents working hours for a single day.
  */
 export interface WorkingHours {
@@ -16,7 +16,7 @@ export interface WorkingHours {
 
 /**
  * Inheritance Source Interface
- * 
+ *
  * Information about the source entity for working hours inheritance.
  */
 export interface InheritanceSource {
@@ -27,10 +27,10 @@ export interface InheritanceSource {
 
 /**
  * Inheritance Result Interface
- * 
+ *
  * Result of working hours inheritance operation.
  * Used by OnboardingWorkingHoursService to provide inherited working hours.
- * 
+ *
  * BZR-29: Working hours inheritance from parent entities
  */
 export interface InheritanceResult {

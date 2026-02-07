@@ -1,6 +1,6 @@
 /**
  * Onboarding Interfaces
- * 
+ *
  * Central export point for all onboarding-related interfaces.
  * These interfaces define the contracts for the onboarding system.
  */

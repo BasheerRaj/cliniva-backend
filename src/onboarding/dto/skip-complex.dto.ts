@@ -3,10 +3,10 @@ import { ApiProperty } from '@nestjs/swagger';
 
 /**
  * Skip Complex DTO
- * 
+ *
  * Data Transfer Object for skipping the complex step in onboarding.
  * Only available for company plan users.
- * 
+ *
  * BZR-25: Skip complex → skip clinic (company plan only)
  */
 export class SkipComplexDto {

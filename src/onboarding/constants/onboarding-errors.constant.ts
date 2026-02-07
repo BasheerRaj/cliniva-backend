@@ -1,9 +1,9 @@
 /**
  * Onboarding Error Constants
- * 
+ *
  * All error messages are bilingual (Arabic & English) to support
  * the platform's internationalization requirements.
- * 
+ *
  * Each error has:
  * - code: Unique error identifier (ONBOARDING_XXX format)
  * - message: Bilingual error message with 'ar' and 'en' properties

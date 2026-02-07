@@ -3,14 +3,14 @@ import { BilingualMessage } from '../interfaces';
 
 /**
  * Onboarding Exception
- * 
+ *
  * Custom exception class for onboarding-related errors.
  * Provides consistent error structure with bilingual messages.
- * 
+ *
  * All onboarding errors follow this format:
  * - success: false
  * - error: { code, message (bilingual), details, timestamp }
- * 
+ *
  * Requirements: US-6.1, US-6.2
  */
 export class OnboardingException extends HttpException {
@@ -39,7 +39,11 @@ export class OnboardingException extends HttpException {
     errorConstant: { code: string; message: BilingualMessage },
     details?: any,
   ): OnboardingException {
-    return new OnboardingException(errorConstant, details, HttpStatus.NOT_FOUND);
+    return new OnboardingException(
+      errorConstant,
+      details,
+      HttpStatus.NOT_FOUND,
+    );
   }
 
   /**
@@ -49,7 +53,11 @@ export class OnboardingException extends HttpException {
     errorConstant: { code: string; message: BilingualMessage },
     details?: any,
   ): OnboardingException {
-    return new OnboardingException(errorConstant, details, HttpStatus.FORBIDDEN);
+    return new OnboardingException(
+      errorConstant,
+      details,
+      HttpStatus.FORBIDDEN,
+    );
   }
 
   /**

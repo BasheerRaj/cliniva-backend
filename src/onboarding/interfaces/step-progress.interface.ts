@@ -1,6 +1,6 @@
 /**
  * Step Progress Interface
- * 
+ *
  * Tracks user progress through the onboarding flow.
  * Used by OnboardingProgressService to manage step completion and navigation.
  */

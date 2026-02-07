@@ -166,3 +166,5 @@ ComplexSchema.index({ organizationId: 1, name: 1 });
 ComplexSchema.index({ status: 1 });
 ComplexSchema.index({ personInChargeId: 1 });
 ComplexSchema.index({ organizationId: 1, status: 1 });
+// Composite index for onboarding plan limit queries (excludes soft-deleted)
+ComplexSchema.index({ subscriptionId: 1, deletedAt: 1 });

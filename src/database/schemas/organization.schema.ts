@@ -191,6 +191,10 @@ export class Organization extends Document {
 
   @Prop()
   privacyPolicyUrl?: string;
+
+  // Soft delete
+  @Prop()
+  deletedAt?: Date;
 }
 
 export const OrganizationSchema = SchemaFactory.createForClass(Organization);
@@ -203,3 +207,5 @@ OrganizationSchema.index({ legalName: 1 });
 OrganizationSchema.index({ email: 1 });
 OrganizationSchema.index({ vatNumber: 1 });
 OrganizationSchema.index({ crNumber: 1 });
+// Composite index for onboarding plan limit queries (excludes soft-deleted)
+OrganizationSchema.index({ subscriptionId: 1, deletedAt: 1 });
