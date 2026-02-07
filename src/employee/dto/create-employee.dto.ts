@@ -19,38 +19,77 @@ import {
   IsUrl,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 // Employee Profile DTOs
 export class CreateEmployeeDto {
   // User Information (for User schema)
+  @ApiProperty({
+    description: 'Employee email address (must be unique)',
+    example: 'john.doe@cliniva.com',
+    type: String,
+  })
   @IsEmail()
   @IsNotEmpty()
   email: string;
 
+  @ApiProperty({
+    description: 'Employee password (minimum 8 characters)',
+    example: 'SecurePass123!',
+    type: String,
+    minLength: 8,
+    maxLength: 50,
+  })
   @IsString()
   @IsNotEmpty()
   @MinLength(8)
   @MaxLength(50)
   password: string;
 
+  @ApiProperty({
+    description: 'Employee first name',
+    example: 'John',
+    type: String,
+    minLength: 2,
+    maxLength: 50,
+  })
   @IsString()
   @IsNotEmpty()
   @MinLength(2)
   @MaxLength(50)
   firstName: string;
 
+  @ApiProperty({
+    description: 'Employee last name',
+    example: 'Doe',
+    type: String,
+    minLength: 2,
+    maxLength: 50,
+  })
   @IsString()
   @IsNotEmpty()
   @MinLength(2)
   @MaxLength(50)
   lastName: string;
 
+  @ApiProperty({
+    description: 'Employee phone number (must be unique)',
+    example: '+966501234567',
+    type: String,
+    minLength: 10,
+    maxLength: 20,
+  })
   @IsString()
   @IsNotEmpty()
   @MinLength(10)
   @MaxLength(20)
   phone: string;
 
+  @ApiProperty({
+    description: 'Employee role in the organization',
+    example: 'doctor',
+    enum: ['doctor', 'nurse', 'technician', 'admin', 'receptionist', 'pharmacist', 'therapist', 'other'],
+  })
   @IsEnum([
     'doctor',
     'nurse',
@@ -64,97 +103,212 @@ export class CreateEmployeeDto {
   @IsNotEmpty()
   role: string;
 
+  @ApiPropertyOptional({
+    description: 'Employee nationality',
+    example: 'Saudi Arabia',
+    type: String,
+    maxLength: 50,
+  })
   @IsString()
   @IsOptional()
   @MaxLength(50)
   nationality?: string;
 
+  @ApiProperty({
+    description: 'Employee gender',
+    example: 'male',
+    enum: ['male', 'female', 'other'],
+  })
   @IsEnum(['male', 'female', 'other'])
   @IsNotEmpty()
   gender: string;
 
+  @ApiProperty({
+    description: 'Employee date of birth (must be at least 16 years old)',
+    example: '1990-05-15',
+    type: String,
+    format: 'date',
+  })
   @IsDateString()
   @IsNotEmpty()
   dateOfBirth: string;
 
+  @ApiPropertyOptional({
+    description: 'Employee address',
+    example: '123 Medical Street, Riyadh',
+    type: String,
+    maxLength: 200,
+  })
   @IsString()
   @IsOptional()
   @MaxLength(200)
   address?: string;
 
   // Employee Profile Information
+  @ApiPropertyOptional({
+    description: 'Unique employee number (auto-generated if not provided)',
+    example: 'EMP20260001',
+    type: String,
+    maxLength: 20,
+  })
   @IsString()
   @IsOptional()
   @MaxLength(20)
   employeeNumber?: string;
 
+  @ApiPropertyOptional({
+    description: 'Employee card number',
+    example: 'CARD123456',
+    type: String,
+    maxLength: 30,
+  })
   @IsString()
   @IsOptional()
   @MaxLength(30)
   cardNumber?: string;
 
+  @ApiPropertyOptional({
+    description: 'Employee marital status',
+    example: 'married',
+    enum: ['single', 'married', 'divorced', 'widowed', 'separated', 'other'],
+  })
   @IsEnum(['single', 'married', 'divorced', 'widowed', 'separated', 'other'])
   @IsOptional()
   maritalStatus?: string;
 
+  @ApiPropertyOptional({
+    description: 'Number of children',
+    example: 2,
+    type: Number,
+    minimum: 0,
+    maximum: 20,
+  })
   @IsNumber()
   @IsOptional()
   @Min(0)
   @Max(20)
   numberOfChildren?: number;
 
+  @ApiPropertyOptional({
+    description: 'URL to employee profile picture',
+    example: 'https://example.com/profiles/john-doe.jpg',
+    type: String,
+  })
   @IsUrl()
   @IsOptional()
   profilePictureUrl?: string;
 
+  @ApiProperty({
+    description: 'Employee job title',
+    example: 'Senior Physician',
+    type: String,
+    minLength: 2,
+    maxLength: 100,
+  })
   @IsString()
   @IsNotEmpty()
   @MinLength(2)
   @MaxLength(100)
   jobTitle: string;
 
+  @ApiProperty({
+    description: 'Date when employee was hired',
+    example: '2024-01-15',
+    type: String,
+    format: 'date',
+  })
   @IsDateString()
   @IsNotEmpty()
   dateOfHiring: string;
 
+  @ApiPropertyOptional({
+    description: 'Employee monthly salary',
+    example: 25000,
+    type: Number,
+    minimum: 0,
+  })
   @IsNumber()
   @IsOptional()
   @Min(0)
   salary?: number;
 
+  @ApiPropertyOptional({
+    description: 'Employee bank account number',
+    example: 'SA1234567890123456789012',
+    type: String,
+    maxLength: 50,
+  })
   @IsString()
   @IsOptional()
   @MaxLength(50)
   bankAccount?: string;
 
+  @ApiPropertyOptional({
+    description: 'Employee social security number',
+    example: 'SSN123456789',
+    type: String,
+    maxLength: 30,
+  })
   @IsString()
   @IsOptional()
   @MaxLength(30)
   socialSecurityNumber?: string;
 
+  @ApiPropertyOptional({
+    description: 'Employee tax ID',
+    example: 'TAX987654321',
+    type: String,
+    maxLength: 30,
+  })
   @IsString()
   @IsOptional()
   @MaxLength(30)
   taxId?: string;
 
+  @ApiPropertyOptional({
+    description: 'Additional notes about the employee',
+    example: 'Specialized in cardiology',
+    type: String,
+    maxLength: 500,
+  })
   @IsString()
   @IsOptional()
   @MaxLength(500)
   notes?: string;
 
   // Assignment Information
+  @ApiPropertyOptional({
+    description: 'Organization ID to assign employee to',
+    example: '507f1f77bcf86cd799439030',
+    type: String,
+  })
   @IsMongoId()
   @IsOptional()
   organizationId?: string;
 
+  @ApiPropertyOptional({
+    description: 'Complex ID to assign employee to',
+    example: '507f1f77bcf86cd799439031',
+    type: String,
+  })
   @IsMongoId()
   @IsOptional()
   complexId?: string;
 
+  @ApiPropertyOptional({
+    description: 'Clinic ID to assign employee to',
+    example: '507f1f77bcf86cd799439032',
+    type: String,
+  })
   @IsMongoId()
   @IsOptional()
   clinicId?: string;
 
+  @ApiPropertyOptional({
+    description: 'Array of specialty IDs for medical staff',
+    example: ['507f1f77bcf86cd799439040', '507f1f77bcf86cd799439041'],
+    type: [String],
+  })
   @IsArray()
   @IsString({ each: true })
   @IsOptional()
@@ -163,90 +317,193 @@ export class CreateEmployeeDto {
 
 export class UpdateEmployeeDto {
   // User Information Updates
+  @ApiPropertyOptional({
+    description: 'Employee first name',
+    example: 'John',
+    type: String,
+    minLength: 2,
+    maxLength: 50,
+  })
   @IsString()
   @IsOptional()
   @MinLength(2)
   @MaxLength(50)
   firstName?: string;
 
+  @ApiPropertyOptional({
+    description: 'Employee last name',
+    example: 'Doe',
+    type: String,
+    minLength: 2,
+    maxLength: 50,
+  })
   @IsString()
   @IsOptional()
   @MinLength(2)
   @MaxLength(50)
   lastName?: string;
 
+  @ApiPropertyOptional({
+    description: 'Employee phone number',
+    example: '+966501234567',
+    type: String,
+    minLength: 10,
+    maxLength: 20,
+  })
   @IsString()
   @IsOptional()
   @MinLength(10)
   @MaxLength(20)
   phone?: string;
 
+  @ApiPropertyOptional({
+    description: 'Employee nationality',
+    example: 'Saudi Arabia',
+    type: String,
+    maxLength: 50,
+  })
   @IsString()
   @IsOptional()
   @MaxLength(50)
   nationality?: string;
 
+  @ApiPropertyOptional({
+    description: 'Employee address',
+    example: '123 Medical Street, Riyadh',
+    type: String,
+    maxLength: 200,
+  })
   @IsString()
   @IsOptional()
   @MaxLength(200)
   address?: string;
 
   // Employee Profile Updates
+  @ApiPropertyOptional({
+    description: 'Employee card number',
+    example: 'CARD123456',
+    type: String,
+    maxLength: 30,
+  })
   @IsString()
   @IsOptional()
   @MaxLength(30)
   cardNumber?: string;
 
+  @ApiPropertyOptional({
+    description: 'Employee marital status',
+    example: 'married',
+    enum: ['single', 'married', 'divorced', 'widowed', 'separated', 'other'],
+  })
   @IsEnum(['single', 'married', 'divorced', 'widowed', 'separated', 'other'])
   @IsOptional()
   maritalStatus?: string;
 
+  @ApiPropertyOptional({
+    description: 'Number of children',
+    example: 2,
+    type: Number,
+    minimum: 0,
+    maximum: 20,
+  })
   @IsNumber()
   @IsOptional()
   @Min(0)
   @Max(20)
   numberOfChildren?: number;
 
+  @ApiPropertyOptional({
+    description: 'URL to employee profile picture',
+    example: 'https://example.com/profiles/john-doe.jpg',
+    type: String,
+  })
   @IsUrl()
   @IsOptional()
   profilePictureUrl?: string;
 
+  @ApiPropertyOptional({
+    description: 'Employee job title',
+    example: 'Chief Physician',
+    type: String,
+    minLength: 2,
+    maxLength: 100,
+  })
   @IsString()
   @IsOptional()
   @MinLength(2)
   @MaxLength(100)
   jobTitle?: string;
 
+  @ApiPropertyOptional({
+    description: 'Employee monthly salary',
+    example: 30000,
+    type: Number,
+    minimum: 0,
+  })
   @IsNumber()
   @IsOptional()
   @Min(0)
   salary?: number;
 
+  @ApiPropertyOptional({
+    description: 'Employee bank account number',
+    example: 'SA1234567890123456789012',
+    type: String,
+    maxLength: 50,
+  })
   @IsString()
   @IsOptional()
   @MaxLength(50)
   bankAccount?: string;
 
+  @ApiPropertyOptional({
+    description: 'Employee social security number',
+    example: 'SSN123456789',
+    type: String,
+    maxLength: 30,
+  })
   @IsString()
   @IsOptional()
   @MaxLength(30)
   socialSecurityNumber?: string;
 
+  @ApiPropertyOptional({
+    description: 'Employee tax ID',
+    example: 'TAX987654321',
+    type: String,
+    maxLength: 30,
+  })
   @IsString()
   @IsOptional()
   @MaxLength(30)
   taxId?: string;
 
+  @ApiPropertyOptional({
+    description: 'Additional notes about the employee',
+    example: 'Promoted to Chief Physician',
+    type: String,
+    maxLength: 500,
+  })
   @IsString()
   @IsOptional()
   @MaxLength(500)
   notes?: string;
 
+  @ApiPropertyOptional({
+    description: 'Employee active status',
+    example: true,
+    type: Boolean,
+  })
   @IsBoolean()
   @IsOptional()
   @Transform(({ value }) => value === 'true' || value === true)
   isActive?: boolean;
 
+  @ApiPropertyOptional({
+    description: 'Array of specialty IDs for medical staff',
+    example: ['507f1f77bcf86cd799439040', '507f1f77bcf86cd799439041'],
+    type: [String],
+  })
   @IsArray()
   @IsString({ each: true })
   @IsOptional()

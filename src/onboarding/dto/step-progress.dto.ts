@@ -8,6 +8,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 // Step types for the onboarding flow
 export type OnboardingStepType =
@@ -25,9 +26,30 @@ export type OnboardingStepType =
 export type PlanType = 'company' | 'complex' | 'clinic';
 
 export class OnboardingStepProgressDto {
+  @ApiProperty({
+    description: 'User ID',
+    example: '507f1f77bcf86cd799439011',
+    type: String,
+  })
   @IsString()
   userId: string;
 
+  @ApiProperty({
+    description: 'Current onboarding step',
+    enum: [
+      'organization-overview',
+      'organization-contact',
+      'organization-legal',
+      'complex-overview',
+      'complex-contact',
+      'complex-schedule',
+      'clinic-overview',
+      'clinic-contact',
+      'clinic-schedule',
+      'completed',
+    ],
+    example: 'clinic-overview',
+  })
   @IsString()
   @IsEnum([
     'organization-overview',
@@ -43,43 +65,91 @@ export class OnboardingStepProgressDto {
   ])
   currentStep: OnboardingStepType;
 
+  @ApiProperty({
+    description: 'Subscription plan type',
+    enum: ['company', 'complex', 'clinic'],
+    example: 'clinic',
+  })
   @IsString()
   @IsEnum(['company', 'complex', 'clinic'])
   planType: PlanType;
 
+  @ApiPropertyOptional({
+    description: 'Array of completed step names',
+    example: ['organization-overview', 'complex-overview'],
+    type: [String],
+  })
   @IsArray()
   @IsString({ each: true })
   @IsOptional()
   completedSteps?: string[];
 
+  @ApiPropertyOptional({
+    description: 'Array of skipped step names',
+    example: ['organization-contact'],
+    type: [String],
+  })
   @IsArray()
   @IsString({ each: true })
   @IsOptional()
   skippedSteps?: string[];
 
+  @ApiPropertyOptional({
+    description: 'Whether current step can be skipped',
+    example: true,
+    type: Boolean,
+  })
   @IsBoolean()
   @IsOptional()
   canSkipCurrent?: boolean; // Whether current step can be skipped
 
+  @ApiPropertyOptional({
+    description: 'Total steps for the plan type',
+    example: 9,
+    type: Number,
+  })
   @IsNumber()
   @IsOptional()
   totalSteps?: number; // Total steps for the plan type
 
+  @ApiPropertyOptional({
+    description: 'Current step number (1-based)',
+    example: 5,
+    type: Number,
+  })
   @IsNumber()
   @IsOptional()
   currentStepNumber?: number; // Current step number (1-based)
 
+  @ApiPropertyOptional({
+    description: 'Temporary data stored between steps',
+  })
   @IsOptional()
   temporaryData?: any; // Temporary data stored between steps
 
+  @ApiPropertyOptional({
+    description: 'Created organization ID',
+    example: '507f1f77bcf86cd799439012',
+    type: String,
+  })
   @IsString()
   @IsOptional()
   organizationId?: string; // Created organization ID
 
+  @ApiPropertyOptional({
+    description: 'Created complex ID',
+    example: '507f1f77bcf86cd799439013',
+    type: String,
+  })
   @IsString()
   @IsOptional()
   complexId?: string; // Created complex ID
 
+  @ApiPropertyOptional({
+    description: 'Created clinic ID',
+    example: '507f1f77bcf86cd799439014',
+    type: String,
+  })
   @IsString()
   @IsOptional()
   clinicId?: string; // Created clinic ID
@@ -236,19 +306,39 @@ export class WorkingHoursValidationDto {
 
 // Inheritance settings DTO
 export class InheritanceSettingsDto {
+  @ApiPropertyOptional({
+    description: 'Whether to inherit from organization',
+    example: true,
+    type: Boolean,
+  })
   @IsBoolean()
   @IsOptional()
   inheritsFromOrganization?: boolean;
 
+  @ApiPropertyOptional({
+    description: 'Whether to inherit from complex',
+    example: true,
+    type: Boolean,
+  })
   @IsBoolean()
   @IsOptional()
   inheritsFromComplex?: boolean;
 
+  @ApiPropertyOptional({
+    description: 'Specific fields to inherit',
+    example: ['workingHours', 'contactInfo'],
+    type: [String],
+  })
   @IsArray()
   @IsString({ each: true })
   @IsOptional()
   fieldsToInherit?: string[]; // Specific fields to inherit
 
+  @ApiPropertyOptional({
+    description: 'Fields to override despite inheritance',
+    example: ['logoUrl', 'website'],
+    type: [String],
+  })
   @IsArray()
   @IsString({ each: true })
   @IsOptional()

@@ -1,6 +1,7 @@
 // Existing DTOs
 export * from './complete-onboarding.dto';
 export * from './validate-onboarding.dto';
+export * from './start-onboarding.dto';
 
 // Step-by-step DTOs
 export * from './organization-step.dto';

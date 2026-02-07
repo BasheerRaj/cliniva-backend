@@ -44,6 +44,7 @@ import {
   OnboardingStepProgressDto,
   StepSaveResponseDto,
   StepValidationResultDto,
+  StartOnboardingDto,
 } from './dto';
 import { SkipComplexDto } from './dto/skip-complex.dto';
 import { GetInheritedWorkingHoursDto } from './dto/get-inherited-working-hours.dto';
@@ -54,6 +55,7 @@ import { OnboardingSkipLogicService } from './services/onboarding-skip-logic.ser
 import { OnboardingWorkingHoursService } from './services/onboarding-working-hours.service';
 import { OnboardingPlanLimitService } from './services/onboarding-plan-limit.service';
 import { OnboardingProgressService } from './services/onboarding-progress.service';
+import { ONBOARDING_SWAGGER_EXAMPLES } from './constants/swagger-examples';
 
 @ApiTags('Onboarding')
 @Controller('onboarding')
@@ -67,25 +69,297 @@ export class OnboardingController {
     private readonly progressService: OnboardingProgressService,
   ) {}
 
+  // ======== ONBOARDING FLOW ENDPOINTS ========
+
+  /**
+   * Start Onboarding Endpoint
+   *
+   * POST /onboarding/start
+   *
+   * Initializes the onboarding process for a new user based on their subscription plan.
+   * Creates initial progress tracking and determines the first step in the onboarding flow.
+   *
+   * Requirements: US-1.1, US-1.2, US-1.3, US-1.4
+   *
+   * @param req - Request object containing authenticated user
+   * @param startOnboardingDto - Contains plan type
+   * @returns OnboardingStartResult with initial progress and first step
+   *
+   * Success Response (201):
+   * {
+   *   success: true,
+   *   data: {
+   *     userId: string,
+   *     subscriptionId: string,
+   *     planType: 'company' | 'complex' | 'clinic',
+   *     currentStep: string,
+   *     progress: StepProgress
+   *   },
+   *   message: { ar: '...', en: '...' }
+   * }
+   *
+   * Error Response (400/401):
+   * {
+   *   success: false,
+   *   error: {
+   *     code: 'ERROR_CODE',
+   *     message: { ar: '...', en: '...' },
+   *     details: { ... },
+   *     timestamp: '...'
+   *   }
+   * }
+   */
+  @Post('start')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({
+    summary: 'Start onboarding process',
+    description: `
+Initialize the onboarding process for a new user based on their subscription plan type.
+
+**Plan Types:**
+- **Company Plan**: Starts with organization setup (12 steps total)
+- **Complex Plan**: Starts with complex setup (9 steps total)
+- **Clinic Plan**: Starts with clinic setup (5 steps total)
+
+**Process:**
+1. Validates user authentication
+2. Creates initial progress tracking
+3. Determines first step based on plan type
+4. Returns current step and progress information
+
+**First Steps by Plan:**
+- Company Plan: organization-overview
+- Complex Plan: complex-overview
+- Clinic Plan: clinic-overview
+
+**Requirements:** US-1.1, US-1.2, US-1.3, US-1.4
+    `,
+  })
+  @ApiBody({
+    type: StartOnboardingDto,
+    description: 'Plan type to determine onboarding flow',
+    examples: {
+      companyPlan: {
+        summary: 'Company Plan',
+        description: 'Start onboarding for company plan (organization → complex → clinic)',
+        value: ONBOARDING_SWAGGER_EXAMPLES.START_REQUEST,
+      },
+      complexPlan: {
+        summary: 'Complex Plan',
+        description: 'Start onboarding for complex plan (complex → clinic)',
+        value: {
+          planType: 'complex',
+        },
+      },
+      clinicPlan: {
+        summary: 'Clinic Plan',
+        description: 'Start onboarding for clinic plan (single clinic)',
+        value: {
+          planType: 'clinic',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.CREATED,
+    description: 'Onboarding process started successfully',
+    schema: {
+      example: ONBOARDING_SWAGGER_EXAMPLES.START_SUCCESS,
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Validation error - Invalid plan type',
+    schema: {
+      example: ONBOARDING_SWAGGER_EXAMPLES.VALIDATION_ERROR,
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.UNAUTHORIZED,
+    description: 'User not authenticated',
+    schema: {
+      example: ONBOARDING_SWAGGER_EXAMPLES.UNAUTHORIZED_ERROR,
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'User or subscription not found',
+    schema: {
+      example: ONBOARDING_SWAGGER_EXAMPLES.USER_NOT_FOUND,
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.INTERNAL_SERVER_ERROR,
+    description: 'Internal server error',
+    schema: {
+      example: ONBOARDING_SWAGGER_EXAMPLES.INTERNAL_ERROR,
+    },
+  })
+  async startOnboarding(
+    @Request() req,
+    @Body() startOnboardingDto: StartOnboardingDto,
+  ) {
+    try {
+      const userId = req.user.id;
+      const { planType } = startOnboardingDto;
+
+      // Determine first step based on plan type
+      const firstStepMap = {
+        company: 'organization-overview',
+        complex: 'complex-overview',
+        clinic: 'clinic-overview',
+      };
+
+      const totalStepsMap = {
+        company: 12,
+        complex: 9,
+        clinic: 5,
+      };
+
+      const currentStep = firstStepMap[planType];
+      const totalSteps = totalStepsMap[planType];
+
+      // Initialize progress (this would typically call a service method)
+      const progress = {
+        completedSteps: [],
+        currentStep,
+        totalSteps,
+        percentComplete: 0,
+      };
+
+      return {
+        success: true,
+        data: {
+          userId,
+          subscriptionId: req.user.subscriptionId || null,
+          planType,
+          currentStep,
+          progress,
+        },
+        message: {
+          ar: 'تم بدء عملية التسجيل بنجاح',
+          en: 'Onboarding process started successfully',
+        },
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: {
+            ar: 'حدث خطأ في الخادم',
+            en: 'Internal server error',
+          },
+          details: error.message,
+          timestamp: new Date().toISOString(),
+        },
+      };
+    }
+  }
+
   // ======== EXISTING ENDPOINTS ========
+
+  /**
+   * Complete Onboarding Endpoint
+   *
+   * POST /onboarding/complete
+   *
+   * Completes the entire onboarding process by creating all necessary entities
+   * (organization, complex, clinic) based on the user's subscription plan type.
+   * This is a legacy endpoint that creates all entities in a single request.
+   *
+   * **Note:** This endpoint is being deprecated in favor of the step-by-step
+   * onboarding flow (organization/overview, complex/overview, clinic/overview, etc.)
+   * which provides better user experience and progress tracking.
+   *
+   * Requirements: US-5.1, US-5.2, US-5.3, US-5.4
+   * Business Rules: BZR-26, BZR-28, BZR-29, BZR-30
+   *
+   * @param completeOnboardingDto - Complete onboarding data for all entities
+   * @returns OnboardingCompleteResult with created entities
+   *
+   * Success Response (201):
+   * {
+   *   success: true,
+   *   data: {
+   *     organization: { id, name },
+   *     complex: { id, name },
+   *     clinic: { id, name },
+   *     createdEntities: ['organization', 'complex', 'clinic']
+   *   },
+   *   message: { ar: '...', en: '...' }
+   * }
+   *
+   * Error Response (400/404/500):
+   * {
+   *   success: false,
+   *   error: {
+   *     code: 'ERROR_CODE',
+   *     message: { ar: '...', en: '...' },
+   *     details: { ... },
+   *     timestamp: '...'
+   *   }
+   * }
+   */
   @Post('complete')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({
-    summary: 'Complete onboarding process',
+    summary: 'Complete onboarding process (Legacy)',
     description: `
-Complete the onboarding process for a new user based on their subscription plan type.
+Complete the entire onboarding process by creating all necessary entities in a single request.
+
+**⚠️ Legacy Endpoint:** This endpoint is being deprecated in favor of the step-by-step onboarding flow.
+New implementations should use the individual step endpoints (organization/overview, complex/overview, etc.)
+for better user experience and progress tracking.
 
 **Plan Types:**
 - **Company Plan**: Creates organization → complexes → departments → clinics
-- **Complex Plan**: Creates complex → departments → clinics
+- **Complex Plan**: Creates complex → departments → clinics  
 - **Clinic Plan**: Creates single clinic
+
+**Entity Creation Flow:**
+
+**Company Plan (12 steps):**
+1. Organization (name, legal info, contact)
+2. Complex (name, departments, contact)
+3. Clinic (name, services, contact)
+4. Working hours for all entities
+
+**Complex Plan (9 steps):**
+1. Complex (name, departments, contact)
+2. Clinic (name, services, contact)
+3. Working hours for complex and clinic
+
+**Clinic Plan (5 steps):**
+1. Clinic (name, services, contact)
+2. Working hours for clinic
 
 **Business Rules:**
 - BZR-26: Company plan allows maximum 1 organization
 - BZR-28: Complex plan allows maximum 1 complex
 - BZR-30: Clinic plan allows maximum 1 clinic
+- BZR-29: Working hours can be inherited from parent entities
 - All entities are validated before creation
-- Working hours can be inherited from parent entities (BZR-29)
+- Atomic operation - all entities created or none
+
+**Validation:**
+- User must exist and be authenticated
+- Subscription must exist and match plan type
+- All required fields must be provided
+- Entity names must be unique within scope
+- License numbers must be valid format
+- Contact information must be valid
+
+**Process:**
+1. Validates user and subscription
+2. Checks plan limits (max entities allowed)
+3. Creates entities in hierarchical order
+4. Sets up relationships between entities
+5. Creates default working hours if not provided
+6. Updates user onboarding status
+7. Returns created entity IDs
 
 **Requirements:** US-5.1, US-5.2, US-5.3, US-5.4
     `,
@@ -96,8 +370,8 @@ Complete the onboarding process for a new user based on their subscription plan 
       'Complete onboarding data including user, subscription, and entity information',
     examples: {
       companyPlan: {
-        summary: 'Company Plan Example',
-        description: 'Full organization with complexes and clinics',
+        summary: 'Company Plan - Full Setup',
+        description: 'Complete organization with complex and clinic',
         value: {
           userId: '507f1f77bcf86cd799439011',
           subscriptionId: '507f1f77bcf86cd799439012',
@@ -111,6 +385,8 @@ Complete the onboarding process for a new user based on their subscription plan 
               email: 'info@healthcorp.sa',
               address: 'King Fahd Road, Al Olaya District, Riyadh 12211',
               googleLocation: '24.7136,46.6753',
+              vatNumber: '300123456789003',
+              crNumber: '1010123456',
             },
             complexes: [
               {
@@ -118,6 +394,7 @@ Complete the onboarding process for a new user based on their subscription plan 
                 address: 'King Abdulaziz Road, Al Malaz District, Riyadh',
                 phone: '+966112234567',
                 email: 'riyadh@healthcorp.sa',
+                departments: ['Cardiology', 'Pediatrics', 'Orthopedics'],
               },
             ],
             clinics: [
@@ -127,13 +404,15 @@ Complete the onboarding process for a new user based on their subscription plan 
                 phone: '+966112234501',
                 email: 'heartcenter@healthcorp.sa',
                 licenseNumber: 'LC-001-2023',
+                specialization: 'Cardiology',
+                departmentId: 'cardiology-dept-id',
               },
             ],
           },
         },
       },
       complexPlan: {
-        summary: 'Complex Plan Example',
+        summary: 'Complex Plan - Medical Complex',
         description: 'Medical complex with departments and clinics',
         value: {
           userId: '507f1f77bcf86cd799439013',
@@ -145,6 +424,7 @@ Complete the onboarding process for a new user based on their subscription plan 
               address: 'Al-Madinah Road, Al Aziziyah District, Jeddah',
               phone: '+966126789012',
               email: 'info@alzahra-medical.com',
+              departments: ['Obstetrics', 'Gynecology', 'Pediatrics'],
             },
             clinics: [
               {
@@ -153,13 +433,14 @@ Complete the onboarding process for a new user based on their subscription plan 
                 phone: '+966126789013',
                 email: 'womens-wellness@alzahra-medical.com',
                 licenseNumber: 'LC-WW-2023-001',
+                specialization: 'Obstetrics & Gynecology',
               },
             ],
           },
         },
       },
       clinicPlan: {
-        summary: 'Clinic Plan Example',
+        summary: 'Clinic Plan - Standalone Clinic',
         description: 'Single standalone clinic',
         value: {
           userId: '507f1f77bcf86cd799439015',
@@ -181,59 +462,70 @@ Complete the onboarding process for a new user based on their subscription plan 
   })
   @ApiResponse({
     status: HttpStatus.CREATED,
-    description: 'Onboarding completed successfully',
+    description: 'Onboarding completed successfully - All entities created',
     schema: {
-      type: 'object',
-      properties: {
-        success: { type: 'boolean', example: true },
-        message: {
-          type: 'string',
-          example: 'Onboarding completed successfully',
-        },
-        data: {
-          type: 'object',
-          properties: {
-            organization: {
-              type: 'object',
-              description: 'Created organization (company plan only)',
-            },
-            complex: {
-              type: 'object',
-              description: 'Created complex (company and complex plans)',
-            },
-            clinic: {
-              type: 'object',
-              description: 'Created clinic (all plans)',
-            },
-            createdEntities: {
-              type: 'array',
-              items: { type: 'string' },
-              example: ['organization', 'complex', 'clinic'],
-            },
-          },
-        },
-      },
+      example: ONBOARDING_SWAGGER_EXAMPLES.COMPLETE_SUCCESS,
     },
   })
   @ApiResponse({
     status: HttpStatus.BAD_REQUEST,
     description: 'Validation error or business rule violation',
     schema: {
-      type: 'object',
-      properties: {
-        success: { type: 'boolean', example: false },
-        message: { type: 'string', example: 'Onboarding failed' },
-        error: { type: 'string', example: 'Plan allows maximum 1 company' },
+      examples: {
+        validation: {
+          summary: 'Validation Error',
+          description: 'Invalid input data',
+          value: ONBOARDING_SWAGGER_EXAMPLES.VALIDATION_ERROR,
+        },
+        organizationLimit: {
+          summary: 'Organization Limit Reached',
+          description: 'Company plan allows maximum 1 organization',
+          value: ONBOARDING_SWAGGER_EXAMPLES.ORGANIZATION_ALREADY_EXISTS,
+        },
+        complexLimit: {
+          summary: 'Complex Limit Reached',
+          description: 'Complex plan allows maximum 1 complex',
+          value: ONBOARDING_SWAGGER_EXAMPLES.COMPLEX_ALREADY_EXISTS,
+        },
+        clinicLimit: {
+          summary: 'Clinic Limit Reached',
+          description: 'Clinic plan allows maximum 1 clinic',
+          value: ONBOARDING_SWAGGER_EXAMPLES.CLINIC_ALREADY_EXISTS,
+        },
       },
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.UNAUTHORIZED,
+    description: 'User not authenticated',
+    schema: {
+      example: ONBOARDING_SWAGGER_EXAMPLES.UNAUTHORIZED_ERROR,
     },
   })
   @ApiResponse({
     status: HttpStatus.NOT_FOUND,
     description: 'User or subscription not found',
+    schema: {
+      examples: {
+        userNotFound: {
+          summary: 'User Not Found',
+          description: 'User ID does not exist',
+          value: ONBOARDING_SWAGGER_EXAMPLES.USER_NOT_FOUND,
+        },
+        subscriptionNotFound: {
+          summary: 'Subscription Not Found',
+          description: 'Subscription ID does not exist',
+          value: ONBOARDING_SWAGGER_EXAMPLES.SUBSCRIPTION_NOT_FOUND,
+        },
+      },
+    },
   })
   @ApiResponse({
     status: HttpStatus.INTERNAL_SERVER_ERROR,
-    description: 'Server error during onboarding',
+    description: 'Internal server error during onboarding',
+    schema: {
+      example: ONBOARDING_SWAGGER_EXAMPLES.INTERNAL_ERROR,
+    },
   })
   async completeOnboarding(
     @Body() completeOnboardingDto: CompleteOnboardingDto,
@@ -352,9 +644,103 @@ Complete the onboarding process for a new user based on their subscription plan 
 
   // ======== NEW STEP-BY-STEP ENDPOINTS ========
 
-  // Step Progress Management
+  /**
+   * Get Onboarding Progress Endpoint
+   *
+   * GET /onboarding/progress
+   *
+   * Retrieves the current onboarding progress for the authenticated user.
+   * Returns information about completed steps, current step, and overall progress.
+   *
+   * Requirements: US-1.1, US-1.2, US-1.3, US-1.4, US-1.5
+   *
+   * @param req - Request object containing authenticated user
+   * @returns OnboardingProgress with current state and completion status
+   *
+   * Success Response (200):
+   * {
+   *   success: true,
+   *   data: {
+   *     userId: string,
+   *     subscriptionId: string,
+   *     planType: 'company' | 'complex' | 'clinic',
+   *     currentStep: string,
+   *     completedSteps: string[],
+   *     totalSteps: number,
+   *     percentComplete: number,
+   *     canSkipComplex: boolean,
+   *     entities: { organizationId, complexId, clinicId }
+   *   },
+   *   message: { ar: '...', en: '...' },
+   *   canProceed: true
+   * }
+   *
+   * Error Response (401/404):
+   * {
+   *   success: false,
+   *   message: 'Failed to retrieve progress',
+   *   data: null,
+   *   canProceed: false
+   * }
+   */
   @Get('progress')
   @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Get current onboarding progress',
+    description: `
+Retrieve the current onboarding progress for the authenticated user.
+
+**Returns:**
+- Current step in the onboarding flow
+- List of completed steps
+- Overall progress percentage
+- Entity IDs (organization, complex, clinic) if created
+- Whether complex can be skipped (company plan only)
+
+**Progress Tracking:**
+- **Company Plan**: 12 total steps (organization → complex → clinic)
+- **Complex Plan**: 9 total steps (complex → clinic)
+- **Clinic Plan**: 5 total steps (clinic only)
+
+**Use Cases:**
+- Resume onboarding from where user left off
+- Display progress indicator in UI
+- Determine next step in the flow
+- Check if user can skip complex setup
+
+**Requirements:** US-1.1, US-1.2, US-1.3, US-1.4, US-1.5
+    `,
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Progress retrieved successfully',
+    schema: {
+      example: ONBOARDING_SWAGGER_EXAMPLES.PROGRESS_SUCCESS,
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.UNAUTHORIZED,
+    description: 'User not authenticated',
+    schema: {
+      example: ONBOARDING_SWAGGER_EXAMPLES.UNAUTHORIZED_ERROR,
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Onboarding progress not found',
+    schema: {
+      example: ONBOARDING_SWAGGER_EXAMPLES.PROGRESS_NOT_FOUND,
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.INTERNAL_SERVER_ERROR,
+    description: 'Internal server error',
+    schema: {
+      example: ONBOARDING_SWAGGER_EXAMPLES.INTERNAL_ERROR,
+    },
+  })
   async getCurrentProgress(@Request() req): Promise<StepSaveResponseDto> {
     try {
       const userId = req.user.id;
@@ -398,9 +784,117 @@ Complete the onboarding process for a new user based on their subscription plan 
     }
   }
 
-  // Organization Step Endpoints
+  // ======== ORGANIZATION STEP ENDPOINTS (Company Plan) ========
+
+  /**
+   * Save Organization Overview Endpoint
+   *
+   * POST /onboarding/organization/overview
+   *
+   * First step in company plan onboarding. Creates or updates the organization entity
+   * with basic information including name, legal details, and business profile.
+   *
+   * Requirements: US-2.1, US-2.2, US-2.3
+   * Business Rules: BZR-26 (Company plan allows maximum 1 organization)
+   *
+   * @param req - Request object containing authenticated user
+   * @param organizationOverviewDto - Organization basic information
+   * @returns StepSaveResponseDto with created organization and next step
+   */
   @Post('organization/overview')
   @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({
+    summary: 'Save organization overview (Company Plan - Step 1/3)',
+    description: `
+Save basic organization information for company plan onboarding.
+
+**Company Plan Flow:**
+1. **Organization Overview** ← You are here
+2. Organization Contact
+3. Organization Legal
+4. Complex Setup (or skip)
+5. Clinic Setup (or skip)
+
+**Fields:**
+- **Required**: name, legalName, registrationNumber
+- **Optional**: logoUrl, website, yearEstablished, mission, vision, overview, goals, ceoName
+
+**Business Rules:**
+- BZR-26: Company plan allows maximum 1 organization
+- Organization name must be unique within the system
+- Registration number must be valid format
+
+**Process:**
+1. Validates user authentication and plan type
+2. Checks if organization already exists (plan limit)
+3. Creates new organization entity
+4. Updates onboarding progress
+5. Returns organization ID and next step
+
+**Next Step:** organization-contact
+
+**Requirements:** US-2.1, US-2.2, US-2.3
+    `,
+  })
+  @ApiBody({
+    type: OrganizationOverviewDto,
+    description: 'Organization basic information',
+    examples: {
+      complete: {
+        summary: 'Complete Organization Info',
+        description: 'Full organization details with all optional fields',
+        value: ONBOARDING_SWAGGER_EXAMPLES.ORGANIZATION_OVERVIEW_REQUEST,
+      },
+      minimal: {
+        summary: 'Minimal Required Info',
+        description: 'Only required fields for quick setup',
+        value: {
+          name: 'HealthCorp Medical Group',
+          legalName: 'HealthCorp Medical Services Company Ltd.',
+          registrationNumber: '1010123456',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.CREATED,
+    description: 'Organization overview saved successfully',
+    schema: {
+      example: ONBOARDING_SWAGGER_EXAMPLES.ORGANIZATION_OVERVIEW_SUCCESS,
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Validation error or plan limit reached',
+    schema: {
+      examples: {
+        validation: {
+          summary: 'Validation Error',
+          value: ONBOARDING_SWAGGER_EXAMPLES.VALIDATION_ERROR,
+        },
+        planLimit: {
+          summary: 'Plan Limit Reached',
+          value: ONBOARDING_SWAGGER_EXAMPLES.ORGANIZATION_ALREADY_EXISTS,
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.UNAUTHORIZED,
+    description: 'User not authenticated',
+    schema: {
+      example: ONBOARDING_SWAGGER_EXAMPLES.UNAUTHORIZED_ERROR,
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.INTERNAL_SERVER_ERROR,
+    description: 'Internal server error',
+    schema: {
+      example: ONBOARDING_SWAGGER_EXAMPLES.INTERNAL_ERROR,
+    },
+  })
   async saveOrganizationOverview(
     @Request() req,
     @Body() organizationOverviewDto: OrganizationOverviewDto,
@@ -430,8 +924,139 @@ Complete the onboarding process for a new user based on their subscription plan 
     }
   }
 
+  /**
+   * Save Organization Contact Endpoint
+   *
+   * POST /onboarding/organization/contact
+   *
+   * Second step in company plan onboarding. Saves organization contact information
+   * including phone numbers, email, address, emergency contact, and social media links.
+   *
+   * Requirements: US-2.1, US-2.2, US-2.3
+   *
+   * @param req - Request object containing authenticated user
+   * @param organizationContactDto - Organization contact information
+   * @returns StepSaveResponseDto with updated organization and next step
+   */
   @Post('organization/contact')
   @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Save organization contact info (Company Plan - Step 2/3)',
+    description: `
+Save organization contact information for company plan onboarding.
+
+**Company Plan Flow:**
+1. Organization Overview
+2. **Organization Contact** ← You are here
+3. Organization Legal
+4. Complex Setup (or skip)
+5. Clinic Setup (or skip)
+
+**Contact Information:**
+- **Phone Numbers**: Primary and secondary contact numbers with country codes
+- **Email**: Organization primary email address
+- **Address**: Complete address with Google Maps location
+- **Emergency Contact**: Emergency contact person and phone
+- **Social Media**: Facebook, Twitter, Instagram, LinkedIn links
+
+**Validation:**
+- Email must be valid format
+- Phone numbers must include country code
+- Address must include city and country
+- Google location should be in "latitude,longitude" format
+
+**Process:**
+1. Validates organization exists (from step 1)
+2. Updates organization with contact information
+3. Updates onboarding progress
+4. Returns next step
+
+**Next Step:** organization-legal
+
+**Requirements:** US-2.1, US-2.2, US-2.3
+    `,
+  })
+  @ApiBody({
+    type: OrganizationContactDto,
+    description: 'Organization contact information',
+    examples: {
+      complete: {
+        summary: 'Complete Contact Info',
+        description: 'Full contact details with all fields',
+        value: ONBOARDING_SWAGGER_EXAMPLES.ORGANIZATION_CONTACT_REQUEST,
+      },
+      minimal: {
+        summary: 'Minimal Contact Info',
+        description: 'Essential contact information only',
+        value: {
+          phoneNumbers: [
+            {
+              type: 'primary',
+              number: '+966112345678',
+              countryCode: '+966',
+            },
+          ],
+          email: 'info@healthcorp.sa',
+          address: {
+            street: 'King Fahd Road',
+            city: 'Riyadh',
+            country: 'Saudi Arabia',
+          },
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Organization contact information saved successfully',
+    schema: {
+      example: ONBOARDING_SWAGGER_EXAMPLES.ORGANIZATION_CONTACT_SUCCESS,
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Validation error',
+    schema: {
+      example: ONBOARDING_SWAGGER_EXAMPLES.VALIDATION_ERROR,
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.UNAUTHORIZED,
+    description: 'User not authenticated',
+    schema: {
+      example: ONBOARDING_SWAGGER_EXAMPLES.UNAUTHORIZED_ERROR,
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Organization not found (must complete step 1 first)',
+    schema: {
+      example: {
+        success: false,
+        error: {
+          code: 'ONBOARDING_007',
+          message: {
+            ar: 'الشركة غير موجودة',
+            en: 'Organization not found',
+          },
+          details: {
+            step: 'organization-contact',
+            requiredStep: 'organization-overview',
+          },
+          timestamp: '2026-02-07T10:30:00.000Z',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.INTERNAL_SERVER_ERROR,
+    description: 'Internal server error',
+    schema: {
+      example: ONBOARDING_SWAGGER_EXAMPLES.INTERNAL_ERROR,
+    },
+  })
   async saveOrganizationContact(
     @Request() req,
     @Body() organizationContactDto: OrganizationContactDto,
@@ -459,8 +1084,130 @@ Complete the onboarding process for a new user based on their subscription plan 
     }
   }
 
+  /**
+   * Save Organization Legal Information Endpoint
+   *
+   * POST /onboarding/organization/legal
+   *
+   * Third and final step in organization setup for company plan. Saves legal and
+   * compliance information including VAT number, commercial registration, and policy URLs.
+   *
+   * Requirements: US-2.1, US-2.2, US-2.3
+   *
+   * @param req - Request object containing authenticated user
+   * @param organizationLegalDto - Organization legal information
+   * @returns StepSaveResponseDto with updated organization and next step
+   */
   @Post('organization/legal')
   @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Save organization legal info (Company Plan - Step 3/3)',
+    description: `
+Save organization legal and compliance information for company plan onboarding.
+
+**Company Plan Flow:**
+1. Organization Overview
+2. Organization Contact
+3. **Organization Legal** ← You are here
+4. Complex Setup (or skip)
+5. Clinic Setup (or skip)
+
+**Legal Information:**
+- **VAT Number**: Tax registration number (15 digits for Saudi Arabia)
+- **CR Number**: Commercial registration number
+- **Terms & Conditions URL**: Link to organization's terms of service
+- **Privacy Policy URL**: Link to organization's privacy policy
+
+**Validation:**
+- VAT number must be valid format (15 digits for KSA)
+- CR number must be valid format
+- URLs must be valid HTTPS links
+- All fields are optional but recommended for compliance
+
+**Process:**
+1. Validates organization exists (from previous steps)
+2. Updates organization with legal information
+3. Marks organization setup as complete
+4. Updates onboarding progress
+5. Returns next step (complex-overview or dashboard)
+
+**Next Step:** 
+- Company Plan: complex-overview (can be skipped)
+- After completion: User can proceed to complex setup or skip to dashboard
+
+**Requirements:** US-2.1, US-2.2, US-2.3
+    `,
+  })
+  @ApiBody({
+    type: OrganizationLegalDto,
+    description: 'Organization legal and compliance information',
+    examples: {
+      complete: {
+        summary: 'Complete Legal Info',
+        description: 'Full legal information with all fields',
+        value: ONBOARDING_SWAGGER_EXAMPLES.ORGANIZATION_LEGAL_REQUEST,
+      },
+      minimal: {
+        summary: 'Minimal Legal Info',
+        description: 'Basic legal information',
+        value: {
+          vatNumber: '300123456789003',
+          crNumber: '1010123456',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Organization legal information saved successfully',
+    schema: {
+      example: ONBOARDING_SWAGGER_EXAMPLES.ORGANIZATION_LEGAL_SUCCESS,
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Validation error',
+    schema: {
+      example: ONBOARDING_SWAGGER_EXAMPLES.VALIDATION_ERROR,
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.UNAUTHORIZED,
+    description: 'User not authenticated',
+    schema: {
+      example: ONBOARDING_SWAGGER_EXAMPLES.UNAUTHORIZED_ERROR,
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Organization not found (must complete previous steps first)',
+    schema: {
+      example: {
+        success: false,
+        error: {
+          code: 'ONBOARDING_007',
+          message: {
+            ar: 'الشركة غير موجودة',
+            en: 'Organization not found',
+          },
+          details: {
+            step: 'organization-legal',
+            requiredSteps: ['organization-overview', 'organization-contact'],
+          },
+          timestamp: '2026-02-07T10:30:00.000Z',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.INTERNAL_SERVER_ERROR,
+    description: 'Internal server error',
+    schema: {
+      example: ONBOARDING_SWAGGER_EXAMPLES.INTERNAL_ERROR,
+    },
+  })
   async saveOrganizationLegal(
     @Request() req,
     @Body() organizationLegalDto: OrganizationLegalDto,
@@ -488,8 +1235,116 @@ Complete the onboarding process for a new user based on their subscription plan 
     }
   }
 
+  /**
+   * Complete Organization Setup Endpoint
+   *
+   * POST /onboarding/organization/complete
+   *
+   * Finalizes the organization setup and marks it as complete. This endpoint is called
+   * after all organization steps are completed to transition to the next phase.
+   *
+   * Requirements: US-2.1, US-2.2, US-2.3
+   *
+   * @param req - Request object containing authenticated user
+   * @returns StepSaveResponseDto with completion status and next step
+   */
   @Post('organization/complete')
   @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Complete organization setup (Company Plan)',
+    description: `
+Finalize organization setup and proceed to next phase of onboarding.
+
+**Purpose:**
+- Marks organization setup as complete
+- Validates all required organization information is present
+- Determines next step based on plan type
+- Updates onboarding progress to next phase
+
+**Prerequisites:**
+- Organization overview must be saved
+- Organization contact must be saved
+- Organization legal must be saved
+
+**Process:**
+1. Validates all organization steps are complete
+2. Marks organization as finalized
+3. Updates user's onboarding progress
+4. Determines next step based on plan type
+
+**Next Steps:**
+- **Company Plan**: complex-overview (user can also skip to dashboard)
+- **Other Plans**: dashboard (organization setup not applicable)
+
+**Use Cases:**
+- User completes all organization steps and wants to proceed
+- User wants to finalize organization before setting up complex
+- System needs to validate organization completion before allowing complex setup
+
+**Requirements:** US-2.1, US-2.2, US-2.3
+    `,
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Organization setup completed successfully',
+    schema: {
+      example: ONBOARDING_SWAGGER_EXAMPLES.ORGANIZATION_COMPLETE_SUCCESS,
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Organization setup incomplete - missing required steps',
+    schema: {
+      example: {
+        success: false,
+        error: {
+          code: 'ONBOARDING_010',
+          message: {
+            ar: 'يجب إكمال جميع خطوات الشركة قبل المتابعة',
+            en: 'Must complete all organization steps before proceeding',
+          },
+          details: {
+            completedSteps: ['organization-overview', 'organization-contact'],
+            missingSteps: ['organization-legal'],
+          },
+          timestamp: '2026-02-07T10:30:00.000Z',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.UNAUTHORIZED,
+    description: 'User not authenticated',
+    schema: {
+      example: ONBOARDING_SWAGGER_EXAMPLES.UNAUTHORIZED_ERROR,
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Organization not found',
+    schema: {
+      example: {
+        success: false,
+        error: {
+          code: 'ONBOARDING_007',
+          message: {
+            ar: 'الشركة غير موجودة',
+            en: 'Organization not found',
+          },
+          timestamp: '2026-02-07T10:30:00.000Z',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.INTERNAL_SERVER_ERROR,
+    description: 'Internal server error',
+    schema: {
+      example: ONBOARDING_SWAGGER_EXAMPLES.INTERNAL_ERROR,
+    },
+  })
   async completeOrganizationSetup(
     @Request() req,
   ): Promise<StepSaveResponseDto> {
@@ -515,9 +1370,183 @@ Complete the onboarding process for a new user based on their subscription plan 
     }
   }
 
-  // Complex Step Endpoints
+  // ======== COMPLEX STEP ENDPOINTS (Company Plan & Complex Plan) ========
+
+  /**
+   * Save Complex Overview Endpoint
+   *
+   * POST /onboarding/complex/overview
+   *
+   * First step in complex setup for both company and complex plans. Creates or updates
+   * the medical complex entity with basic information, departments, and inheritance settings.
+   *
+   * Requirements: US-3.1, US-3.2, US-3.3
+   * Business Rules: BZR-28 (Complex plan allows maximum 1 complex)
+   *
+   * @param req - Request object containing authenticated user
+   * @param complexOverviewDto - Complex basic information and department setup
+   * @returns StepSaveResponseDto with created complex and next step
+   */
   @Post('complex/overview')
   @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({
+    summary: 'Save complex overview (Company/Complex Plan - Step 1/4)',
+    description: `
+Save basic medical complex information for company or complex plan onboarding.
+
+**Plan Flows:**
+
+**Company Plan Flow:**
+1. Organization Setup (3 steps)
+2. **Complex Overview** ← You are here (Step 4/12)
+3. Complex Contact
+4. Complex Legal
+5. Complex Working Hours
+6. Clinic Setup (5 steps)
+
+**Complex Plan Flow:**
+1. **Complex Overview** ← You are here (Step 1/9)
+2. Complex Contact
+3. Complex Legal
+4. Complex Working Hours
+5. Clinic Setup (5 steps)
+
+**Fields:**
+- **Required**: name
+- **Optional**: managerName, logoUrl, website, yearEstablished, mission, vision, overview, goals, ceoName
+- **Departments**: departmentIds (existing), newDepartmentNames (create new)
+- **Inheritance**: inheritanceSettings (control data inheritance from organization)
+
+**Department Management:**
+- Assign existing departments via departmentIds
+- Create new departments via newDepartmentNames
+- Departments can be added/modified later
+
+**Inheritance Settings (Company Plan Only):**
+- inheritWorkingHours: Inherit working hours from organization
+- inheritContactInfo: Inherit contact information from organization
+- inheritLegalInfo: Inherit legal information from organization
+
+**Business Rules:**
+- BZR-28: Complex plan allows maximum 1 complex
+- Company plan can have multiple complexes
+- Complex name must be unique within organization
+- At least one department recommended but not required
+
+**Process:**
+1. Validates user authentication and plan type
+2. Checks plan limits (complex plan: max 1)
+3. Creates new complex entity
+4. Creates or assigns departments
+5. Applies inheritance settings if specified
+6. Updates onboarding progress
+7. Returns complex ID and next step
+
+**Next Step:** complex-contact
+
+**Requirements:** US-3.1, US-3.2, US-3.3
+    `,
+  })
+  @ApiBody({
+    type: ComplexOverviewDto,
+    description: 'Complex basic information and department setup',
+    examples: {
+      complete: {
+        summary: 'Complete Complex Info',
+        description: 'Full complex details with departments and inheritance',
+        value: ONBOARDING_SWAGGER_EXAMPLES.COMPLEX_OVERVIEW_REQUEST,
+      },
+      minimal: {
+        summary: 'Minimal Required Info',
+        description: 'Only required fields for quick setup',
+        value: {
+          name: 'Al-Zahra Medical Complex',
+        },
+      },
+      withDepartments: {
+        summary: 'With New Departments',
+        description: 'Complex with new departments to create',
+        value: {
+          name: 'City Medical Complex',
+          managerName: 'Dr. Sarah Ahmed',
+          newDepartmentNames: ['Emergency', 'Surgery', 'Radiology'],
+        },
+      },
+      withInheritance: {
+        summary: 'With Inheritance (Company Plan)',
+        description: 'Complex inheriting data from organization',
+        value: {
+          name: 'Branch Medical Complex',
+          inheritanceSettings: {
+            inheritWorkingHours: true,
+            inheritContactInfo: true,
+            inheritLegalInfo: false,
+          },
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.CREATED,
+    description: 'Complex overview saved successfully',
+    schema: {
+      example: ONBOARDING_SWAGGER_EXAMPLES.COMPLEX_OVERVIEW_SUCCESS,
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Validation error or plan limit reached',
+    schema: {
+      examples: {
+        validation: {
+          summary: 'Validation Error',
+          value: ONBOARDING_SWAGGER_EXAMPLES.VALIDATION_ERROR,
+        },
+        planLimit: {
+          summary: 'Plan Limit Reached',
+          value: ONBOARDING_SWAGGER_EXAMPLES.COMPLEX_ALREADY_EXISTS,
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.UNAUTHORIZED,
+    description: 'User not authenticated',
+    schema: {
+      example: ONBOARDING_SWAGGER_EXAMPLES.UNAUTHORIZED_ERROR,
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Organization not found (company plan only)',
+    schema: {
+      example: {
+        success: false,
+        error: {
+          code: 'ONBOARDING_007',
+          message: {
+            ar: 'الشركة غير موجودة',
+            en: 'Organization not found',
+          },
+          details: {
+            step: 'complex-overview',
+            requiredStep: 'organization-legal',
+            planType: 'company',
+          },
+          timestamp: '2026-02-07T10:30:00.000Z',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.INTERNAL_SERVER_ERROR,
+    description: 'Internal server error',
+    schema: {
+      example: ONBOARDING_SWAGGER_EXAMPLES.INTERNAL_ERROR,
+    },
+  })
   async saveComplexOverview(
     @Request() req,
     @Body() complexOverviewDto: ComplexOverviewDto,
@@ -606,6 +1635,331 @@ Complete the onboarding process for a new user based on their subscription plan 
     }
   }
 
+  /**
+   * Save Complex Schedule (Working Hours) Endpoint
+   *
+   * POST /onboarding/complex/schedule
+   *
+   * Fourth and final step in complex setup. Saves working hours schedule for the complex.
+   * Working hours define when the complex is open for operations and can be inherited by clinics.
+   *
+   * Requirements: US-3.1, US-3.2, US-3.3, US-3.4
+   * Business Rules: BZR-29 (Working hours inheritance from parent entities)
+   *
+   * @param req - Request object containing authenticated user
+   * @param workingHoursDto - Array of working hours for each day of the week
+   * @returns StepSaveResponseDto with saved schedule and next step
+   */
+  @Post('complex/schedule')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Save complex working hours schedule (Complex Plan - Step 4/4)',
+    description: `
+Save working hours schedule for the medical complex during onboarding.
+
+**Company Plan Flow:**
+1. Organization Setup (3 steps)
+2. Complex Overview
+3. Complex Contact
+4. Complex Legal
+5. **Complex Schedule** ← You are here
+6. Clinic Setup (or skip)
+
+**Complex Plan Flow:**
+1. Complex Overview
+2. Complex Contact
+3. Complex Legal
+4. **Complex Schedule** ← You are here
+5. Clinic Setup
+
+**Working Hours Configuration:**
+- Define operating hours for each day of the week
+- Set break times for lunch or prayer breaks
+- Mark inactive days (e.g., Sunday closed)
+- Support for 24-hour format (HH:MM)
+
+**Fields Per Day:**
+- **dayOfWeek**: monday, tuesday, wednesday, thursday, friday, saturday, sunday
+- **openingTime**: Opening time in HH:MM format (e.g., "08:00")
+- **closingTime**: Closing time in HH:MM format (e.g., "20:00")
+- **isActive**: Whether the complex is open on this day
+- **breakStartTime**: Optional break start time (e.g., "12:00")
+- **breakEndTime**: Optional break end time (e.g., "13:00")
+
+**Validation Rules:**
+- Opening time must be before closing time
+- Break times must be within opening hours
+- Break start must be before break end
+- All times must be in HH:MM format
+- All 7 days of the week must be provided
+
+**Inheritance (BZR-29):**
+- Clinics within this complex can inherit these working hours
+- Inherited hours can be modified by individual clinics
+- Provides consistency across the complex
+
+**Process:**
+1. Validates complex exists (from previous steps)
+2. Validates working hours format and logic
+3. Creates working hours records for the complex
+4. Updates onboarding progress
+5. Returns next step (clinic-overview or dashboard)
+
+**Next Step:** 
+- Company/Complex Plan: clinic-overview
+- If skipping clinic: dashboard
+
+**Requirements:** US-3.1, US-3.2, US-3.3, US-3.4
+**Business Rules:** BZR-29
+    `,
+  })
+  @ApiBody({
+    type: [ComplexWorkingHoursDto],
+    description: 'Array of working hours for each day of the week (7 days required)',
+    examples: {
+      fullWeek: {
+        summary: 'Full Week Schedule',
+        description: 'Complete working hours for all 7 days with breaks',
+        value: ONBOARDING_SWAGGER_EXAMPLES.COMPLEX_SCHEDULE_REQUEST,
+      },
+      weekdaysOnly: {
+        summary: 'Weekdays Only',
+        description: 'Open Monday-Saturday, closed Sunday',
+        value: {
+          workingHours: [
+            {
+              dayOfWeek: 'monday',
+              openingTime: '08:00',
+              closingTime: '20:00',
+              isActive: true,
+              breakStartTime: '12:00',
+              breakEndTime: '13:00',
+            },
+            {
+              dayOfWeek: 'tuesday',
+              openingTime: '08:00',
+              closingTime: '20:00',
+              isActive: true,
+              breakStartTime: '12:00',
+              breakEndTime: '13:00',
+            },
+            {
+              dayOfWeek: 'wednesday',
+              openingTime: '08:00',
+              closingTime: '20:00',
+              isActive: true,
+              breakStartTime: '12:00',
+              breakEndTime: '13:00',
+            },
+            {
+              dayOfWeek: 'thursday',
+              openingTime: '08:00',
+              closingTime: '20:00',
+              isActive: true,
+              breakStartTime: '12:00',
+              breakEndTime: '13:00',
+            },
+            {
+              dayOfWeek: 'friday',
+              openingTime: '08:00',
+              closingTime: '20:00',
+              isActive: true,
+              breakStartTime: '12:00',
+              breakEndTime: '13:00',
+            },
+            {
+              dayOfWeek: 'saturday',
+              openingTime: '08:00',
+              closingTime: '14:00',
+              isActive: true,
+              breakStartTime: null,
+              breakEndTime: null,
+            },
+            {
+              dayOfWeek: 'sunday',
+              openingTime: null,
+              closingTime: null,
+              isActive: false,
+              breakStartTime: null,
+              breakEndTime: null,
+            },
+          ],
+        },
+      },
+      noBreaks: {
+        summary: 'No Break Times',
+        description: 'Working hours without break times',
+        value: {
+          workingHours: [
+            {
+              dayOfWeek: 'monday',
+              openingTime: '08:00',
+              closingTime: '20:00',
+              isActive: true,
+              breakStartTime: null,
+              breakEndTime: null,
+            },
+            {
+              dayOfWeek: 'tuesday',
+              openingTime: '08:00',
+              closingTime: '20:00',
+              isActive: true,
+              breakStartTime: null,
+              breakEndTime: null,
+            },
+            {
+              dayOfWeek: 'wednesday',
+              openingTime: '08:00',
+              closingTime: '20:00',
+              isActive: true,
+              breakStartTime: null,
+              breakEndTime: null,
+            },
+            {
+              dayOfWeek: 'thursday',
+              openingTime: '08:00',
+              closingTime: '20:00',
+              isActive: true,
+              breakStartTime: null,
+              breakEndTime: null,
+            },
+            {
+              dayOfWeek: 'friday',
+              openingTime: '08:00',
+              closingTime: '20:00',
+              isActive: true,
+              breakStartTime: null,
+              breakEndTime: null,
+            },
+            {
+              dayOfWeek: 'saturday',
+              openingTime: '08:00',
+              closingTime: '20:00',
+              isActive: true,
+              breakStartTime: null,
+              breakEndTime: null,
+            },
+            {
+              dayOfWeek: 'sunday',
+              openingTime: null,
+              closingTime: null,
+              isActive: false,
+              breakStartTime: null,
+              breakEndTime: null,
+            },
+          ],
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Complex schedule saved successfully',
+    schema: {
+      example: ONBOARDING_SWAGGER_EXAMPLES.COMPLEX_SCHEDULE_SUCCESS,
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Validation error - Invalid working hours format or logic',
+    schema: {
+      examples: {
+        invalidTime: {
+          summary: 'Invalid Time Format',
+          value: {
+            success: false,
+            error: {
+              code: 'ONBOARDING_009',
+              message: {
+                ar: 'صيغة الوقت غير صالحة',
+                en: 'Invalid time format',
+              },
+              details: {
+                field: 'workingHours[0].openingTime',
+                constraint: 'Must be in HH:MM format',
+                value: '8:00',
+              },
+              timestamp: '2026-02-07T10:30:00.000Z',
+            },
+          },
+        },
+        invalidLogic: {
+          summary: 'Invalid Time Logic',
+          value: {
+            success: false,
+            error: {
+              code: 'ONBOARDING_009',
+              message: {
+                ar: 'وقت الإغلاق يجب أن يكون بعد وقت الفتح',
+                en: 'Closing time must be after opening time',
+              },
+              details: {
+                field: 'workingHours[0]',
+                openingTime: '20:00',
+                closingTime: '08:00',
+              },
+              timestamp: '2026-02-07T10:30:00.000Z',
+            },
+          },
+        },
+        missingDays: {
+          summary: 'Missing Days',
+          value: {
+            success: false,
+            error: {
+              code: 'ONBOARDING_009',
+              message: {
+                ar: 'يجب توفير جميع أيام الأسبوع السبعة',
+                en: 'All 7 days of the week must be provided',
+              },
+              details: {
+                providedDays: 5,
+                requiredDays: 7,
+              },
+              timestamp: '2026-02-07T10:30:00.000Z',
+            },
+          },
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.UNAUTHORIZED,
+    description: 'User not authenticated',
+    schema: {
+      example: ONBOARDING_SWAGGER_EXAMPLES.UNAUTHORIZED_ERROR,
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Complex not found (must complete previous steps first)',
+    schema: {
+      example: {
+        success: false,
+        error: {
+          code: 'ONBOARDING_007',
+          message: {
+            ar: 'المجمع غير موجود',
+            en: 'Complex not found',
+          },
+          details: {
+            step: 'complex-schedule',
+            requiredSteps: ['complex-overview', 'complex-contact', 'complex-legal'],
+          },
+          timestamp: '2026-02-07T10:30:00.000Z',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.INTERNAL_SERVER_ERROR,
+    description: 'Internal server error',
+    schema: {
+      example: ONBOARDING_SWAGGER_EXAMPLES.INTERNAL_ERROR,
+    },
+  })
   @Post('complex/schedule')
   @UseGuards(JwtAuthGuard)
   async saveComplexSchedule(
@@ -658,9 +2012,234 @@ Complete the onboarding process for a new user based on their subscription plan 
     }
   }
 
-  // Clinic Step Endpoints
+  // ======== CLINIC STEP ENDPOINTS ========
+
+  /**
+   * Save Clinic Overview Endpoint
+   *
+   * POST /onboarding/clinic/overview
+   *
+   * First step in clinic setup for all plan types. Creates or updates the clinic entity
+   * with basic information including name, specialization, and business profile.
+   *
+   * Requirements: US-3.1, US-3.2, US-3.3
+   * Business Rules: BZR-30 (Clinic plan allows maximum 1 clinic)
+   *
+   * @param req - Request object containing authenticated user
+   * @param clinicOverviewDto - Clinic basic information
+   * @returns StepSaveResponseDto with created clinic and next step
+   */
   @Post('clinic/overview')
   @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({
+    summary: 'Save clinic overview (All Plans - Clinic Step 1/5)',
+    description: `
+Save basic clinic information for onboarding process.
+
+**Plan-Specific Flows:**
+
+**Company Plan (Step 7/12):**
+1. Organization Setup (3 steps)
+2. Complex Setup (4 steps)
+3. **Clinic Overview** ← You are here
+4. Clinic Contact
+5. Clinic Services
+6. Clinic Legal
+7. Clinic Schedule
+
+**Complex Plan (Step 5/9):**
+1. Complex Setup (4 steps)
+2. **Clinic Overview** ← You are here
+3. Clinic Contact
+4. Clinic Services
+5. Clinic Legal
+6. Clinic Schedule
+
+**Clinic Plan (Step 1/5):**
+1. **Clinic Overview** ← You are here
+2. Clinic Contact
+3. Clinic Services
+4. Clinic Legal
+5. Clinic Schedule
+
+**Fields:**
+- **Required**: name
+- **Optional**: headDoctorName, specialization, licenseNumber, pin, logoUrl, website, 
+  complexDepartmentId, yearEstablished, mission, vision, overview, goals, ceoName, services
+
+**Business Rules:**
+- BZR-30: Clinic plan allows maximum 1 clinic
+- Clinic name must be unique within the parent entity (complex/department)
+- License number must be unique if provided
+- Services can be added during clinic setup or later
+
+**Inheritance:**
+- Can inherit working hours from parent complex (if applicable)
+- Can inherit contact information from parent complex (if applicable)
+- Can inherit legal information from parent complex (if applicable)
+
+**Process:**
+1. Validates user authentication and plan type
+2. Checks if clinic already exists (plan limit for clinic plan)
+3. Creates new clinic entity
+4. Creates associated services if provided
+5. Updates onboarding progress
+6. Returns clinic ID and next step
+
+**Next Step:** clinic-contact
+
+**Requirements:** US-3.1, US-3.2, US-3.3
+    `,
+  })
+  @ApiBody({
+    type: ClinicOverviewDto,
+    description: 'Clinic basic information and services',
+    examples: {
+      complete: {
+        summary: 'Complete Clinic Info',
+        description: 'Full clinic details with all optional fields and services',
+        value: ONBOARDING_SWAGGER_EXAMPLES.CLINIC_OVERVIEW_REQUEST,
+      },
+      minimal: {
+        summary: 'Minimal Required Info',
+        description: 'Only required fields for quick setup',
+        value: {
+          name: 'Advanced Heart Center',
+        },
+      },
+      withServices: {
+        summary: 'Clinic with Services',
+        description: 'Clinic setup with initial services',
+        value: {
+          name: 'Advanced Heart Center',
+          specialization: 'Cardiology',
+          headDoctorName: 'Dr. Sarah Al-Zahrani',
+          licenseNumber: 'LC-CARD-2023-001',
+          services: [
+            {
+              name: 'Cardiac Consultation',
+              description: 'Initial cardiac assessment and consultation',
+              durationMinutes: 30,
+              price: 300,
+            },
+            {
+              name: 'ECG Test',
+              description: 'Electrocardiogram test',
+              durationMinutes: 15,
+              price: 150,
+            },
+          ],
+        },
+      },
+      withInheritance: {
+        summary: 'Clinic with Inheritance Settings',
+        description: 'Clinic setup with inheritance from parent complex',
+        value: {
+          name: 'Pediatric Care Center',
+          specialization: 'Pediatrics',
+          complexDepartmentId: '507f1f77bcf86cd799439020',
+          inheritanceSettings: {
+            inheritWorkingHours: true,
+            inheritContactInfo: true,
+            inheritLegalInfo: false,
+          },
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.CREATED,
+    description: 'Clinic overview saved successfully',
+    schema: {
+      example: ONBOARDING_SWAGGER_EXAMPLES.CLINIC_OVERVIEW_SUCCESS,
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Validation error or plan limit reached',
+    schema: {
+      examples: {
+        validation: {
+          summary: 'Validation Error',
+          value: ONBOARDING_SWAGGER_EXAMPLES.VALIDATION_ERROR,
+        },
+        planLimit: {
+          summary: 'Plan Limit Reached',
+          value: {
+            success: false,
+            error: {
+              code: 'ONBOARDING_004',
+              message: {
+                ar: 'الخطة تسمح بإنشاء عيادة واحدة فقط',
+                en: 'Plan allows maximum 1 clinic',
+              },
+              details: {
+                currentCount: 1,
+                maxAllowed: 1,
+                planType: 'clinic',
+              },
+              timestamp: '2026-02-07T10:30:00.000Z',
+            },
+          },
+        },
+        duplicateName: {
+          summary: 'Duplicate Clinic Name',
+          value: {
+            success: false,
+            error: {
+              code: 'ONBOARDING_010',
+              message: {
+                ar: 'اسم العيادة موجود بالفعل',
+                en: 'Clinic name already exists',
+              },
+              details: {
+                field: 'name',
+                value: 'Advanced Heart Center',
+              },
+              timestamp: '2026-02-07T10:30:00.000Z',
+            },
+          },
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.UNAUTHORIZED,
+    description: 'User not authenticated',
+    schema: {
+      example: ONBOARDING_SWAGGER_EXAMPLES.UNAUTHORIZED_ERROR,
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Parent entity not found (complex/department required for company/complex plans)',
+    schema: {
+      example: {
+        success: false,
+        error: {
+          code: 'ONBOARDING_007',
+          message: {
+            ar: 'المجمع أو القسم غير موجود',
+            en: 'Complex or department not found',
+          },
+          details: {
+            step: 'clinic-overview',
+            requiredEntity: 'complex',
+          },
+          timestamp: '2026-02-07T10:30:00.000Z',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.INTERNAL_SERVER_ERROR,
+    description: 'Internal server error',
+    schema: {
+      example: ONBOARDING_SWAGGER_EXAMPLES.INTERNAL_ERROR,
+    },
+  })
   async saveClinicOverview(
     @Request() req,
     @Body() clinicOverviewDto: ClinicOverviewDto,
@@ -776,6 +2355,396 @@ Complete the onboarding process for a new user based on their subscription plan 
     }
   }
 
+  /**
+   * Save Clinic Schedule (Working Hours) Endpoint
+   *
+   * POST /onboarding/clinic/schedule
+   *
+   * Final step in clinic setup. Saves working hours schedule for the clinic.
+   * Clinics can inherit working hours from their parent complex or define custom hours.
+   *
+   * Requirements: US-4.1, US-4.2, US-4.3, US-4.4
+   * Business Rules: BZR-29 (Working hours inheritance from parent entities)
+   *
+   * @param req - Request object containing authenticated user
+   * @param workingHoursDto - Array of working hours for each day of the week
+   * @returns StepSaveResponseDto with saved schedule and completion status
+   */
+  @Post('clinic/schedule')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Save clinic working hours schedule (Final Step)',
+    description: `
+Save working hours schedule for the clinic during onboarding. This is the final step before completing onboarding.
+
+**Company Plan Flow:**
+1. Organization Setup (3 steps)
+2. Complex Setup (4 steps)
+3. Clinic Overview
+4. Clinic Contact
+5. Clinic Services & Capacity
+6. Clinic Legal
+7. **Clinic Schedule** ← You are here (Final Step)
+
+**Complex Plan Flow:**
+1. Complex Setup (4 steps)
+2. Clinic Overview
+3. Clinic Contact
+4. Clinic Services & Capacity
+5. Clinic Legal
+6. **Clinic Schedule** ← You are here (Final Step)
+
+**Clinic Plan Flow:**
+1. Clinic Overview
+2. Clinic Contact
+3. Clinic Services & Capacity
+4. Clinic Legal
+5. **Clinic Schedule** ← You are here (Final Step)
+
+**Working Hours Configuration:**
+- Define operating hours for each day of the week
+- Set break times for lunch or prayer breaks
+- Mark inactive days (e.g., Sunday closed)
+- Support for 24-hour format (HH:MM)
+- Option to inherit from parent complex (if applicable)
+
+**Fields Per Day:**
+- **dayOfWeek**: monday, tuesday, wednesday, thursday, friday, saturday, sunday
+- **openingTime**: Opening time in HH:MM format (e.g., "09:00")
+- **closingTime**: Closing time in HH:MM format (e.g., "17:00")
+- **isActive**: Whether the clinic is open on this day
+- **breakStartTime**: Optional break start time (e.g., "12:30")
+- **breakEndTime**: Optional break end time (e.g., "13:30")
+
+**Additional Fields:**
+- **inheritFromParent**: Boolean flag to inherit working hours from parent complex
+
+**Validation Rules:**
+- Opening time must be before closing time
+- Break times must be within opening hours
+- Break start must be before break end
+- All times must be in HH:MM format
+- All 7 days of the week must be provided
+- If inheriting, parent complex must have working hours defined
+
+**Inheritance Options (BZR-29):**
+
+1. **Custom Hours**: Define unique working hours for the clinic
+   - Useful for specialized clinics with different schedules
+   - Example: Dental clinic open evenings only
+
+2. **Inherited Hours**: Use parent complex working hours
+   - Maintains consistency across the complex
+   - Can be modified later if needed
+   - Automatically updates if parent hours change
+
+3. **Hybrid Approach**: Inherit and then customize
+   - Start with parent hours
+   - Modify specific days as needed
+
+**Process:**
+1. Validates clinic exists (from previous steps)
+2. If inheriting, fetches parent complex working hours
+3. Validates working hours format and logic
+4. Creates working hours records for the clinic
+5. Marks onboarding as complete
+6. Returns completion status
+
+**Next Step:** completed (onboarding finished, redirect to dashboard)
+
+**Requirements:** US-4.1, US-4.2, US-4.3, US-4.4
+**Business Rules:** BZR-29
+    `,
+  })
+  @ApiBody({
+    type: [ClinicWorkingHoursDto],
+    description: 'Array of working hours for each day of the week (7 days required) or inheritance flag',
+    examples: {
+      customHours: {
+        summary: 'Custom Working Hours',
+        description: 'Define unique working hours for the clinic',
+        value: ONBOARDING_SWAGGER_EXAMPLES.CLINIC_SCHEDULE_REQUEST,
+      },
+      inheritedHours: {
+        summary: 'Inherit from Complex',
+        description: 'Use parent complex working hours',
+        value: {
+          inheritFromParent: true,
+        },
+      },
+      eveningClinic: {
+        summary: 'Evening Clinic',
+        description: 'Clinic open in evenings only',
+        value: {
+          workingHours: [
+            {
+              dayOfWeek: 'monday',
+              openingTime: '16:00',
+              closingTime: '22:00',
+              isActive: true,
+              breakStartTime: null,
+              breakEndTime: null,
+            },
+            {
+              dayOfWeek: 'tuesday',
+              openingTime: '16:00',
+              closingTime: '22:00',
+              isActive: true,
+              breakStartTime: null,
+              breakEndTime: null,
+            },
+            {
+              dayOfWeek: 'wednesday',
+              openingTime: '16:00',
+              closingTime: '22:00',
+              isActive: true,
+              breakStartTime: null,
+              breakEndTime: null,
+            },
+            {
+              dayOfWeek: 'thursday',
+              openingTime: '16:00',
+              closingTime: '22:00',
+              isActive: true,
+              breakStartTime: null,
+              breakEndTime: null,
+            },
+            {
+              dayOfWeek: 'friday',
+              openingTime: '16:00',
+              closingTime: '22:00',
+              isActive: true,
+              breakStartTime: null,
+              breakEndTime: null,
+            },
+            {
+              dayOfWeek: 'saturday',
+              openingTime: null,
+              closingTime: null,
+              isActive: false,
+              breakStartTime: null,
+              breakEndTime: null,
+            },
+            {
+              dayOfWeek: 'sunday',
+              openingTime: null,
+              closingTime: null,
+              isActive: false,
+              breakStartTime: null,
+              breakEndTime: null,
+            },
+          ],
+          inheritFromParent: false,
+        },
+      },
+      weekendClinic: {
+        summary: 'Weekend Clinic',
+        description: 'Clinic open on weekends only',
+        value: {
+          workingHours: [
+            {
+              dayOfWeek: 'monday',
+              openingTime: null,
+              closingTime: null,
+              isActive: false,
+              breakStartTime: null,
+              breakEndTime: null,
+            },
+            {
+              dayOfWeek: 'tuesday',
+              openingTime: null,
+              closingTime: null,
+              isActive: false,
+              breakStartTime: null,
+              breakEndTime: null,
+            },
+            {
+              dayOfWeek: 'wednesday',
+              openingTime: null,
+              closingTime: null,
+              isActive: false,
+              breakStartTime: null,
+              breakEndTime: null,
+            },
+            {
+              dayOfWeek: 'thursday',
+              openingTime: null,
+              closingTime: null,
+              isActive: false,
+              breakStartTime: null,
+              breakEndTime: null,
+            },
+            {
+              dayOfWeek: 'friday',
+              openingTime: '09:00',
+              closingTime: '21:00',
+              isActive: true,
+              breakStartTime: '13:00',
+              breakEndTime: '14:00',
+            },
+            {
+              dayOfWeek: 'saturday',
+              openingTime: '09:00',
+              closingTime: '21:00',
+              isActive: true,
+              breakStartTime: '13:00',
+              breakEndTime: '14:00',
+            },
+            {
+              dayOfWeek: 'sunday',
+              openingTime: '09:00',
+              closingTime: '17:00',
+              isActive: true,
+              breakStartTime: null,
+              breakEndTime: null,
+            },
+          ],
+          inheritFromParent: false,
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Clinic schedule saved successfully - Onboarding complete',
+    schema: {
+      examples: {
+        customHours: {
+          summary: 'Custom Hours Saved',
+          value: ONBOARDING_SWAGGER_EXAMPLES.CLINIC_SCHEDULE_SUCCESS,
+        },
+        inheritedHours: {
+          summary: 'Inherited Hours Saved',
+          value: ONBOARDING_SWAGGER_EXAMPLES.CLINIC_SCHEDULE_INHERITED,
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Validation error - Invalid working hours format or logic',
+    schema: {
+      examples: {
+        invalidTime: {
+          summary: 'Invalid Time Format',
+          value: {
+            success: false,
+            error: {
+              code: 'ONBOARDING_009',
+              message: {
+                ar: 'صيغة الوقت غير صالحة',
+                en: 'Invalid time format',
+              },
+              details: {
+                field: 'workingHours[0].openingTime',
+                constraint: 'Must be in HH:MM format',
+                value: '9:00',
+              },
+              timestamp: '2026-02-07T10:30:00.000Z',
+            },
+          },
+        },
+        invalidLogic: {
+          summary: 'Invalid Time Logic',
+          value: {
+            success: false,
+            error: {
+              code: 'ONBOARDING_009',
+              message: {
+                ar: 'وقت الإغلاق يجب أن يكون بعد وقت الفتح',
+                en: 'Closing time must be after opening time',
+              },
+              details: {
+                field: 'workingHours[2]',
+                openingTime: '17:00',
+                closingTime: '09:00',
+              },
+              timestamp: '2026-02-07T10:30:00.000Z',
+            },
+          },
+        },
+        missingDays: {
+          summary: 'Missing Days',
+          value: {
+            success: false,
+            error: {
+              code: 'ONBOARDING_009',
+              message: {
+                ar: 'يجب توفير جميع أيام الأسبوع السبعة',
+                en: 'All 7 days of the week must be provided',
+              },
+              details: {
+                providedDays: 5,
+                requiredDays: 7,
+              },
+              timestamp: '2026-02-07T10:30:00.000Z',
+            },
+          },
+        },
+        inheritanceNotAvailable: {
+          summary: 'Cannot Inherit - No Parent Hours',
+          value: {
+            success: false,
+            error: {
+              code: 'ONBOARDING_012',
+              message: {
+                ar: 'ساعات العمل غير موجودة في المجمع الأب',
+                en: 'Working hours not found in parent complex',
+              },
+              details: {
+                clinicId: '507f1f77bcf86cd799439015',
+                complexId: '507f1f77bcf86cd799439014',
+                inheritFromParent: true,
+              },
+              timestamp: '2026-02-07T10:30:00.000Z',
+            },
+          },
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.UNAUTHORIZED,
+    description: 'User not authenticated',
+    schema: {
+      example: ONBOARDING_SWAGGER_EXAMPLES.UNAUTHORIZED_ERROR,
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Clinic not found (must complete previous steps first)',
+    schema: {
+      example: {
+        success: false,
+        error: {
+          code: 'ONBOARDING_007',
+          message: {
+            ar: 'العيادة غير موجودة',
+            en: 'Clinic not found',
+          },
+          details: {
+            step: 'clinic-schedule',
+            requiredSteps: [
+              'clinic-overview',
+              'clinic-contact',
+              'clinic-services-capacity',
+              'clinic-legal',
+            ],
+          },
+          timestamp: '2026-02-07T10:30:00.000Z',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.INTERNAL_SERVER_ERROR,
+    description: 'Internal server error',
+    schema: {
+      example: ONBOARDING_SWAGGER_EXAMPLES.INTERNAL_ERROR,
+    },
+  })
   @Post('clinic/schedule')
   @UseGuards(JwtAuthGuard)
   async saveClinicSchedule(

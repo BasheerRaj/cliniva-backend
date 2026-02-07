@@ -107,6 +107,153 @@ export class WorkingHoursController {
    */
   @Post()
   @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({
+    summary: 'Create working hours for an entity',
+    description:
+      'Creates working hours schedule for a clinic, complex, or user. ' +
+      'Validates schedule format and ensures all required fields are present. ' +
+      'Each day of the week must be specified with working status and times.',
+  })
+  @ApiBody({
+    type: CreateWorkingHoursDto,
+    description: 'Working hours creation data',
+    examples: {
+      'clinic-schedule': {
+        summary: 'Create clinic working hours',
+        value: {
+          entityType: 'clinic',
+          entityId: '507f1f77bcf86cd799439011',
+          schedule: [
+            {
+              dayOfWeek: 'monday',
+              isWorkingDay: true,
+              openingTime: '08:00',
+              closingTime: '17:00',
+              breakStartTime: '12:00',
+              breakEndTime: '13:00',
+            },
+            {
+              dayOfWeek: 'tuesday',
+              isWorkingDay: true,
+              openingTime: '08:00',
+              closingTime: '17:00',
+            },
+            {
+              dayOfWeek: 'wednesday',
+              isWorkingDay: true,
+              openingTime: '08:00',
+              closingTime: '17:00',
+            },
+            {
+              dayOfWeek: 'thursday',
+              isWorkingDay: true,
+              openingTime: '08:00',
+              closingTime: '17:00',
+            },
+            {
+              dayOfWeek: 'friday',
+              isWorkingDay: false,
+            },
+            {
+              dayOfWeek: 'saturday',
+              isWorkingDay: true,
+              openingTime: '09:00',
+              closingTime: '14:00',
+            },
+            {
+              dayOfWeek: 'sunday',
+              isWorkingDay: false,
+            },
+          ],
+        },
+      },
+      'user-schedule': {
+        summary: 'Create doctor working hours',
+        value: {
+          entityType: 'user',
+          entityId: '507f1f77bcf86cd799439012',
+          schedule: [
+            {
+              dayOfWeek: 'monday',
+              isWorkingDay: true,
+              openingTime: '09:00',
+              closingTime: '16:00',
+            },
+            {
+              dayOfWeek: 'tuesday',
+              isWorkingDay: true,
+              openingTime: '09:00',
+              closingTime: '16:00',
+            },
+            {
+              dayOfWeek: 'wednesday',
+              isWorkingDay: false,
+            },
+            {
+              dayOfWeek: 'thursday',
+              isWorkingDay: true,
+              openingTime: '10:00',
+              closingTime: '17:00',
+            },
+            {
+              dayOfWeek: 'friday',
+              isWorkingDay: false,
+            },
+            {
+              dayOfWeek: 'saturday',
+              isWorkingDay: true,
+              openingTime: '09:00',
+              closingTime: '13:00',
+            },
+            {
+              dayOfWeek: 'sunday',
+              isWorkingDay: false,
+            },
+          ],
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Working hours created successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: true },
+        data: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              _id: { type: 'string', example: '507f1f77bcf86cd799439011' },
+              entityType: { type: 'string', example: 'clinic' },
+              entityId: { type: 'string', example: '507f1f77bcf86cd799439012' },
+              dayOfWeek: { type: 'string', example: 'monday' },
+              isWorkingDay: { type: 'boolean', example: true },
+              openingTime: { type: 'string', example: '08:00' },
+              closingTime: { type: 'string', example: '17:00' },
+              breakStartTime: { type: 'string', example: '12:00' },
+              breakEndTime: { type: 'string', example: '13:00' },
+              createdAt: { type: 'string', example: '2026-02-07T10:00:00.000Z' },
+              updatedAt: { type: 'string', example: '2026-02-07T10:00:00.000Z' },
+            },
+          },
+        },
+        message: {
+          type: 'object',
+          properties: {
+            ar: { type: 'string', example: 'تم إنشاء ساعات العمل بنجاح' },
+            en: { type: 'string', example: 'Working hours created successfully' },
+          },
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid request data or validation error',
+  })
   async createWorkingHours(
     @Body() createDto: CreateWorkingHoursDto,
   ): Promise<StandardResponse<WorkingHours[]>> {
@@ -128,6 +275,39 @@ export class WorkingHoursController {
    */
   @Post('validate-clinic-hours')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: '[DEPRECATED] Validate clinic hours against complex',
+    description:
+      'DEPRECATED: Use POST /working-hours/validate instead. ' +
+      'Validates clinic working hours against complex working hours constraints.',
+    deprecated: true,
+  })
+  @ApiBody({
+    description: 'Clinic hours validation request',
+    schema: {
+      type: 'object',
+      properties: {
+        clinicId: { type: 'string', example: '507f1f77bcf86cd799439011' },
+        clinicSchedule: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              dayOfWeek: { type: 'string', example: 'monday' },
+              isWorkingDay: { type: 'boolean', example: true },
+              openingTime: { type: 'string', example: '09:00' },
+              closingTime: { type: 'string', example: '17:00' },
+            },
+          },
+        },
+        complexId: { type: 'string', example: '507f1f77bcf86cd799439012' },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Validation completed',
+  })
   async validateClinicHours(
     @Body()
     body: {
@@ -1102,6 +1282,49 @@ export class WorkingHoursController {
    */
   @Post('with-parent-validation')
   @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({
+    summary: 'Create working hours with parent validation',
+    description:
+      'Creates working hours and validates them against parent entity constraints. ' +
+      'Ensures child hours are within parent hours and child is not open when parent is closed.',
+  })
+  @ApiBody({
+    description: 'Working hours with parent validation data',
+    schema: {
+      type: 'object',
+      properties: {
+        workingHours: {
+          type: 'object',
+          properties: {
+            entityType: { type: 'string', example: 'clinic' },
+            entityId: { type: 'string', example: '507f1f77bcf86cd799439011' },
+            schedule: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  dayOfWeek: { type: 'string', example: 'monday' },
+                  isWorkingDay: { type: 'boolean', example: true },
+                  openingTime: { type: 'string', example: '09:00' },
+                  closingTime: { type: 'string', example: '17:00' },
+                },
+              },
+            },
+          },
+        },
+        parentEntityType: { type: 'string', example: 'complex' },
+        parentEntityId: { type: 'string', example: '507f1f77bcf86cd799439012' },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Working hours created successfully with parent validation',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Validation failed - hours outside parent constraints',
+  })
   async createWorkingHoursWithParentValidation(
     @Body()
     body: {
@@ -1131,6 +1354,50 @@ export class WorkingHoursController {
    * @returns {Promise<StandardResponse<WorkingHours[]>>} Working hours records
    */
   @Get(':entityType/:entityId')
+  @ApiOperation({
+    summary: 'Get working hours for an entity',
+    description:
+      'Retrieves the working hours schedule for a specific entity (clinic, complex, or user). ' +
+      'Returns all days of the week with their working status and times.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Working hours retrieved successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: true },
+        data: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              _id: { type: 'string', example: '507f1f77bcf86cd799439011' },
+              entityType: { type: 'string', example: 'clinic' },
+              entityId: { type: 'string', example: '507f1f77bcf86cd799439012' },
+              dayOfWeek: { type: 'string', example: 'monday' },
+              isWorkingDay: { type: 'boolean', example: true },
+              openingTime: { type: 'string', example: '08:00' },
+              closingTime: { type: 'string', example: '17:00' },
+              breakStartTime: { type: 'string', example: '12:00' },
+              breakEndTime: { type: 'string', example: '13:00' },
+            },
+          },
+        },
+        message: {
+          type: 'object',
+          properties: {
+            ar: { type: 'string', example: 'تم استرجاع ساعات العمل بنجاح' },
+            en: { type: 'string', example: 'Working hours retrieved successfully' },
+          },
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Entity not found or no working hours configured',
+  })
   async getWorkingHours(
     @Param('entityType') entityType: string,
     @Param('entityId') entityId: string,
@@ -1153,6 +1420,18 @@ export class WorkingHoursController {
    * @returns {Promise<StandardResponse>} Complex working hours
    */
   @Get('complex/:complexId')
+  @ApiOperation({
+    summary: 'Get complex working hours',
+    description: 'Retrieves working hours for a specific medical complex.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Complex working hours retrieved successfully',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Complex not found',
+  })
   async getComplexWorkingHours(
     @Param('complexId') complexId: string,
   ): Promise<StandardResponse> {
@@ -1177,6 +1456,123 @@ export class WorkingHoursController {
    */
   @Put(':entityType/:entityId')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Update working hours for an entity',
+    description:
+      'Updates the working hours schedule for an entity. ' +
+      'Optionally validates against parent entity constraints using query parameters.',
+  })
+  @ApiQuery({
+    name: 'validateWithParent',
+    type: String,
+    required: false,
+    description: 'Set to "true" to validate against parent entity',
+    example: 'true',
+  })
+  @ApiQuery({
+    name: 'parentEntityType',
+    type: String,
+    required: false,
+    description: 'Parent entity type (required if validateWithParent=true)',
+    example: 'complex',
+  })
+  @ApiQuery({
+    name: 'parentEntityId',
+    type: String,
+    required: false,
+    description: 'Parent entity ID (required if validateWithParent=true)',
+    example: '507f1f77bcf86cd799439011',
+  })
+  @ApiBody({
+    type: UpdateWorkingHoursDto,
+    description: 'Updated working hours schedule',
+    examples: {
+      'update-schedule': {
+        summary: 'Update working hours',
+        value: {
+          schedule: [
+            {
+              dayOfWeek: 'monday',
+              isWorkingDay: true,
+              openingTime: '09:00',
+              closingTime: '18:00',
+            },
+            {
+              dayOfWeek: 'tuesday',
+              isWorkingDay: true,
+              openingTime: '09:00',
+              closingTime: '18:00',
+            },
+            {
+              dayOfWeek: 'wednesday',
+              isWorkingDay: false,
+            },
+            {
+              dayOfWeek: 'thursday',
+              isWorkingDay: true,
+              openingTime: '09:00',
+              closingTime: '18:00',
+            },
+            {
+              dayOfWeek: 'friday',
+              isWorkingDay: false,
+            },
+            {
+              dayOfWeek: 'saturday',
+              isWorkingDay: true,
+              openingTime: '10:00',
+              closingTime: '15:00',
+            },
+            {
+              dayOfWeek: 'sunday',
+              isWorkingDay: false,
+            },
+          ],
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Working hours updated successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: true },
+        data: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              _id: { type: 'string' },
+              entityType: { type: 'string' },
+              entityId: { type: 'string' },
+              dayOfWeek: { type: 'string' },
+              isWorkingDay: { type: 'boolean' },
+              openingTime: { type: 'string' },
+              closingTime: { type: 'string' },
+              updatedAt: { type: 'string' },
+            },
+          },
+        },
+        message: {
+          type: 'object',
+          properties: {
+            ar: { type: 'string', example: 'تم تحديث ساعات العمل بنجاح' },
+            en: { type: 'string', example: 'Working hours updated successfully' },
+          },
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid request data or validation failed',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Entity not found',
+  })
   async updateWorkingHours(
     @Param('entityType') entityType: string,
     @Param('entityId') entityId: string,

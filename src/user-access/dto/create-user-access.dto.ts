@@ -15,37 +15,74 @@ import {
   IsObject,
   IsIP,
 } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { PermissionsEnum } from '../../common/enums/permissions.enum';
 
 // User Access Management DTOs
 export class CreateUserAccessDto {
+  @ApiProperty({
+    description: 'User ID to grant access to',
+    example: '507f1f77bcf86cd799439012',
+    type: String,
+  })
   @IsMongoId()
   @IsNotEmpty()
   userId: string;
 
+  @ApiProperty({
+    description: 'Scope type - defines the level of access (organization, complex, department, or clinic)',
+    enum: ['organization', 'complex', 'department', 'clinic'],
+    example: 'clinic',
+  })
   @IsEnum(['organization', 'complex', 'department', 'clinic'])
   @IsNotEmpty()
   scopeType: string;
 
+  @ApiProperty({
+    description: 'Scope entity ID - the ID of the organization, complex, department, or clinic',
+    example: '507f1f77bcf86cd799439013',
+    type: String,
+  })
   @IsMongoId()
   @IsNotEmpty()
   scopeId: string;
 
+  @ApiProperty({
+    description: 'User role within the scope',
+    enum: UserRole,
+    example: UserRole.ADMIN,
+  })
   @IsEnum(UserRole)
   @IsNotEmpty()
   role: UserRole;
 
+  @ApiPropertyOptional({
+    description: 'Custom permissions beyond role defaults',
+    type: [String],
+    enum: PermissionsEnum,
+    example: [PermissionsEnum.USER_READ, PermissionsEnum.USER_CREATE],
+  })
   @IsArray()
   @IsEnum(PermissionsEnum, { each: true })
   @IsOptional()
   customPermissions?: PermissionsEnum[];
 
+  @ApiPropertyOptional({
+    description: 'Access expiration date (ISO 8601 format)',
+    example: '2026-12-31T23:59:59.000Z',
+    type: String,
+  })
   @IsDateString()
   @IsOptional()
   expiresAt?: string;
 
+  @ApiPropertyOptional({
+    description: 'Additional notes about this access grant',
+    example: 'Temporary access for project duration',
+    maxLength: 500,
+  })
   @IsString()
   @IsOptional()
   @Length(0, 500)
@@ -53,24 +90,50 @@ export class CreateUserAccessDto {
 }
 
 export class UpdateUserAccessDto {
+  @ApiPropertyOptional({
+    description: 'Updated user role',
+    enum: UserRole,
+    example: UserRole.DOCTOR,
+  })
   @IsEnum(UserRole)
   @IsOptional()
   role?: UserRole;
 
+  @ApiPropertyOptional({
+    description: 'Updated custom permissions',
+    type: [String],
+    enum: PermissionsEnum,
+    example: [PermissionsEnum.USER_READ, PermissionsEnum.USER_UPDATE],
+  })
   @IsArray()
   @IsEnum(PermissionsEnum, { each: true })
   @IsOptional()
   customPermissions?: PermissionsEnum[];
 
+  @ApiPropertyOptional({
+    description: 'Updated expiration date',
+    example: '2027-12-31T23:59:59.000Z',
+    type: String,
+  })
   @IsDateString()
   @IsOptional()
   expiresAt?: string;
 
+  @ApiPropertyOptional({
+    description: 'Updated notes',
+    example: 'Extended access for additional responsibilities',
+    maxLength: 500,
+  })
   @IsString()
   @IsOptional()
   @Length(0, 500)
   notes?: string;
 
+  @ApiPropertyOptional({
+    description: 'Active status - set to false to temporarily disable access',
+    example: true,
+    type: Boolean,
+  })
   @IsBoolean()
   @IsOptional()
   @Transform(({ value }) => value === 'true' || value === true)
@@ -224,27 +287,58 @@ export class CreateAccessLogDto {
 
 // User Permission DTOs
 export class AssignPermissionsDto {
+  @ApiProperty({
+    description: 'User ID to assign permissions to',
+    example: '507f1f77bcf86cd799439012',
+    type: String,
+  })
   @IsMongoId()
   @IsNotEmpty()
   userId: string;
 
+  @ApiProperty({
+    description: 'Permissions to assign',
+    type: [String],
+    enum: PermissionsEnum,
+    example: [PermissionsEnum.USER_READ, PermissionsEnum.USER_CREATE],
+  })
   @IsArray()
   @IsEnum(PermissionsEnum, { each: true })
   @IsNotEmpty()
   permissions: PermissionsEnum[];
 
+  @ApiProperty({
+    description: 'Scope type where permissions apply',
+    enum: ['organization', 'complex', 'department', 'clinic'],
+    example: 'clinic',
+  })
   @IsEnum(['organization', 'complex', 'department', 'clinic'])
   @IsNotEmpty()
   scopeType: string;
 
+  @ApiProperty({
+    description: 'Scope entity ID',
+    example: '507f1f77bcf86cd799439013',
+    type: String,
+  })
   @IsMongoId()
   @IsNotEmpty()
   scopeId: string;
 
+  @ApiPropertyOptional({
+    description: 'Permission expiration date',
+    example: '2026-12-31T23:59:59.000Z',
+    type: String,
+  })
   @IsDateString()
   @IsOptional()
   expiresAt?: string;
 
+  @ApiPropertyOptional({
+    description: 'Reason for assigning permissions',
+    example: 'Temporary access for special project',
+    maxLength: 500,
+  })
   @IsString()
   @IsOptional()
   @Length(0, 500)
@@ -252,23 +346,50 @@ export class AssignPermissionsDto {
 }
 
 export class RevokePermissionsDto {
+  @ApiProperty({
+    description: 'User ID to revoke permissions from',
+    example: '507f1f77bcf86cd799439012',
+    type: String,
+  })
   @IsMongoId()
   @IsNotEmpty()
   userId: string;
 
+  @ApiProperty({
+    description: 'Permissions to revoke',
+    type: [String],
+    enum: PermissionsEnum,
+    example: [PermissionsEnum.USER_DELETE],
+  })
   @IsArray()
   @IsEnum(PermissionsEnum, { each: true })
   @IsNotEmpty()
   permissions: PermissionsEnum[];
 
+  @ApiProperty({
+    description: 'Scope type where permissions are revoked',
+    enum: ['organization', 'complex', 'department', 'clinic'],
+    example: 'clinic',
+  })
   @IsEnum(['organization', 'complex', 'department', 'clinic'])
   @IsNotEmpty()
   scopeType: string;
 
+  @ApiProperty({
+    description: 'Scope entity ID',
+    example: '507f1f77bcf86cd799439013',
+    type: String,
+  })
   @IsMongoId()
   @IsNotEmpty()
   scopeId: string;
 
+  @ApiProperty({
+    description: 'Reason for revoking permissions (required)',
+    example: 'Role change - no longer requires delete permission',
+    minLength: 1,
+    maxLength: 500,
+  })
   @IsString()
   @IsNotEmpty()
   @Length(1, 500)
@@ -277,53 +398,118 @@ export class RevokePermissionsDto {
 
 // Search and Filter DTOs
 export class UserAccessSearchDto {
+  @ApiPropertyOptional({
+    description: 'Search term - searches across user names and emails',
+    example: 'ahmed',
+    type: String,
+  })
   @IsString()
   @IsOptional()
   search?: string; // Search across user names and emails
 
+  @ApiPropertyOptional({
+    description: 'Filter by user ID',
+    example: '507f1f77bcf86cd799439012',
+    type: String,
+  })
   @IsMongoId()
   @IsOptional()
   userId?: string;
 
+  @ApiPropertyOptional({
+    description: 'Filter by scope type',
+    enum: ['organization', 'complex', 'department', 'clinic'],
+    example: 'clinic',
+  })
   @IsEnum(['organization', 'complex', 'department', 'clinic'])
   @IsOptional()
   scopeType?: string;
 
+  @ApiPropertyOptional({
+    description: 'Filter by scope ID',
+    example: '507f1f77bcf86cd799439013',
+    type: String,
+  })
   @IsMongoId()
   @IsOptional()
   scopeId?: string;
 
+  @ApiPropertyOptional({
+    description: 'Filter by role',
+    enum: UserRole,
+    example: UserRole.ADMIN,
+  })
   @IsEnum(UserRole)
   @IsOptional()
   role?: string;
 
+  @ApiPropertyOptional({
+    description: 'Filter by permissions - returns records with any of these permissions',
+    type: [String],
+    enum: PermissionsEnum,
+    example: [PermissionsEnum.USER_READ],
+  })
   @IsArray()
   @IsEnum(PermissionsEnum, { each: true })
   @IsOptional()
   hasPermissions?: PermissionsEnum[];
 
+  @ApiPropertyOptional({
+    description: 'Filter by active status',
+    example: true,
+    type: Boolean,
+  })
   @IsBoolean()
   @IsOptional()
   @Transform(({ value }) => value === 'true' || value === true)
   isActive?: boolean;
 
+  @ApiPropertyOptional({
+    description: 'Filter by expiration status',
+    example: false,
+    type: Boolean,
+  })
   @IsBoolean()
   @IsOptional()
   @Transform(({ value }) => value === 'true' || value === true)
   isExpired?: boolean;
 
+  @ApiPropertyOptional({
+    description: 'Page number',
+    example: 1,
+    type: String,
+    default: '1',
+  })
   @IsString()
   @IsOptional()
   page?: string;
 
+  @ApiPropertyOptional({
+    description: 'Items per page (max: 100)',
+    example: 10,
+    type: String,
+    default: '10',
+  })
   @IsString()
   @IsOptional()
   limit?: string;
 
+  @ApiPropertyOptional({
+    description: 'Sort field',
+    example: 'createdAt',
+    type: String,
+    default: 'createdAt',
+  })
   @IsString()
   @IsOptional()
   sortBy?: string;
 
+  @ApiPropertyOptional({
+    description: 'Sort order',
+    enum: ['asc', 'desc'],
+    example: 'desc',
+    default: 'desc',
+  })
   @IsEnum(['asc', 'desc'])
   @IsOptional()
   sortOrder?: 'asc' | 'desc';
@@ -468,41 +654,88 @@ export class UpdateRoleDto {
 
 // Permission Check DTOs
 export class CheckPermissionDto {
+  @ApiProperty({
+    description: 'User ID to check permission for',
+    example: '507f1f77bcf86cd799439012',
+    type: String,
+  })
   @IsMongoId()
   @IsNotEmpty()
   userId: string;
 
+  @ApiProperty({
+    description: 'Permission to check',
+    enum: PermissionsEnum,
+    example: PermissionsEnum.USER_READ,
+  })
   @IsEnum(PermissionsEnum)
   @IsNotEmpty()
   permission: PermissionsEnum;
 
+  @ApiProperty({
+    description: 'Scope type to check permission in',
+    enum: ['organization', 'complex', 'department', 'clinic'],
+    example: 'clinic',
+  })
   @IsEnum(['organization', 'complex', 'department', 'clinic'])
   @IsNotEmpty()
   scopeType: string;
 
+  @ApiProperty({
+    description: 'Scope entity ID',
+    example: '507f1f77bcf86cd799439013',
+    type: String,
+  })
   @IsMongoId()
   @IsNotEmpty()
   scopeId: string;
 }
 
 export class CheckMultiplePermissionsDto {
+  @ApiProperty({
+    description: 'User ID to check permissions for',
+    example: '507f1f77bcf86cd799439012',
+    type: String,
+  })
   @IsMongoId()
   @IsNotEmpty()
   userId: string;
 
+  @ApiProperty({
+    description: 'List of permissions to check',
+    type: [String],
+    enum: PermissionsEnum,
+    example: [PermissionsEnum.USER_READ, PermissionsEnum.USER_CREATE],
+  })
   @IsArray()
   @IsEnum(PermissionsEnum, { each: true })
   @IsNotEmpty()
   permissions: PermissionsEnum[];
 
+  @ApiProperty({
+    description: 'Scope type to check permissions in',
+    enum: ['organization', 'complex', 'department', 'clinic'],
+    example: 'clinic',
+  })
   @IsEnum(['organization', 'complex', 'department', 'clinic'])
   @IsNotEmpty()
   scopeType: string;
 
+  @ApiProperty({
+    description: 'Scope entity ID',
+    example: '507f1f77bcf86cd799439013',
+    type: String,
+  })
   @IsMongoId()
   @IsNotEmpty()
   scopeId: string;
 
+  @ApiPropertyOptional({
+    description: 'Requirement type - "all" requires all permissions, "any" requires at least one',
+    enum: ['all', 'any'],
+    example: 'all',
+    default: 'all',
+  })
   @IsEnum(['all', 'any'])
   @IsOptional()
   requirementType?: 'all' | 'any'; // Require all permissions or any permission

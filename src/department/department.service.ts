@@ -13,6 +13,7 @@ import { Service } from '../database/schemas/service.schema';
 import {
   CreateDepartmentDto,
   AssignDepartmentsDto,
+  UpdateDepartmentDto,
 } from './dto/create-department.dto';
 import {
   DeleteResult,
@@ -103,6 +104,54 @@ export class DepartmentService {
       });
     }
     return department;
+  }
+
+  /**
+   * Update a department
+   * @param departmentId - Department ID
+   * @param updateDepartmentDto - Department update data
+   * @returns Updated department document
+   * @throws NotFoundException if department not found
+   * @throws BadRequestException if new name already exists
+   */
+  async updateDepartment(
+    departmentId: string,
+    updateDepartmentDto: UpdateDepartmentDto,
+  ): Promise<Department> {
+    // Validate department exists
+    await this.validateDepartmentExists(departmentId);
+
+    // If name is being updated, check for uniqueness
+    if (updateDepartmentDto.name) {
+      const existingDepartment = await this.departmentModel.findOne({
+        name: updateDepartmentDto.name,
+        _id: { $ne: departmentId },
+      });
+
+      if (existingDepartment) {
+        throw new BadRequestException({
+          message: DEPARTMENT_ERROR_MESSAGES.NAME_EXISTS,
+          code: DEPARTMENT_ERROR_CODES.NAME_EXISTS,
+        });
+      }
+    }
+
+    // Update department
+    const updatedDepartment = await this.departmentModel
+      .findByIdAndUpdate(departmentId, updateDepartmentDto, {
+        new: true,
+        runValidators: true,
+      })
+      .exec();
+
+    if (!updatedDepartment) {
+      throw new NotFoundException({
+        message: DEPARTMENT_ERROR_MESSAGES.NOT_FOUND,
+        code: DEPARTMENT_ERROR_CODES.NOT_FOUND,
+      });
+    }
+
+    return updatedDepartment;
   }
 
   /**
