@@ -7,3 +7,7 @@ export * from './organization-step.dto';
 export * from './complex-step.dto';
 export * from './clinic-step.dto';
 export * from './step-progress.dto';
+
+// M2 Refactor DTOs
+export * from './skip-complex.dto';
+export * from './validate-step.dto';
