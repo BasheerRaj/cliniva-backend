@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -41,6 +42,8 @@ interface LinkedClinicData {
 
 @Injectable()
 export class DepartmentService {
+  private readonly logger = new Logger(DepartmentService.name);
+
   constructor(
     @InjectModel('Department')
     private readonly departmentModel: Model<Department>,
@@ -216,14 +219,34 @@ export class DepartmentService {
   }
 
   /**
-   * Validate that a department exists
-   * @param departmentId - Department ID to validate
+   * Validate that a department exists and return it
+   *
+   * This method performs validation to ensure a department exists in the database
+   * before performing operations on it. It also validates the ObjectId format.
+   *
+   * @param departmentId - Department ID to validate (must be valid MongoDB ObjectId)
    * @returns Department document if found
-   * @throws NotFoundException if department not found
+   * @throws BadRequestException if departmentId is not a valid ObjectId
+   * @throws NotFoundException if department not found in database
+   *
+   * @private
+   * @example
+   * const department = await this.validateDepartmentExists('507f1f77bcf86cd799439011');
    */
   private async validateDepartmentExists(
     departmentId: string,
   ): Promise<Department> {
+    // Validate ObjectId format before querying database
+    if (!Types.ObjectId.isValid(departmentId)) {
+      throw new BadRequestException({
+        message: {
+          ar: 'معرف القسم غير صالح',
+          en: 'Invalid department ID format',
+        },
+        code: 'INVALID_ID',
+      });
+    }
+
     const department = await this.departmentModel.findById(departmentId);
 
     if (!department) {
@@ -238,8 +261,18 @@ export class DepartmentService {
 
   /**
    * Get ComplexDepartment IDs for a given department
-   * @param departmentId - Department ID
-   * @returns Array of ComplexDepartment ObjectIds
+   *
+   * Retrieves all active ComplexDepartment junction records that link
+   * the specified department to complexes. This is used to find all
+   * clinics that might be using this department.
+   *
+   * @param departmentId - Department ID (must be valid MongoDB ObjectId)
+   * @returns Array of ComplexDepartment ObjectIds (empty array if none found)
+   *
+   * @private
+   * @example
+   * const complexDeptIds = await this.getComplexDepartmentIds('507f1f77bcf86cd799439011');
+   * // Returns: [ObjectId('...'), ObjectId('...')]
    */
   private async getComplexDepartmentIds(
     departmentId: string,
@@ -257,8 +290,23 @@ export class DepartmentService {
 
   /**
    * Get clinics linked to ComplexDepartment IDs
-   * @param complexDeptIds - Array of ComplexDepartment IDs
-   * @returns Array of linked clinics with complex information
+   *
+   * Queries the Clinic collection to find all clinics that are using
+   * the specified ComplexDepartment IDs. Excludes deleted clinics and
+   * populates complex information for detailed error messages.
+   *
+   * Query is optimized with:
+   * - `.select()` to limit returned fields
+   * - `.lean()` for read-only performance
+   * - `.populate()` only for required complex name
+   *
+   * @param complexDeptIds - Array of ComplexDepartment IDs to check
+   * @returns Array of linked clinics with complex information (empty if none found)
+   *
+   * @private
+   * @example
+   * const linkedClinics = await this.getLinkedClinics([ObjectId('...')]);
+   * // Returns: [{ _id: ObjectId, name: 'Clinic A', complexId: { _id: ObjectId, name: 'Complex 1' } }]
    */
   private async getLinkedClinics(
     complexDeptIds: Types.ObjectId[],
@@ -281,8 +329,23 @@ export class DepartmentService {
 
   /**
    * Get count of services linked to ComplexDepartment IDs
-   * @param complexDeptIds - Array of ComplexDepartment IDs
-   * @returns Count of linked services
+   *
+   * Counts services that are using the specified ComplexDepartment IDs.
+   * Uses `countDocuments()` for optimal performance instead of fetching
+   * all documents.
+   *
+   * Handles edge cases:
+   * - Returns 0 if no ComplexDepartment IDs provided
+   * - Returns 0 if service model is not available (optional dependency)
+   * - Returns 0 if service collection doesn't exist yet
+   *
+   * @param complexDeptIds - Array of ComplexDepartment IDs to check
+   * @returns Count of linked services (0 if none found or service collection unavailable)
+   *
+   * @private
+   * @example
+   * const serviceCount = await this.getLinkedServicesCount([ObjectId('...')]);
+   * // Returns: 5
    */
   private async getLinkedServicesCount(
     complexDeptIds: Types.ObjectId[],
@@ -301,15 +364,28 @@ export class DepartmentService {
         complexDepartmentId: { $in: complexDeptIds },
       });
     } catch (error) {
-      // Service collection might not exist yet
+      // Service collection might not exist yet - log and return 0
+      this.logger.warn(
+        `Unable to count services for department: ${error.message}`,
+      );
       return 0;
     }
   }
 
   /**
    * Format linked clinic data to DTO format
-   * @param linkedClinics - Array of linked clinic data from database
-   * @returns Array of formatted LinkedClinicDto objects
+   *
+   * Transforms internal database clinic data structure to the public
+   * DTO format used in API responses. Handles missing complex data
+   * gracefully by providing 'Unknown' as fallback.
+   *
+   * @param linkedClinics - Array of linked clinic data from database query
+   * @returns Array of formatted LinkedClinicDto objects for API response
+   *
+   * @private
+   * @example
+   * const formatted = this.formatLinkedClinics(dbClinics);
+   * // Returns: [{ clinicId: '507f...', clinicName: 'Clinic A', complexName: 'Complex 1', complexId: '507f...' }]
    */
   private formatLinkedClinics(
     linkedClinics: LinkedClinicData[],
@@ -324,9 +400,30 @@ export class DepartmentService {
 
   /**
    * Build response for can-delete check
-   * @param linkedClinics - Array of linked clinics
-   * @param linkedServices - Count of linked services
+   *
+   * Constructs a comprehensive response indicating whether a department
+   * can be safely deleted, along with detailed information about any
+   * blocking linkages.
+   *
+   * Response includes:
+   * - canDelete flag (true if no linkages exist)
+   * - Bilingual reason message (if deletion blocked)
+   * - List of linked clinics with details (if applicable)
+   * - Count of linked services (if applicable)
+   * - Bilingual recommendations for user action (if deletion blocked)
+   *
+   * @param linkedClinics - Array of clinics linked to the department
+   * @param linkedServices - Count of services linked to the department
    * @returns CanDeleteResult with deletion eligibility information
+   *
+   * @private
+   * @example
+   * const result = this.buildCanDeleteResponse([], 0);
+   * // Returns: { success: true, data: { canDelete: true } }
+   *
+   * @example
+   * const result = this.buildCanDeleteResponse([clinic1, clinic2], 5);
+   * // Returns: { success: true, data: { canDelete: false, reason: {...}, linkedClinics: [...], linkedServices: 5, recommendations: {...} } }
    */
   private buildCanDeleteResponse(
     linkedClinics: LinkedClinicData[],
@@ -374,10 +471,32 @@ export class DepartmentService {
 
   /**
    * Delete a department with validation
-   * @param departmentId - Department ID to delete
-   * @returns DeleteResult with success message
-   * @throws NotFoundException if department not found
-   * @throws BadRequestException if department is linked to clinics or has services
+   *
+   * Performs comprehensive validation before deleting a department to ensure
+   * data integrity. Implements Business Rule BZR-36 which prevents deletion
+   * of departments that are linked to clinics or have services.
+   *
+   * Validation steps:
+   * 1. Verify department exists (throws NotFoundException if not found)
+   * 2. Check for linked clinics via ComplexDepartment relationships
+   * 3. Check for linked services
+   * 4. Delete department if no linkages exist
+   *
+   * @param departmentId - Department ID to delete (must be valid MongoDB ObjectId)
+   * @returns DeleteResult with bilingual success message
+   *
+   * @throws NotFoundException if department not found (DEPARTMENT_003)
+   * @throws BadRequestException if department is linked to clinics (DEPARTMENT_001)
+   * @throws BadRequestException if department has services (DEPARTMENT_002)
+   * @throws BadRequestException for unexpected errors
+   *
+   * @example
+   * const result = await service.deleteDepartment('507f1f77bcf86cd799439011');
+   * // Returns: { success: true, message: { ar: '...', en: '...' } }
+   *
+   * @example
+   * // Throws BadRequestException with linked clinics details
+   * await service.deleteDepartment('linked-department-id');
    */
   async deleteDepartment(departmentId: string): Promise<DeleteResult> {
     try {
@@ -393,6 +512,10 @@ export class DepartmentService {
       if (linkedClinics.length > 0) {
         const formattedClinics = this.formatLinkedClinics(linkedClinics);
 
+        this.logger.warn(
+          `Department deletion blocked: ${departmentId} - linked to ${linkedClinics.length} clinics`,
+        );
+
         throw new BadRequestException({
           message: DEPARTMENT_ERROR_MESSAGES.LINKED_TO_CLINICS,
           code: DEPARTMENT_ERROR_CODES.LINKED_TO_CLINICS,
@@ -405,6 +528,10 @@ export class DepartmentService {
       const linkedServices = await this.getLinkedServicesCount(complexDeptIds);
 
       if (linkedServices > 0) {
+        this.logger.warn(
+          `Department deletion blocked: ${departmentId} - has ${linkedServices} services`,
+        );
+
         throw new BadRequestException({
           message: DEPARTMENT_ERROR_MESSAGES.HAS_SERVICES,
           code: DEPARTMENT_ERROR_CODES.HAS_SERVICES,
@@ -414,6 +541,8 @@ export class DepartmentService {
 
       // Step 5: Safe to delete
       await this.departmentModel.findByIdAndDelete(departmentId);
+
+      this.logger.log(`Department deleted successfully: ${departmentId}`);
 
       return {
         success: true,
@@ -429,6 +558,11 @@ export class DepartmentService {
       }
 
       // Handle unexpected errors
+      this.logger.error(
+        `Unexpected error deleting department ${departmentId}:`,
+        error.stack,
+      );
+
       throw new BadRequestException({
         message: {
           ar: 'حدث خطأ أثناء حذف القسم',
@@ -440,9 +574,32 @@ export class DepartmentService {
 
   /**
    * Check if a department can be deleted
-   * @param departmentId - Department ID to check
+   *
+   * Performs a read-only check to determine if a department can be safely
+   * deleted without violating data integrity constraints. This endpoint is
+   * designed for frontend UI to disable delete buttons and show tooltips.
+   *
+   * Returns comprehensive information including:
+   * - Whether deletion is allowed (canDelete flag)
+   * - Bilingual reason if deletion is blocked
+   * - List of linked clinics with details
+   * - Count of linked services
+   * - Bilingual recommendations for user action
+   *
+   * @param departmentId - Department ID to check (must be valid MongoDB ObjectId)
    * @returns CanDeleteResult with deletion eligibility information
-   * @throws NotFoundException if department not found
+   *
+   * @throws NotFoundException if department not found (DEPARTMENT_003)
+   * @throws BadRequestException for unexpected errors
+   *
+   * @example
+   * const result = await service.canDeleteDepartment('507f1f77bcf86cd799439011');
+   * // Returns: { success: true, data: { canDelete: true } }
+   *
+   * @example
+   * // Returns detailed information about blocking linkages
+   * const result = await service.canDeleteDepartment('linked-department-id');
+   * // Returns: { success: true, data: { canDelete: false, reason: {...}, linkedClinics: [...], ... } }
    */
   async canDeleteDepartment(departmentId: string): Promise<CanDeleteResult> {
     try {
@@ -467,6 +624,11 @@ export class DepartmentService {
       }
 
       // Handle unexpected errors
+      this.logger.error(
+        `Unexpected error checking can-delete for department ${departmentId}:`,
+        error.stack,
+      );
+
       throw new BadRequestException({
         message: {
           ar: 'حدث خطأ أثناء التحقق من إمكانية حذف القسم',

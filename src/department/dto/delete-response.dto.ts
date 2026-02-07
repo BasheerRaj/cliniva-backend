@@ -43,7 +43,10 @@ export class DeleteResult {
 
   @ApiProperty({
     description: 'Bilingual success message',
-    example: { ar: 'تم حذف القسم بنجاح', en: 'Department deleted successfully' },
+    example: {
+      ar: 'تم حذف القسم بنجاح',
+      en: 'Department deleted successfully',
+    },
   })
   message: BilingualMessage;
 }
@@ -82,7 +85,10 @@ export class CanDeleteData {
 
   @ApiProperty({
     description: 'Bilingual recommendations for user action',
-    example: { ar: 'يرجى حذف العيادات المرتبطة أولاً', en: 'Please delete linked clinics first' },
+    example: {
+      ar: 'يرجى حذف العيادات المرتبطة أولاً',
+      en: 'Please delete linked clinics first',
+    },
     required: false,
   })
   recommendations?: BilingualMessage;
