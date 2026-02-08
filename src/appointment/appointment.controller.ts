@@ -15,6 +15,15 @@ import {
   ParseIntPipe,
   BadRequestException,
 } from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiBody,
+  ApiParam,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { AppointmentService } from './appointment.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import {
@@ -28,9 +37,12 @@ import {
   ConfirmAppointmentDto,
   AppointmentStatsDto,
 } from './dto';
+import { SWAGGER_EXAMPLES } from './constants/swagger-examples';
 
+@ApiTags('Appointments')
 @Controller('appointments')
 @UseGuards(JwtAuthGuard)
+@ApiBearerAuth()
 export class AppointmentController {
   constructor(private readonly appointmentService: AppointmentService) {}
 
@@ -38,6 +50,48 @@ export class AppointmentController {
    * Create a new appointment
    * POST /appointments
    */
+  @ApiOperation({
+    summary: 'Create new appointment',
+    description:
+      'Creates a new appointment for a patient with a doctor at a specific clinic. Validates appointment time, checks for conflicts, and ensures all referenced entities exist. Appointments can have different urgency levels (low, medium, high, urgent) and will be created with "scheduled" status by default.',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Appointment created successfully',
+    schema: {
+      example: SWAGGER_EXAMPLES.CREATE_SUCCESS,
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description:
+      'Bad Request - Validation error, past date, or appointment conflicts',
+    schema: {
+      example: SWAGGER_EXAMPLES.VALIDATION_ERROR,
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - Authentication required',
+    schema: {
+      example: SWAGGER_EXAMPLES.UNAUTHORIZED_ERROR,
+    },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Not Found - Patient, doctor, clinic, or service not found',
+    schema: {
+      example: SWAGGER_EXAMPLES.NOT_FOUND_ERROR,
+    },
+  })
+  @ApiResponse({
+    status: 409,
+    description: 'Conflict - Doctor or patient has conflicting appointment',
+    schema: {
+      example: SWAGGER_EXAMPLES.CONFLICT_ERROR,
+    },
+  })
+  @ApiBody({ type: CreateAppointmentDto })
   @Post()
   async createAppointment(
     @Body(new ValidationPipe()) createAppointmentDto: CreateAppointmentDto,
@@ -66,6 +120,120 @@ export class AppointmentController {
    * Get all appointments with filtering and pagination
    * GET /appointments
    */
+  @ApiOperation({
+    summary: 'List appointments with filtering',
+    description:
+      'Retrieves a paginated list of appointments with optional filtering by patient, doctor, clinic, service, date range, status, and urgency level. Supports search across patient and doctor names. Results include populated patient, doctor, clinic, and service details.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Appointments retrieved successfully with pagination',
+    schema: {
+      example: SWAGGER_EXAMPLES.LIST_SUCCESS,
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - Authentication required',
+    schema: {
+      example: SWAGGER_EXAMPLES.UNAUTHORIZED_ERROR,
+    },
+  })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    type: String,
+    description: 'Search term for patient or doctor name',
+  })
+  @ApiQuery({
+    name: 'patientId',
+    required: false,
+    type: String,
+    description: 'Filter by patient ID',
+  })
+  @ApiQuery({
+    name: 'doctorId',
+    required: false,
+    type: String,
+    description: 'Filter by doctor ID',
+  })
+  @ApiQuery({
+    name: 'clinicId',
+    required: false,
+    type: String,
+    description: 'Filter by clinic ID',
+  })
+  @ApiQuery({
+    name: 'serviceId',
+    required: false,
+    type: String,
+    description: 'Filter by service ID',
+  })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    enum: [
+      'scheduled',
+      'confirmed',
+      'in_progress',
+      'completed',
+      'cancelled',
+      'no_show',
+    ],
+    description: 'Filter by appointment status',
+  })
+  @ApiQuery({
+    name: 'urgencyLevel',
+    required: false,
+    enum: ['low', 'medium', 'high', 'urgent'],
+    description: 'Filter by urgency level',
+  })
+  @ApiQuery({
+    name: 'appointmentDate',
+    required: false,
+    type: String,
+    description: 'Filter by specific date (YYYY-MM-DD)',
+  })
+  @ApiQuery({
+    name: 'dateFrom',
+    required: false,
+    type: String,
+    description: 'Filter by date range start (YYYY-MM-DD)',
+  })
+  @ApiQuery({
+    name: 'dateTo',
+    required: false,
+    type: String,
+    description: 'Filter by date range end (YYYY-MM-DD)',
+  })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    type: Number,
+    description: 'Page number (default: 1)',
+    example: 1,
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    description: 'Items per page (default: 10, max: 100)',
+    example: 10,
+  })
+  @ApiQuery({
+    name: 'sortBy',
+    required: false,
+    type: String,
+    description: 'Sort field (default: appointmentDate)',
+    example: 'appointmentDate',
+  })
+  @ApiQuery({
+    name: 'sortOrder',
+    required: false,
+    enum: ['asc', 'desc'],
+    description: 'Sort order (default: desc)',
+    example: 'desc',
+  })
   @Get()
   async getAppointments(
     @Query(new ValidationPipe()) query: AppointmentSearchQueryDto,
@@ -96,6 +264,45 @@ export class AppointmentController {
    * Get appointment by ID
    * GET /appointments/:id
    */
+  @ApiOperation({
+    summary: 'Get appointment by ID',
+    description:
+      'Retrieves detailed information about a specific appointment including populated patient, doctor, clinic, and service details. Returns full appointment data with all related entity information.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Appointment retrieved successfully',
+    schema: {
+      example: SWAGGER_EXAMPLES.GET_SUCCESS,
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad Request - Invalid appointment ID format',
+    schema: {
+      example: SWAGGER_EXAMPLES.INVALID_ID_ERROR,
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - Authentication required',
+    schema: {
+      example: SWAGGER_EXAMPLES.UNAUTHORIZED_ERROR,
+    },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Not Found - Appointment does not exist',
+    schema: {
+      example: SWAGGER_EXAMPLES.NOT_FOUND_ERROR,
+    },
+  })
+  @ApiParam({
+    name: 'id',
+    type: String,
+    description: 'Appointment ID (MongoDB ObjectId)',
+    example: '507f1f77bcf86cd799439011',
+  })
   @Get(':id')
   async getAppointment(@Param('id') id: string) {
     try {
@@ -118,6 +325,54 @@ export class AppointmentController {
    * Update appointment information
    * PUT /appointments/:id
    */
+  @ApiOperation({
+    summary: 'Update appointment',
+    description:
+      'Updates appointment information including patient, doctor, clinic, service, date, time, status, urgency level, and notes. Validates new appointment time and checks for conflicts if date/time is changed. Cannot update completed, cancelled, or no-show appointments.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Appointment updated successfully',
+    schema: {
+      example: SWAGGER_EXAMPLES.UPDATE_SUCCESS,
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description:
+      'Bad Request - Invalid data, past date, or appointment conflicts',
+    schema: {
+      example: SWAGGER_EXAMPLES.VALIDATION_ERROR,
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - Authentication required',
+    schema: {
+      example: SWAGGER_EXAMPLES.UNAUTHORIZED_ERROR,
+    },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Not Found - Appointment or related entity not found',
+    schema: {
+      example: SWAGGER_EXAMPLES.NOT_FOUND_ERROR,
+    },
+  })
+  @ApiResponse({
+    status: 409,
+    description: 'Conflict - New time conflicts with existing appointment',
+    schema: {
+      example: SWAGGER_EXAMPLES.CONFLICT_ERROR,
+    },
+  })
+  @ApiParam({
+    name: 'id',
+    type: String,
+    description: 'Appointment ID (MongoDB ObjectId)',
+    example: '507f1f77bcf86cd799439011',
+  })
+  @ApiBody({ type: UpdateAppointmentDto })
   @Put(':id')
   async updateAppointment(
     @Param('id') id: string,
@@ -148,6 +403,45 @@ export class AppointmentController {
    * Soft delete appointment
    * DELETE /appointments/:id
    */
+  @ApiOperation({
+    summary: 'Delete appointment',
+    description:
+      'Soft deletes an appointment by setting deletedAt timestamp. The appointment is not permanently removed from the database and can be recovered if needed. Deleted appointments are excluded from all queries by default.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Appointment deleted successfully',
+    schema: {
+      example: SWAGGER_EXAMPLES.DELETE_SUCCESS,
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad Request - Invalid appointment ID format',
+    schema: {
+      example: SWAGGER_EXAMPLES.INVALID_ID_ERROR,
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - Authentication required',
+    schema: {
+      example: SWAGGER_EXAMPLES.UNAUTHORIZED_ERROR,
+    },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Not Found - Appointment does not exist',
+    schema: {
+      example: SWAGGER_EXAMPLES.NOT_FOUND_ERROR,
+    },
+  })
+  @ApiParam({
+    name: 'id',
+    type: String,
+    description: 'Appointment ID (MongoDB ObjectId)',
+    example: '507f1f77bcf86cd799439011',
+  })
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
   async deleteAppointment(@Param('id') id: string, @Request() req: any) {
@@ -170,6 +464,54 @@ export class AppointmentController {
    * Reschedule appointment
    * POST /appointments/:id/reschedule
    */
+  @ApiOperation({
+    summary: 'Reschedule appointment',
+    description:
+      'Reschedules an existing appointment to a new date and time. Validates the new time slot, checks for conflicts with doctor and patient schedules. Cannot reschedule completed, cancelled, or no-show appointments. Optionally notifies the patient of the change.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Appointment rescheduled successfully',
+    schema: {
+      example: SWAGGER_EXAMPLES.RESCHEDULE_SUCCESS,
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description:
+      'Bad Request - Invalid status for rescheduling or invalid new time',
+    schema: {
+      example: SWAGGER_EXAMPLES.INVALID_STATUS_ERROR,
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - Authentication required',
+    schema: {
+      example: SWAGGER_EXAMPLES.UNAUTHORIZED_ERROR,
+    },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Not Found - Appointment does not exist',
+    schema: {
+      example: SWAGGER_EXAMPLES.NOT_FOUND_ERROR,
+    },
+  })
+  @ApiResponse({
+    status: 409,
+    description: 'Conflict - New time conflicts with existing appointment',
+    schema: {
+      example: SWAGGER_EXAMPLES.CONFLICT_ERROR,
+    },
+  })
+  @ApiParam({
+    name: 'id',
+    type: String,
+    description: 'Appointment ID (MongoDB ObjectId)',
+    example: '507f1f77bcf86cd799439011',
+  })
+  @ApiBody({ type: RescheduleAppointmentDto })
   @Post(':id/reschedule')
   async rescheduleAppointment(
     @Param('id') id: string,
@@ -200,6 +542,46 @@ export class AppointmentController {
    * Cancel appointment
    * POST /appointments/:id/cancel
    */
+  @ApiOperation({
+    summary: 'Cancel appointment',
+    description:
+      'Cancels an existing appointment and records the cancellation reason. Updates appointment status to "cancelled". Cannot cancel already completed or cancelled appointments. Optionally notifies the patient and allows rescheduling.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Appointment cancelled successfully',
+    schema: {
+      example: SWAGGER_EXAMPLES.CANCEL_SUCCESS,
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad Request - Cannot cancel appointment with current status',
+    schema: {
+      example: SWAGGER_EXAMPLES.INVALID_STATUS_ERROR,
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - Authentication required',
+    schema: {
+      example: SWAGGER_EXAMPLES.UNAUTHORIZED_ERROR,
+    },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Not Found - Appointment does not exist',
+    schema: {
+      example: SWAGGER_EXAMPLES.NOT_FOUND_ERROR,
+    },
+  })
+  @ApiParam({
+    name: 'id',
+    type: String,
+    description: 'Appointment ID (MongoDB ObjectId)',
+    example: '507f1f77bcf86cd799439011',
+  })
+  @ApiBody({ type: CancelAppointmentDto })
   @Post(':id/cancel')
   async cancelAppointment(
     @Param('id') id: string,
@@ -230,6 +612,46 @@ export class AppointmentController {
    * Confirm appointment
    * POST /appointments/:id/confirm
    */
+  @ApiOperation({
+    summary: 'Confirm appointment',
+    description:
+      'Confirms a scheduled appointment by updating its status to "confirmed". Only scheduled appointments can be confirmed. Optionally sends confirmation email and reminder SMS to the patient. Records confirmation notes for audit trail.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Appointment confirmed successfully',
+    schema: {
+      example: SWAGGER_EXAMPLES.CONFIRM_SUCCESS,
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad Request - Only scheduled appointments can be confirmed',
+    schema: {
+      example: SWAGGER_EXAMPLES.INVALID_STATUS_ERROR,
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - Authentication required',
+    schema: {
+      example: SWAGGER_EXAMPLES.UNAUTHORIZED_ERROR,
+    },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Not Found - Appointment does not exist',
+    schema: {
+      example: SWAGGER_EXAMPLES.NOT_FOUND_ERROR,
+    },
+  })
+  @ApiParam({
+    name: 'id',
+    type: String,
+    description: 'Appointment ID (MongoDB ObjectId)',
+    example: '507f1f77bcf86cd799439011',
+  })
+  @ApiBody({ type: ConfirmAppointmentDto })
   @Post(':id/confirm')
   async confirmAppointment(
     @Param('id') id: string,
@@ -260,6 +682,58 @@ export class AppointmentController {
    * Get doctor availability for a specific date
    * GET /appointments/availability/:doctorId?date=YYYY-MM-DD
    */
+  @ApiOperation({
+    summary: 'Get doctor availability',
+    description:
+      'Retrieves available time slots for a doctor on a specific date. Shows working hours, breaks, and which time slots are already booked. Useful for appointment scheduling UI to display available times. Returns 30-minute time slots by default.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Doctor availability retrieved successfully',
+    schema: {
+      example: SWAGGER_EXAMPLES.AVAILABILITY_SUCCESS,
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad Request - Date parameter is required',
+    schema: {
+      example: SWAGGER_EXAMPLES.VALIDATION_ERROR,
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - Authentication required',
+    schema: {
+      example: SWAGGER_EXAMPLES.UNAUTHORIZED_ERROR,
+    },
+  })
+  @ApiParam({
+    name: 'doctorId',
+    type: String,
+    description: 'Doctor ID (MongoDB ObjectId)',
+    example: '507f1f77bcf86cd799439013',
+  })
+  @ApiQuery({
+    name: 'date',
+    required: true,
+    type: String,
+    description: 'Date to check availability (YYYY-MM-DD)',
+    example: '2026-02-15',
+  })
+  @ApiQuery({
+    name: 'clinicId',
+    required: false,
+    type: String,
+    description: 'Filter by specific clinic',
+  })
+  @ApiQuery({
+    name: 'durationMinutes',
+    required: false,
+    type: Number,
+    description: 'Appointment duration in minutes (default: 30)',
+    example: 30,
+  })
   @Get('availability/:doctorId')
   async getDoctorAvailability(
     @Param('doctorId') doctorId: string,
@@ -442,6 +916,25 @@ export class AppointmentController {
    * Get appointment statistics
    * GET /appointments/stats/overview
    */
+  @ApiOperation({
+    summary: 'Get appointment statistics',
+    description:
+      'Retrieves comprehensive appointment statistics including total counts by status, today\'s appointments, upcoming appointments, average duration, top services, top doctors, and urgency level distribution. Useful for dashboard and reporting.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Appointment statistics retrieved successfully',
+    schema: {
+      example: SWAGGER_EXAMPLES.STATS_SUCCESS,
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - Authentication required',
+    schema: {
+      example: SWAGGER_EXAMPLES.UNAUTHORIZED_ERROR,
+    },
+  })
   @Get('stats/overview')
   async getAppointmentStats() {
     try {
@@ -505,6 +998,63 @@ export class AppointmentController {
    * Check for appointment conflicts
    * POST /appointments/check-conflicts
    */
+  @ApiOperation({
+    summary: 'Check appointment conflicts',
+    description:
+      'Checks if a proposed appointment time conflicts with existing appointments for the doctor or patient. Returns conflict details including conflict type (doctor_busy, patient_busy) and conflicting appointment IDs. Use before creating or rescheduling appointments.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Conflict check completed',
+    schema: {
+      example: SWAGGER_EXAMPLES.CONFLICT_CHECK_SUCCESS,
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - Authentication required',
+    schema: {
+      example: SWAGGER_EXAMPLES.UNAUTHORIZED_ERROR,
+    },
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        patientId: {
+          type: 'string',
+          description: 'Patient ID',
+          example: '507f1f77bcf86cd799439012',
+        },
+        doctorId: {
+          type: 'string',
+          description: 'Doctor ID',
+          example: '507f1f77bcf86cd799439013',
+        },
+        appointmentDate: {
+          type: 'string',
+          description: 'Appointment date (YYYY-MM-DD)',
+          example: '2026-02-15',
+        },
+        appointmentTime: {
+          type: 'string',
+          description: 'Appointment time (HH:mm)',
+          example: '14:30',
+        },
+        durationMinutes: {
+          type: 'number',
+          description: 'Duration in minutes (default: 30)',
+          example: 30,
+        },
+        excludeAppointmentId: {
+          type: 'string',
+          description: 'Exclude this appointment from conflict check (for rescheduling)',
+          example: '507f1f77bcf86cd799439011',
+        },
+      },
+      required: ['patientId', 'doctorId', 'appointmentDate', 'appointmentTime'],
+    },
+  })
   @Post('check-conflicts')
   async checkConflicts(
     @Body()
