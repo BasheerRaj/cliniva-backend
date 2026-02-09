@@ -9,6 +9,7 @@ import { WorkingHoursReschedulingService } from './services/working-hours-resche
 import { WorkingHoursSchema } from '../database/schemas/working-hours.schema';
 import { ClinicSchema } from '../database/schemas/clinic.schema';
 import { ComplexSchema } from '../database/schemas/complex.schema';
+import { UserSchema } from '../database/schemas/user.schema';
 import { AppointmentSchema } from '../database/schemas/appointment.schema';
 import { NotificationSchema } from '../database/schemas/notification.schema';
 import { CommonModule } from '../common/common.module';
@@ -17,6 +18,7 @@ import { CommonModule } from '../common/common.module';
   imports: [
     MongooseModule.forFeature([
       { name: 'WorkingHours', schema: WorkingHoursSchema },
+      { name: 'User', schema: UserSchema },
       { name: 'Clinic', schema: ClinicSchema },
       { name: 'Complex', schema: ComplexSchema },
       { name: 'Appointment', schema: AppointmentSchema },

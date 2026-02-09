@@ -20,6 +20,8 @@ import { DeactivateWithTransferDto } from './dto/deactivate-with-transfer.dto';
 import { SessionService } from '../auth/session.service';
 import { EmailService } from '../auth/email.service';
 import { AuditService } from '../auth/audit.service';
+import { UserRestrictionService } from './user-restriction.service';
+import { DoctorDeactivationService } from './doctor-deactivation.service';
 import { ValidationUtil } from '../common/utils/validation.util';
 import { ResponseBuilder } from '../common/utils/response-builder.util';
 import { ERROR_MESSAGES } from '../common/utils/error-messages.constant';
@@ -43,6 +45,8 @@ export class UserService {
     private readonly sessionService: SessionService,
     private readonly emailService: EmailService,
     private readonly auditService: AuditService,
+    private readonly userRestrictionService: UserRestrictionService,
+    private readonly doctorDeactivationService: DoctorDeactivationService,
   ) {}
 
   async checkUserEntities(userId: string): Promise<UserEntitiesResponseDto> {
@@ -294,7 +298,8 @@ export class UserService {
    * when deactivating a user. It prevents users from deactivating their own accounts.
    *
    * Task 4.1: Implement updateUserStatus method
-   * Requirements: 3.1 (BZR-n0c4e9f2)
+   * Task 9.2: Add validation to user status endpoints
+   * Requirements: 3.1 (BZR-n0c4e9f2), 8.1, 8.3, 8.5
    * Design: Section 3.2.1
    *
    * @param userId - User ID to update status
@@ -312,13 +317,10 @@ export class UserService {
     userAgent: string,
   ) {
     try {
-      // Validate not self-modification when deactivating
+      // Task 9.2: Check UserRestrictionService before allowing status change
+      // Requirement 8.1, 8.3: Prevent self-deactivation
       if (!updateUserStatusDto.isActive) {
-        ValidationUtil.validateNotSelfModification(
-          userId,
-          currentUserId,
-          'deactivate',
-        );
+        this.userRestrictionService.canDeactivateUser(currentUserId, userId);
       }
 
       // Validate user exists
@@ -346,7 +348,8 @@ export class UserService {
         this.logger.log(`User ${userId} deactivated and sessions invalidated`);
       }
 
-      // Create audit log entry for status change
+      // Task 9.2: Log failed self-action attempts in audit trail
+      // Requirement 8.5: Audit logging for status changes
       await this.auditService.logUserStatusChange(
         userId,
         updateUserStatusDto.isActive,
@@ -377,6 +380,8 @@ export class UserService {
           : ERROR_MESSAGES.USER_DEACTIVATED,
       );
     } catch (error) {
+      // Task 9.2: Return 403 Forbidden with bilingual error if self-action
+      // The UserRestrictionService already throws ForbiddenException with bilingual message
       this.logger.error(`Error updating user status for ${userId}:`, error);
       throw error;
     }
@@ -459,7 +464,7 @@ export class UserService {
               {
                 $set: {
                   doctorId: new Types.ObjectId(transferData.targetDoctorId),
-                  previousDoctorId: new Types.ObjectId(doctorId),
+                  transferredFrom: new Types.ObjectId(doctorId),
                   transferredAt: new Date(),
                   transferredBy: new Types.ObjectId(currentUserId),
                 },
@@ -489,9 +494,8 @@ export class UserService {
                 $set: {
                   status: 'cancelled',
                   cancellationReason: 'doctor_deactivated',
-                  reschedulingReason: 'doctor_deactivated',
-                  markedForReschedulingAt: new Date(),
-                  markedBy: new Types.ObjectId(currentUserId),
+                  rescheduledReason: 'doctor_deactivated',
+                  rescheduledAt: new Date(),
                 },
               },
               { session },
@@ -631,6 +635,169 @@ export class UserService {
     } catch (error) {
       this.logger.error('Error getting users for dropdown:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Delete user with self-modification check
+   *
+   * This method handles user deletion with validation to prevent self-deletion
+   * and ensure the user is deactivated before deletion.
+   *
+   * Task 9.3: Add validation to user delete endpoint
+   * Requirements: 9.1, 9.3, 9.4
+   * Design: Section 2.1 - User Restriction Service
+   *
+   * Business Rules:
+   * - BZR-m3d5a8b7: Users cannot delete their own account
+   * - Users must be deactivated before deletion
+   *
+   * @param userId - User ID to delete
+   * @param currentUserId - ID of user performing the action
+   * @param ipAddress - IP address of the request
+   * @param userAgent - User agent string from the request
+   * @returns Standardized response with success message
+   */
+  async deleteUser(
+    userId: string,
+    currentUserId: string,
+    ipAddress: string,
+    userAgent: string,
+  ) {
+    try {
+      // Task 9.3: Check UserRestrictionService before allowing deletion
+      // Requirement 9.1, 9.3: Prevent self-deletion
+      this.userRestrictionService.canDeleteUser(currentUserId, userId);
+
+      // Validate user exists
+      const user = await ValidationUtil.validateEntityExists(
+        this.userModel,
+        userId,
+        ERROR_MESSAGES.USER_NOT_FOUND,
+      );
+
+      // Task 9.3: Check that user is deactivated before deletion
+      // Requirement 9.4: Deactivation before deletion
+      if (user.isActive) {
+        this.logger.warn(
+          `Attempted to delete active user ${userId}. User must be deactivated first.`,
+        );
+        throw new BadRequestException({
+          message: {
+            ar: 'يجب إلغاء تفعيل المستخدم قبل الحذف',
+            en: 'User must be deactivated before deletion',
+          },
+          code: 'USER_MUST_BE_DEACTIVATED',
+        });
+      }
+
+      // Delete user
+      await this.userModel.findByIdAndDelete(userId).exec();
+
+      // Task 9.3: Log failed self-action attempts in audit trail
+      // Requirement 9.3: Audit logging for deletion
+      await this.auditService.logUserDeleted(
+        userId,
+        currentUserId,
+        ipAddress,
+        userAgent,
+      );
+
+      this.logger.log(`User ${userId} deleted successfully by ${currentUserId}`);
+
+      // Return standardized response
+      return ResponseBuilder.success(
+        { deletedUserId: userId },
+        ERROR_MESSAGES.USER_DELETED,
+      );
+    } catch (error) {
+      // Task 9.3: Return 403 Forbidden with bilingual error if self-action
+      // The UserRestrictionService already throws ForbiddenException with bilingual message
+      this.logger.error(`Error deleting user ${userId}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Transfer appointments from one doctor to another
+   * Task 10.3: Create appointment transfer endpoint
+   * Requirements: 7.2, 7.3, 7.4, 7.6
+   *
+   * This method delegates to DoctorDeactivationService.transferAppointments()
+   * to handle the actual transfer logic, including:
+   * - Validating target doctor exists and is active
+   * - Updating appointment records with transfer details
+   * - Sending email notifications to affected patients
+   * - Logging transfer details in audit trail
+   *
+   * @param fromDoctorId - Source doctor ID
+   * @param toDoctorId - Target doctor ID
+   * @param appointmentIds - Array of appointment IDs to transfer
+   * @param actorId - ID of the user performing the transfer
+   * @returns Transfer result with success/failure counts
+   */
+  async transferAppointments(
+    fromDoctorId: string,
+    toDoctorId: string,
+    appointmentIds: string[],
+    actorId: string,
+  ) {
+    try {
+      this.logger.log(
+        `Transferring ${appointmentIds.length} appointments from doctor ${fromDoctorId} to ${toDoctorId}`,
+      );
+
+      // Validate source doctor exists
+      const sourceDoctor = await this.userModel.findById(fromDoctorId).exec();
+      if (!sourceDoctor) {
+        throw new NotFoundException({
+          message: {
+            ar: 'الطبيب المصدر غير موجود',
+            en: 'Source doctor not found',
+          },
+          code: 'SOURCE_DOCTOR_NOT_FOUND',
+        });
+      }
+
+      // Call DoctorDeactivationService to handle the transfer
+      const result = await this.doctorDeactivationService.transferAppointments(
+        fromDoctorId,
+        toDoctorId,
+        appointmentIds,
+        actorId,
+      );
+
+      this.logger.log(
+        `Transfer complete: ${result.transferred} succeeded, ${result.failed} failed`,
+      );
+
+      return result;
+    } catch (error) {
+      this.logger.error(
+        `Error transferring appointments from ${fromDoctorId} to ${toDoctorId}:`,
+        error,
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Find user by ID
+   * Helper method to retrieve user details
+   *
+   * @param userId - User ID
+   * @returns User document or null if not found
+   */
+  async findById(userId: string): Promise<User | null> {
+    try {
+      if (!Types.ObjectId.isValid(userId)) {
+        return null;
+      }
+
+      return await this.userModel.findById(userId).exec();
+    } catch (error) {
+      this.logger.error(`Error finding user ${userId}:`, error);
+      return null;
     }
   }
 }

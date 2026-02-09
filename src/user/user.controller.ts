@@ -4,6 +4,7 @@ import {
   Post,
   Put,
   Patch,
+  Delete,
   Body,
   Param,
   Query,
@@ -24,6 +25,7 @@ import {
   ApiBody,
 } from '@nestjs/swagger';
 import { UserService } from './user.service';
+import { UserDropdownService } from './user-dropdown.service';
 import {
   CheckUserEntitiesDto,
   UserEntitiesResponseDto,
@@ -31,6 +33,7 @@ import {
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UpdateUserStatusDto } from './dto/update-user-status.dto';
 import { DeactivateWithTransferDto } from './dto/deactivate-with-transfer.dto';
+import { TransferAppointmentsDto } from './dto/transfer-appointments.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AdminGuard } from '../auth/guards/admin.guard';
 import { AuthService } from '../auth/auth.service';
@@ -40,9 +43,14 @@ import * as EXAMPLES from './constants/swagger-examples';
 @Controller('users')
 export class UserController {
   private readonly logger = new Logger(UserController.name);
+  
+  // Simple in-memory cache for dropdown results
+  private dropdownCache: Map<string, { data: any; timestamp: number }> = new Map();
+  private readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes in milliseconds
 
   constructor(
     private readonly userService: UserService,
+    private readonly userDropdownService: UserDropdownService,
     private readonly authService: AuthService,
   ) {}
 
@@ -464,25 +472,193 @@ export class UserController {
   }
 
   /**
+   * Transfer appointments from one doctor to another
+   * BZR-q0d8a9f1: Doctor appointment transfer on deactivation
+   *
+   * Task 10.3: Create appointment transfer endpoint
+   * Requirements: 7.2, 7.3, 7.4, 7.6
+   *
+   * This endpoint allows administrators to transfer appointments from one doctor
+   * to another without deactivating the source doctor. Useful for workload
+   * redistribution or temporary coverage.
+   *
+   * @param doctorId - Source doctor ID from route params
+   * @param transferDto - Transfer data with target doctor and appointment IDs
+   * @param req - Request object containing authenticated admin user
+   * @returns Success response with transfer results
+   */
+  @ApiOperation({
+    summary: 'Transfer appointments between doctors',
+    description:
+      'Transfer specific appointments from one doctor to another. Validates target doctor exists and is active. Sends email notifications to affected patients.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Appointments transferred successfully',
+    schema: {
+      example: EXAMPLES.TRANSFER_APPOINTMENTS_RESPONSE_EXAMPLE,
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid transfer data',
+    schema: {
+      example: {
+        message: {
+          ar: 'بيانات النقل غير صالحة',
+          en: 'Invalid transfer data',
+        },
+        code: 'INVALID_TRANSFER_DATA',
+      },
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - Invalid or missing token',
+    schema: {
+      example: EXAMPLES.ERROR_UNAUTHORIZED_EXAMPLE,
+    },
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Insufficient permissions',
+    schema: {
+      example: EXAMPLES.ERROR_FORBIDDEN_EXAMPLE,
+    },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Doctor not found',
+    schema: {
+      example: EXAMPLES.ERROR_USER_NOT_FOUND_EXAMPLE,
+    },
+  })
+  @ApiBearerAuth()
+  @ApiParam({
+    name: 'id',
+    description: 'Source doctor ID',
+    type: String,
+    example: '507f1f77bcf86cd799439011',
+  })
+  @ApiBody({ 
+    type: TransferAppointmentsDto,
+    examples: {
+      transfer: {
+        summary: 'Transfer appointments',
+        value: EXAMPLES.TRANSFER_APPOINTMENTS_REQUEST_EXAMPLE,
+      },
+    },
+  })
+  @Post(':id/transfer-appointments')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @HttpCode(HttpStatus.OK)
+  async transferAppointments(
+    @Param('id') doctorId: string,
+    @Body() transferDto: TransferAppointmentsDto,
+    @Request() req: any,
+  ) {
+    try {
+      // Extract currentUserId from JWT payload
+      const currentUserId = req.user?.userId || req.user?.sub || req.user?.id;
+
+      if (!currentUserId) {
+        this.logger.error('User ID not found in request');
+        throw new HttpException(
+          {
+            message: {
+              ar: 'معرف المستخدم غير موجود',
+              en: 'User ID not found',
+            },
+            code: 'USER_ID_NOT_FOUND',
+          },
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      // Call DoctorDeactivationService.transferAppointments()
+      const result = await this.userService.transferAppointments(
+        doctorId,
+        transferDto.targetDoctorId,
+        transferDto.appointmentIds,
+        currentUserId,
+      );
+
+      // Get target doctor details for response
+      const targetDoctor = await this.userService.findById(
+        transferDto.targetDoctorId,
+      );
+
+      // Return success response with bilingual message
+      return {
+        success: true,
+        data: {
+          transferred: result.transferred,
+          failed: result.failed,
+          errors: result.errors,
+          targetDoctor: targetDoctor
+            ? {
+                id: targetDoctor._id,
+                firstName: targetDoctor.firstName,
+                lastName: targetDoctor.lastName,
+                email: targetDoctor.email,
+              }
+            : null,
+        },
+        message: {
+          ar:
+            result.failed === 0
+              ? 'تم نقل المواعيد بنجاح'
+              : 'تم نقل بعض المواعيد بنجاح',
+          en:
+            result.failed === 0
+              ? 'Appointments transferred successfully'
+              : 'Some appointments transferred successfully',
+        },
+      };
+    } catch (error) {
+      // Re-throw if already an HTTP exception
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      this.logger.error(
+        `Transfer appointments failed: ${error.message}`,
+        error.stack,
+      );
+      throw new HttpException(
+        {
+          message: {
+            ar: 'فشل نقل المواعيد',
+            en: 'Failed to transfer appointments',
+          },
+          code: 'APPOINTMENT_TRANSFER_FAILED',
+        },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+  }
+
+  /**
    * Get users for dropdown
    * BZR-q4f3e1b8: Deactivated user restrictions in dropdowns
    *
-   * Task 7.3: Add getUsersForDropdown endpoint to UserController
-   * Requirements: 3.2
-   * Design: Section 3.6.1
+   * Task 11.2: Create user dropdown endpoint
+   * Requirements: 10.1, 10.2
+   * Design: Section 2.3 - User Dropdown Service
    *
-   * This endpoint returns only active users for dropdown selection,
-   * with optional filtering by role, complex, and clinic.
+   * This endpoint returns users for dropdown selection with optional filters.
+   * By default, only active users are returned. Results are cached for 5 minutes.
    *
    * @param role - Optional role filter
    * @param complexId - Optional complex ID filter
    * @param clinicId - Optional clinic ID filter
-   * @returns List of active users
+   * @param includeDeactivated - Optional flag to include deactivated users
+   * @returns List of users for dropdown
    */
   @ApiOperation({
     summary: 'Get users for dropdown',
     description:
-      'Get active users for dropdown selection with optional filters. Only returns active users.',
+      'Get users for dropdown selection with optional filters. Only returns active users by default. Results are cached for 5 minutes.',
   })
   @ApiResponse({
     status: 200,
@@ -520,6 +696,13 @@ export class UserController {
     description: 'Filter by clinic ID',
     example: '507f1f77bcf86cd799439014',
   })
+  @ApiQuery({
+    name: 'includeDeactivated',
+    required: false,
+    type: Boolean,
+    description: 'Include deactivated users in results',
+    example: false,
+  })
   @Get('dropdown')
   @UseGuards(JwtAuthGuard, AdminGuard)
   @HttpCode(HttpStatus.OK)
@@ -527,13 +710,65 @@ export class UserController {
     @Query('role') role?: string,
     @Query('complexId') complexId?: string,
     @Query('clinicId') clinicId?: string,
+    @Query('includeDeactivated') includeDeactivated?: string,
   ) {
     try {
-      return await this.userService.getUsersForDropdown({
+      // Parse includeDeactivated as boolean
+      const includeDeactivatedBool = includeDeactivated === 'true';
+      
+      // Create cache key from query parameters
+      const cacheKey = JSON.stringify({
         role,
         complexId,
         clinicId,
+        includeDeactivated: includeDeactivatedBool,
       });
+
+      // Check cache
+      const cached = this.dropdownCache.get(cacheKey);
+      const now = Date.now();
+      
+      if (cached && (now - cached.timestamp) < this.CACHE_TTL) {
+        this.logger.log('Returning cached dropdown results');
+        return cached.data;
+      }
+
+      // Call UserDropdownService.getUsersForDropdown()
+      const users = await this.userDropdownService.getUsersForDropdown({
+        role,
+        complexId,
+        clinicId,
+        includeDeactivated: includeDeactivatedBool,
+      });
+
+      // Build response
+      const response = {
+        success: true,
+        data: users,
+        message: {
+          ar: 'تم جلب قائمة المستخدمين بنجاح',
+          en: 'Users retrieved successfully',
+        },
+      };
+
+      // Cache the result for 5 minutes
+      this.dropdownCache.set(cacheKey, {
+        data: response,
+        timestamp: now,
+      });
+
+      // Clean up old cache entries (simple cleanup strategy)
+      if (this.dropdownCache.size > 100) {
+        const keysToDelete: string[] = [];
+        this.dropdownCache.forEach((value, key) => {
+          if ((now - value.timestamp) >= this.CACHE_TTL) {
+            keysToDelete.push(key);
+          }
+        });
+        keysToDelete.forEach(key => this.dropdownCache.delete(key));
+      }
+
+      return response;
     } catch (error) {
       // Re-throw if already an HTTP exception
       if (error instanceof HttpException) {
@@ -806,6 +1041,138 @@ export class UserController {
             en: 'Failed to update user',
           },
           code: 'USER_UPDATE_FAILED',
+        },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+  }
+
+  /**
+   * Delete user
+   * BZR-m3d5a8b7: Cannot delete own account
+   *
+   * Task 9.3: Add validation to user delete endpoint
+   * Requirements: 9.1, 9.3, 9.4
+   * Design: Section 2.1
+   *
+   * This endpoint allows administrators to delete a user.
+   * It prevents users from deleting their own accounts and requires
+   * the user to be deactivated before deletion.
+   *
+   * @param userId - User ID from route params
+   * @param req - Request object containing authenticated admin user
+   * @returns Success response with deleted user ID
+   */
+  @ApiOperation({
+    summary: 'Delete user',
+    description:
+      'Delete a user. Cannot delete own account. User must be deactivated before deletion.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'User deleted successfully',
+    schema: {
+      example: {
+        success: true,
+        data: {
+          deletedUserId: '507f1f77bcf86cd799439011',
+        },
+        message: {
+          ar: 'تم حذف المستخدم بنجاح',
+          en: 'User deleted successfully',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'User must be deactivated before deletion',
+    schema: {
+      example: {
+        message: {
+          ar: 'يجب إلغاء تفعيل المستخدم قبل الحذف',
+          en: 'User must be deactivated before deletion',
+        },
+        code: 'USER_MUST_BE_DEACTIVATED',
+      },
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - Invalid or missing token',
+    schema: {
+      example: EXAMPLES.ERROR_UNAUTHORIZED_EXAMPLE,
+    },
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Cannot delete own account',
+    schema: {
+      example: {
+        message: {
+          ar: 'لا يمكنك حذف حسابك الخاص',
+          en: 'You cannot delete your own account',
+        },
+        code: 'CANNOT_DELETE_SELF',
+      },
+    },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'User not found',
+    schema: {
+      example: EXAMPLES.ERROR_USER_NOT_FOUND_EXAMPLE,
+    },
+  })
+  @ApiBearerAuth()
+  @ApiParam({
+    name: 'id',
+    description: 'User ID',
+    type: String,
+    example: '507f1f77bcf86cd799439011',
+  })
+  @Delete(':id')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @HttpCode(HttpStatus.OK)
+  async deleteUser(@Param('id') userId: string, @Request() req: any) {
+    try {
+      // Extract currentUserId from JWT payload
+      const currentUserId = req.user?.userId || req.user?.sub || req.user?.id;
+
+      if (!currentUserId) {
+        this.logger.error('User ID not found in request');
+        throw new HttpException(
+          {
+            message: {
+              ar: 'معرف المستخدم غير موجود',
+              en: 'User ID not found',
+            },
+            code: 'USER_ID_NOT_FOUND',
+          },
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      return await this.userService.deleteUser(
+        userId,
+        currentUserId,
+        req.ip,
+        req.headers['user-agent'],
+      );
+    } catch (error) {
+      // Re-throw if already an HTTP exception
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      this.logger.error(`Delete user failed: ${error.message}`, error.stack);
+      throw new HttpException(
+        {
+          message: {
+            ar: 'فشل حذف المستخدم',
+            en: 'Failed to delete user',
+          },
+          code: 'USER_DELETE_FAILED',
         },
         HttpStatus.BAD_REQUEST,
       );

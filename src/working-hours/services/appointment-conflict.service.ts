@@ -28,6 +28,16 @@ export interface ConflictResult {
 }
 
 /**
+ * Interface for rescheduling option
+ */
+export interface ReschedulingOption {
+  appointmentId: string;
+  suggestedDate: string;
+  suggestedTime: string;
+  alternativeTimes: string[];
+}
+
+/**
  * AppointmentConflictService
  *
  * Service for detecting appointment conflicts when updating doctor working hours.
@@ -166,6 +176,272 @@ export class AppointmentConflictService {
       affectedAppointments: conflicts.length,
       requiresRescheduling: conflicts.length > 0,
     };
+  }
+
+  /**
+   * Suggests rescheduling options for conflicting appointments.
+   *
+   * This method analyzes conflicting appointments and suggests alternative
+   * time slots within the doctor's new working hours. It checks doctor
+   * availability and avoids conflicts with existing appointments.
+   *
+   * For each conflicting appointment, it:
+   * 1. Finds the nearest available time slot on the same day
+   * 2. Provides up to 3 alternative time slots
+   * 3. Ensures suggested times don't conflict with existing appointments
+   * 4. Respects break times and working hours boundaries
+   *
+   * @param {Appointment[]} appointments - Conflicting appointments to reschedule
+   * @param {string} doctorId - Doctor's user ID
+   * @param {WorkingHoursSchedule[]} newSchedule - New working hours schedule
+   * @returns {Promise<ReschedulingOption[]>} Array of rescheduling suggestions
+   *
+   * @example
+   * const suggestions = await conflictService.suggestRescheduling(
+   *   conflictingAppointments,
+   *   'doctor123',
+   *   newSchedule
+   * );
+   * suggestions.forEach(suggestion => {
+   *   console.log(`Appointment ${suggestion.appointmentId}:`);
+   *   console.log(`  Suggested: ${suggestion.suggestedDate} at ${suggestion.suggestedTime}`);
+   *   console.log(`  Alternatives: ${suggestion.alternativeTimes.join(', ')}`);
+   * });
+   */
+  async suggestRescheduling(
+    appointments: Appointment[],
+    doctorId: string,
+    newSchedule: WorkingHoursSchedule[],
+  ): Promise<ReschedulingOption[]> {
+    const suggestions: ReschedulingOption[] = [];
+
+    // Create a map of working hours by day for quick lookup
+    const scheduleMap = new Map<string, WorkingHoursSchedule>();
+    newSchedule.forEach((schedule) => {
+      scheduleMap.set(schedule.dayOfWeek.toLowerCase(), schedule);
+    });
+
+    // Get all existing appointments for the doctor to avoid conflicts
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const existingAppointments = await this.appointmentModel
+      .find({
+        doctorId: new Types.ObjectId(doctorId),
+        appointmentDate: { $gte: today },
+        status: { $in: ['scheduled', 'confirmed'] },
+        deletedAt: null,
+      })
+      .select('appointmentDate appointmentTime durationMinutes')
+      .exec();
+
+    // Create a map of existing appointments by date and time
+    const existingAppointmentsMap = new Map<string, Set<string>>();
+    for (const apt of existingAppointments) {
+      const dateKey = new Date(apt.appointmentDate)
+        .toISOString()
+        .split('T')[0];
+      if (!existingAppointmentsMap.has(dateKey)) {
+        existingAppointmentsMap.set(dateKey, new Set());
+      }
+      existingAppointmentsMap.get(dateKey)!.add(apt.appointmentTime);
+    }
+
+    // Process each conflicting appointment
+    for (const appointment of appointments) {
+      const appointmentDate = new Date(appointment.appointmentDate);
+      const dateKey = appointmentDate.toISOString().split('T')[0];
+      const dayOfWeek = this.getDayOfWeek(appointmentDate);
+      const workingHours = scheduleMap.get(dayOfWeek);
+
+      if (!workingHours || !workingHours.isWorkingDay) {
+        // Day is no longer a working day - suggest next available working day
+        const nextWorkingDay = this.findNextWorkingDay(
+          appointmentDate,
+          scheduleMap,
+        );
+        if (nextWorkingDay) {
+          const nextDayKey = nextWorkingDay.date.toISOString().split('T')[0];
+          const availableTimes = this.findAvailableTimeSlots(
+            nextWorkingDay.schedule,
+            appointment.durationMinutes || 30,
+            existingAppointmentsMap.get(nextDayKey) || new Set(),
+            3,
+          );
+
+          if (availableTimes.length > 0) {
+            suggestions.push({
+              appointmentId: (appointment._id as Types.ObjectId).toString(),
+              suggestedDate: nextDayKey,
+              suggestedTime: availableTimes[0],
+              alternativeTimes: availableTimes.slice(1),
+            });
+          }
+        }
+        continue;
+      }
+
+      // Find available time slots on the same day
+      const existingTimes = existingAppointmentsMap.get(dateKey) || new Set();
+      const availableTimes = this.findAvailableTimeSlots(
+        workingHours,
+        appointment.durationMinutes || 30,
+        existingTimes,
+        3,
+      );
+
+      if (availableTimes.length > 0) {
+        suggestions.push({
+          appointmentId: (appointment._id as Types.ObjectId).toString(),
+          suggestedDate: dateKey,
+          suggestedTime: availableTimes[0],
+          alternativeTimes: availableTimes.slice(1),
+        });
+      } else {
+        // No available slots on the same day - try next working day
+        const nextWorkingDay = this.findNextWorkingDay(
+          appointmentDate,
+          scheduleMap,
+        );
+        if (nextWorkingDay) {
+          const nextDayKey = nextWorkingDay.date.toISOString().split('T')[0];
+          const nextDayTimes =
+            existingAppointmentsMap.get(nextDayKey) || new Set();
+          const nextDayAvailableTimes = this.findAvailableTimeSlots(
+            nextWorkingDay.schedule,
+            appointment.durationMinutes || 30,
+            nextDayTimes,
+            3,
+          );
+
+          if (nextDayAvailableTimes.length > 0) {
+            suggestions.push({
+              appointmentId: (appointment._id as Types.ObjectId).toString(),
+              suggestedDate: nextDayKey,
+              suggestedTime: nextDayAvailableTimes[0],
+              alternativeTimes: nextDayAvailableTimes.slice(1),
+            });
+          }
+        }
+      }
+    }
+
+    return suggestions;
+  }
+
+  /**
+   * Finds available time slots within working hours.
+   *
+   * This method generates a list of available time slots by:
+   * 1. Iterating through working hours in 15-minute intervals
+   * 2. Checking if each slot can accommodate the appointment duration
+   * 3. Avoiding break times
+   * 4. Excluding times with existing appointments
+   *
+   * @private
+   * @param {WorkingHoursSchedule} workingHours - Working hours for the day
+   * @param {number} durationMinutes - Appointment duration in minutes
+   * @param {Set<string>} existingTimes - Set of existing appointment times
+   * @param {number} maxSlots - Maximum number of slots to return
+   * @returns {string[]} Array of available time slots in HH:mm format
+   */
+  private findAvailableTimeSlots(
+    workingHours: WorkingHoursSchedule,
+    durationMinutes: number,
+    existingTimes: Set<string>,
+    maxSlots: number,
+  ): string[] {
+    const availableSlots: string[] = [];
+
+    if (
+      !workingHours.isWorkingDay ||
+      !workingHours.openingTime ||
+      !workingHours.closingTime
+    ) {
+      return availableSlots;
+    }
+
+    const openingTime = this.parseTime(workingHours.openingTime);
+    const closingTime = this.parseTime(workingHours.closingTime);
+    const breakStart = workingHours.breakStartTime
+      ? this.parseTime(workingHours.breakStartTime)
+      : null;
+    const breakEnd = workingHours.breakEndTime
+      ? this.parseTime(workingHours.breakEndTime)
+      : null;
+
+    // Iterate through time slots in 15-minute intervals
+    for (
+      let time = openingTime;
+      time + durationMinutes <= closingTime && availableSlots.length < maxSlots;
+      time += 15
+    ) {
+      const timeStr = this.formatTime(time);
+      const endTime = time + durationMinutes;
+
+      // Skip if time conflicts with existing appointment
+      if (existingTimes.has(timeStr)) {
+        continue;
+      }
+
+      // Skip if time conflicts with break
+      if (breakStart !== null && breakEnd !== null) {
+        if (
+          (time >= breakStart && time < breakEnd) ||
+          (endTime > breakStart && endTime <= breakEnd) ||
+          (time < breakStart && endTime > breakEnd)
+        ) {
+          continue;
+        }
+      }
+
+      availableSlots.push(timeStr);
+    }
+
+    return availableSlots;
+  }
+
+  /**
+   * Finds the next working day after a given date.
+   *
+   * This method searches for the next day with working hours defined
+   * in the schedule, up to 14 days in the future.
+   *
+   * @private
+   * @param {Date} fromDate - Starting date
+   * @param {Map<string, WorkingHoursSchedule>} scheduleMap - Working hours schedule map
+   * @returns {{ date: Date; schedule: WorkingHoursSchedule } | null} Next working day info or null
+   */
+  private findNextWorkingDay(
+    fromDate: Date,
+    scheduleMap: Map<string, WorkingHoursSchedule>,
+  ): { date: Date; schedule: WorkingHoursSchedule } | null {
+    // Search up to 14 days ahead
+    for (let i = 1; i <= 14; i++) {
+      const nextDate = new Date(fromDate);
+      nextDate.setDate(nextDate.getDate() + i);
+      const dayOfWeek = this.getDayOfWeek(nextDate);
+      const workingHours = scheduleMap.get(dayOfWeek);
+
+      if (workingHours && workingHours.isWorkingDay) {
+        return { date: nextDate, schedule: workingHours };
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Formats minutes to time string (HH:mm).
+   *
+   * @private
+   * @param {number} minutes - Time in minutes since midnight
+   * @returns {string} Time in HH:mm format
+   */
+  private formatTime(minutes: number): string {
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
   }
 
   /**

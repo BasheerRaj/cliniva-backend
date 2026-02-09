@@ -54,6 +54,15 @@ export const ERROR_MESSAGES = {
     en: 'You cannot delete your own account',
   } as BilingualMessage,
 
+  /**
+   * Error when user attempts to change their own role.
+   * Implicit business rule for self-modification restrictions
+   */
+  CANNOT_CHANGE_OWN_ROLE: {
+    ar: 'لا يمكنك تغيير دورك الخاص',
+    en: 'You cannot change your own role',
+  } as BilingualMessage,
+
   // ============================================================================
   // Entity Not Found Errors
   // ============================================================================

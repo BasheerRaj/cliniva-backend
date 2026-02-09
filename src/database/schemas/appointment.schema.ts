@@ -52,25 +52,28 @@ export class Appointment extends Document {
   @Prop()
   cancellationReason?: string;
 
-  // Appointment transfer tracking fields
+  // Appointment transfer tracking fields (Requirements 7.3, 7.4)
   @Prop({ type: Types.ObjectId, ref: 'User' })
-  previousDoctorId?: Types.ObjectId;
+  transferredFrom?: Types.ObjectId; // Original doctor ID before transfer
 
   @Prop()
-  transferredAt?: Date;
+  transferredAt?: Date; // Timestamp when appointment was transferred
 
   @Prop({ type: Types.ObjectId, ref: 'User' })
-  transferredBy?: Types.ObjectId;
+  transferredBy?: Types.ObjectId; // Admin who performed the transfer
 
-  // Rescheduling tracking fields
+  // Rescheduling tracking fields (Requirements 7.3, 7.4)
   @Prop()
-  reschedulingReason?: string;
+  rescheduledFrom?: Date; // Original appointment date/time before rescheduling
 
   @Prop()
-  markedForReschedulingAt?: Date;
+  rescheduledReason?: string; // Reason for rescheduling
 
-  @Prop({ type: Types.ObjectId, ref: 'User' })
-  markedBy?: Types.ObjectId;
+  @Prop()
+  rescheduledAt?: Date; // Timestamp when appointment was rescheduled
+
+  @Prop()
+  markedForReschedulingAt?: Date; // Timestamp when marked for manual rescheduling
 
   @Prop({ type: Types.ObjectId, ref: 'User', required: true })
   createdBy: Types.ObjectId;
@@ -92,6 +95,7 @@ AppointmentSchema.index({ serviceId: 1 });
 AppointmentSchema.index({ status: 1 });
 AppointmentSchema.index({ urgencyLevel: 1 });
 AppointmentSchema.index({ deletedAt: 1 });
+AppointmentSchema.index({ transferredFrom: 1 }); // Index for transfer tracking queries
 AppointmentSchema.index({ doctorId: 1, status: 1, appointmentDate: 1 }); // Composite index for appointment transfer queries
 
 // Optimized indexes for conflict detection and rescheduling

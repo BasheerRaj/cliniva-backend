@@ -11,6 +11,7 @@ import {
   BadRequestException,
   NotFoundException,
   InternalServerErrorException,
+  UnprocessableEntityException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -18,6 +19,7 @@ import {
   ApiResponse,
   ApiBody,
   ApiQuery,
+  ApiParam,
 } from '@nestjs/swagger';
 import { WorkingHoursService } from './working-hours.service';
 import { WorkingHoursValidationService } from './services/working-hours-validation.service';
@@ -254,16 +256,100 @@ export class WorkingHoursController {
     status: 400,
     description: 'Invalid request data or validation error',
   })
+  @ApiResponse({
+    status: 422,
+    description: 'Hierarchical validation failed - child hours outside parent hours',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: false },
+        message: {
+          type: 'object',
+          properties: {
+            ar: { type: 'string', example: 'فشل التحقق من صحة ساعات العمل الهرمية' },
+            en: { type: 'string', example: 'Hierarchical validation failed' },
+          },
+        },
+        error: {
+          type: 'object',
+          properties: {
+            code: { type: 'string', example: 'HIERARCHICAL_VALIDATION_FAILED' },
+            details: {
+              type: 'object',
+              properties: {
+                errors: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      dayOfWeek: { type: 'string', example: 'monday' },
+                      message: {
+                        type: 'object',
+                        properties: {
+                          ar: { type: 'string' },
+                          en: { type: 'string' },
+                        },
+                      },
+                      suggestedRange: {
+                        type: 'object',
+                        properties: {
+                          openingTime: { type: 'string', example: '08:00' },
+                          closingTime: { type: 'string', example: '17:00' },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  })
   async createWorkingHours(
     @Body() createDto: CreateWorkingHoursDto,
   ): Promise<StandardResponse<WorkingHours[]>> {
-    const workingHours =
-      await this.workingHoursService.createWorkingHours(createDto);
+    try {
+      // Perform hierarchical validation against parent entity
+      const validationResult = await this.validationService.validateAgainstParent(
+        createDto.entityType,
+        createDto.entityId,
+        createDto.schedule,
+      );
 
-    return this.createSuccessResponse(workingHours, {
-      ar: 'تم إنشاء ساعات العمل بنجاح',
-      en: 'Working hours created successfully',
-    });
+      // If validation fails, return 422 Unprocessable Entity with bilingual errors
+      if (!validationResult.isValid) {
+        throw new UnprocessableEntityException({
+          message: {
+            ar: 'فشل التحقق من صحة ساعات العمل الهرمية',
+            en: 'Hierarchical validation failed',
+          },
+          code: 'HIERARCHICAL_VALIDATION_FAILED',
+          details: { errors: validationResult.errors },
+        });
+      }
+
+      // Create working hours if validation passes
+      const workingHours =
+        await this.workingHoursService.createWorkingHours(createDto);
+
+      return this.createSuccessResponse(workingHours, {
+        ar: 'تم إنشاء ساعات العمل بنجاح',
+        en: 'Working hours created successfully',
+      });
+    } catch (error) {
+      // Re-throw validation errors as UnprocessableEntityException
+      if (error instanceof UnprocessableEntityException) {
+        throw error;
+      }
+      // Re-throw BadRequestException for format validation errors
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      // Re-throw other errors
+      throw error;
+    }
   }
 
   /**
@@ -623,6 +709,123 @@ export class WorkingHoursController {
       query.role,
       query.clinicId,
       query.complexId,
+    );
+
+    return {
+      success: true,
+      data: suggestionResult,
+    };
+  }
+
+  /**
+   * Get suggested working hours based on entity type and ID
+   *
+   * This endpoint provides auto-fill suggestions for working hours based on
+   * the entity's parent in the hierarchy according to business rules:
+   * - BZR-h5e4c7a0: Auto-fill from parent entity
+   * - BZR-r2b4e5c7: Suggestions are editable
+   * - Requirement 12.1: Suggest parent entity hours
+   * - Requirement 12.2: Suggest complex hours for clinics
+   * - Requirement 12.4: Fallback to standard business hours
+   *
+   * Hierarchy: User → Clinic → Complex → Organization
+   *
+   * @param {string} entityType - Entity type (user, clinic, complex, organization)
+   * @param {string} entityId - Entity ID
+   * @returns {Promise<SuggestWorkingHoursResponse>} Suggested schedule with source information
+   *
+   * @example
+   * GET /working-hours/suggestions/user/507f1f77bcf86cd799439011
+   *
+   * @example
+   * GET /working-hours/suggestions/clinic/507f1f77bcf86cd799439012
+   */
+  @Get('suggestions/:entityType/:entityId')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Get suggested working hours from parent entity',
+    description:
+      'Provides auto-fill suggestions for working hours based on parent entity in hierarchy. ' +
+      'Returns parent entity hours if available, otherwise returns standard business hours (9 AM - 5 PM, Mon-Fri). ' +
+      'Suggested hours can be modified within parent entity constraints.',
+  })
+  @ApiParam({
+    name: 'entityType',
+    enum: ['user', 'clinic', 'complex', 'organization'],
+    description: 'Type of entity requesting suggestions',
+    example: 'user',
+  })
+  @ApiParam({
+    name: 'entityId',
+    description: 'Entity ID',
+    example: '507f1f77bcf86cd799439011',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Suggestions retrieved successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: true },
+        data: {
+          type: 'object',
+          properties: {
+            suggestedSchedule: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  dayOfWeek: { type: 'string', example: 'monday' },
+                  isWorkingDay: { type: 'boolean', example: true },
+                  openingTime: { type: 'string', example: '09:00' },
+                  closingTime: { type: 'string', example: '17:00' },
+                  breakStartTime: { type: 'string', example: '12:00' },
+                  breakEndTime: { type: 'string', example: '13:00' },
+                },
+              },
+            },
+            source: {
+              type: 'object',
+              properties: {
+                entityType: {
+                  type: 'string',
+                  enum: ['clinic', 'complex'],
+                  example: 'clinic',
+                },
+                entityId: { type: 'string', example: '507f1f77bcf86cd799439012' },
+                entityName: { type: 'string', example: 'Main Clinic' },
+              },
+            },
+            canModify: { type: 'boolean', example: true },
+          },
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Entity not found',
+  })
+  async getWorkingHoursSuggestions(
+    @Param('entityType') entityType: string,
+    @Param('entityId') entityId: string,
+  ): Promise<SuggestWorkingHoursResponse> {
+    // Validate entityType
+    const validEntityTypes = ['user', 'clinic', 'complex', 'organization'];
+    if (!validEntityTypes.includes(entityType)) {
+      throw new NotFoundException({
+        message: {
+          ar: 'نوع الكيان غير صالح',
+          en: 'Invalid entity type',
+        },
+        code: 'INVALID_ENTITY_TYPE',
+      });
+    }
+
+    // Get suggestions based on entity type and ID
+    const suggestionResult = await this.suggestionService.getSuggestions(
+      entityType as 'user' | 'clinic' | 'complex' | 'organization',
+      entityId,
     );
 
     return {
@@ -1573,6 +1776,57 @@ export class WorkingHoursController {
     status: 404,
     description: 'Entity not found',
   })
+  @ApiResponse({
+    status: 422,
+    description: 'Hierarchical validation failed - child hours outside parent hours',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: false },
+        message: {
+          type: 'object',
+          properties: {
+            ar: { type: 'string', example: 'فشل التحقق من صحة ساعات العمل الهرمية' },
+            en: { type: 'string', example: 'Hierarchical validation failed' },
+          },
+        },
+        error: {
+          type: 'object',
+          properties: {
+            code: { type: 'string', example: 'HIERARCHICAL_VALIDATION_FAILED' },
+            details: {
+              type: 'object',
+              properties: {
+                errors: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      dayOfWeek: { type: 'string', example: 'monday' },
+                      message: {
+                        type: 'object',
+                        properties: {
+                          ar: { type: 'string' },
+                          en: { type: 'string' },
+                        },
+                      },
+                      suggestedRange: {
+                        type: 'object',
+                        properties: {
+                          openingTime: { type: 'string', example: '08:00' },
+                          closingTime: { type: 'string', example: '17:00' },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  })
   async updateWorkingHours(
     @Param('entityType') entityType: string,
     @Param('entityId') entityId: string,
@@ -1581,32 +1835,64 @@ export class WorkingHoursController {
     @Query('parentEntityType') parentEntityType?: string,
     @Query('parentEntityId') parentEntityId?: string,
   ): Promise<StandardResponse<WorkingHours[]>> {
-    let workingHours;
+    try {
+      let workingHours;
 
-    if (validateWithParent === 'true' && parentEntityType && parentEntityId) {
-      // Use parent validation
-      workingHours =
-        await this.workingHoursService.createWorkingHoursWithParentValidation(
-          {
-            entityType,
-            entityId,
-            schedule: updateDto.schedule,
-          },
-          parentEntityType,
-          parentEntityId,
-        );
-    } else {
-      // Standard update
-      workingHours = await this.workingHoursService.updateWorkingHours(
+      // Always perform hierarchical validation against parent entity
+      const validationResult = await this.validationService.validateAgainstParent(
         entityType,
         entityId,
-        updateDto,
+        updateDto.schedule,
       );
-    }
 
-    return this.createSuccessResponse(workingHours, {
-      ar: 'تم تحديث ساعات العمل بنجاح',
-      en: 'Working hours updated successfully',
-    });
+      // If validation fails, return 422 Unprocessable Entity with bilingual errors
+      if (!validationResult.isValid) {
+        throw new UnprocessableEntityException({
+          message: {
+            ar: 'فشل التحقق من صحة ساعات العمل الهرمية',
+            en: 'Hierarchical validation failed',
+          },
+          code: 'HIERARCHICAL_VALIDATION_FAILED',
+          details: { errors: validationResult.errors },
+        });
+      }
+
+      if (validateWithParent === 'true' && parentEntityType && parentEntityId) {
+        // Use parent validation (legacy support)
+        workingHours =
+          await this.workingHoursService.createWorkingHoursWithParentValidation(
+            {
+              entityType,
+              entityId,
+              schedule: updateDto.schedule,
+            },
+            parentEntityType,
+            parentEntityId,
+          );
+      } else {
+        // Standard update
+        workingHours = await this.workingHoursService.updateWorkingHours(
+          entityType,
+          entityId,
+          updateDto,
+        );
+      }
+
+      return this.createSuccessResponse(workingHours, {
+        ar: 'تم تحديث ساعات العمل بنجاح',
+        en: 'Working hours updated successfully',
+      });
+    } catch (error) {
+      // Re-throw validation errors as UnprocessableEntityException
+      if (error instanceof UnprocessableEntityException) {
+        throw error;
+      }
+      // Re-throw BadRequestException for format validation errors
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      // Re-throw other errors
+      throw error;
+    }
   }
 }

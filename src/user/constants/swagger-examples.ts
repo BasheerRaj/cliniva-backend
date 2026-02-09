@@ -321,6 +321,57 @@ export const USERS_DROPDOWN_RESPONSE_EXAMPLE = {
 };
 
 // ============================================================================
+// TRANSFER APPOINTMENTS EXAMPLES
+// ============================================================================
+
+export const TRANSFER_APPOINTMENTS_REQUEST_EXAMPLE = {
+  targetDoctorId: '507f1f77bcf86cd799439016',
+  appointmentIds: [
+    '507f1f77bcf86cd799439020',
+    '507f1f77bcf86cd799439021',
+    '507f1f77bcf86cd799439022',
+  ],
+};
+
+export const TRANSFER_APPOINTMENTS_RESPONSE_EXAMPLE = {
+  success: true,
+  data: {
+    transferred: 3,
+    failed: 0,
+    errors: [],
+    targetDoctor: {
+      id: '507f1f77bcf86cd799439016',
+      firstName: 'Dr. Sarah',
+      lastName: 'Johnson',
+      email: 'sarah.johnson@example.com',
+    },
+  },
+  message: {
+    ar: 'تم نقل المواعيد بنجاح',
+    en: 'Appointments transferred successfully',
+  },
+};
+
+export const TRANSFER_APPOINTMENTS_PARTIAL_RESPONSE_EXAMPLE = {
+  success: true,
+  data: {
+    transferred: 2,
+    failed: 1,
+    errors: ['Appointment not found: 507f1f77bcf86cd799439022'],
+    targetDoctor: {
+      id: '507f1f77bcf86cd799439016',
+      firstName: 'Dr. Sarah',
+      lastName: 'Johnson',
+      email: 'sarah.johnson@example.com',
+    },
+  },
+  message: {
+    ar: 'تم نقل بعض المواعيد بنجاح',
+    en: 'Some appointments transferred successfully',
+  },
+};
+
+// ============================================================================
 // SEND PASSWORD RESET EXAMPLES
 // ============================================================================
 

@@ -61,7 +61,219 @@ export class WorkingHoursValidationService {
   constructor(
     @InjectModel('WorkingHours')
     private readonly workingHoursModel: Model<WorkingHours>,
+    @InjectModel('User')
+    private readonly userModel: Model<any>,
+    @InjectModel('Clinic')
+    private readonly clinicModel: Model<any>,
+    @InjectModel('Complex')
+    private readonly complexModel: Model<any>,
   ) {}
+
+  /**
+   * Validates working hours against parent entity automatically.
+   * 
+   * This method automatically determines the parent entity based on the entity type
+   * and validates the schedule against parent working hours:
+   * - User → Clinic
+   * - Clinic → Complex
+   * - Complex → Organization
+   *
+   * @param {string} entityType - Entity type ('user', 'clinic', 'complex', 'organization')
+   * @param {string} entityId - Entity ID
+   * @param {WorkingHoursSchedule[]} schedule - Working hours schedule to validate
+   * @returns {Promise<ValidationResult>} Validation result with errors and suggestions
+   *
+   * @example
+   * const result = await validationService.validateAgainstParent(
+   *   'user',
+   *   'user123',
+   *   userSchedule
+   * );
+   * if (!result.isValid) {
+   *   console.log(result.errors);
+   * }
+   */
+  async validateAgainstParent(
+    entityType: string,
+    entityId: string,
+    schedule: WorkingHoursSchedule[],
+  ): Promise<ValidationResult> {
+    // Determine parent entity
+    const parentInfo = await this.getParentEntity(entityType, entityId);
+
+    // If no parent entity exists, validation passes
+    if (!parentInfo) {
+      return { isValid: true, errors: [] };
+    }
+
+    // Get entity name for error messages
+    const entityName = await this.getEntityName(entityType, entityId);
+
+    // Validate against parent
+    return this.validateHierarchical(
+      schedule,
+      parentInfo.parentEntityType,
+      parentInfo.parentEntityId,
+      entityName,
+    );
+  }
+
+  /**
+   * Determines the parent entity for a given entity type and ID.
+   * 
+   * Hierarchy:
+   * - User → Clinic (via clinicId)
+   * - Clinic → Complex (via complexId)
+   * - Complex → Organization (via organizationId)
+   * - Organization → null (top level)
+   *
+   * @param {string} entityType - Entity type
+   * @param {string} entityId - Entity ID
+   * @returns {Promise<{parentEntityType: string, parentEntityId: string} | null>} Parent entity info or null
+   * @private
+   */
+  private async getParentEntity(
+    entityType: string,
+    entityId: string,
+  ): Promise<{ parentEntityType: string; parentEntityId: string } | null> {
+    try {
+      switch (entityType.toLowerCase()) {
+        case 'user': {
+          // User → Clinic
+          const user = await this.userModel
+            .findById(entityId)
+            .select('clinicId')
+            .lean()
+            .exec();
+
+          if ((user as any)?.clinicId) {
+            return {
+              parentEntityType: 'clinic',
+              parentEntityId: (user as any).clinicId.toString(),
+            };
+          }
+          return null;
+        }
+
+        case 'clinic': {
+          // Clinic → Complex
+          const clinic = await this.clinicModel
+            .findById(entityId)
+            .select('complexId')
+            .lean()
+            .exec();
+
+          if ((clinic as any)?.complexId) {
+            return {
+              parentEntityType: 'complex',
+              parentEntityId: (clinic as any).complexId.toString(),
+            };
+          }
+          return null;
+        }
+
+        case 'complex': {
+          // Complex → Organization
+          const complex = await this.complexModel
+            .findById(entityId)
+            .select('organizationId')
+            .lean()
+            .exec();
+
+          if ((complex as any)?.organizationId) {
+            return {
+              parentEntityType: 'organization',
+              parentEntityId: (complex as any).organizationId.toString(),
+            };
+          }
+          return null;
+        }
+
+        case 'organization': {
+          // Organization is top level, no parent
+          return null;
+        }
+
+        default:
+          throw new BadRequestException({
+            message: {
+              ar: `نوع الكيان غير صالح: ${entityType}`,
+              en: `Invalid entity type: ${entityType}`,
+            },
+          });
+      }
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      // Log error and return null to allow validation to proceed
+      console.error(
+        `Error determining parent entity for ${entityType}:${entityId}`,
+        error,
+      );
+      return null;
+    }
+  }
+
+  /**
+   * Gets the entity name for error messages.
+   *
+   * @param {string} entityType - Entity type
+   * @param {string} entityId - Entity ID
+   * @returns {Promise<string>} Entity name
+   * @private
+   */
+  private async getEntityName(
+    entityType: string,
+    entityId: string,
+  ): Promise<string> {
+    try {
+      switch (entityType.toLowerCase()) {
+        case 'user': {
+          const user = await this.userModel
+            .findById(entityId)
+            .select('firstName lastName')
+            .lean()
+            .exec();
+          return user
+            ? `${(user as any).firstName} ${(user as any).lastName}`
+            : `User ${entityId}`;
+        }
+
+        case 'clinic': {
+          const clinic = await this.clinicModel
+            .findById(entityId)
+            .select('name')
+            .lean()
+            .exec();
+          return clinic ? (clinic as any).name : `Clinic ${entityId}`;
+        }
+
+        case 'complex': {
+          const complex = await this.complexModel
+            .findById(entityId)
+            .select('name')
+            .lean()
+            .exec();
+          return complex ? (complex as any).name : `Complex ${entityId}`;
+        }
+
+        case 'organization': {
+          // Organization model not injected, return generic name
+          return `Organization ${entityId}`;
+        }
+
+        default:
+          return `Entity ${entityId}`;
+      }
+    } catch (error) {
+      console.error(
+        `Error getting entity name for ${entityType}:${entityId}`,
+        error,
+      );
+      return `Entity ${entityId}`;
+    }
+  }
 
   /**
    * Validates child working hours against parent working hours hierarchically.

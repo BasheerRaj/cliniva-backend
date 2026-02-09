@@ -2,6 +2,9 @@ import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { UserController } from './user.controller';
 import { UserService } from './user.service';
+import { UserRestrictionService } from './user-restriction.service';
+import { DoctorDeactivationService } from './doctor-deactivation.service';
+import { UserDropdownService } from './user-dropdown.service';
 import { User, UserSchema } from '../database/schemas/user.schema';
 import {
   Organization,
@@ -37,7 +40,17 @@ import { AuthModule } from '../auth/auth.module';
     forwardRef(() => AuthModule), // Use forwardRef to avoid circular dependency
   ],
   controllers: [UserController],
-  providers: [UserService],
-  exports: [UserService],
+  providers: [
+    UserService,
+    UserRestrictionService,
+    DoctorDeactivationService,
+    UserDropdownService,
+  ],
+  exports: [
+    UserService,
+    UserRestrictionService,
+    DoctorDeactivationService,
+    UserDropdownService,
+  ],
 })
 export class UserModule {}

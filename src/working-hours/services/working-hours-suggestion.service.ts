@@ -4,6 +4,7 @@ import { Model, Types } from 'mongoose';
 import { WorkingHours } from '../../database/schemas/working-hours.schema';
 import { Clinic } from '../../database/schemas/clinic.schema';
 import { Complex } from '../../database/schemas/complex.schema';
+import { User } from '../../database/schemas/user.schema';
 import {
   ERROR_MESSAGES,
   createDynamicMessage,
@@ -31,6 +32,49 @@ export interface SuggestionResult {
   canModify: boolean;
 }
 
+type EntityType = 'user' | 'clinic' | 'complex' | 'organization';
+
+const STANDARD_BUSINESS_HOURS: SuggestedSchedule[] = [
+  {
+    dayOfWeek: 'monday',
+    isWorkingDay: true,
+    openingTime: '09:00',
+    closingTime: '17:00',
+  },
+  {
+    dayOfWeek: 'tuesday',
+    isWorkingDay: true,
+    openingTime: '09:00',
+    closingTime: '17:00',
+  },
+  {
+    dayOfWeek: 'wednesday',
+    isWorkingDay: true,
+    openingTime: '09:00',
+    closingTime: '17:00',
+  },
+  {
+    dayOfWeek: 'thursday',
+    isWorkingDay: true,
+    openingTime: '09:00',
+    closingTime: '17:00',
+  },
+  {
+    dayOfWeek: 'friday',
+    isWorkingDay: true,
+    openingTime: '09:00',
+    closingTime: '17:00',
+  },
+  {
+    dayOfWeek: 'saturday',
+    isWorkingDay: false,
+  },
+  {
+    dayOfWeek: 'sunday',
+    isWorkingDay: false,
+  },
+];
+
 @Injectable()
 export class WorkingHoursSuggestionService {
   constructor(
@@ -40,7 +84,166 @@ export class WorkingHoursSuggestionService {
     private readonly clinicModel: Model<Clinic>,
     @InjectModel('Complex')
     private readonly complexModel: Model<Complex>,
+    @InjectModel('User')
+    private readonly userModel: Model<any>,
   ) {}
+
+  /**
+   * Get suggested working hours based on entity type and ID
+   * Implements Requirements 12.1, 12.2, 12.4
+   *
+   * @param entityType - Type of entity ('user', 'clinic', 'complex', 'organization')
+   * @param entityId - Entity ID
+   * @returns Suggested schedule with source information
+   */
+  async getSuggestions(
+    entityType: EntityType,
+    entityId: string,
+  ): Promise<SuggestionResult> {
+    // Determine parent entity based on entityType
+    const parentInfo = await this.getParentEntity(entityType, entityId);
+
+    if (!parentInfo) {
+      // No parent entity, return standard business hours
+      return {
+        suggestedSchedule: STANDARD_BUSINESS_HOURS,
+        source: {
+          entityType: 'complex', // Default source type
+          entityId: '',
+          entityName: 'Standard Business Hours',
+        },
+        canModify: true,
+      };
+    }
+
+    // Query parent entity working hours
+    const parentHours = await this.workingHoursModel
+      .find({
+        entityType: parentInfo.entityType,
+        entityId: new Types.ObjectId(parentInfo.entityId),
+        isActive: true,
+      })
+      .select(
+        'dayOfWeek isWorkingDay openingTime closingTime breakStartTime breakEndTime',
+      )
+      .lean()
+      .exec();
+
+    if (parentHours.length === 0) {
+      // Parent exists but has no hours, return standard business hours
+      return {
+        suggestedSchedule: STANDARD_BUSINESS_HOURS,
+        source: {
+          entityType: parentInfo.entityType,
+          entityId: parentInfo.entityId,
+          entityName: parentInfo.entityName,
+        },
+        canModify: true,
+      };
+    }
+
+    // Return parent hours as suggestions
+    return {
+      suggestedSchedule: parentHours.map((hour) => ({
+        dayOfWeek: hour.dayOfWeek,
+        isWorkingDay: hour.isWorkingDay,
+        openingTime: hour.openingTime,
+        closingTime: hour.closingTime,
+        breakStartTime: hour.breakStartTime,
+        breakEndTime: hour.breakEndTime,
+      })),
+      source: {
+        entityType: parentInfo.entityType,
+        entityId: parentInfo.entityId,
+        entityName: parentInfo.entityName,
+      },
+      canModify: true,
+    };
+  }
+
+  /**
+   * Determine parent entity based on entity type
+   * Hierarchy: User → Clinic, Clinic → Complex, Complex → Organization
+   *
+   * @param entityType - Type of entity
+   * @param entityId - Entity ID
+   * @returns Parent entity information or null if no parent
+   */
+  private async getParentEntity(
+    entityType: EntityType,
+    entityId: string,
+  ): Promise<EntityInfo | null> {
+    try {
+      if (entityType === 'user') {
+        // User's parent is Clinic
+        const user = await this.userModel
+          .findById(new Types.ObjectId(entityId))
+          .select('clinicId')
+          .lean()
+          .exec();
+
+        if (!user || !(user as any).clinicId) {
+          return null;
+        }
+
+        const clinic = await this.clinicModel
+          .findById((user as any).clinicId)
+          .select('name')
+          .lean()
+          .exec();
+
+        if (!clinic) {
+          return null;
+        }
+
+        return {
+          entityType: 'clinic',
+          entityId: (user as any).clinicId.toString(),
+          entityName: (clinic as any).name,
+        };
+      } else if (entityType === 'clinic') {
+        // Clinic's parent is Complex
+        const clinic = await this.clinicModel
+          .findById(new Types.ObjectId(entityId))
+          .select('complexId')
+          .lean()
+          .exec();
+
+        if (!clinic || !clinic.complexId) {
+          return null;
+        }
+
+        const complex = await this.complexModel
+          .findById(clinic.complexId)
+          .select('name')
+          .lean()
+          .exec();
+
+        if (!complex) {
+          return null;
+        }
+
+        return {
+          entityType: 'complex',
+          entityId: clinic.complexId.toString(),
+          entityName: complex.name,
+        };
+      } else if (entityType === 'complex') {
+        // Complex's parent is Organization
+        // Note: Organization schema not available in current codebase
+        // Return null for now (will use standard business hours)
+        return null;
+      } else if (entityType === 'organization') {
+        // Organization has no parent
+        return null;
+      }
+
+      return null;
+    } catch (error) {
+      // If any error occurs, return null to fall back to standard hours
+      return null;
+    }
+  }
 
   /**
    * Get suggested working hours based on role and entity assignment

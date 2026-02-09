@@ -61,4 +61,5 @@ export * from './access-log.schema';
 
 // Authentication & Session Management
 export * from './token-blacklist.schema';
+export * from './session.schema';
 export * from './rate-limit-counter.schema';

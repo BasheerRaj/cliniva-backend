@@ -282,8 +282,10 @@ export class WorkingHoursReschedulingService {
             {
               $set: {
                 appointmentTime: newTime,
-                reschedulingReason:
+                rescheduledFrom: appointment.appointmentDate,
+                rescheduledReason:
                   'Automatically rescheduled due to working hours change',
+                rescheduledAt: new Date(),
                 updatedAt: new Date(),
               },
             },
@@ -309,7 +311,7 @@ export class WorkingHoursReschedulingService {
             {
               $set: {
                 status: 'needs_rescheduling',
-                reschedulingReason:
+                rescheduledReason:
                   'No suitable time slot available - requires manual rescheduling',
                 markedForReschedulingAt: new Date(),
                 updatedAt: new Date(),
@@ -332,7 +334,7 @@ export class WorkingHoursReschedulingService {
           {
             $set: {
               status: 'needs_rescheduling',
-              reschedulingReason: 'Day is no longer a working day',
+              rescheduledReason: 'Day is no longer a working day',
               markedForReschedulingAt: new Date(),
               updatedAt: new Date(),
             },
@@ -383,7 +385,7 @@ export class WorkingHoursReschedulingService {
         {
           $set: {
             status: 'needs_rescheduling',
-            reschedulingReason: reason,
+            rescheduledReason: reason,
             markedForReschedulingAt: new Date(),
             updatedAt: new Date(),
           },

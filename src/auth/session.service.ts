@@ -2,19 +2,22 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { TokenBlacklist } from '../database/schemas/token-blacklist.schema';
+import { Session, DeviceInfo } from '../database/schemas/session.schema';
 import { TokenService } from './token.service';
 
 /**
  * SessionService - Manages user sessions and token invalidation
  *
  * Provides methods for:
+ * - Creating and managing user sessions
+ * - Session restoration
  * - Invalidating all user sessions (adds tokens to blacklist)
  * - Adding individual tokens to blacklist
  * - Checking if tokens are blacklisted
  * - Cleaning up expired tokens from blacklist
  * - Counting active sessions for a user
  *
- * Requirements: 3.3, 3.4, 3.5, 3.7
+ * Requirements: 3.3, 3.4, 3.5, 3.7, 4.1, 4.2, 4.3, 5.1, 6.1
  */
 @Injectable()
 export class SessionService {
@@ -23,44 +26,177 @@ export class SessionService {
   constructor(
     @InjectModel(TokenBlacklist.name)
     private readonly tokenBlacklistModel: Model<TokenBlacklist>,
+    @InjectModel(Session.name)
+    private readonly sessionModel: Model<Session>,
     private readonly tokenService: TokenService,
   ) {}
+
+  // ==================== Session Management Methods ====================
+
+  /**
+   * Create a new session
+   *
+   * @param userId - User ID for the session
+   * @param deviceInfo - Device information (userAgent, ipAddress, browser, os)
+   * @param token - Access token
+   * @param refreshToken - Refresh token
+   * @param expiresAt - Session expiration date
+   * @returns Created session
+   *
+   * Requirements: 4.1, 4.2
+   */
+  async createSession(
+    userId: string,
+    deviceInfo: DeviceInfo,
+    token: string,
+    refreshToken: string,
+    expiresAt: Date,
+  ): Promise<Session> {
+    try {
+      // Hash the token for storage
+      const tokenHash = this.tokenService.hashToken(token);
+
+      const session = new this.sessionModel({
+        userId: new Types.ObjectId(userId),
+        token: tokenHash,
+        refreshToken,
+        deviceInfo,
+        expiresAt,
+        isActive: true,
+      });
+
+      const savedSession = await session.save();
+
+      this.logger.log(
+        `Session created for user ${userId} from ${deviceInfo.ipAddress}`,
+      );
+
+      return savedSession;
+    } catch (error) {
+      this.logger.error(
+        `Failed to create session for user ${userId}: ${error.message}`,
+        error.stack,
+      );
+      throw new Error('Failed to create session');
+    }
+  }
+
+  /**
+   * Restore session from token
+   *
+   * @param token - Access token to restore session from
+   * @returns Session if found and active, null otherwise
+   *
+   * Requirements: 4.2, 4.3, 4.4
+   */
+  async restoreSession(token: string): Promise<Session | null> {
+    try {
+      // Hash the token for lookup
+      const tokenHash = this.tokenService.hashToken(token);
+
+      const session = await this.sessionModel
+        .findOne({
+          token: tokenHash,
+          isActive: true,
+          expiresAt: { $gt: new Date() },
+        })
+        .lean()
+        .exec();
+
+      if (session) {
+        this.logger.debug(`Session restored for user ${session.userId}`);
+      } else {
+        this.logger.debug('No active session found for token');
+      }
+
+      return session as Session | null;
+    } catch (error) {
+      this.logger.error(
+        `Failed to restore session: ${error.message}`,
+        error.stack,
+      );
+      return null;
+    }
+  }
 
   /**
    * Invalidate all sessions for a user
    *
-   * This method adds all active tokens for a user to the blacklist.
-   * Used when critical account changes occur (email change, role change, password change).
+   * This method marks all active sessions as inactive and adds their tokens to the blacklist.
+   * Used when critical account changes occur (username change, role change, password change).
    *
    * @param userId - User ID whose sessions should be invalidated
-   * @param reason - Reason for invalidation (e.g., 'password_change', 'email_change', 'role_change')
+   * @param reason - Reason for invalidation (e.g., 'password_change', 'username_change', 'role_change')
    * @param adminId - Optional admin ID if invalidation was triggered by an admin
+   * @returns Number of sessions invalidated
    *
-   * Requirement 3.3: Session invalidation adds tokens to blacklist
-   *
-   * Note: This method doesn't actually retrieve existing tokens because JWT is stateless.
-   * Instead, it's called in conjunction with other operations that have access to the tokens.
-   * The actual token blacklisting happens via addTokenToBlacklist() calls.
+   * Requirements: 4.3, 5.1, 6.1
    */
   async invalidateUserSessions(
     userId: string,
     reason: string,
     adminId?: string,
-  ): Promise<void> {
+  ): Promise<number> {
     try {
       this.logger.log(
         `Invalidating sessions for user ${userId}, reason: ${reason}${adminId ? `, admin: ${adminId}` : ''}`,
       );
 
-      // Note: In a stateless JWT system, we don't have a list of active tokens.
-      // This method serves as a coordination point for session invalidation logic.
-      // The actual blacklisting happens when tokens are explicitly provided
-      // (e.g., during logout, password change, etc.)
+      // Find all active sessions for the user
+      const activeSessions = await this.sessionModel
+        .find({
+          userId: new Types.ObjectId(userId),
+          isActive: true,
+        })
+        .exec();
 
-      // This method is primarily used to log the invalidation event
-      // and can be extended to handle additional cleanup or notification logic.
+      if (activeSessions.length === 0) {
+        this.logger.log(`No active sessions found for user ${userId}`);
+        return 0;
+      }
 
-      this.logger.log(`Session invalidation initiated for user ${userId}`);
+      // Mark all sessions as inactive
+      const updateResult = await this.sessionModel
+        .updateMany(
+          {
+            userId: new Types.ObjectId(userId),
+            isActive: true,
+          },
+          {
+            $set: {
+              isActive: false,
+              invalidatedAt: new Date(),
+              invalidationReason: reason,
+            },
+          },
+        )
+        .exec();
+
+      // Add all tokens to blacklist
+      for (const session of activeSessions) {
+        try {
+          await this.addTokenToBlacklist(
+            session.token,
+            userId,
+            session.expiresAt,
+            reason,
+            adminId,
+          );
+        } catch (error) {
+          // Continue even if blacklisting fails for individual tokens
+          this.logger.warn(
+            `Failed to blacklist token for session ${session._id}: ${error.message}`,
+          );
+        }
+      }
+
+      const invalidatedCount = updateResult.modifiedCount || 0;
+
+      this.logger.log(
+        `Invalidated ${invalidatedCount} sessions for user ${userId}`,
+      );
+
+      return invalidatedCount;
     } catch (error) {
       this.logger.error(
         `Failed to invalidate sessions for user ${userId}: ${error.message}`,
@@ -69,6 +205,87 @@ export class SessionService {
       throw new Error('Failed to invalidate user sessions');
     }
   }
+
+  /**
+   * Invalidate a specific session
+   *
+   * @param sessionId - Session ID to invalidate
+   * @param reason - Reason for invalidation
+   * @returns void
+   *
+   * Requirements: 4.3
+   */
+  async invalidateSession(sessionId: string, reason?: string): Promise<void> {
+    try {
+      const session = await this.sessionModel.findById(sessionId).exec();
+
+      if (!session) {
+        this.logger.warn(`Session ${sessionId} not found`);
+        return;
+      }
+
+      // Mark session as inactive
+      session.isActive = false;
+      session.invalidatedAt = new Date();
+      session.invalidationReason = reason || 'manual_invalidation';
+
+      await session.save();
+
+      // Add token to blacklist
+      await this.addTokenToBlacklist(
+        session.token,
+        session.userId.toString(),
+        session.expiresAt,
+        reason || 'manual_invalidation',
+      );
+
+      this.logger.log(`Session ${sessionId} invalidated`);
+    } catch (error) {
+      this.logger.error(
+        `Failed to invalidate session ${sessionId}: ${error.message}`,
+        error.stack,
+      );
+      throw new Error('Failed to invalidate session');
+    }
+  }
+
+  /**
+   * Get active sessions for a user
+   *
+   * @param userId - User ID to get sessions for
+   * @returns Array of active sessions
+   *
+   * Requirements: 4.1, 4.2
+   */
+  async getActiveSessions(userId: string): Promise<Session[]> {
+    try {
+      const sessions = await this.sessionModel
+        .find({
+          userId: new Types.ObjectId(userId),
+          isActive: true,
+          expiresAt: { $gt: new Date() },
+        })
+        .sort({ createdAt: -1 })
+        .lean()
+        .exec();
+
+      this.logger.debug(
+        `Found ${sessions.length} active sessions for user ${userId}`,
+      );
+
+      return sessions as Session[];
+    } catch (error) {
+      this.logger.error(
+        `Failed to get active sessions for user ${userId}: ${error.message}`,
+        error.stack,
+      );
+      throw new Error('Failed to get active sessions');
+    }
+  }
+
+  // ==================== Token Blacklist Methods ====================
+
+  // ==================== Token Blacklist Methods ====================
 
   /**
    * Add a token to the blacklist
@@ -231,8 +448,9 @@ export class SessionService {
    * This is an alias for invalidateUserSessions with a default reason.
    *
    * @param userId - User ID whose tokens should be invalidated
+   * @returns Number of sessions invalidated
    */
-  async invalidateAllUserTokens(userId: string): Promise<void> {
-    await this.invalidateUserSessions(userId, 'manual_invalidation');
+  async invalidateAllUserTokens(userId: string): Promise<number> {
+    return await this.invalidateUserSessions(userId, 'manual_invalidation');
   }
 }

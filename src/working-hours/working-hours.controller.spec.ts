@@ -6,13 +6,17 @@ import { WorkingHoursSuggestionService } from './services/working-hours-suggesti
 import { AppointmentConflictService } from './services/appointment-conflict.service';
 import { WorkingHoursReschedulingService } from './services/working-hours-rescheduling.service';
 import { ValidateWorkingHoursDto } from './dto/validate-working-hours.dto';
+import { CreateWorkingHoursDto, UpdateWorkingHoursDto } from './dto/create-working-hours.dto';
+import { UnprocessableEntityException } from '@nestjs/common';
 
 describe('WorkingHoursController - Validation Endpoint', () => {
   let controller: WorkingHoursController;
   let validationService: WorkingHoursValidationService;
+  let workingHoursService: WorkingHoursService;
 
   const mockValidationService = {
     validateHierarchical: jest.fn(),
+    validateAgainstParent: jest.fn(),
   };
 
   const mockSuggestionService = {
@@ -72,6 +76,7 @@ describe('WorkingHoursController - Validation Endpoint', () => {
     validationService = module.get<WorkingHoursValidationService>(
       WorkingHoursValidationService,
     );
+    workingHoursService = module.get<WorkingHoursService>(WorkingHoursService);
   });
 
   afterEach(() => {
@@ -300,6 +305,307 @@ describe('WorkingHoursController - Validation Endpoint', () => {
       expect(result.data.errors[0].suggestedRange).toBeDefined();
       expect(result.data.errors[0].suggestedRange?.openingTime).toBe('08:00');
       expect(result.data.errors[0].suggestedRange?.closingTime).toBe('18:00');
+    });
+  });
+
+  describe('POST /working-hours - Create with Validation', () => {
+    it('should create working hours successfully when validation passes', async () => {
+      const createDto: CreateWorkingHoursDto = {
+        entityType: 'user',
+        entityId: '507f1f77bcf86cd799439011',
+        schedule: [
+          {
+            dayOfWeek: 'monday',
+            isWorkingDay: true,
+            openingTime: '09:00',
+            closingTime: '17:00',
+          },
+        ],
+      };
+
+      const mockValidationResult = {
+        isValid: true,
+        errors: [],
+      };
+
+      const mockCreatedHours = [
+        {
+          _id: '507f1f77bcf86cd799439020',
+          entityType: 'user',
+          entityId: '507f1f77bcf86cd799439011',
+          dayOfWeek: 'monday',
+          isWorkingDay: true,
+          openingTime: '09:00',
+          closingTime: '17:00',
+        },
+      ];
+
+      mockValidationService.validateAgainstParent.mockResolvedValue(
+        mockValidationResult,
+      );
+      mockWorkingHoursService.createWorkingHours.mockResolvedValue(
+        mockCreatedHours,
+      );
+
+      const result = await controller.createWorkingHours(createDto);
+
+      expect(result.success).toBe(true);
+      expect(result.data).toEqual(mockCreatedHours);
+      expect(validationService.validateAgainstParent).toHaveBeenCalledWith(
+        createDto.entityType,
+        createDto.entityId,
+        createDto.schedule,
+      );
+      expect(workingHoursService.createWorkingHours).toHaveBeenCalledWith(
+        createDto,
+      );
+    });
+
+    it('should throw UnprocessableEntityException when validation fails', async () => {
+      const createDto: CreateWorkingHoursDto = {
+        entityType: 'user',
+        entityId: '507f1f77bcf86cd799439011',
+        schedule: [
+          {
+            dayOfWeek: 'monday',
+            isWorkingDay: true,
+            openingTime: '07:00', // Before parent opening time
+            closingTime: '17:00',
+          },
+        ],
+      };
+
+      const mockValidationResult = {
+        isValid: false,
+        errors: [
+          {
+            dayOfWeek: 'monday',
+            message: {
+              ar: 'ساعات العمل يجب أن تكون ضمن ساعات clinic',
+              en: 'Working hours must be within clinic hours',
+            },
+            suggestedRange: {
+              openingTime: '08:00',
+              closingTime: '17:00',
+            },
+          },
+        ],
+      };
+
+      mockValidationService.validateAgainstParent.mockResolvedValue(
+        mockValidationResult,
+      );
+
+      await expect(controller.createWorkingHours(createDto)).rejects.toThrow(
+        UnprocessableEntityException,
+      );
+
+      expect(validationService.validateAgainstParent).toHaveBeenCalledWith(
+        createDto.entityType,
+        createDto.entityId,
+        createDto.schedule,
+      );
+      expect(workingHoursService.createWorkingHours).not.toHaveBeenCalled();
+    });
+
+    it('should include bilingual error messages in validation failure', async () => {
+      const createDto: CreateWorkingHoursDto = {
+        entityType: 'user',
+        entityId: '507f1f77bcf86cd799439011',
+        schedule: [
+          {
+            dayOfWeek: 'monday',
+            isWorkingDay: true,
+            openingTime: '07:00',
+            closingTime: '17:00',
+          },
+        ],
+      };
+
+      const mockValidationResult = {
+        isValid: false,
+        errors: [
+          {
+            dayOfWeek: 'monday',
+            message: {
+              ar: 'ساعات العمل يجب أن تكون ضمن ساعات clinic',
+              en: 'Working hours must be within clinic hours',
+            },
+          },
+        ],
+      };
+
+      mockValidationService.validateAgainstParent.mockResolvedValue(
+        mockValidationResult,
+      );
+
+      try {
+        await controller.createWorkingHours(createDto);
+        fail('Should have thrown UnprocessableEntityException');
+      } catch (error) {
+        expect(error).toBeInstanceOf(UnprocessableEntityException);
+        const response = error.getResponse() as any;
+        expect(response.message).toHaveProperty('ar');
+        expect(response.message).toHaveProperty('en');
+        expect(response.code).toBe('HIERARCHICAL_VALIDATION_FAILED');
+        expect(response.details.errors).toEqual(mockValidationResult.errors);
+      }
+    });
+  });
+
+  describe('PUT /working-hours/:entityType/:entityId - Update with Validation', () => {
+    it('should update working hours successfully when validation passes', async () => {
+      const updateDto: UpdateWorkingHoursDto = {
+        schedule: [
+          {
+            dayOfWeek: 'monday',
+            isWorkingDay: true,
+            openingTime: '09:00',
+            closingTime: '17:00',
+          },
+        ],
+      };
+
+      const mockValidationResult = {
+        isValid: true,
+        errors: [],
+      };
+
+      const mockUpdatedHours = [
+        {
+          _id: '507f1f77bcf86cd799439020',
+          entityType: 'user',
+          entityId: '507f1f77bcf86cd799439011',
+          dayOfWeek: 'monday',
+          isWorkingDay: true,
+          openingTime: '09:00',
+          closingTime: '17:00',
+        },
+      ];
+
+      mockValidationService.validateAgainstParent.mockResolvedValue(
+        mockValidationResult,
+      );
+      mockWorkingHoursService.updateWorkingHours.mockResolvedValue(
+        mockUpdatedHours,
+      );
+
+      const result = await controller.updateWorkingHours(
+        'user',
+        '507f1f77bcf86cd799439011',
+        updateDto,
+      );
+
+      expect(result.success).toBe(true);
+      expect(result.data).toEqual(mockUpdatedHours);
+      expect(validationService.validateAgainstParent).toHaveBeenCalledWith(
+        'user',
+        '507f1f77bcf86cd799439011',
+        updateDto.schedule,
+      );
+      expect(workingHoursService.updateWorkingHours).toHaveBeenCalledWith(
+        'user',
+        '507f1f77bcf86cd799439011',
+        updateDto,
+      );
+    });
+
+    it('should throw UnprocessableEntityException when validation fails', async () => {
+      const updateDto: UpdateWorkingHoursDto = {
+        schedule: [
+          {
+            dayOfWeek: 'monday',
+            isWorkingDay: true,
+            openingTime: '07:00', // Before parent opening time
+            closingTime: '17:00',
+          },
+        ],
+      };
+
+      const mockValidationResult = {
+        isValid: false,
+        errors: [
+          {
+            dayOfWeek: 'monday',
+            message: {
+              ar: 'ساعات العمل يجب أن تكون ضمن ساعات clinic',
+              en: 'Working hours must be within clinic hours',
+            },
+            suggestedRange: {
+              openingTime: '08:00',
+              closingTime: '17:00',
+            },
+          },
+        ],
+      };
+
+      mockValidationService.validateAgainstParent.mockResolvedValue(
+        mockValidationResult,
+      );
+
+      await expect(
+        controller.updateWorkingHours(
+          'user',
+          '507f1f77bcf86cd799439011',
+          updateDto,
+        ),
+      ).rejects.toThrow(UnprocessableEntityException);
+
+      expect(validationService.validateAgainstParent).toHaveBeenCalledWith(
+        'user',
+        '507f1f77bcf86cd799439011',
+        updateDto.schedule,
+      );
+      expect(workingHoursService.updateWorkingHours).not.toHaveBeenCalled();
+    });
+
+    it('should validate even when validateWithParent query param is not provided', async () => {
+      const updateDto: UpdateWorkingHoursDto = {
+        schedule: [
+          {
+            dayOfWeek: 'monday',
+            isWorkingDay: true,
+            openingTime: '09:00',
+            closingTime: '17:00',
+          },
+        ],
+      };
+
+      const mockValidationResult = {
+        isValid: true,
+        errors: [],
+      };
+
+      const mockUpdatedHours = [
+        {
+          _id: '507f1f77bcf86cd799439020',
+          entityType: 'user',
+          entityId: '507f1f77bcf86cd799439011',
+          dayOfWeek: 'monday',
+          isWorkingDay: true,
+          openingTime: '09:00',
+          closingTime: '17:00',
+        },
+      ];
+
+      mockValidationService.validateAgainstParent.mockResolvedValue(
+        mockValidationResult,
+      );
+      mockWorkingHoursService.updateWorkingHours.mockResolvedValue(
+        mockUpdatedHours,
+      );
+
+      const result = await controller.updateWorkingHours(
+        'user',
+        '507f1f77bcf86cd799439011',
+        updateDto,
+        undefined, // No validateWithParent param
+        undefined,
+        undefined,
+      );
+
+      expect(result.success).toBe(true);
+      expect(validationService.validateAgainstParent).toHaveBeenCalled();
     });
   });
 });

@@ -7,11 +7,40 @@ import { Types } from 'mongoose';
 describe('WorkingHoursValidationService', () => {
   let service: WorkingHoursValidationService;
   let mockWorkingHoursModel: any;
+  let mockUserModel: any;
+  let mockClinicModel: any;
+  let mockComplexModel: any;
 
   beforeEach(async () => {
     // Mock the WorkingHours model
     mockWorkingHoursModel = {
       find: jest.fn().mockReturnThis(),
+      select: jest.fn().mockReturnThis(),
+      lean: jest.fn().mockReturnThis(),
+      exec: jest.fn(),
+    };
+
+    // Mock the User model
+    mockUserModel = {
+      findById: jest.fn().mockReturnThis(),
+      select: jest.fn().mockReturnThis(),
+      lean: jest.fn().mockReturnThis(),
+      exec: jest.fn(),
+    };
+
+    // Mock the Clinic model
+    mockClinicModel = {
+      findById: jest.fn().mockReturnThis(),
+      select: jest.fn().mockReturnThis(),
+      lean: jest.fn().mockReturnThis(),
+      exec: jest.fn(),
+    };
+
+    // Mock the Complex model
+    mockComplexModel = {
+      findById: jest.fn().mockReturnThis(),
+      select: jest.fn().mockReturnThis(),
+      lean: jest.fn().mockReturnThis(),
       exec: jest.fn(),
     };
 
@@ -22,12 +51,27 @@ describe('WorkingHoursValidationService', () => {
           provide: getModelToken('WorkingHours'),
           useValue: mockWorkingHoursModel,
         },
+        {
+          provide: getModelToken('User'),
+          useValue: mockUserModel,
+        },
+        {
+          provide: getModelToken('Clinic'),
+          useValue: mockClinicModel,
+        },
+        {
+          provide: getModelToken('Complex'),
+          useValue: mockComplexModel,
+        },
       ],
     }).compile();
 
     service = module.get<WorkingHoursValidationService>(
       WorkingHoursValidationService,
     );
+
+    // Reset all mocks before each test
+    jest.clearAllMocks();
   });
 
   it('should be defined', () => {
@@ -48,6 +92,8 @@ describe('WorkingHoursValidationService', () => {
         },
       ];
 
+      mockWorkingHoursModel.select.mockReturnThis();
+      mockWorkingHoursModel.lean.mockReturnThis();
       mockWorkingHoursModel.exec.mockResolvedValue(mockParentHours);
 
       const result = await service.getParentWorkingHours(
@@ -87,6 +133,8 @@ describe('WorkingHoursValidationService', () => {
         },
       ];
 
+      mockWorkingHoursModel.select.mockReturnThis();
+      mockWorkingHoursModel.lean.mockReturnThis();
       mockWorkingHoursModel.exec.mockResolvedValue(parentHours);
 
       const result = await service.validateHierarchical(
@@ -122,6 +170,8 @@ describe('WorkingHoursValidationService', () => {
         },
       ];
 
+      mockWorkingHoursModel.select.mockReturnThis();
+      mockWorkingHoursModel.lean.mockReturnThis();
       mockWorkingHoursModel.exec.mockResolvedValue(parentHours);
 
       const result = await service.validateHierarchical(
@@ -159,6 +209,8 @@ describe('WorkingHoursValidationService', () => {
         },
       ];
 
+      mockWorkingHoursModel.select.mockReturnThis();
+      mockWorkingHoursModel.lean.mockReturnThis();
       mockWorkingHoursModel.exec.mockResolvedValue(parentHours);
 
       const result = await service.validateHierarchical(
@@ -193,6 +245,9 @@ describe('WorkingHoursValidationService', () => {
         },
       ];
 
+      // Mock the chain properly
+      mockWorkingHoursModel.select.mockReturnThis();
+      mockWorkingHoursModel.lean.mockReturnThis();
       mockWorkingHoursModel.exec.mockResolvedValue(parentHours);
 
       const result = await service.validateHierarchical(
@@ -217,6 +272,8 @@ describe('WorkingHoursValidationService', () => {
         },
       ];
 
+      mockWorkingHoursModel.select.mockReturnThis();
+      mockWorkingHoursModel.lean.mockReturnThis();
       mockWorkingHoursModel.exec.mockResolvedValue([]); // No parent hours
 
       const result = await service.validateHierarchical(
@@ -309,6 +366,257 @@ describe('WorkingHoursValidationService', () => {
       );
 
       expect(suggestions.size).toBe(0);
+    });
+  });
+
+  describe('validateAgainstParent', () => {
+    it('should validate user hours against clinic hours', async () => {
+      const userId = new Types.ObjectId();
+      const clinicId = new Types.ObjectId();
+
+      // Mock user with clinicId
+      mockUserModel.exec.mockResolvedValue({
+        _id: userId,
+        clinicId: clinicId,
+        firstName: 'John',
+        lastName: 'Doe',
+      });
+
+      // Mock clinic working hours
+      const clinicHours = [
+        {
+          entityType: 'clinic',
+          entityId: clinicId,
+          dayOfWeek: 'monday',
+          isWorkingDay: true,
+          openingTime: '08:00',
+          closingTime: '17:00',
+          isActive: true,
+        },
+      ];
+
+      mockWorkingHoursModel.select.mockReturnThis();
+      mockWorkingHoursModel.lean.mockReturnThis();
+      mockWorkingHoursModel.exec.mockResolvedValue(clinicHours);
+
+      const userSchedule = [
+        {
+          dayOfWeek: 'monday',
+          isWorkingDay: true,
+          openingTime: '09:00',
+          closingTime: '16:00',
+        },
+      ];
+
+      const result = await service.validateAgainstParent(
+        'user',
+        userId.toString(),
+        userSchedule,
+      );
+
+      expect(result.isValid).toBe(true);
+      expect(result.errors).toHaveLength(0);
+      expect(mockUserModel.findById).toHaveBeenCalledWith(userId.toString());
+    });
+
+    it('should validate clinic hours against complex hours', async () => {
+      const clinicId = new Types.ObjectId();
+      const complexId = new Types.ObjectId();
+
+      // Mock clinic with complexId
+      mockClinicModel.exec.mockResolvedValue({
+        _id: clinicId,
+        complexId: complexId,
+        name: 'Test Clinic',
+      });
+
+      // Mock complex working hours
+      const complexHours = [
+        {
+          entityType: 'complex',
+          entityId: complexId,
+          dayOfWeek: 'monday',
+          isWorkingDay: true,
+          openingTime: '08:00',
+          closingTime: '18:00',
+          isActive: true,
+        },
+      ];
+
+      mockWorkingHoursModel.select.mockReturnThis();
+      mockWorkingHoursModel.lean.mockReturnThis();
+      mockWorkingHoursModel.exec.mockResolvedValue(complexHours);
+
+      const clinicSchedule = [
+        {
+          dayOfWeek: 'monday',
+          isWorkingDay: true,
+          openingTime: '09:00',
+          closingTime: '17:00',
+        },
+      ];
+
+      const result = await service.validateAgainstParent(
+        'clinic',
+        clinicId.toString(),
+        clinicSchedule,
+      );
+
+      expect(result.isValid).toBe(true);
+      expect(result.errors).toHaveLength(0);
+      expect(mockClinicModel.findById).toHaveBeenCalledWith(
+        clinicId.toString(),
+      );
+    });
+
+    it('should validate complex hours against organization hours', async () => {
+      const complexId = new Types.ObjectId();
+      const organizationId = new Types.ObjectId();
+
+      // Mock complex with organizationId
+      mockComplexModel.exec.mockResolvedValue({
+        _id: complexId,
+        organizationId: organizationId,
+        name: 'Test Complex',
+      });
+
+      // Mock organization working hours
+      const organizationHours = [
+        {
+          entityType: 'organization',
+          entityId: organizationId,
+          dayOfWeek: 'monday',
+          isWorkingDay: true,
+          openingTime: '07:00',
+          closingTime: '19:00',
+          isActive: true,
+        },
+      ];
+
+      mockWorkingHoursModel.select.mockReturnThis();
+      mockWorkingHoursModel.lean.mockReturnThis();
+      mockWorkingHoursModel.exec.mockResolvedValue(organizationHours);
+
+      const complexSchedule = [
+        {
+          dayOfWeek: 'monday',
+          isWorkingDay: true,
+          openingTime: '08:00',
+          closingTime: '18:00',
+        },
+      ];
+
+      const result = await service.validateAgainstParent(
+        'complex',
+        complexId.toString(),
+        complexSchedule,
+      );
+
+      expect(result.isValid).toBe(true);
+      expect(result.errors).toHaveLength(0);
+      expect(mockComplexModel.findById).toHaveBeenCalledWith(
+        complexId.toString(),
+      );
+    });
+
+    it('should pass validation when entity has no parent', async () => {
+      const userId = new Types.ObjectId();
+
+      // Mock user without clinicId
+      mockUserModel.exec.mockResolvedValue({
+        _id: userId,
+        clinicId: null,
+        firstName: 'John',
+        lastName: 'Doe',
+      });
+
+      const userSchedule = [
+        {
+          dayOfWeek: 'monday',
+          isWorkingDay: true,
+          openingTime: '09:00',
+          closingTime: '17:00',
+        },
+      ];
+
+      const result = await service.validateAgainstParent(
+        'user',
+        userId.toString(),
+        userSchedule,
+      );
+
+      expect(result.isValid).toBe(true);
+      expect(result.errors).toHaveLength(0);
+    });
+
+    it('should pass validation for organization (top level)', async () => {
+      const organizationId = new Types.ObjectId();
+
+      const organizationSchedule = [
+        {
+          dayOfWeek: 'monday',
+          isWorkingDay: true,
+          openingTime: '08:00',
+          closingTime: '18:00',
+        },
+      ];
+
+      const result = await service.validateAgainstParent(
+        'organization',
+        organizationId.toString(),
+        organizationSchedule,
+      );
+
+      expect(result.isValid).toBe(true);
+      expect(result.errors).toHaveLength(0);
+    });
+
+    it('should fail validation when user hours exceed clinic hours', async () => {
+      const userId = new Types.ObjectId();
+      const clinicId = new Types.ObjectId();
+
+      // Mock user with clinicId
+      mockUserModel.exec.mockResolvedValue({
+        _id: userId,
+        clinicId: clinicId,
+        firstName: 'John',
+        lastName: 'Doe',
+      });
+
+      // Mock clinic working hours
+      const clinicHours = [
+        {
+          entityType: 'clinic',
+          entityId: clinicId,
+          dayOfWeek: 'monday',
+          isWorkingDay: true,
+          openingTime: '08:00',
+          closingTime: '17:00',
+          isActive: true,
+        },
+      ];
+
+      mockWorkingHoursModel.select.mockReturnThis();
+      mockWorkingHoursModel.lean.mockReturnThis();
+      mockWorkingHoursModel.exec.mockResolvedValue(clinicHours);
+
+      const userSchedule = [
+        {
+          dayOfWeek: 'monday',
+          isWorkingDay: true,
+          openingTime: '07:00', // Before clinic opening
+          closingTime: '18:00', // After clinic closing
+        },
+      ];
+
+      const result = await service.validateAgainstParent(
+        'user',
+        userId.toString(),
+        userSchedule,
+      );
+
+      expect(result.isValid).toBe(false);
+      expect(result.errors.length).toBeGreaterThan(0);
     });
   });
 });

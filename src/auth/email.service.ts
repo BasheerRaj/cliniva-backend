@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ClientSession } from 'mongoose';
 
 /**
  * EmailService - Handles bilingual email notifications
@@ -185,6 +186,50 @@ export class EmailService {
     } catch (error) {
       this.logger.error(
         `Failed to send session invalidated notification to ${email}: ${error.message}`,
+        error.stack,
+      );
+      // Don't throw - email failure shouldn't block the operation
+    }
+  }
+
+  /**
+   * Send appointment notification
+   *
+   * @param email - Recipient email address
+   * @param appointmentData - Appointment details
+   * @param type - Notification type ('transferred' or 'rescheduled')
+   * @param language - Preferred language ('ar' or 'en')
+   * @param session - Optional MongoDB session for transaction support
+   *
+   * Requirement 7.4: Notify affected patients via email
+   */
+  async sendAppointmentNotification(
+    email: string,
+    appointmentData: {
+      patientName: string;
+      doctorName?: string;
+      appointmentDate: Date;
+      appointmentTime: string;
+      serviceName: string;
+      reason?: string;
+    },
+    type: 'transferred' | 'rescheduled',
+    language: 'ar' | 'en',
+    session?: ClientSession,
+  ): Promise<void> {
+    try {
+      this.logger.log(
+        `Sending appointment ${type} notification to ${email} in ${language}`,
+      );
+
+      // TODO: Implement actual email sending with templates
+      this.logger.debug(
+        `Appointment ${type} notification would be sent to ${email}`,
+      );
+      this.logger.debug(`Appointment data:`, appointmentData);
+    } catch (error) {
+      this.logger.error(
+        `Failed to send appointment ${type} notification to ${email}: ${error.message}`,
         error.stack,
       );
       // Don't throw - email failure shouldn't block the operation

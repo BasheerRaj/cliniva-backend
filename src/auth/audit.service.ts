@@ -1,8 +1,18 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose';
+import { Model, Types, ClientSession } from 'mongoose';
 import { AuditLog } from '../database/schemas/audit-log.schema';
 import { AuditEventType } from '../common/enums/audit-event-type.enum';
+
+export interface SecurityEvent {
+  eventType: string;
+  userId: string;
+  actorId?: string;
+  ipAddress: string;
+  userAgent: string;
+  metadata: Record<string, any>;
+  timestamp: Date;
+}
 
 export interface AuditLogFilters {
   userId?: string;
@@ -334,6 +344,40 @@ export class AuditService {
   }
 
   /**
+   * Log user deletion event
+   * Task 9.3: Add validation to user delete endpoint
+   * Requirements: 9.3
+   *
+   * @param userId - User ID that was deleted
+   * @param deletedBy - User ID who deleted the user
+   * @param ipAddress - IP address of the request
+   * @param userAgent - User agent string from the request
+   */
+  async logUserDeleted(
+    userId: string,
+    deletedBy: string,
+    ipAddress: string,
+    userAgent?: string,
+  ): Promise<void> {
+    try {
+      await this.auditLogModel.create({
+        eventType: AuditEventType.USER_DELETED,
+        userId: new Types.ObjectId(userId),
+        adminId: new Types.ObjectId(deletedBy),
+        ipAddress,
+        userAgent,
+        timestamp: new Date(),
+        success: true,
+        details: {
+          action: 'User deleted',
+        },
+      });
+    } catch (error) {
+      this.logger.error(`Failed to log user deletion for user ${userId}`, error);
+    }
+  }
+
+  /**
    * Log employee creation event
    * @param employeeId - Employee ID that was created
    * @param createdBy - User ID who created the employee
@@ -646,6 +690,44 @@ export class AuditService {
         `Failed to log staff transfer from clinic ${fromClinicId} to ${toClinicId}`,
         error,
       );
+    }
+  }
+
+  /**
+   * Log security event with transaction support
+   * Generic method for logging security events with optional MongoDB session
+   * Requirements: 7.6, 20.1-20.5
+   *
+   * @param event - Security event details
+   * @param session - Optional MongoDB session for transaction support
+   */
+  async logSecurityEvent(
+    event: SecurityEvent,
+    session?: ClientSession,
+  ): Promise<void> {
+    try {
+      const auditLogData = {
+        eventType: event.eventType as AuditEventType,
+        userId: new Types.ObjectId(event.userId),
+        adminId: event.actorId ? new Types.ObjectId(event.actorId) : undefined,
+        ipAddress: event.ipAddress,
+        userAgent: event.userAgent,
+        timestamp: event.timestamp,
+        success: true,
+        details: event.metadata,
+      };
+
+      if (session) {
+        await this.auditLogModel.create([auditLogData], { session });
+      } else {
+        await this.auditLogModel.create(auditLogData);
+      }
+    } catch (error) {
+      this.logger.error(
+        `Failed to log security event ${event.eventType} for user ${event.userId}`,
+        error,
+      );
+      // Don't throw - audit logging failure shouldn't block operations
     }
   }
 }

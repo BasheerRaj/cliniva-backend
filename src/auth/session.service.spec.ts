@@ -4,10 +4,12 @@ import { Model, Types } from 'mongoose';
 import { SessionService } from './session.service';
 import { TokenService } from './token.service';
 import { TokenBlacklist } from '../database/schemas/token-blacklist.schema';
+import { Session } from '../database/schemas/session.schema';
 
 describe('SessionService', () => {
   let service: SessionService;
   let tokenBlacklistModel: Model<TokenBlacklist>;
+  let sessionModel: Model<Session>;
   let tokenService: TokenService;
 
   // Mock data
@@ -24,6 +26,18 @@ describe('SessionService', () => {
     findOne: jest.fn(),
     countDocuments: jest.fn(),
     deleteMany: jest.fn(),
+    updateMany: jest.fn(),
+    save: jest.fn(),
+  };
+
+  // Mock Session model
+  const mockSessionModel = {
+    new: jest.fn(),
+    constructor: jest.fn(),
+    findOne: jest.fn(),
+    find: jest.fn(),
+    findById: jest.fn(),
+    updateMany: jest.fn(),
     save: jest.fn(),
   };
 
@@ -41,6 +55,10 @@ describe('SessionService', () => {
           useValue: mockTokenBlacklistModel,
         },
         {
+          provide: getModelToken(Session.name),
+          useValue: mockSessionModel,
+        },
+        {
           provide: TokenService,
           useValue: mockTokenService,
         },
@@ -51,6 +69,7 @@ describe('SessionService', () => {
     tokenBlacklistModel = module.get<Model<TokenBlacklist>>(
       getModelToken(TokenBlacklist.name),
     );
+    sessionModel = module.get<Model<Session>>(getModelToken(Session.name));
     tokenService = module.get<TokenService>(TokenService);
 
     // Reset mocks
@@ -62,22 +81,46 @@ describe('SessionService', () => {
   });
 
   describe('invalidateUserSessions', () => {
-    it('should log session invalidation for a user', async () => {
+    it('should invalidate all active sessions for a user', async () => {
       const reason = 'password_change';
+      const mockSessions = [
+        {
+          _id: new Types.ObjectId(),
+          userId: new Types.ObjectId(mockUserId),
+          token: mockTokenHash,
+          expiresAt: mockExpiresAt,
+          isActive: true,
+        },
+      ];
 
-      await service.invalidateUserSessions(mockUserId, reason);
+      mockSessionModel.find.mockReturnValue({
+        exec: jest.fn().mockResolvedValue(mockSessions),
+      });
 
-      // Should complete without errors
-      expect(true).toBe(true);
+      mockSessionModel.updateMany.mockReturnValue({
+        exec: jest.fn().mockResolvedValue({ modifiedCount: 1 }),
+      });
+
+      const result = await service.invalidateUserSessions(mockUserId, reason);
+
+      expect(result).toBe(1);
+      expect(mockSessionModel.find).toHaveBeenCalledWith({
+        userId: new Types.ObjectId(mockUserId),
+        isActive: true,
+      });
+      expect(mockSessionModel.updateMany).toHaveBeenCalled();
     });
 
-    it('should log session invalidation with admin ID', async () => {
+    it('should return 0 if no active sessions found', async () => {
       const reason = 'email_change';
 
-      await service.invalidateUserSessions(mockUserId, reason, mockAdminId);
+      mockSessionModel.find.mockReturnValue({
+        exec: jest.fn().mockResolvedValue([]),
+      });
 
-      // Should complete without errors
-      expect(true).toBe(true);
+      const result = await service.invalidateUserSessions(mockUserId, reason);
+
+      expect(result).toBe(0);
     });
   });
 
@@ -289,12 +332,15 @@ describe('SessionService', () => {
   });
 
   describe('invalidateAllUserTokens', () => {
-    it('should call invalidateUserSessions with default reason', async () => {
-      const spy = jest.spyOn(service, 'invalidateUserSessions');
+    it('should call invalidateUserSessions with default reason and return count', async () => {
+      const spy = jest
+        .spyOn(service, 'invalidateUserSessions')
+        .mockResolvedValue(2);
 
-      await service.invalidateAllUserTokens(mockUserId);
+      const result = await service.invalidateAllUserTokens(mockUserId);
 
       expect(spy).toHaveBeenCalledWith(mockUserId, 'manual_invalidation');
+      expect(result).toBe(2);
     });
   });
 });

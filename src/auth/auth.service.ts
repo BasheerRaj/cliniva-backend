@@ -66,6 +66,7 @@ export class AuthService {
         emailVerified: false,
         // Authentication fields
         isFirstLogin: true,
+        temporaryPassword: false,
         lastPasswordChange: new Date(),
         passwordChangeRequired: false,
         passwordResetUsed: false,
@@ -77,8 +78,35 @@ export class AuthService {
       // Generate tokens
       const tokens = await this.generateTokens(savedUser);
 
+      // Calculate token expiration
+      const accessTokenExpiry = this.parseTimeToSeconds(
+        process.env.JWT_EXPIRES_IN || '24h',
+      );
+      const expiresAt = new Date(Date.now() + accessTokenExpiry * 1000);
+
+      // Create session record - Requirement 4.1, 4.2
+      const userId = (savedUser._id as any).toString();
+      try {
+        await this.sessionService.createSession(
+          userId,
+          {
+            userAgent: 'unknown',
+            ipAddress: '0.0.0.0',
+          },
+          tokens.access_token,
+          tokens.refresh_token,
+          expiresAt,
+        );
+        this.logger.log(`Session created for new user ${userId}`);
+      } catch (error) {
+        // Log error but don't fail registration if session creation fails
+        this.logger.warn(
+          `Failed to create session for new user ${userId}: ${error.message}`,
+        );
+      }
+
       // Update last login
-      await this.updateLastLogin((savedUser._id as any).toString());
+      await this.updateLastLogin(userId);
 
       return {
         ...tokens,
@@ -195,6 +223,32 @@ export class AuthService {
 
       // Generate tokens
       const tokens = await this.generateTokens(user);
+
+      // Calculate token expiration
+      const accessTokenExpiry = this.parseTimeToSeconds(
+        process.env.JWT_EXPIRES_IN || '24h',
+      );
+      const expiresAt = new Date(Date.now() + accessTokenExpiry * 1000);
+
+      // Create session record - Requirement 4.1, 4.2
+      try {
+        await this.sessionService.createSession(
+          userId,
+          {
+            userAgent: userAgent || 'unknown',
+            ipAddress: ipAddress || '0.0.0.0',
+          },
+          tokens.access_token,
+          tokens.refresh_token,
+          expiresAt,
+        );
+        this.logger.log(`Session created for user ${userId}`);
+      } catch (error) {
+        // Log error but don't fail login if session creation fails
+        this.logger.warn(
+          `Failed to create session for user ${userId}: ${error.message}`,
+        );
+      }
 
       // Update last login timestamp - Requirement 1.1
       await this.updateLastLogin(userId);
@@ -637,9 +691,10 @@ export class AuthService {
       // Hash new password with bcrypt (12 rounds)
       const hashedPassword = await this.hashPassword(newPassword);
 
-      // Update user: password, isFirstLogin=false, lastPasswordChange=now (Requirement 1.4)
+      // Update user: password, isFirstLogin=false, temporaryPassword=false, lastPasswordChange=now (Requirement 1.4)
       user.passwordHash = hashedPassword;
       user.isFirstLogin = false;
+      user.temporaryPassword = false;
       user.lastPasswordChange = new Date();
       await user.save();
 
@@ -1084,6 +1139,28 @@ export class AuthService {
       );
 
       this.logger.log(`Access token blacklisted for user ${userId} on logout`);
+
+      // Invalidate session record - Requirement 4.3
+      try {
+        // Find and invalidate the session by token
+        const tokenHash = crypto
+          .createHash('sha256')
+          .update(accessToken)
+          .digest('hex');
+        const session = await this.sessionService.restoreSession(accessToken);
+        if (session) {
+          await this.sessionService.invalidateSession(
+            (session._id as any).toString(),
+            'logout',
+          );
+          this.logger.log(`Session invalidated for user ${userId} on logout`);
+        }
+      } catch (error) {
+        // Log error but don't fail logout if session invalidation fails
+        this.logger.warn(
+          `Failed to invalidate session for user ${userId}: ${error.message}`,
+        );
+      }
 
       // If refresh token provided, blacklist it too
       if (refreshToken) {

@@ -234,7 +234,7 @@ describe('WorkingHoursReschedulingService', () => {
         expect.objectContaining({
           $set: expect.objectContaining({
             status: 'needs_rescheduling',
-            reschedulingReason: 'Working hours changed',
+            rescheduledReason: 'Working hours changed',
           }),
         }),
         { session: mockSession },
@@ -707,7 +707,7 @@ describe('WorkingHoursReschedulingService', () => {
         expect.objectContaining({
           $set: expect.objectContaining({
             status: 'needs_rescheduling',
-            reschedulingReason: 'Custom reason',
+            rescheduledReason: 'Custom reason',
             markedForReschedulingAt: expect.any(Date),
           }),
         }),

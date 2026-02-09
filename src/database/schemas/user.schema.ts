@@ -55,6 +55,9 @@ export class User extends Document {
   @Prop({ default: true })
   isFirstLogin: boolean;
 
+  @Prop({ default: false })
+  temporaryPassword: boolean;
+
   @Prop()
   lastPasswordChange?: Date;
 

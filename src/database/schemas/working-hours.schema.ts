@@ -46,6 +46,21 @@ export class WorkingHours extends Document {
 
   @Prop({ default: true })
   isActive: boolean;
+
+  // Hierarchical validation fields (Requirement 11.1, 11.2, 11.4)
+  @Prop({
+    enum: ['organization', 'complex', 'clinic'],
+  })
+  parentEntityType?: string;
+
+  @Prop({ type: Types.ObjectId })
+  parentEntityId?: Types.ObjectId;
+
+  @Prop({ default: false })
+  validatedAgainstParent: boolean;
+
+  @Prop()
+  lastValidationDate?: Date;
 }
 
 export const WorkingHoursSchema = SchemaFactory.createForClass(WorkingHours);
@@ -70,3 +85,16 @@ WorkingHoursSchema.index({
   dayOfWeek: 1,
   isActive: 1,
 }); // Composite index for day-specific queries
+
+// Hierarchical validation indexes (Requirement 11.1, 11.2, 11.4)
+WorkingHoursSchema.index({
+  parentEntityType: 1,
+  parentEntityId: 1,
+}); // Index for querying child entities by parent
+
+WorkingHoursSchema.index({
+  entityType: 1,
+  entityId: 1,
+  dayOfWeek: 1,
+  validatedAgainstParent: 1,
+}); // Composite index for validation status queries
