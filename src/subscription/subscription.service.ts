@@ -28,45 +28,31 @@ export class SubscriptionService {
   async createSubscription(
     createSubscriptionDto: CreateSubscriptionDto,
   ): Promise<Subscription> {
-    // Validate plan exists - handle both ObjectId and plan name/type
-    let plan;
-    try {
-      // First try to find by ObjectId
-      plan = await this.subscriptionPlanModel.findById(
-        createSubscriptionDto.planId,
-      );
-    } catch (error) {
-      // If ObjectId is invalid, try to find by plan name/type
-      plan = null;
-    }
-
-    // If not found by ID, try to find by plan name/type
-    if (!plan) {
-      plan = await this.subscriptionPlanModel.findOne({
-        name: createSubscriptionDto.planType.toLowerCase(),
-      });
-    }
+    // Validate plan exists by ID
+    const plan = await this.subscriptionPlanModel.findById(
+      createSubscriptionDto.subscriptionPlanId,
+    );
 
     if (!plan) {
       throw new NotFoundException({
         message: ERROR_MESSAGES.SUBSCRIPTION_PLAN_NOT_FOUND,
         code: 'SUBSCRIPTION_PLAN_NOT_FOUND',
-        details: { planType: createSubscriptionDto.planType },
+        details: { planId: createSubscriptionDto.subscriptionPlanId },
       });
     }
 
-    // Validate plan type matches
-    if (
-      plan.name.toLowerCase() !== createSubscriptionDto.planType.toLowerCase()
-    ) {
-      throw new BadRequestException({
-        message: ERROR_MESSAGES.PLAN_TYPE_MISMATCH,
-        code: 'PLAN_TYPE_MISMATCH',
-        details: {
-          expectedPlanType: plan.name,
-          providedPlanType: createSubscriptionDto.planType,
-        },
-      });
+    // If planType is provided, validate it matches the plan
+    if (createSubscriptionDto.planType) {
+      if (plan.name.toLowerCase() !== createSubscriptionDto.planType.toLowerCase()) {
+        throw new BadRequestException({
+          message: ERROR_MESSAGES.PLAN_TYPE_MISMATCH,
+          code: 'PLAN_TYPE_MISMATCH',
+          details: {
+            expectedPlanType: plan.name,
+            providedPlanType: createSubscriptionDto.planType,
+          },
+        });
+      }
     }
 
     // Check if user already has an active subscription
@@ -82,14 +68,29 @@ export class SubscriptionService {
       });
     }
 
+    // Calculate expiration date based on billing cycle
+    const startDate = new Date();
+    let expiresAt: Date | null = null;
+
+    if (createSubscriptionDto.expiresAt) {
+      // Use provided expiration date
+      expiresAt = new Date(createSubscriptionDto.expiresAt);
+    } else if (createSubscriptionDto.billingCycle) {
+      // Calculate based on billing cycle
+      expiresAt = new Date(startDate);
+      if (createSubscriptionDto.billingCycle === 'monthly') {
+        expiresAt.setMonth(expiresAt.getMonth() + 1);
+      } else if (createSubscriptionDto.billingCycle === 'yearly') {
+        expiresAt.setFullYear(expiresAt.getFullYear() + 1);
+      }
+    }
+
     const subscriptionData = {
       userId: new Types.ObjectId(createSubscriptionDto.userId),
-      planId: new Types.ObjectId(plan._id), // Use the actual plan ID from database
+      planId: plan._id as Types.ObjectId,
       status: createSubscriptionDto.status || 'active',
-      startedAt: new Date(),
-      expiresAt: createSubscriptionDto.expiresAt
-        ? new Date(createSubscriptionDto.expiresAt)
-        : null,
+      startedAt: startDate,
+      expiresAt,
     };
 
     const subscription = new this.subscriptionModel(subscriptionData);

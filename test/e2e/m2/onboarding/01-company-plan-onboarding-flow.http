@@ -2,7 +2,15 @@
 ### Use Case: UC-c5e6f4d - Setup Company Plan
 ### Description: Complete onboarding flow for Company Plan (Organization → Complex → Clinic)
 
-@baseUrl = http://localhost:3001
+@baseUrl = http://localhost:3001/api/v1
+
+@accessToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2OTg5YmVlMjgyYzU5ZDBhYjE3YTdiNjIiLCJlbWFpbCI6ImNvbXBhbnkub3duZXJAY2xpbml2YS5jb20iLCJyb2xlIjoib3duZXIiLCJpYXQiOjE3NzA2MzQ5NzgsImV4cCI6MTc3MDcyMTM3OH0.Mx3g_1a5kLPG9qX_qK5l1Xu7xLMwYeI5WrbtM1lMPuQ
+@userId = 6989bee282c59d0ab17a7b62
+
+@companyPlanId = 6989c2e2ca3d9aa044ffc4bc
+
+@subscriptionId = 6989c883e85c6be91e02006e
+
 
 ###############################################################################
 # 1. User Registration
@@ -39,15 +47,13 @@ Content-Type: application/json
   "password": "CompanyOwner@123"
 }
 
-@accessToken = <copy_access_token_from_response>
-@userId = <copy_user_id_from_response>
 
 ###############################################################################
 # 2. Get Available Subscription Plans
 ###############################################################################
 
 ### 2.1 Get all subscription plans
-GET {{baseUrl}}/subscription-plans
+GET {{baseUrl}}/subscriptions/plans
 Authorization: Bearer {{accessToken}}
 
 # Expected Response:
@@ -55,7 +61,6 @@ Authorization: Bearer {{accessToken}}
 # - List of available plans (Company, Complex, Clinic)
 # - Plan details with features and pricing
 
-@companyPlanId = <copy_company_plan_id_from_response>
 
 ###############################################################################
 # 3. Select Company Plan
@@ -77,8 +82,6 @@ Content-Type: application/json
 # - 201 Created
 # - Subscription created
 # - Payment pending or completed
-
-@subscriptionId = <copy_subscription_id_from_response>
 
 ###############################################################################
 # 4. Step 1: Create Organization (Company)

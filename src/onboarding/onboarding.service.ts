@@ -188,7 +188,7 @@ export class OnboardingService {
       // Step 5: Create subscription
       const subscription = await this.subscriptionService.createSubscription({
         userId,
-        planId: actualPlanId,
+        subscriptionPlanId: actualPlanId,
         planType: onboardingDto.subscriptionData.planType,
       });
       const subscriptionId =

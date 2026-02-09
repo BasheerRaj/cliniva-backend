@@ -8,6 +8,7 @@ import {
   EmailTemplate,
   SmsTemplate,
 } from '../schemas';
+import { EntitiesSeederService } from './entities.seeder';
 
 @Injectable()
 export class DatabaseSeederService {
@@ -21,17 +22,22 @@ export class DatabaseSeederService {
     @InjectModel(EmailTemplate.name)
     private emailTemplateModel: Model<EmailTemplate>,
     @InjectModel(SmsTemplate.name) private smsTemplateModel: Model<SmsTemplate>,
+    private entitiesSeeder: EntitiesSeederService,
   ) {}
 
   async seedAll(): Promise<void> {
     this.logger.log('🌱 Starting database seeding...');
 
     try {
+      // Seed base data first
       await this.seedSubscriptionPlans();
       await this.seedDepartments();
       await this.seedSpecialties();
       await this.seedEmailTemplates();
       await this.seedSmsTemplates();
+
+      // Seed entities (organizations, complexes, clinics)
+      await this.entitiesSeeder.seedAll();
 
       this.logger.log('✅ Database seeding completed successfully');
     } catch (error) {
@@ -324,6 +330,10 @@ export class DatabaseSeederService {
     this.logger.warn('🗑️ Clearing database...');
 
     try {
+      // Clear entities first (due to foreign key relationships)
+      await this.entitiesSeeder.clearEntities();
+
+      // Then clear base data
       await this.subscriptionPlanModel.deleteMany({});
       await this.departmentModel.deleteMany({});
       await this.specialtyModel.deleteMany({});

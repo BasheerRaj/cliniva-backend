@@ -4,6 +4,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { DatabaseService } from './database.service';
 import { DatabaseController } from './database.controller';
 import { DatabaseSeederService } from './seeders/database-seeder.service';
+import { EntitiesSeederService } from './seeders/entities.seeder';
 import { DatabaseInitializerService } from './database-initializer.service';
 
 // Import all schemas
@@ -167,6 +168,7 @@ import {
   providers: [
     DatabaseService,
     DatabaseSeederService,
+    EntitiesSeederService,
     DatabaseInitializerService,
   ],
   exports: [

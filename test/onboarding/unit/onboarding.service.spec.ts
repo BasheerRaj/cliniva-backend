@@ -278,7 +278,7 @@ describe('OnboardingService', () => {
         expect(mockSubscriptionService.createSubscription).toHaveBeenCalledWith(
           {
             userId: expect.any(String),
-            planId: validCompanyPlanData.subscriptionData.planId,
+            subscriptionPlanId: validCompanyPlanData.subscriptionData.planId,
             planType: validCompanyPlanData.subscriptionData.planType,
           },
         );

@@ -28,6 +28,8 @@
     "db:seed": "npm run db:cli seed",
     "db:reset": "npm run db:cli reset",
     "db:migrate:super-admin": "ts-node -r tsconfig-paths/register scripts/migrations/add-super-admin-role.ts",
+    "seed:entities": "ts-node -r tsconfig-paths/register scripts/seed-entities.ts",
+    "seed:entities:clear": "ts-node -r tsconfig-paths/register scripts/seed-entities.ts --clear",
     "swagger:audit": "ts-node -r tsconfig-paths/register scripts/audit-swagger.ts",
     "swagger:validate": "ts-node -r tsconfig-paths/register scripts/validate-swagger.ts"
   },

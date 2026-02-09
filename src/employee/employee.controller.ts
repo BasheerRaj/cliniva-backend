@@ -306,6 +306,71 @@ export class EmployeeController {
   }
 
   /**
+   * Get current user's employee profile
+   * GET /employees/me
+   */
+  @ApiOperation({
+    summary: 'Get current user employee profile',
+    description:
+      'Retrieves the authenticated user\'s employee profile including employee number, job title, salary, date of hiring, certifications, and documents.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Employee profile retrieved successfully',
+    schema: {
+      example: EMPLOYEE_SWAGGER_EXAMPLES.GET_SUCCESS,
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - Authentication required',
+    schema: {
+      example: EMPLOYEE_SWAGGER_EXAMPLES.UNAUTHORIZED,
+    },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Employee profile not found',
+    schema: {
+      example: EMPLOYEE_SWAGGER_EXAMPLES.NOT_FOUND,
+    },
+  })
+  @ApiResponse({
+    status: 500,
+    description: 'Internal server error',
+    schema: {
+      example: EMPLOYEE_SWAGGER_EXAMPLES.INTERNAL_ERROR,
+    },
+  })
+  @ApiBearerAuth()
+  @Get('me')
+  async getCurrentEmployeeProfile(@Request() req: any) {
+    try {
+      const userId = req.user?.id || req.user?.userId || req.user?.sub;
+      if (!userId) {
+        return {
+          success: false,
+          message: 'Failed to retrieve employee',
+          error: 'User ID not found in token',
+        };
+      }
+
+      const employee = await this.employeeService.getEmployeeById(userId);
+      return {
+        success: true,
+        message: 'Employee profile retrieved successfully',
+        data: employee,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: 'Failed to retrieve employee',
+        error: error.message,
+      };
+    }
+  }
+
+  /**
    * Get employee by ID
    * GET /employees/:id
    */

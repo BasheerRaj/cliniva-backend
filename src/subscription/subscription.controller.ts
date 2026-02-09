@@ -8,6 +8,7 @@ import {
   HttpStatus,
   HttpCode,
   BadRequestException,
+  ValidationPipe,
 } from '@nestjs/common';
 import {
   ApiTags,

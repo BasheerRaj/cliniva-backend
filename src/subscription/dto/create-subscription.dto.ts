@@ -24,16 +24,34 @@ export class CreateSubscriptionDto {
   })
   @IsString()
   @IsNotEmpty()
-  planId: string;
+  subscriptionPlanId: string;
 
-  @ApiProperty({
-    description: 'Type of subscription plan',
+  @ApiPropertyOptional({
+    description: 'Type of subscription plan (optional, will be auto-detected from plan)',
     enum: ['company', 'complex', 'clinic'],
     example: 'complex',
   })
-  @IsString()
+  @IsOptional()
   @IsEnum(['company', 'complex', 'clinic'])
-  planType: string;
+  planType?: string;
+
+  @ApiPropertyOptional({
+    description: 'Payment method',
+    enum: ['credit_card', 'debit_card', 'bank_transfer', 'cash'],
+    example: 'credit_card',
+  })
+  @IsOptional()
+  @IsString()
+  paymentMethod?: string;
+
+  @ApiPropertyOptional({
+    description: 'Billing cycle',
+    enum: ['monthly', 'yearly'],
+    example: 'monthly',
+  })
+  @IsOptional()
+  @IsString()
+  billingCycle?: string;
 
   @ApiPropertyOptional({
     description: 'Subscription status',
@@ -41,9 +59,8 @@ export class CreateSubscriptionDto {
     example: 'active',
     default: 'active',
   })
-  @IsString()
-  @IsEnum(['active', 'inactive', 'cancelled'])
   @IsOptional()
+  @IsEnum(['active', 'inactive', 'cancelled'])
   status?: string = 'active';
 
   @ApiPropertyOptional({
