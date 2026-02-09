@@ -1,0 +1,408 @@
+### M2 - Onboarding: Company Plan Flow
+### Use Case: UC-c5e6f4d - Setup Company Plan
+### Description: Complete onboarding flow for Company Plan (Organization → Complex → Clinic)
+
+@baseUrl = http://localhost:3001
+
+###############################################################################
+# 1. User Registration
+###############################################################################
+
+### 1.1 Register new user (owner)
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "email": "company.owner@cliniva.com",
+  "password": "CompanyOwner@123",
+  "confirmPassword": "CompanyOwner@123",
+  "firstName": "Mohammed",
+  "lastName": "Al-Saud",
+  "phone": "+966501234567",
+  "dateOfBirth": "1985-03-20",
+  "gender": "male",
+  "nationality": "Saudi Arabia",
+  "role": "owner"
+}
+
+# Expected Response:
+# - 201 Created
+# - User created successfully
+# - Email verification sent (if enabled)
+
+### 1.2 Login with new account
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "company.owner@cliniva.com",
+  "password": "CompanyOwner@123"
+}
+
+@accessToken = <copy_access_token_from_response>
+@userId = <copy_user_id_from_response>
+
+###############################################################################
+# 2. Get Available Subscription Plans
+###############################################################################
+
+### 2.1 Get all subscription plans
+GET {{baseUrl}}/subscription-plans
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - List of available plans (Company, Complex, Clinic)
+# - Plan details with features and pricing
+
+@companyPlanId = <copy_company_plan_id_from_response>
+
+###############################################################################
+# 3. Select Company Plan
+###############################################################################
+
+### 3.1 Create subscription with Company Plan
+POST {{baseUrl}}/subscriptions
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "subscriptionPlanId": "{{companyPlanId}}",
+  "userId": "{{userId}}",
+  "paymentMethod": "credit_card",
+  "billingCycle": "monthly"
+}
+
+# Expected Response:
+# - 201 Created
+# - Subscription created
+# - Payment pending or completed
+
+@subscriptionId = <copy_subscription_id_from_response>
+
+###############################################################################
+# 4. Step 1: Create Organization (Company)
+###############################################################################
+
+### 4.1 Create organization with complete information
+POST {{baseUrl}}/organizations
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": "Al-Shifa Medical Group",
+  "legalName": "Al-Shifa Medical Services Company",
+  "tradeName": "Al-Shifa Healthcare",
+  "logoUrl": "https://example.com/logos/alshifa.png",
+  "website": "https://alshifa-medical.com",
+  "yearEstablished": 2010,
+  "overview": "Leading healthcare provider in Saudi Arabia",
+  "vision": "To be the most trusted healthcare provider in the region",
+  "goals": "Provide world-class medical services to all communities",
+  "ceoName": "Dr. Abdullah Al-Rashid",
+  "phoneNumbers": [
+    {
+      "type": "main",
+      "number": "+966112345678",
+      "isPrimary": true
+    },
+    {
+      "type": "support",
+      "number": "+966112345679",
+      "isPrimary": false
+    }
+  ],
+  "email": "info@alshifa-medical.com",
+  "address": {
+    "street": "King Fahd Road",
+    "city": "Riyadh",
+    "state": "Riyadh Region",
+    "country": "Saudi Arabia",
+    "postalCode": "12345",
+    "coordinates": {
+      "latitude": 24.7136,
+      "longitude": 46.6753
+    }
+  },
+  "emergencyContact": {
+    "name": "Emergency Department",
+    "phone": "+966112345680",
+    "email": "emergency@alshifa-medical.com"
+  },
+  "socialMediaLinks": {
+    "facebook": "https://facebook.com/alshifa",
+    "twitter": "https://twitter.com/alshifa",
+    "instagram": "https://instagram.com/alshifa",
+    "linkedin": "https://linkedin.com/company/alshifa"
+  },
+  "vatNumber": "300123456700003",
+  "crNumber": "1010123456",
+  "termsConditionsUrl": "https://alshifa-medical.com/terms",
+  "privacyPolicyUrl": "https://alshifa-medical.com/privacy",
+  "subscriptionId": "{{subscriptionId}}",
+  "ownerId": "{{userId}}"
+}
+
+# Expected Response:
+# - 201 Created
+# - Organization created successfully
+# - Returns organization ID
+
+@organizationId = <copy_organization_id_from_response>
+
+###############################################################################
+# 5. Step 2: Create Medical Complex
+###############################################################################
+
+### 5.1 Create first medical complex
+POST {{baseUrl}}/complexes
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": "Al-Shifa Medical Complex - Riyadh",
+  "managerName": "Dr. Khalid Al-Otaibi",
+  "logoUrl": "https://example.com/logos/complex-riyadh.png",
+  "website": "https://alshifa-medical.com/riyadh",
+  "yearEstablished": 2015,
+  "mission": "Provide comprehensive healthcare services to Riyadh residents",
+  "vision": "Be the leading medical complex in Riyadh",
+  "overview": "State-of-the-art medical complex with multiple specialties",
+  "goals": "Serve 10,000+ patients annually",
+  "ceoName": "Dr. Abdullah Al-Rashid",
+  "phoneNumbers": [
+    {
+      "type": "main",
+      "number": "+966112345681",
+      "isPrimary": true
+    }
+  ],
+  "email": "riyadh@alshifa-medical.com",
+  "address": {
+    "street": "Olaya Street",
+    "city": "Riyadh",
+    "state": "Riyadh Region",
+    "country": "Saudi Arabia",
+    "postalCode": "12345",
+    "coordinates": {
+      "latitude": 24.7136,
+      "longitude": 46.6753
+    }
+  },
+  "emergencyContact": {
+    "name": "Complex Emergency",
+    "phone": "+966112345682",
+    "email": "emergency.riyadh@alshifa-medical.com"
+  },
+  "socialMediaLinks": {
+    "facebook": "https://facebook.com/alshifa.riyadh",
+    "twitter": "https://twitter.com/alshifa_riyadh"
+  },
+  "vatNumber": "300123456700004",
+  "crNumber": "1010123457",
+  "organizationId": "{{organizationId}}",
+  "subscriptionId": "{{subscriptionId}}",
+  "departments": []
+}
+
+# Expected Response:
+# - 201 Created
+# - Complex created successfully
+# - Returns complex ID
+
+@complexId = <copy_complex_id_from_response>
+
+###############################################################################
+# 6. Step 3: Create Departments
+###############################################################################
+
+### 6.1 Create Cardiology Department
+POST {{baseUrl}}/departments
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": "Cardiology",
+  "description": "Heart and cardiovascular care",
+  "complexId": "{{complexId}}"
+}
+
+@cardiologyDeptId = <copy_department_id_from_response>
+
+### 6.2 Create Pediatrics Department
+POST {{baseUrl}}/departments
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": "Pediatrics",
+  "description": "Children's healthcare",
+  "complexId": "{{complexId}}"
+}
+
+@pediatricsDeptId = <copy_department_id_from_response>
+
+### 6.3 Create General Medicine Department
+POST {{baseUrl}}/departments
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": "General Medicine",
+  "description": "General medical consultations",
+  "complexId": "{{complexId}}"
+}
+
+@generalMedicineDeptId = <copy_department_id_from_response>
+
+###############################################################################
+# 7. Step 4: Create Clinics
+###############################################################################
+
+### 7.1 Create Cardiology Clinic
+POST {{baseUrl}}/clinics
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": "Cardiology Clinic",
+  "headDoctorName": "Dr. Fahad Al-Mutairi",
+  "specialization": "Cardiology",
+  "licenseNumber": "CARD-2024-001",
+  "pin": "1234",
+  "logoUrl": "https://example.com/logos/cardiology-clinic.png",
+  "website": "https://alshifa-medical.com/cardiology",
+  "yearEstablished": 2015,
+  "mission": "Excellence in cardiac care",
+  "phoneNumbers": [
+    {
+      "type": "main",
+      "number": "+966112345683",
+      "isPrimary": true
+    }
+  ],
+  "email": "cardiology@alshifa-medical.com",
+  "address": {
+    "street": "Olaya Street, Building A",
+    "city": "Riyadh",
+    "state": "Riyadh Region",
+    "country": "Saudi Arabia",
+    "postalCode": "12345"
+  },
+  "vatNumber": "300123456700005",
+  "crNumber": "1010123458",
+  "complexId": "{{complexId}}",
+  "complexDepartmentId": "{{cardiologyDeptId}}",
+  "subscriptionId": "{{subscriptionId}}",
+  "maxStaff": 10,
+  "maxDoctors": 5,
+  "maxPatients": 100,
+  "sessionDuration": 30
+}
+
+@cardiologyClinicId = <copy_clinic_id_from_response>
+
+### 7.2 Create Pediatrics Clinic
+POST {{baseUrl}}/clinics
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": "Pediatrics Clinic",
+  "headDoctorName": "Dr. Sara Al-Zahrani",
+  "specialization": "Pediatrics",
+  "licenseNumber": "PED-2024-001",
+  "pin": "5678",
+  "logoUrl": "https://example.com/logos/pediatrics-clinic.png",
+  "phoneNumbers": [
+    {
+      "type": "main",
+      "number": "+966112345684",
+      "isPrimary": true
+    }
+  ],
+  "email": "pediatrics@alshifa-medical.com",
+  "address": {
+    "street": "Olaya Street, Building B",
+    "city": "Riyadh",
+    "state": "Riyadh Region",
+    "country": "Saudi Arabia",
+    "postalCode": "12345"
+  },
+  "vatNumber": "300123456700006",
+  "crNumber": "1010123459",
+  "complexId": "{{complexId}}",
+  "complexDepartmentId": "{{pediatricsDeptId}}",
+  "subscriptionId": "{{subscriptionId}}",
+  "maxStaff": 8,
+  "maxDoctors": 4,
+  "maxPatients": 80,
+  "sessionDuration": 20
+}
+
+@pediatricsClinicId = <copy_clinic_id_from_response>
+
+###############################################################################
+# 8. Verify Complete Setup
+###############################################################################
+
+### 8.1 Get organization with all relationships
+GET {{baseUrl}}/organizations/{{organizationId}}
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Organization details
+# - Includes complexes, departments, clinics
+
+### 8.2 Get complex with clinics
+GET {{baseUrl}}/complexes/{{complexId}}
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Complex details
+# - List of departments and clinics
+
+### 8.3 Get user profile (should show onboarding complete)
+GET {{baseUrl}}/auth/profile
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - User profile
+# - onboardingComplete: true
+# - setupComplete: true
+
+###############################################################################
+# 9. Update User Onboarding Status
+###############################################################################
+
+### 9.1 Mark onboarding as complete
+PATCH {{baseUrl}}/users/{{userId}}/onboarding
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "onboardingComplete": true,
+  "setupComplete": true
+}
+
+# Expected Response:
+# - 200 OK
+# - User updated successfully
+# - Can now access full system
+
+###############################################################################
+# 10. Access Dashboard
+###############################################################################
+
+### 10.1 Get dashboard data
+GET {{baseUrl}}/dashboard
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Dashboard widgets and statistics
+# - Organization overview
+# - Complex and clinic summaries

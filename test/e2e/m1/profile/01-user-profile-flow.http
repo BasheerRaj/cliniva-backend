@@ -1,0 +1,458 @@
+### M1 - Profile Management: User Profile Flow
+### Use Case: UC-gt1e26j, UC-0r1e2cm - View/Edit Profile
+### Description: Complete flow for viewing and editing user profile
+
+@baseUrl = http://localhost:3001
+@userEmail = staff.member@cliniva.com
+@userPassword = StaffPassword@123
+
+###############################################################################
+# 1. User Login
+###############################################################################
+
+### 1.1 Login as regular user
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{userEmail}}",
+  "password": "{{userPassword}}"
+}
+
+@accessToken = <copy_access_token_from_response>
+@userId = <copy_user_id_from_response>
+
+###############################################################################
+# 2. View Own Profile
+###############################################################################
+
+### 2.1 Get own profile
+GET {{baseUrl}}/users/me
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Complete user profile including:
+#   - Basic info (name, email, phone)
+#   - Employee profile
+#   - Working hours
+#   - Assigned complex/clinic
+#   - Role and permissions
+#   - Last login
+#   - Account status
+
+### 2.2 Get own employee profile
+GET {{baseUrl}}/employees/me
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Employee-specific information:
+#   - Employee number
+#   - Job title
+#   - Salary
+#   - Date of hiring
+#   - Certifications (for doctors)
+#   - Documents
+
+### 2.3 Get own working hours
+GET {{baseUrl}}/working-hours/me
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - User's working schedule for all days
+
+###############################################################################
+# 3. Edit Basic Profile Information
+###############################################################################
+
+### 3.1 Update basic information
+PUT {{baseUrl}}/users/me
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "firstName": "Ahmed",
+  "lastName": "Al-Mansour",
+  "phone": "+966506789012",
+  "nationality": "Saudi Arabia"
+}
+
+# Expected Response:
+# - 200 OK
+# - Profile updated successfully
+# - Message: {
+#     ar: "تم تحديث الملف الشخصي بنجاح",
+#     en: "Profile updated successfully"
+#   }
+
+### 3.2 Verify profile updated
+GET {{baseUrl}}/users/me
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Shows updated information
+
+###############################################################################
+# 4. Update Contact Information
+###############################################################################
+
+### 4.1 Update phone number
+PUT {{baseUrl}}/users/me
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "phone": "+966507890123"
+}
+
+# Expected Response:
+# - 200 OK
+# - Phone number updated
+
+### 4.2 Update email (requires verification)
+PUT {{baseUrl}}/users/me
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "email": "ahmed.new@cliniva.com"
+}
+
+# Expected Response:
+# - 200 OK
+# - Email update initiated
+# - Verification email sent
+# - Message: {
+#     ar: "تم إرسال رابط التحقق إلى البريد الإلكتروني الجديد",
+#     en: "Verification link sent to new email"
+#   }
+
+###############################################################################
+# 5. Change Password
+###############################################################################
+
+### 5.1 Change password (success)
+POST {{baseUrl}}/auth/change-password
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "currentPassword": "{{userPassword}}",
+  "newPassword": "NewPassword@123",
+  "confirmPassword": "NewPassword@123"
+}
+
+# Expected Response:
+# - 200 OK
+# - Password changed successfully
+# - Message: {
+#     ar: "تم تغيير كلمة المرور بنجاح",
+#     en: "Password changed successfully"
+#   }
+
+### 5.2 Login with new password
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{userEmail}}",
+  "password": "NewPassword@123"
+}
+
+# Expected Response:
+# - 200 OK
+# - Login successful with new password
+
+@newAccessToken = <copy_new_access_token>
+
+### 5.3 Change password with wrong current password
+POST {{baseUrl}}/auth/change-password
+Authorization: Bearer {{newAccessToken}}
+Content-Type: application/json
+
+{
+  "currentPassword": "WrongPassword@123",
+  "newPassword": "AnotherPassword@123",
+  "confirmPassword": "AnotherPassword@123"
+}
+
+# Expected Response:
+# - 400 Bad Request
+# - Error: Current password is incorrect
+# - Message: {
+#     ar: "كلمة المرور الحالية غير صحيحة",
+#     en: "Current password is incorrect"
+#   }
+
+### 5.4 Change password with mismatched confirmation
+POST {{baseUrl}}/auth/change-password
+Authorization: Bearer {{newAccessToken}}
+Content-Type: application/json
+
+{
+  "currentPassword": "NewPassword@123",
+  "newPassword": "AnotherPassword@123",
+  "confirmPassword": "DifferentPassword@123"
+}
+
+# Expected Response:
+# - 400 Bad Request
+# - Error: Passwords do not match
+# - Message: {
+#     ar: "كلمات المرور غير متطابقة",
+#     en: "Passwords do not match"
+#   }
+
+### 5.5 Change password with weak password
+POST {{baseUrl}}/auth/change-password
+Authorization: Bearer {{newAccessToken}}
+Content-Type: application/json
+
+{
+  "currentPassword": "NewPassword@123",
+  "newPassword": "weak",
+  "confirmPassword": "weak"
+}
+
+# Expected Response:
+# - 400 Bad Request
+# - Error: Password does not meet requirements
+# - Message: {
+#     ar: "كلمة المرور لا تستوفي المتطلبات",
+#     en: "Password does not meet requirements"
+#   }
+# - Details: {
+#     requirements: [
+#       "At least 8 characters",
+#       "At least one uppercase letter",
+#       "At least one lowercase letter",
+#       "At least one number",
+#       "At least one special character"
+#     ]
+#   }
+
+###############################################################################
+# 6. Update Preferences
+###############################################################################
+
+### 6.1 Update language preference
+PUT {{baseUrl}}/users/me/preferences
+Authorization: Bearer {{newAccessToken}}
+Content-Type: application/json
+
+{
+  "language": "ar"
+}
+
+# Expected Response:
+# - 200 OK
+# - Language preference updated
+# - Subsequent responses in Arabic
+
+### 6.2 Update theme preference
+PUT {{baseUrl}}/users/me/preferences
+Authorization: Bearer {{newAccessToken}}
+Content-Type: application/json
+
+{
+  "theme": "dark"
+}
+
+# Expected Response:
+# - 200 OK
+# - Theme preference updated
+
+### 6.3 Update notification preferences
+PUT {{baseUrl}}/users/me/preferences
+Authorization: Bearer {{newAccessToken}}
+Content-Type: application/json
+
+{
+  "notifications": {
+    "email": true,
+    "sms": false,
+    "push": true,
+    "appointmentReminders": true,
+    "systemUpdates": false
+  }
+}
+
+# Expected Response:
+# - 200 OK
+# - Notification preferences updated
+
+### 6.4 Get current preferences
+GET {{baseUrl}}/users/me/preferences
+Authorization: Bearer {{newAccessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Current user preferences
+
+###############################################################################
+# 7. Upload Profile Picture
+###############################################################################
+
+### 7.1 Upload profile picture
+POST {{baseUrl}}/users/me/profile-picture
+Authorization: Bearer {{newAccessToken}}
+Content-Type: multipart/form-data
+
+# Form data:
+# - file: <image_file>
+
+# Expected Response:
+# - 200 OK
+# - Profile picture uploaded
+# - Returns URL: {
+#     profilePictureUrl: "https://storage.cliniva.com/profiles/user-id.jpg"
+#   }
+
+### 7.2 Get profile with picture
+GET {{baseUrl}}/users/me
+Authorization: Bearer {{newAccessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Profile includes profilePictureUrl
+
+### 7.3 Delete profile picture
+DELETE {{baseUrl}}/users/me/profile-picture
+Authorization: Bearer {{newAccessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Profile picture removed
+# - profilePictureUrl set to null
+
+###############################################################################
+# 8. View Activity History
+###############################################################################
+
+### 8.1 Get own login history
+GET {{baseUrl}}/users/me/login-history
+Authorization: Bearer {{newAccessToken}}
+
+# Expected Response:
+# - 200 OK
+# - List of recent logins with:
+#   - timestamp
+#   - IP address
+#   - device/browser info
+#   - location (if available)
+
+### 8.2 Get own activity log
+GET {{baseUrl}}/users/me/activity-log?limit=50
+Authorization: Bearer {{newAccessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Recent activities:
+#   - Profile updates
+#   - Password changes
+#   - Login/logout events
+#   - Important actions
+
+###############################################################################
+# 9. Two-Factor Authentication
+###############################################################################
+
+### 9.1 Enable 2FA
+POST {{baseUrl}}/auth/2fa/enable
+Authorization: Bearer {{newAccessToken}}
+
+# Expected Response:
+# - 200 OK
+# - QR code for authenticator app
+# - Backup codes
+# - Message: {
+#     ar: "تم تفعيل المصادقة الثنائية",
+#     en: "Two-factor authentication enabled"
+#   }
+
+### 9.2 Verify 2FA setup
+POST {{baseUrl}}/auth/2fa/verify
+Authorization: Bearer {{newAccessToken}}
+Content-Type: application/json
+
+{
+  "code": "123456"
+}
+
+# Expected Response:
+# - 200 OK
+# - 2FA verified and activated
+
+### 9.3 Disable 2FA
+POST {{baseUrl}}/auth/2fa/disable
+Authorization: Bearer {{newAccessToken}}
+Content-Type: application/json
+
+{
+  "password": "NewPassword@123",
+  "code": "123456"
+}
+
+# Expected Response:
+# - 200 OK
+# - 2FA disabled
+
+###############################################################################
+# 10. Validation Errors
+###############################################################################
+
+### 10.1 Update with invalid phone format
+PUT {{baseUrl}}/users/me
+Authorization: Bearer {{newAccessToken}}
+Content-Type: application/json
+
+{
+  "phone": "123"
+}
+
+# Expected Response:
+# - 400 Bad Request
+# - Error: Invalid phone format
+
+### 10.2 Update with invalid email format
+PUT {{baseUrl}}/users/me
+Authorization: Bearer {{newAccessToken}}
+Content-Type: application/json
+
+{
+  "email": "not-an-email"
+}
+
+# Expected Response:
+# - 400 Bad Request
+# - Error: Invalid email format
+
+### 10.3 Attempt to change role (should fail)
+PUT {{baseUrl}}/users/me
+Authorization: Bearer {{newAccessToken}}
+Content-Type: application/json
+
+{
+  "role": "admin"
+}
+
+# Expected Response:
+# - 403 Forbidden
+# - Error: Cannot change own role
+
+### 10.4 Attempt to change status (should fail)
+PUT {{baseUrl}}/users/me
+Authorization: Bearer {{newAccessToken}}
+Content-Type: application/json
+
+{
+  "isActive": false
+}
+
+# Expected Response:
+# - 403 Forbidden
+# - Error: Cannot change own status
+

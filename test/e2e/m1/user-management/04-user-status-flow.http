@@ -1,0 +1,374 @@
+### M1 - User Management: User Status Management Flow
+### Use Case: US-02ace2cd - Change User Status
+### Description: Complete flow for activating, deactivating, and deleting users
+
+@baseUrl = http://localhost:3001
+@adminEmail = admin@cliniva.com
+@adminPassword = Admin@123
+
+###############################################################################
+# 1. Admin Login
+###############################################################################
+
+### 1.1 Login as admin
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{adminEmail}}",
+  "password": "{{adminPassword}}"
+}
+
+@accessToken = <copy_access_token_from_response>
+@adminUserId = <copy_admin_user_id_from_response>
+
+###############################################################################
+# 2. Create Test User for Status Changes
+###############################################################################
+
+### 2.1 Create a test staff user
+POST {{baseUrl}}/employees
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "email": "test.status@cliniva.com",
+  "firstName": "Test",
+  "lastName": "Status",
+  "phone": "+966505678901",
+  "dateOfBirth": "1992-01-01",
+  "gender": "male",
+  "nationality": "Saudi Arabia",
+  "role": "staff",
+  "subscriptionId": "<subscription_id>",
+  "clinicId": "<clinic_id>",
+  "employeeProfile": {
+    "jobTitle": "Test Staff",
+    "dateOfHiring": "2024-01-01",
+    "salary": 5000
+  }
+}
+
+@testUserId = <copy_user_id_from_response>
+@testEmployeeId = <copy_employee_id_from_response>
+
+###############################################################################
+# 3. Deactivate User
+###############################################################################
+
+### 3.1 Deactivate user (success)
+PATCH {{baseUrl}}/users/{{testUserId}}/deactivate
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "reason": "Temporary leave of absence"
+}
+
+# Expected Response:
+# - 200 OK
+# - User deactivated
+# - Message: {
+#     ar: "تم إلغاء تفعيل المستخدم بنجاح",
+#     en: "User deactivated successfully"
+#   }
+
+### 3.2 Verify user is deactivated
+GET {{baseUrl}}/users/{{testUserId}}
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - isActive: false
+# - deactivatedAt: <timestamp>
+# - deactivationReason: "Temporary leave of absence"
+
+### 3.3 Verify deactivated user cannot login
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "test.status@cliniva.com",
+  "password": "<temporary_password>"
+}
+
+# Expected Response:
+# - 403 Forbidden
+# - Error code: AUTH_006
+# - Message: {
+#     ar: "الحساب معطل",
+#     en: "Account deactivated"
+#   }
+
+### 3.4 Verify deactivated user not in active users list
+GET {{baseUrl}}/users?status=active
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - List should not include deactivated user
+
+### 3.5 Verify deactivated user not in dropdowns
+GET {{baseUrl}}/users/dropdown?role=staff
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Dropdown list should not include deactivated user (BZR)
+
+###############################################################################
+# 4. Activate User
+###############################################################################
+
+### 4.1 Activate previously deactivated user
+PATCH {{baseUrl}}/users/{{testUserId}}/activate
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - User activated
+# - Message: {
+#     ar: "تم تفعيل المستخدم بنجاح",
+#     en: "User activated successfully"
+#   }
+
+### 4.2 Verify user is activated
+GET {{baseUrl}}/users/{{testUserId}}
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - isActive: true
+# - deactivatedAt: null
+# - deactivationReason: null
+
+### 4.3 Verify activated user can login
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "test.status@cliniva.com",
+  "password": "<temporary_password>"
+}
+
+# Expected Response:
+# - 200 OK
+# - Login successful
+
+### 4.4 Verify activated user appears in dropdowns
+GET {{baseUrl}}/users/dropdown?role=staff
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Dropdown list includes activated user
+
+###############################################################################
+# 5. Delete User (Soft Delete)
+###############################################################################
+
+### 5.1 Deactivate user first (required before deletion)
+PATCH {{baseUrl}}/users/{{testUserId}}/deactivate
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "reason": "Preparing for deletion"
+}
+
+### 5.2 Delete user (soft delete)
+DELETE {{baseUrl}}/users/{{testUserId}}
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - User deleted (soft delete)
+# - Message: {
+#     ar: "تم حذف المستخدم بنجاح",
+#     en: "User deleted successfully"
+#   }
+
+### 5.3 Verify user is soft deleted
+GET {{baseUrl}}/users/{{testUserId}}
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 404 Not Found
+# - Error: User not found (soft deleted users are hidden)
+
+### 5.4 Get deleted users (admin only)
+GET {{baseUrl}}/users?includeDeleted=true
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - List includes deleted users with deletedAt timestamp
+
+###############################################################################
+# 6. Status Change Restrictions
+###############################################################################
+
+### 6.1 Admin attempts to deactivate own account (should fail)
+PATCH {{baseUrl}}/users/{{adminUserId}}/deactivate
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "reason": "Test"
+}
+
+# Expected Response:
+# - 403 Forbidden
+# - Error code: USER_003
+# - Message: {
+#     ar: "لا يمكنك إلغاء تفعيل حسابك الخاص",
+#     en: "Cannot deactivate your own account"
+#   }
+
+### 6.2 Admin attempts to delete own account (should fail)
+DELETE {{baseUrl}}/users/{{adminUserId}}
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 403 Forbidden
+# - Error code: USER_004
+# - Message: {
+#     ar: "لا يمكنك حذف حسابك الخاص",
+#     en: "Cannot delete your own account"
+#   }
+
+### 6.3 Attempt to delete active user (should fail)
+@activeUserId = <copy_active_user_id>
+
+DELETE {{baseUrl}}/users/{{activeUserId}}
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 400 Bad Request
+# - Error: User must be deactivated before deletion
+
+###############################################################################
+# 7. Doctor Deactivation with Appointments
+###############################################################################
+
+@doctorUserId = <copy_doctor_user_id>
+
+### 7.1 Get doctor's future appointments
+GET {{baseUrl}}/appointments?doctorId={{doctorUserId}}&status=scheduled&fromDate=2024-02-10
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - List of future appointments
+
+### 7.2 Attempt to deactivate doctor with future appointments
+PATCH {{baseUrl}}/users/{{doctorUserId}}/deactivate
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "reason": "Leaving the clinic"
+}
+
+# Expected Response:
+# - ⚠️ Current: 200 OK (deactivates without transfer)
+# - ⚠️ Future: 400 Bad Request
+# - Error: Doctor has future appointments. Please transfer or cancel them first.
+# - Details: {
+#     futureAppointmentsCount: 5,
+#     nextAppointmentDate: "2024-02-15"
+#   }
+
+### 7.3 Transfer doctor's appointments (future feature)
+# POST {{baseUrl}}/appointments/transfer
+# Authorization: Bearer {{accessToken}}
+# Content-Type: application/json
+#
+# {
+#   "fromDoctorId": "{{doctorUserId}}",
+#   "toDoctorId": "<new_doctor_id>",
+#   "appointmentIds": ["<appointment_id_1>", "<appointment_id_2>"],
+#   "notifyPatients": true
+# }
+
+# Expected Response:
+# - 200 OK
+# - Appointments transferred
+# - Patients notified
+
+### 7.4 Deactivate doctor after transfer
+# PATCH {{baseUrl}}/users/{{doctorUserId}}/deactivate
+# Authorization: Bearer {{accessToken}}
+# Content-Type: application/json
+#
+# {
+#   "reason": "Leaving the clinic",
+#   "appointmentsTransferred": true
+# }
+
+# Expected Response:
+# - 200 OK
+# - Doctor deactivated
+
+###############################################################################
+# 8. Bulk Status Operations
+###############################################################################
+
+### 8.1 Bulk deactivate users
+POST {{baseUrl}}/users/bulk-deactivate
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "userIds": ["<user_id_1>", "<user_id_2>", "<user_id_3>"],
+  "reason": "Department restructuring"
+}
+
+# Expected Response:
+# - 200 OK
+# - Success count
+# - Failed count with reasons
+# - Message: {
+#     ar: "تم إلغاء تفعيل 3 مستخدمين بنجاح",
+#     en: "Successfully deactivated 3 users"
+#   }
+
+### 8.2 Bulk activate users
+POST {{baseUrl}}/users/bulk-activate
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "userIds": ["<user_id_1>", "<user_id_2>", "<user_id_3>"]
+}
+
+# Expected Response:
+# - 200 OK
+# - Success count
+# - Failed count with reasons
+
+###############################################################################
+# 9. Status Change Audit Log
+###############################################################################
+
+### 9.1 Get user status change history
+GET {{baseUrl}}/users/{{testUserId}}/status-history
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - List of status changes with:
+#   - timestamp
+#   - changedBy (user who made the change)
+#   - oldStatus
+#   - newStatus
+#   - reason
+
+### 9.2 Get all status changes (admin only)
+GET {{baseUrl}}/audit-logs?action=user_status_change&fromDate=2024-02-01
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - List of all status changes across system
+

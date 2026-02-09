@@ -1,0 +1,137 @@
+### M1 - Authentication: Token Refresh Flow
+### Description: Refresh access token using refresh token
+
+@baseUrl = http://localhost:3001
+@email = admin@cliniva.com
+@password = Admin@123
+
+###############################################################################
+# 1. Initial Login
+###############################################################################
+
+### 1.1 Login to get tokens
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "password": "{{password}}"
+}
+
+# Save tokens from response
+@accessToken = <copy_access_token_from_response>
+@refreshToken = <copy_refresh_token_from_response>
+
+###############################################################################
+# 2. Use Access Token
+###############################################################################
+
+### 2.1 Access protected resource with valid token
+GET {{baseUrl}}/auth/profile
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Returns user profile
+
+###############################################################################
+# 3. Refresh Access Token
+###############################################################################
+
+### 3.1 Refresh token before expiry
+POST {{baseUrl}}/auth/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "{{refreshToken}}"
+}
+
+# Expected Response:
+# - 200 OK
+# - Returns new accessToken and refreshToken
+# - Old tokens are invalidated
+
+# Save new tokens
+@newAccessToken = <copy_new_access_token_from_response>
+@newRefreshToken = <copy_new_refresh_token_from_response>
+
+###############################################################################
+# 4. Verify New Token Works
+###############################################################################
+
+### 4.1 Use new access token
+GET {{baseUrl}}/auth/profile
+Authorization: Bearer {{newAccessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Returns user profile
+
+###############################################################################
+# 5. Verify Old Token is Invalidated
+###############################################################################
+
+### 5.1 Try to use old access token
+GET {{baseUrl}}/auth/profile
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 401 Unauthorized
+# - Token is no longer valid
+
+###############################################################################
+# 6. Error Cases
+###############################################################################
+
+### 6.1 Refresh with invalid token
+POST {{baseUrl}}/auth/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "invalid-token-string"
+}
+
+# Expected Response:
+# - 401 Unauthorized
+# - Error code: AUTH_003
+# - Message: Invalid token
+
+### 6.2 Refresh with expired token
+POST {{baseUrl}}/auth/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.expired.token"
+}
+
+# Expected Response:
+# - 401 Unauthorized
+# - Error code: AUTH_002
+# - Message: Token expired
+
+### 6.3 Refresh with missing token
+POST {{baseUrl}}/auth/refresh
+Content-Type: application/json
+
+{
+}
+
+# Expected Response:
+# - 400 Bad Request
+# - Validation error: refreshToken is required
+
+###############################################################################
+# 7. Automatic Token Refresh Simulation
+###############################################################################
+
+### 7.1 Access resource with expired token (should trigger auto-refresh)
+# Note: This simulates the frontend's automatic token refresh mechanism
+# In practice, the frontend intercepts 401 responses and refreshes automatically
+
+GET {{baseUrl}}/auth/profile
+Authorization: Bearer expired-token-here
+
+# Expected Response:
+# - 401 Unauthorized
+# - Frontend should catch this and call /auth/refresh
+# - Then retry the original request with new token

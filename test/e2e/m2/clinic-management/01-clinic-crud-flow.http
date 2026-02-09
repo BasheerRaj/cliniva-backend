@@ -1,0 +1,543 @@
+### M2 - Clinic Management: CRUD Operations Flow
+### Description: Complete flow for managing clinics
+
+@baseUrl = http://localhost:3001
+@adminEmail = admin@cliniva.com
+@adminPassword = Admin@123
+
+###############################################################################
+# 1. Admin Login
+###############################################################################
+
+### 1.1 Login as admin
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{adminEmail}}",
+  "password": "{{adminPassword}}"
+}
+
+@accessToken = <copy_access_token_from_response>
+@subscriptionId = <copy_subscription_id_from_response>
+@complexId = <copy_complex_id_from_response>
+@departmentId = <copy_department_id_from_response>
+
+###############################################################################
+# 2. Create Clinic
+###############################################################################
+
+### 2.1 Create clinic (success)
+POST {{baseUrl}}/clinics
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": {
+    "ar": "عيادة القلب",
+    "en": "Cardiology Clinic"
+  },
+  "description": {
+    "ar": "عيادة متخصصة في أمراض القلب والأوعية الدموية",
+    "en": "Specialized clinic for cardiovascular diseases"
+  },
+  "subscriptionId": "{{subscriptionId}}",
+  "complexId": "{{complexId}}",
+  "departmentId": "{{departmentId}}",
+  "address": {
+    "floor": "3",
+    "roomNumber": "301",
+    "building": "Building A"
+  },
+  "contactInfo": {
+    "phone": "+966112345680",
+    "email": "cardiology@medicalcare.com",
+    "extension": "301"
+  },
+  "capacity": {
+    "doctors": 5,
+    "staff": 10,
+    "patients": 50
+  },
+  "workingHours": [
+    {
+      "dayOfWeek": "sunday",
+      "isWorkingDay": true,
+      "openingTime": "08:00",
+      "closingTime": "16:00"
+    },
+    {
+      "dayOfWeek": "monday",
+      "isWorkingDay": true,
+      "openingTime": "08:00",
+      "closingTime": "16:00"
+    },
+    {
+      "dayOfWeek": "tuesday",
+      "isWorkingDay": true,
+      "openingTime": "08:00",
+      "closingTime": "16:00"
+    },
+    {
+      "dayOfWeek": "wednesday",
+      "isWorkingDay": true,
+      "openingTime": "08:00",
+      "closingTime": "16:00"
+    },
+    {
+      "dayOfWeek": "thursday",
+      "isWorkingDay": true,
+      "openingTime": "08:00",
+      "closingTime": "14:00"
+    },
+    {
+      "dayOfWeek": "friday",
+      "isWorkingDay": false
+    },
+    {
+      "dayOfWeek": "saturday",
+      "isWorkingDay": false
+    }
+  ]
+}
+
+# Expected Response:
+# - 201 Created
+# - Clinic created successfully
+# - Message: {
+#     ar: "تم إنشاء العيادة بنجاح",
+#     en: "Clinic created successfully"
+#   }
+
+@clinicId = <copy_clinic_id_from_response>
+
+###############################################################################
+# 3. Get Clinic Details
+###############################################################################
+
+### 3.1 Get clinic by ID
+GET {{baseUrl}}/clinics/{{clinicId}}
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Complete clinic information including:
+#   - Basic info
+#   - Address and contact
+#   - Capacity
+#   - Working hours
+#   - Assigned complex and department
+#   - Statistics
+
+### 3.2 Get clinic with capacity status (BZR-39)
+GET {{baseUrl}}/clinics/{{clinicId}}?includeCapacity=true
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Clinic with capacity details:
+#   - currentDoctorCount
+#   - currentStaffCount
+#   - currentPatientCount
+#   - isDoctorCapacityExceeded (BZR-39)
+#   - isStaffCapacityExceeded (BZR-39)
+#   - isPatientCapacityExceeded (BZR-39)
+#   - capacityWarnings: [
+#       {
+#         type: "doctors",
+#         message: "Doctor capacity exceeded",
+#         current: 6,
+#         capacity: 5
+#       }
+#     ]
+
+###############################################################################
+# 4. List Clinics
+###############################################################################
+
+### 4.1 Get all clinics
+GET {{baseUrl}}/clinics
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - List of clinics with pagination
+
+### 4.2 Get clinics by complex
+GET {{baseUrl}}/clinics?complexId={{complexId}}
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Clinics for specified complex
+
+### 4.3 Get clinics by department
+GET {{baseUrl}}/clinics?departmentId={{departmentId}}
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Clinics for specified department
+
+### 4.4 Get active clinics only
+GET {{baseUrl}}/clinics?status=active
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Only active clinics
+
+### 4.5 Get clinics with capacity exceeded (BZR-39)
+GET {{baseUrl}}/clinics?capacityExceeded=true
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Clinics where capacity is exceeded
+# - Highlighted for admin attention
+
+###############################################################################
+# 5. Update Clinic
+###############################################################################
+
+### 5.1 Update basic information
+PUT {{baseUrl}}/clinics/{{clinicId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": {
+    "ar": "عيادة القلب والأوعية الدموية",
+    "en": "Cardiovascular Clinic"
+  },
+  "description": {
+    "ar": "عيادة متطورة لأمراض القلب والأوعية الدموية",
+    "en": "Advanced clinic for cardiovascular diseases"
+  }
+}
+
+# Expected Response:
+# - 200 OK
+# - Clinic updated successfully
+
+### 5.2 Update contact information
+PUT {{baseUrl}}/clinics/{{clinicId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "contactInfo": {
+    "phone": "+966112345681",
+    "email": "cardio@medicalcare.com",
+    "extension": "302"
+  }
+}
+
+# Expected Response:
+# - 200 OK
+# - Contact information updated
+
+### 5.3 Update capacity
+PUT {{baseUrl}}/clinics/{{clinicId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "capacity": {
+    "doctors": 8,
+    "staff": 15,
+    "patients": 80
+  }
+}
+
+# Expected Response:
+# - 200 OK
+# - Capacity updated
+# - Warning if current count exceeds new capacity
+
+### 5.4 Update department assignment
+PUT {{baseUrl}}/clinics/{{clinicId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "departmentId": "<new_department_id>"
+}
+
+# Expected Response:
+# - 200 OK
+# - Department assignment updated
+
+###############################################################################
+# 6. Update Working Hours (BZR-42)
+###############################################################################
+
+### 6.1 Update clinic working hours
+PUT {{baseUrl}}/clinics/{{clinicId}}/working-hours
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "workingHours": [
+    {
+      "dayOfWeek": "sunday",
+      "isWorkingDay": true,
+      "openingTime": "09:00",
+      "closingTime": "17:00"
+    },
+    {
+      "dayOfWeek": "monday",
+      "isWorkingDay": true,
+      "openingTime": "09:00",
+      "closingTime": "17:00"
+    },
+    {
+      "dayOfWeek": "tuesday",
+      "isWorkingDay": true,
+      "openingTime": "09:00",
+      "closingTime": "17:00"
+    },
+    {
+      "dayOfWeek": "wednesday",
+      "isWorkingDay": true,
+      "openingTime": "09:00",
+      "closingTime": "17:00"
+    },
+    {
+      "dayOfWeek": "thursday",
+      "isWorkingDay": true,
+      "openingTime": "09:00",
+      "closingTime": "15:00"
+    },
+    {
+      "dayOfWeek": "friday",
+      "isWorkingDay": false
+    },
+    {
+      "dayOfWeek": "saturday",
+      "isWorkingDay": true,
+      "openingTime": "10:00",
+      "closingTime": "14:00"
+    }
+  ]
+}
+
+# Expected Response:
+# - 200 OK
+# - Working hours updated
+# - ⚠️ Warning if outside complex hours (BZR-42 - not fully implemented)
+# - ⚠️ Warning if conflicts with appointments (BZR-43 - not implemented)
+
+### 6.2 Validate working hours against complex (BZR-42)
+POST {{baseUrl}}/clinics/{{clinicId}}/validate-working-hours
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "workingHours": [
+    {
+      "dayOfWeek": "sunday",
+      "isWorkingDay": true,
+      "openingTime": "06:00",
+      "closingTime": "22:00"
+    }
+  ]
+}
+
+# Expected Response (Future):
+# - 400 Bad Request
+# - Error: Working hours outside complex hours
+# - Details: {
+#     complexOpeningTime: "08:00",
+#     complexClosingTime: "20:00",
+#     violations: [
+#       {
+#         day: "sunday",
+#         issue: "Opening time before complex opening",
+#         clinicTime: "06:00",
+#         complexTime: "08:00"
+#       }
+#     ]
+#   }
+
+###############################################################################
+# 7. Assign Person-in-Charge (BZR-41)
+###############################################################################
+
+@picEmployeeId = <copy_employee_id>
+
+### 7.1 Get available PICs (from complex PICs - BZR-41)
+GET {{baseUrl}}/employees?role=admin,manager&complexId={{complexId}}&status=active
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - List of eligible employees (complex PICs)
+
+### 7.2 Assign PIC to clinic
+PATCH {{baseUrl}}/clinics/{{clinicId}}/pic
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "personInChargeId": "{{picEmployeeId}}"
+}
+
+# Expected Response:
+# - 200 OK
+# - PIC assigned successfully
+# - Message: {
+#     ar: "تم تعيين المسؤول بنجاح",
+#     en: "Person-in-charge assigned successfully"
+#   }
+
+### 7.3 Verify PIC assigned
+GET {{baseUrl}}/clinics/{{clinicId}}
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Clinic includes personInChargeId
+
+###############################################################################
+# 8. Get Clinic Statistics
+###############################################################################
+
+### 8.1 Get capacity status (BZR-39)
+GET {{baseUrl}}/clinics/{{clinicId}}/capacity
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - {
+#     doctors: {
+#       capacity: 8,
+#       current: 6,
+#       available: 2,
+#       utilizationPercentage: 75,
+#       isExceeded: false
+#     },
+#     staff: {
+#       capacity: 15,
+#       current: 12,
+#       available: 3,
+#       utilizationPercentage: 80,
+#       isExceeded: false
+#     },
+#     patients: {
+#       capacity: 80,
+#       current: 65,
+#       available: 15,
+#       utilizationPercentage: 81,
+#       isExceeded: false
+#     },
+#     warnings: []
+#   }
+
+### 8.2 Get assigned doctors and staff
+GET {{baseUrl}}/clinics/{{clinicId}}/staff
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - {
+#     doctors: [<doctor_list>],
+#     staff: [<staff_list>],
+#     totalDoctors: <count>,
+#     totalStaff: <count>
+#   }
+
+### 8.3 Get scheduled appointments
+GET {{baseUrl}}/clinics/{{clinicId}}/appointments?status=scheduled
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - List of scheduled appointments
+
+###############################################################################
+# 9. Delete Clinic
+###############################################################################
+
+### 9.1 Attempt to delete clinic with active appointments (should fail)
+DELETE {{baseUrl}}/clinics/{{clinicId}}
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 400 Bad Request
+# - Error code: CLINIC_003
+# - Message: {
+#     ar: "لا يمكن حذف العيادة التي تحتوي على مواعيد نشطة",
+#     en: "Cannot delete clinic with active appointments"
+#   }
+
+### 9.2 Delete clinic (after handling appointments)
+DELETE {{baseUrl}}/clinics/{{clinicId}}
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Clinic deleted (soft delete)
+# - Message: {
+#     ar: "تم حذف العيادة بنجاح",
+#     en: "Clinic deleted successfully"
+#   }
+
+###############################################################################
+# 10. Validation Errors
+###############################################################################
+
+### 10.1 Create clinic without required fields
+POST {{baseUrl}}/clinics
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": {
+    "en": "Test Clinic"
+  }
+}
+
+# Expected Response:
+# - 400 Bad Request
+# - Validation errors for missing fields
+
+### 10.2 Create clinic exceeding plan limit (BZR-30)
+POST {{baseUrl}}/clinics
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": {
+    "ar": "عيادة ثانية",
+    "en": "Second Clinic"
+  },
+  "subscriptionId": "{{subscriptionId}}"
+}
+
+# Expected Response (for Clinic Plan):
+# - 400 Bad Request
+# - Error code: CLINIC_001
+# - Message: {
+#     ar: "تم الوصول إلى الحد الأقصى للعيادات في خطتك",
+#     en: "Clinic limit reached for your plan"
+#   }
+
+### 10.3 Create clinic with invalid complex
+POST {{baseUrl}}/clinics
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": {
+    "ar": "عيادة اختبار",
+    "en": "Test Clinic"
+  },
+  "complexId": "invalid-complex-id",
+  "subscriptionId": "{{subscriptionId}}"
+}
+
+# Expected Response:
+# - 400 Bad Request
+# - Error: Invalid complex ID
+

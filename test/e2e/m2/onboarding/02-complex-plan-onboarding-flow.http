@@ -1,0 +1,236 @@
+### M2 - Onboarding: Complex Plan Flow
+### Use Case: UC-c5d4e3f - Setup Complex Plan
+### Description: Onboarding flow for Complex Plan (Complex → Clinic, no Organization)
+
+@baseUrl = http://localhost:3001
+
+###############################################################################
+# 1. User Registration
+###############################################################################
+
+### 1.1 Register new user (owner)
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "email": "complex.owner@cliniva.com",
+  "password": "ComplexOwner@123",
+  "confirmPassword": "ComplexOwner@123",
+  "firstName": "Fatima",
+  "lastName": "Al-Qahtani",
+  "phone": "+966502345678",
+  "dateOfBirth": "1988-07-15",
+  "gender": "female",
+  "nationality": "Saudi Arabia",
+  "role": "owner"
+}
+
+### 1.2 Login
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "complex.owner@cliniva.com",
+  "password": "ComplexOwner@123"
+}
+
+@accessToken = <copy_access_token_from_response>
+@userId = <copy_user_id_from_response>
+
+###############################################################################
+# 2. Select Complex Plan
+###############################################################################
+
+### 2.1 Get subscription plans
+GET {{baseUrl}}/subscription-plans
+Authorization: Bearer {{accessToken}}
+
+@complexPlanId = <copy_complex_plan_id_from_response>
+
+### 2.2 Create subscription with Complex Plan
+POST {{baseUrl}}/subscriptions
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "subscriptionPlanId": "{{complexPlanId}}",
+  "userId": "{{userId}}",
+  "paymentMethod": "credit_card",
+  "billingCycle": "monthly"
+}
+
+@subscriptionId = <copy_subscription_id_from_response>
+
+###############################################################################
+# 3. Create Medical Complex (No Organization)
+###############################################################################
+
+### 3.1 Create complex directly (BZR-28: Only 1 complex allowed)
+POST {{baseUrl}}/complexes
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": "Jeddah Medical Complex",
+  "managerName": "Dr. Nasser Al-Ghamdi",
+  "logoUrl": "https://example.com/logos/jeddah-complex.png",
+  "website": "https://jeddah-medical.com",
+  "yearEstablished": 2018,
+  "mission": "Quality healthcare for Jeddah community",
+  "vision": "Leading medical complex in Western Region",
+  "overview": "Comprehensive medical services in Jeddah",
+  "phoneNumbers": [
+    {
+      "type": "main",
+      "number": "+966122345678",
+      "isPrimary": true
+    }
+  ],
+  "email": "info@jeddah-medical.com",
+  "address": {
+    "street": "Palestine Street",
+    "city": "Jeddah",
+    "state": "Makkah Region",
+    "country": "Saudi Arabia",
+    "postalCode": "23456"
+  },
+  "emergencyContact": {
+    "name": "Emergency Services",
+    "phone": "+966122345679",
+    "email": "emergency@jeddah-medical.com"
+  },
+  "vatNumber": "300234567800003",
+  "crNumber": "2020234567",
+  "subscriptionId": "{{subscriptionId}}",
+  "departments": []
+}
+
+@complexId = <copy_complex_id_from_response>
+
+###############################################################################
+# 4. Create Departments
+###############################################################################
+
+### 4.1 Create Orthopedics Department
+POST {{baseUrl}}/departments
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": "Orthopedics",
+  "description": "Bone and joint care",
+  "complexId": "{{complexId}}"
+}
+
+@orthopedicsDeptId = <copy_department_id_from_response>
+
+### 4.2 Create Dermatology Department
+POST {{baseUrl}}/departments
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": "Dermatology",
+  "description": "Skin care and treatment",
+  "complexId": "{{complexId}}"
+}
+
+@dermatologyDeptId = <copy_department_id_from_response>
+
+###############################################################################
+# 5. Create Clinics
+###############################################################################
+
+### 5.1 Create Orthopedics Clinic
+POST {{baseUrl}}/clinics
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": "Orthopedics Clinic",
+  "headDoctorName": "Dr. Omar Al-Harbi",
+  "specialization": "Orthopedics",
+  "licenseNumber": "ORTHO-2024-001",
+  "phoneNumbers": [
+    {
+      "type": "main",
+      "number": "+966122345680",
+      "isPrimary": true
+    }
+  ],
+  "email": "orthopedics@jeddah-medical.com",
+  "address": {
+    "street": "Palestine Street, Floor 2",
+    "city": "Jeddah",
+    "state": "Makkah Region",
+    "country": "Saudi Arabia",
+    "postalCode": "23456"
+  },
+  "complexId": "{{complexId}}",
+  "complexDepartmentId": "{{orthopedicsDeptId}}",
+  "subscriptionId": "{{subscriptionId}}",
+  "maxStaff": 6,
+  "maxDoctors": 3,
+  "maxPatients": 60,
+  "sessionDuration": 30
+}
+
+@orthoClinicId = <copy_clinic_id_from_response>
+
+###############################################################################
+# 6. Verify Setup (No Organization Section)
+###############################################################################
+
+### 6.1 Get complex details
+GET {{baseUrl}}/complexes/{{complexId}}
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Complex details
+# - organizationId should be null
+# - Departments and clinics included
+
+### 6.2 Verify user cannot create another complex (BZR-28)
+POST {{baseUrl}}/complexes
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": "Second Complex",
+  "subscriptionId": "{{subscriptionId}}"
+}
+
+# Expected Response:
+# - 400 Bad Request
+# - Error code: COMPLEX_001
+# - Message: Plan allows maximum 1 complex
+
+### 6.3 Get user profile
+GET {{baseUrl}}/auth/profile
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - User profile
+# - complexId populated
+# - organizationId should be null
+
+###############################################################################
+# 7. Complete Onboarding
+###############################################################################
+
+### 7.1 Mark onboarding complete
+PATCH {{baseUrl}}/users/{{userId}}/onboarding
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "onboardingComplete": true,
+  "setupComplete": true
+}
+
+# Expected Response:
+# - 200 OK
+# - Onboarding completed
+# - User can access system

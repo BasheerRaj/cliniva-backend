@@ -1,0 +1,493 @@
+### M2 - Utilities: Working Hours Validation
+### Description: Validate working hours, check conflicts, and get suggestions
+
+@baseUrl = http://localhost:3001
+@adminEmail = admin@cliniva.com
+@adminPassword = Admin@123
+
+###############################################################################
+# 1. Admin Login
+###############################################################################
+
+### 1.1 Login as admin
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{adminEmail}}",
+  "password": "{{adminPassword}}"
+}
+
+@accessToken = <copy_access_token_from_response>
+@complexId = <copy_complex_id_from_response>
+@clinicId = <copy_clinic_id_from_response>
+
+###############################################################################
+# 2. Validate Working Hours
+###############################################################################
+
+### 2.1 Validate working hours (valid schedule)
+POST {{baseUrl}}/working-hours/validate
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "entityType": "clinic",
+  "entityId": "{{clinicId}}",
+  "schedule": [
+    {
+      "dayOfWeek": "sunday",
+      "isWorkingDay": true,
+      "openingTime": "09:00",
+      "closingTime": "17:00"
+    },
+    {
+      "dayOfWeek": "monday",
+      "isWorkingDay": true,
+      "openingTime": "09:00",
+      "closingTime": "17:00"
+    },
+    {
+      "dayOfWeek": "friday",
+      "isWorkingDay": false
+    }
+  ]
+}
+
+# Expected Response:
+# - 200 OK
+# - { "valid": true, "errors": [] }
+
+### 2.2 Validate working hours (invalid - closing before opening)
+POST {{baseUrl}}/working-hours/validate
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "entityType": "clinic",
+  "entityId": "{{clinicId}}",
+  "schedule": [
+    {
+      "dayOfWeek": "sunday",
+      "isWorkingDay": true,
+      "openingTime": "17:00",
+      "closingTime": "09:00"
+    }
+  ]
+}
+
+# Expected Response:
+# - 400 Bad Request
+# - Error: Closing time must be after opening time
+
+### 2.3 Validate working hours (invalid - break outside working hours)
+POST {{baseUrl}}/working-hours/validate
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "entityType": "clinic",
+  "entityId": "{{clinicId}}",
+  "schedule": [
+    {
+      "dayOfWeek": "sunday",
+      "isWorkingDay": true,
+      "openingTime": "09:00",
+      "closingTime": "17:00",
+      "breakStartTime": "18:00",
+      "breakEndTime": "19:00"
+    }
+  ]
+}
+
+# Expected Response:
+# - 400 Bad Request
+# - Error: Break time must be within working hours
+
+###############################################################################
+# 3. Validate Clinic Hours Against Complex Hours (BZR-42)
+###############################################################################
+
+### 3.1 Validate clinic hours within complex hours (valid)
+POST {{baseUrl}}/working-hours/validate-clinic-hours
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "clinicId": "{{clinicId}}",
+  "complexId": "{{complexId}}",
+  "schedule": [
+    {
+      "dayOfWeek": "sunday",
+      "isWorkingDay": true,
+      "openingTime": "10:00",
+      "closingTime": "16:00"
+    }
+  ]
+}
+
+# Expected Response:
+# - 200 OK
+# - { "valid": true, "errors": [] }
+# - Clinic hours are within complex hours
+
+### 3.2 Validate clinic hours outside complex hours (invalid)
+POST {{baseUrl}}/working-hours/validate-clinic-hours
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "clinicId": "{{clinicId}}",
+  "complexId": "{{complexId}}",
+  "schedule": [
+    {
+      "dayOfWeek": "sunday",
+      "isWorkingDay": true,
+      "openingTime": "07:00",
+      "closingTime": "20:00"
+    }
+  ]
+}
+
+# Expected Response:
+# - 400 Bad Request
+# - Error: Clinic hours must be within complex hours
+# - Details: Complex hours are 08:00 - 18:00
+
+### 3.3 Validate clinic open when complex closed (invalid)
+POST {{baseUrl}}/working-hours/validate-clinic-hours
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "clinicId": "{{clinicId}}",
+  "complexId": "{{complexId}}",
+  "schedule": [
+    {
+      "dayOfWeek": "friday",
+      "isWorkingDay": true,
+      "openingTime": "09:00",
+      "closingTime": "17:00"
+    }
+  ]
+}
+
+# Expected Response:
+# - 400 Bad Request
+# - Error: Clinic cannot be open when complex is closed
+# - Details: Complex is closed on Friday
+
+###############################################################################
+# 4. Check Working Hours Conflicts (BZR-43)
+###############################################################################
+
+### 4.1 Check conflicts with appointments
+POST {{baseUrl}}/working-hours/check-conflicts
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "entityType": "clinic",
+  "entityId": "{{clinicId}}",
+  "newSchedule": [
+    {
+      "dayOfWeek": "sunday",
+      "isWorkingDay": true,
+      "openingTime": "10:00",
+      "closingTime": "15:00"
+    }
+  ]
+}
+
+# Expected Response:
+# - 200 OK
+# - {
+#     "hasConflicts": true/false,
+#     "conflicts": {
+#       "appointments": [
+#         {
+#           "appointmentId": "...",
+#           "patientName": "...",
+#           "doctorName": "...",
+#           "appointmentTime": "08:00",
+#           "reason": "Appointment is before new opening time"
+#         }
+#       ],
+#       "doctors": [
+#         {
+#           "doctorId": "...",
+#           "doctorName": "...",
+#           "conflictDays": ["sunday"]
+#         }
+#       ],
+#       "staff": []
+#     },
+#     "affectedAppointments": 5,
+#     "requiresRescheduling": true
+#   }
+
+### 4.2 Check conflicts for user working hours
+POST {{baseUrl}}/working-hours/check-conflicts
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "entityType": "user",
+  "entityId": "{{userId}}",
+  "newSchedule": [
+    {
+      "dayOfWeek": "sunday",
+      "isWorkingDay": false
+    }
+  ]
+}
+
+# Expected Response:
+# - 200 OK
+# - Lists appointments and shifts affected
+
+###############################################################################
+# 5. Validate Clinic Working Hours (Comprehensive)
+###############################################################################
+
+### 5.1 Validate clinic working hours with all checks
+POST {{baseUrl}}/clinics/{{clinicId}}/validate-working-hours
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "workingHours": [
+    {
+      "dayOfWeek": "sunday",
+      "isWorkingDay": true,
+      "openingTime": "09:00",
+      "closingTime": "17:00",
+      "breakStartTime": "13:00",
+      "breakEndTime": "14:00"
+    },
+    {
+      "dayOfWeek": "monday",
+      "isWorkingDay": true,
+      "openingTime": "09:00",
+      "closingTime": "17:00"
+    },
+    {
+      "dayOfWeek": "tuesday",
+      "isWorkingDay": true,
+      "openingTime": "09:00",
+      "closingTime": "17:00"
+    },
+    {
+      "dayOfWeek": "wednesday",
+      "isWorkingDay": true,
+      "openingTime": "09:00",
+      "closingTime": "17:00"
+    },
+    {
+      "dayOfWeek": "thursday",
+      "isWorkingDay": true,
+      "openingTime": "09:00",
+      "closingTime": "17:00"
+    },
+    {
+      "dayOfWeek": "friday",
+      "isWorkingDay": false
+    },
+    {
+      "dayOfWeek": "saturday",
+      "isWorkingDay": false
+    }
+  ]
+}
+
+# Expected Response:
+# - 200 OK
+# - {
+#     "isValid": true/false,
+#     "errors": [],
+#     "conflicts": {
+#       "appointments": [],
+#       "doctors": [],
+#       "staff": []
+#     },
+#     "requiresRescheduling": false,
+#     "affectedAppointments": 0
+#   }
+
+###############################################################################
+# 6. Get Working Hours Suggestions
+###############################################################################
+
+### 6.1 Get suggested working hours from parent entity
+POST {{baseUrl}}/working-hours/suggest
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "entityType": "clinic",
+  "entityId": "{{clinicId}}",
+  "parentEntityType": "complex",
+  "parentEntityId": "{{complexId}}"
+}
+
+# Expected Response:
+# - 200 OK
+# - Returns parent entity's working hours as suggestion
+# - Can be used to auto-fill clinic hours
+
+### 6.2 Get suggested working hours for user
+POST {{baseUrl}}/working-hours/suggest
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "entityType": "user",
+  "entityId": "{{userId}}",
+  "parentEntityType": "clinic",
+  "parentEntityId": "{{clinicId}}"
+}
+
+# Expected Response:
+# - 200 OK
+# - Returns clinic's working hours as suggestion
+
+###############################################################################
+# 7. Schedule Conflict Detection
+###############################################################################
+
+### 7.1 Check schedule conflicts for doctor
+POST {{baseUrl}}/schedules/check-conflicts
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "doctorId": "{{doctorId}}",
+  "date": "2024-03-15",
+  "startTime": "10:00",
+  "endTime": "11:00"
+}
+
+# Expected Response:
+# - 200 OK
+# - {
+#     "hasConflict": true/false,
+#     "conflicts": [
+#       {
+#         "type": "appointment",
+#         "id": "...",
+#         "startTime": "10:30",
+#         "endTime": "11:00",
+#         "details": "Existing appointment"
+#       }
+#     ]
+#   }
+
+### 7.2 Check schedule conflicts for clinic
+POST {{baseUrl}}/schedules/check-conflicts
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "clinicId": "{{clinicId}}",
+  "date": "2024-03-15",
+  "startTime": "10:00",
+  "endTime": "11:00"
+}
+
+# Expected Response:
+# - 200 OK
+# - Lists all conflicts in clinic at that time
+
+###############################################################################
+# 8. Appointment Conflict Detection
+###############################################################################
+
+### 8.1 Check appointment conflicts
+POST {{baseUrl}}/appointments/check-conflicts
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "doctorId": "{{doctorId}}",
+  "clinicId": "{{clinicId}}",
+  "appointmentDate": "2024-03-15",
+  "startTime": "10:00",
+  "endTime": "11:00"
+}
+
+# Expected Response:
+# - 200 OK
+# - {
+#     "hasConflict": true/false,
+#     "conflicts": [
+#       {
+#         "type": "doctor_unavailable",
+#         "reason": "Doctor has another appointment",
+#         "conflictingAppointmentId": "..."
+#       },
+#       {
+#         "type": "outside_working_hours",
+#         "reason": "Clinic is closed at this time"
+#       }
+#     ]
+#   }
+
+###############################################################################
+# 9. Working Hours Auto-fill
+###############################################################################
+
+### 9.1 Get auto-fill working hours for clinic
+GET {{baseUrl}}/working-hours/auto-fill?entityType=clinic&entityId={{clinicId}}&parentType=complex&parentId={{complexId}}
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Returns complex working hours
+# - Can be used to pre-populate clinic form
+
+### 9.2 Get auto-fill working hours for user
+GET {{baseUrl}}/working-hours/auto-fill?entityType=user&entityId={{userId}}&parentType=clinic&parentId={{clinicId}}
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Returns clinic working hours
+# - Can be used to pre-populate user form
+
+###############################################################################
+# 10. Rescheduling Suggestions
+###############################################################################
+
+### 10.1 Get rescheduling suggestions for conflicting appointments
+POST {{baseUrl}}/working-hours/reschedule-suggestions
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "clinicId": "{{clinicId}}",
+  "appointmentIds": ["appointment1", "appointment2"],
+  "newWorkingHours": [
+    {
+      "dayOfWeek": "sunday",
+      "isWorkingDay": true,
+      "openingTime": "10:00",
+      "closingTime": "16:00"
+    }
+  ]
+}
+
+# Expected Response:
+# - 200 OK
+# - {
+#     "suggestions": [
+#       {
+#         "appointmentId": "...",
+#         "currentTime": "08:00",
+#         "suggestedTimes": [
+#           { "date": "2024-03-15", "time": "10:00" },
+#           { "date": "2024-03-15", "time": "11:00" },
+#           { "date": "2024-03-16", "time": "10:00" }
+#         ]
+#       }
+#     ]
+#   }

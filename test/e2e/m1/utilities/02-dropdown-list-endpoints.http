@@ -1,0 +1,436 @@
+### M1 - Utilities: Dropdown and List Endpoints
+### Description: Endpoints for populating dropdowns and lists in UI
+
+@baseUrl = http://localhost:3001
+@adminEmail = admin@cliniva.com
+@adminPassword = Admin@123
+
+###############################################################################
+# 1. Admin Login
+###############################################################################
+
+### 1.1 Login as admin
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{adminEmail}}",
+  "password": "{{adminPassword}}"
+}
+
+@accessToken = <copy_access_token_from_response>
+@subscriptionId = <copy_subscription_id_from_response>
+@complexId = <copy_complex_id_from_response>
+@clinicId = <copy_clinic_id_from_response>
+
+###############################################################################
+# 2. User Dropdown Lists
+###############################################################################
+
+### 2.1 Get all active users for dropdown
+GET {{baseUrl}}/users/dropdown
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Simplified user list for dropdowns
+# - [
+#     {
+#       "_id": "...",
+#       "firstName": "...",
+#       "lastName": "...",
+#       "email": "...",
+#       "role": "..."
+#     }
+#   ]
+
+### 2.2 Get users by role for dropdown
+GET {{baseUrl}}/users/dropdown?role=doctor
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Only doctors in the list
+
+### 2.3 Get users by clinic for dropdown
+GET {{baseUrl}}/users/dropdown?clinicId={{clinicId}}
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Only users assigned to specific clinic
+
+### 2.4 Get users by complex for dropdown
+GET {{baseUrl}}/users/dropdown?complexId={{complexId}}
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Only users assigned to specific complex
+
+### 2.5 Get active doctors only
+GET {{baseUrl}}/users/dropdown?role=doctor&isActive=true
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Only active doctors
+
+### 2.6 Get staff members for dropdown
+GET {{baseUrl}}/users/dropdown?role=staff&isActive=true
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Only active staff members
+
+###############################################################################
+# 3. Clinic Dropdown Lists
+###############################################################################
+
+### 3.1 Get all active clinics for dropdown
+GET {{baseUrl}}/clinics/dropdown
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Simplified clinic list
+# - [
+#     {
+#       "_id": "...",
+#       "name": "...",
+#       "specialization": "...",
+#       "complexId": "..."
+#     }
+#   ]
+
+### 3.2 Get clinics by complex for dropdown
+GET {{baseUrl}}/clinics/dropdown?complexId={{complexId}}
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Only clinics within specific complex
+
+### 3.3 Get clinics by subscription for dropdown
+GET {{baseUrl}}/clinics/dropdown?subscriptionId={{subscriptionId}}
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - All clinics under subscription
+
+### 3.4 Get clinics by department for dropdown
+GET {{baseUrl}}/clinics/dropdown?departmentId={{departmentId}}
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Clinics in specific department
+
+###############################################################################
+# 4. Complex Lists
+###############################################################################
+
+### 4.1 Get all complexes (simple list)
+GET {{baseUrl}}/complexes?page=1&limit=100
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - List of complexes with basic info
+# - Suitable for dropdown population
+
+### 4.2 Get complexes by organization
+GET {{baseUrl}}/complexes?organizationId={{organizationId}}
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Complexes within specific organization
+
+### 4.3 Get complexes by subscription
+GET {{baseUrl}}/complexes?subscriptionId={{subscriptionId}}
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - All complexes under subscription
+
+###############################################################################
+# 5. Department Lists
+###############################################################################
+
+### 5.1 Get all departments
+GET {{baseUrl}}/departments
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - List of all departments
+
+### 5.2 Get departments by complex
+GET {{baseUrl}}/departments?complexId={{complexId}}
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Departments within specific complex
+
+### 5.3 Get active departments only
+GET {{baseUrl}}/departments?isActive=true
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Only active departments
+
+###############################################################################
+# 6. Subscription Plans List
+###############################################################################
+
+### 6.1 Get all subscription plans
+GET {{baseUrl}}/subscription-plans
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - List of available subscription plans
+# - [
+#     {
+#       "_id": "...",
+#       "name": "Company Plan",
+#       "code": "company",
+#       "price": 999,
+#       "features": [...],
+#       "maxOrganizations": 1,
+#       "maxComplexes": 999,
+#       "maxClinics": 999
+#     }
+#   ]
+
+### 6.2 Get active subscription plans only
+GET {{baseUrl}}/subscription-plans?isActive=true
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Only active/available plans
+
+###############################################################################
+# 7. Service Lists
+###############################################################################
+
+### 7.1 Get all services
+GET {{baseUrl}}/services
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - List of medical services
+
+### 7.2 Get services by clinic
+GET {{baseUrl}}/services?clinicId={{clinicId}}
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Services available in specific clinic
+
+### 7.3 Get active services only
+GET {{baseUrl}}/services?isActive=true
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Only active services
+
+### 7.4 Get services by category
+GET {{baseUrl}}/services?category=consultation
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Services in specific category
+
+###############################################################################
+# 8. Specialty Lists
+###############################################################################
+
+### 8.1 Get all specialties
+GET {{baseUrl}}/specialties
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - List of medical specialties
+# - [
+#     {
+#       "_id": "...",
+#       "name": "Cardiology",
+#       "description": "...",
+#       "isActive": true
+#     }
+#   ]
+
+### 8.2 Get active specialties only
+GET {{baseUrl}}/specialties?isActive=true
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Only active specialties
+
+###############################################################################
+# 9. Patient Lists
+###############################################################################
+
+### 9.1 Get recent patients
+GET {{baseUrl}}/patients/recent/list?limit=10
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Last 10 patients
+# - Useful for quick access lists
+
+### 9.2 Get patients by clinic
+GET {{baseUrl}}/patients?clinicId={{clinicId}}&limit=50
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Patients registered in specific clinic
+
+### 9.3 Search patients for dropdown
+GET {{baseUrl}}/patients?search=ahmed&limit=10
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Patients matching search term
+# - Useful for autocomplete
+
+###############################################################################
+# 10. Role and Permission Lists
+###############################################################################
+
+### 10.1 Get available roles
+GET {{baseUrl}}/user-access/roles
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - List of system roles
+# - [
+#     {
+#       "code": "admin",
+#       "name": { "ar": "مدير", "en": "Admin" },
+#       "permissions": [...]
+#     }
+#   ]
+
+### 10.2 Get available permissions
+GET {{baseUrl}}/user-access/permissions
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - List of all permissions
+# - Grouped by module
+
+### 10.3 Get permissions by role
+GET {{baseUrl}}/user-access/roles/admin/permissions
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Permissions for specific role
+
+###############################################################################
+# 11. Working Hours Templates
+###############################################################################
+
+### 11.1 Get working hours by entity
+GET {{baseUrl}}/working-hours?entityType=clinic&entityId={{clinicId}}
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Working hours schedule for entity
+# - Can be used as template
+
+### 11.2 Get working hours by complex (for inheritance)
+GET {{baseUrl}}/working-hours?entityType=complex&entityId={{complexId}}
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Complex working hours
+# - Used to auto-fill clinic hours
+
+###############################################################################
+# 12. Statistics and Counts
+###############################################################################
+
+### 12.1 Get employee statistics
+GET {{baseUrl}}/employees/statistics
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Employee counts by role, status, etc.
+# - Useful for dashboard widgets
+
+### 12.2 Get user counts by role
+GET {{baseUrl}}/users?groupBy=role
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Count of users per role
+
+### 12.3 Get clinic statistics
+GET {{baseUrl}}/clinics/statistics
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Clinic counts, capacity usage, etc.
+
+###############################################################################
+# 13. Lookup Data
+###############################################################################
+
+### 13.1 Get countries list
+GET {{baseUrl}}/lookup/countries
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - List of countries for dropdown
+
+### 13.2 Get nationalities list
+GET {{baseUrl}}/lookup/nationalities
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - List of nationalities
+
+### 13.3 Get time zones
+GET {{baseUrl}}/lookup/timezones
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - List of time zones
+
+### 13.4 Get languages
+GET {{baseUrl}}/lookup/languages
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Supported languages
+# - [{ "code": "ar", "name": "Arabic" }, { "code": "en", "name": "English" }]

@@ -1,0 +1,481 @@
+### M2 - Utilities: Capacity Management
+### Description: Check capacity, get capacity status, and capacity calculations
+
+@baseUrl = http://localhost:3001
+@adminEmail = admin@cliniva.com
+@adminPassword = Admin@123
+
+###############################################################################
+# 1. Admin Login
+###############################################################################
+
+### 1.1 Login as admin
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{adminEmail}}",
+  "password": "{{adminPassword}}"
+}
+
+@accessToken = <copy_access_token_from_response>
+@complexId = <copy_complex_id_from_response>
+@clinicId = <copy_clinic_id_from_response>
+
+###############################################################################
+# 2. Complex Capacity Management (BZR-33, BZR-35)
+###############################################################################
+
+### 2.1 Get complex capacity overview
+GET {{baseUrl}}/complexes/{{complexId}}/capacity
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - {
+#     "complexId": "...",
+#     "complexName": "...",
+#     "clinics": [
+#       {
+#         "clinicId": "...",
+#         "clinicName": "...",
+#         "capacity": {
+#           "doctors": { "max": 5, "current": 3, "available": 2 },
+#           "staff": { "max": 10, "current": 7, "available": 3 },
+#           "patients": { "max": 100, "current": 85, "available": 15 }
+#         }
+#       }
+#     ],
+#     "totalCapacity": {
+#       "doctors": {
+#         "total": 20,
+#         "current": 15,
+#         "available": 5,
+#         "percentage": 75,
+#         "isExceeded": false
+#       },
+#       "staff": {
+#         "total": 40,
+#         "current": 35,
+#         "available": 5,
+#         "percentage": 87.5,
+#         "isExceeded": false
+#       },
+#       "patients": {
+#         "total": 400,
+#         "current": 380,
+#         "available": 20,
+#         "percentage": 95,
+#         "isExceeded": false
+#       }
+#     },
+#     "recommendations": [
+#       {
+#         "type": "warning",
+#         "message": {
+#           "ar": "سعة المرضى تقترب من الحد الأقصى",
+#           "en": "Patient capacity is near maximum"
+#         }
+#       }
+#     ]
+#   }
+
+### 2.2 Get complex capacity with exceeded warning
+GET {{baseUrl}}/complexes/{{complexId}}/capacity
+Authorization: Bearer {{accessToken}}
+
+# Expected Response (when capacity exceeded):
+# - 200 OK
+# - totalCapacity.doctors.isExceeded: true
+# - Recommendations include warning messages
+
+### 2.3 Get scheduled appointments count (BZR-31)
+GET {{baseUrl}}/complexes/{{complexId}}?includeCounts=true
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Complex details with scheduledAppointmentsCount
+# - Count of active scheduled appointments
+
+### 2.4 Get clinics assigned count (BZR-32)
+GET {{baseUrl}}/complexes/{{complexId}}?includeCounts=true
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Complex details with clinicsAssignedCount
+# - Count of active clinics only
+
+###############################################################################
+# 3. Clinic Capacity Management (BZR-39)
+###############################################################################
+
+### 3.1 Get clinic capacity status
+GET {{baseUrl}}/clinics/{{clinicId}}/capacity
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - {
+#     "clinicId": "...",
+#     "clinicName": "...",
+#     "capacity": {
+#       "doctors": {
+#         "max": 5,
+#         "current": 3,
+#         "available": 2,
+#         "percentage": 60,
+#         "isExceeded": false,
+#         "list": [
+#           {
+#             "userId": "...",
+#             "name": "Dr. Ahmed Hassan",
+#             "specialization": "Cardiology",
+#             "appointmentsCount": 25
+#           }
+#         ]
+#       },
+#       "staff": {
+#         "max": 10,
+#         "current": 8,
+#         "available": 2,
+#         "percentage": 80,
+#         "isExceeded": false,
+#         "list": [
+#           {
+#             "userId": "...",
+#             "name": "Sara Ali",
+#             "role": "nurse"
+#           }
+#         ]
+#       },
+#       "patients": {
+#         "max": 100,
+#         "current": 95,
+#         "available": 5,
+#         "percentage": 95,
+#         "isExceeded": false
+#       }
+#     },
+#     "recommendations": [
+#       {
+#         "type": "warning",
+#         "message": {
+#           "ar": "سعة المرضى تجاوزت 90%",
+#           "en": "Patient capacity exceeded 90%"
+#         }
+#       }
+#     ]
+#   }
+
+### 3.2 Get clinic capacity with exceeded status (BZR-39)
+GET {{baseUrl}}/clinics/{{clinicId}}/capacity
+Authorization: Bearer {{accessToken}}
+
+# Expected Response (when exceeded):
+# - 200 OK
+# - capacity.doctors.isExceeded: true
+# - UI should highlight in red
+
+### 3.3 Get clinic with capacity in list view
+GET {{baseUrl}}/clinics?includeCapacity=true
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Each clinic includes capacity object
+# - isExceeded flags for highlighting
+
+###############################################################################
+# 4. Check Capacity Before Assignment
+###############################################################################
+
+### 4.1 Check if can assign doctor to clinic
+POST {{baseUrl}}/clinics/{{clinicId}}/check-capacity
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "type": "doctor",
+  "count": 1
+}
+
+# Expected Response:
+# - 200 OK
+# - {
+#     "canAssign": true/false,
+#     "currentCapacity": 3,
+#     "maxCapacity": 5,
+#     "available": 2,
+#     "message": {
+#       "ar": "يمكن إضافة طبيب",
+#       "en": "Can add doctor"
+#     }
+#   }
+
+### 4.2 Check if can assign multiple staff
+POST {{baseUrl}}/clinics/{{clinicId}}/check-capacity
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "type": "staff",
+  "count": 5
+}
+
+# Expected Response:
+# - 200 OK
+# - {
+#     "canAssign": false,
+#     "currentCapacity": 8,
+#     "maxCapacity": 10,
+#     "available": 2,
+#     "message": {
+#       "ar": "لا يمكن إضافة 5 موظفين. السعة المتاحة: 2",
+#       "en": "Cannot add 5 staff. Available capacity: 2"
+#     }
+#   }
+
+### 4.3 Check patient capacity
+POST {{baseUrl}}/clinics/{{clinicId}}/check-capacity
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "type": "patient",
+  "count": 1
+}
+
+# Expected Response:
+# - 200 OK
+# - Indicates if clinic can accept new patient
+
+###############################################################################
+# 5. Capacity Warnings and Alerts
+###############################################################################
+
+### 5.1 Get capacity warnings for complex
+GET {{baseUrl}}/complexes/{{complexId}}/capacity-warnings
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - {
+#     "warnings": [
+#       {
+#         "level": "critical",
+#         "type": "doctors",
+#         "clinicId": "...",
+#         "clinicName": "...",
+#         "message": {
+#           "ar": "سعة الأطباء تجاوزت الحد الأقصى",
+#           "en": "Doctor capacity exceeded"
+#         },
+#         "current": 6,
+#         "max": 5,
+#         "exceededBy": 1
+#       },
+#       {
+#         "level": "warning",
+#         "type": "patients",
+#         "clinicId": "...",
+#         "clinicName": "...",
+#         "message": {
+#           "ar": "سعة المرضى تجاوزت 90%",
+#           "en": "Patient capacity exceeded 90%"
+#         },
+#         "current": 92,
+#         "max": 100,
+#         "percentage": 92
+#       }
+#     ]
+#   }
+
+### 5.2 Get capacity warnings for clinic
+GET {{baseUrl}}/clinics/{{clinicId}}/capacity-warnings
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - List of capacity warnings for specific clinic
+
+###############################################################################
+# 6. Capacity History and Trends
+###############################################################################
+
+### 6.1 Get capacity history for complex
+GET {{baseUrl}}/complexes/{{complexId}}/capacity-history?period=30days
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - {
+#     "period": "30days",
+#     "data": [
+#       {
+#         "date": "2024-03-01",
+#         "doctors": { "count": 15, "percentage": 75 },
+#         "staff": { "count": 35, "percentage": 87.5 },
+#         "patients": { "count": 350, "percentage": 87.5 }
+#       }
+#     ],
+#     "trends": {
+#       "doctors": "increasing",
+#       "staff": "stable",
+#       "patients": "increasing"
+#     }
+#   }
+
+### 6.2 Get capacity trends for clinic
+GET {{baseUrl}}/clinics/{{clinicId}}/capacity-history?period=7days
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Capacity data for last 7 days
+
+###############################################################################
+# 7. Capacity Recommendations
+###############################################################################
+
+### 7.1 Get capacity recommendations for complex
+GET {{baseUrl}}/complexes/{{complexId}}/capacity-recommendations
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - {
+#     "recommendations": [
+#       {
+#         "type": "increase_capacity",
+#         "category": "doctors",
+#         "clinicId": "...",
+#         "clinicName": "...",
+#         "message": {
+#           "ar": "يُنصح بزيادة عدد الأطباء بمقدار 2",
+#           "en": "Recommend increasing doctors by 2"
+#         },
+#         "reason": "Current capacity exceeded",
+#         "suggestedIncrease": 2
+#       },
+#       {
+#         "type": "redistribute",
+#         "category": "staff",
+#         "message": {
+#           "ar": "يمكن إعادة توزيع الموظفين بين العيادات",
+#           "en": "Staff can be redistributed between clinics"
+#         },
+#         "details": {
+#           "fromClinic": "...",
+#           "toClinic": "...",
+#           "count": 2
+#         }
+#       }
+#     ]
+#   }
+
+###############################################################################
+# 8. Capacity Utilization Reports
+###############################################################################
+
+### 8.1 Get capacity utilization for complex
+GET {{baseUrl}}/complexes/{{complexId}}/capacity-utilization
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - {
+#     "overall": {
+#       "doctors": { "utilization": 75, "efficiency": "good" },
+#       "staff": { "utilization": 87.5, "efficiency": "high" },
+#       "patients": { "utilization": 95, "efficiency": "very_high" }
+#     },
+#     "byCli nic": [
+#       {
+#         "clinicId": "...",
+#         "clinicName": "...",
+#         "utilization": {
+#           "doctors": 80,
+#           "staff": 90,
+#           "patients": 95
+#         }
+#       }
+#     ]
+#   }
+
+### 8.2 Get capacity utilization for clinic
+GET {{baseUrl}}/clinics/{{clinicId}}/capacity-utilization
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Detailed utilization metrics for clinic
+
+###############################################################################
+# 9. Capacity Planning
+###############################################################################
+
+### 9.1 Calculate required capacity
+POST {{baseUrl}}/capacity/calculate-requirements
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "clinicId": "{{clinicId}}",
+  "expectedPatients": 150,
+  "averageAppointmentsPerDay": 30,
+  "sessionDuration": 30
+}
+
+# Expected Response:
+# - 200 OK
+# - {
+#     "requiredDoctors": 6,
+#     "requiredStaff": 12,
+#     "currentDoctors": 5,
+#     "currentStaff": 10,
+#     "gap": {
+#       "doctors": 1,
+#       "staff": 2
+#     },
+#     "recommendations": [...]
+#   }
+
+###############################################################################
+# 10. Capacity Alerts Configuration
+###############################################################################
+
+### 10.1 Set capacity alert thresholds
+POST {{baseUrl}}/clinics/{{clinicId}}/capacity-alerts
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "doctors": {
+    "warningThreshold": 80,
+    "criticalThreshold": 95
+  },
+  "staff": {
+    "warningThreshold": 85,
+    "criticalThreshold": 95
+  },
+  "patients": {
+    "warningThreshold": 90,
+    "criticalThreshold": 98
+  },
+  "notifyEmails": ["admin@cliniva.com"],
+  "notifyOnExceeded": true
+}
+
+# Expected Response:
+# - 200 OK
+# - Alert configuration saved
+
+### 10.2 Get capacity alert settings
+GET {{baseUrl}}/clinics/{{clinicId}}/capacity-alerts
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Current alert configuration

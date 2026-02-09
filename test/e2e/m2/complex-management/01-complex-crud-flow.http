@@ -1,0 +1,495 @@
+### M2 - Complex Management: CRUD Operations Flow
+### Description: Complete flow for managing medical complexes
+
+@baseUrl = http://localhost:3001
+@adminEmail = admin@cliniva.com
+@adminPassword = Admin@123
+
+###############################################################################
+# 1. Admin Login
+###############################################################################
+
+### 1.1 Login as admin
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{adminEmail}}",
+  "password": "{{adminPassword}}"
+}
+
+@accessToken = <copy_access_token_from_response>
+@subscriptionId = <copy_subscription_id_from_response>
+@organizationId = <copy_organization_id_from_response>
+
+###############################################################################
+# 2. Create Medical Complex
+###############################################################################
+
+### 2.1 Create complex (success)
+POST {{baseUrl}}/complexes
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": {
+    "ar": "مجمع الرعاية الطبية",
+    "en": "Medical Care Complex"
+  },
+  "description": {
+    "ar": "مجمع طبي متكامل يقدم خدمات صحية شاملة",
+    "en": "Comprehensive medical complex providing full healthcare services"
+  },
+  "organizationId": "{{organizationId}}",
+  "subscriptionId": "{{subscriptionId}}",
+  "address": {
+    "street": "King Fahd Road",
+    "city": "Riyadh",
+    "state": "Riyadh Region",
+    "country": "Saudi Arabia",
+    "postalCode": "12345",
+    "coordinates": {
+      "latitude": 24.7136,
+      "longitude": 46.6753
+    }
+  },
+  "contactInfo": {
+    "phone": "+966112345678",
+    "email": "info@medicalcare.com",
+    "website": "https://medicalcare.com",
+    "socialMedia": {
+      "facebook": "medicalcare",
+      "twitter": "@medicalcare",
+      "instagram": "medicalcare"
+    }
+  },
+  "capacity": {
+    "doctors": 50,
+    "staff": 100,
+    "patients": 500
+  },
+  "workingHours": [
+    {
+      "dayOfWeek": "sunday",
+      "isWorkingDay": true,
+      "openingTime": "08:00",
+      "closingTime": "20:00"
+    },
+    {
+      "dayOfWeek": "monday",
+      "isWorkingDay": true,
+      "openingTime": "08:00",
+      "closingTime": "20:00"
+    },
+    {
+      "dayOfWeek": "tuesday",
+      "isWorkingDay": true,
+      "openingTime": "08:00",
+      "closingTime": "20:00"
+    },
+    {
+      "dayOfWeek": "wednesday",
+      "isWorkingDay": true,
+      "openingTime": "08:00",
+      "closingTime": "20:00"
+    },
+    {
+      "dayOfWeek": "thursday",
+      "isWorkingDay": true,
+      "openingTime": "08:00",
+      "closingTime": "20:00"
+    },
+    {
+      "dayOfWeek": "friday",
+      "isWorkingDay": false
+    },
+    {
+      "dayOfWeek": "saturday",
+      "isWorkingDay": false
+    }
+  ]
+}
+
+# Expected Response:
+# - 201 Created
+# - Complex created successfully
+# - Message: {
+#     ar: "تم إنشاء المجمع الطبي بنجاح",
+#     en: "Medical complex created successfully"
+#   }
+
+@complexId = <copy_complex_id_from_response>
+
+###############################################################################
+# 3. Get Complex Details
+###############################################################################
+
+### 3.1 Get complex by ID
+GET {{baseUrl}}/complexes/{{complexId}}
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Complete complex information including:
+#   - Basic info
+#   - Address and contact
+#   - Capacity
+#   - Working hours
+#   - Statistics (BZR-31, BZR-32):
+#     - scheduledAppointmentsCount
+#     - clinicsAssignedCount
+#     - currentDoctorCount
+#     - currentStaffCount
+
+### 3.2 Get complex with capacity calculations (BZR-33, BZR-35)
+GET {{baseUrl}}/complexes/{{complexId}}?includeCapacity=true
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Complex with capacity details:
+#   - totalDoctorCapacity (sum from clinics)
+#   - totalStaffCapacity (sum from clinics)
+#   - totalPatientCapacity (sum from clinics)
+#   - currentDoctorCount
+#   - currentStaffCount
+#   - currentPatientCount
+#   - isDoctorCapacityExceeded
+#   - isStaffCapacityExceeded
+#   - isPatientCapacityExceeded
+
+###############################################################################
+# 4. List Complexes
+###############################################################################
+
+### 4.1 Get all complexes
+GET {{baseUrl}}/complexes
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - List of complexes with pagination
+
+### 4.2 Get complexes by organization
+GET {{baseUrl}}/complexes?organizationId={{organizationId}}
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Complexes for specified organization
+
+### 4.3 Get complexes by subscription
+GET {{baseUrl}}/complexes?subscriptionId={{subscriptionId}}
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Complexes for specified subscription
+
+### 4.4 Get active complexes only
+GET {{baseUrl}}/complexes?status=active
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Only active complexes
+
+###############################################################################
+# 5. Update Complex
+###############################################################################
+
+### 5.1 Update basic information
+PUT {{baseUrl}}/complexes/{{complexId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": {
+    "ar": "مجمع الرعاية الطبية المتقدمة",
+    "en": "Advanced Medical Care Complex"
+  },
+  "description": {
+    "ar": "مجمع طبي متطور يقدم أحدث الخدمات الصحية",
+    "en": "Advanced medical complex with state-of-the-art healthcare services"
+  }
+}
+
+# Expected Response:
+# - 200 OK
+# - Complex updated successfully
+
+### 5.2 Update contact information
+PUT {{baseUrl}}/complexes/{{complexId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "contactInfo": {
+    "phone": "+966112345679",
+    "email": "contact@medicalcare.com",
+    "website": "https://www.medicalcare.com"
+  }
+}
+
+# Expected Response:
+# - 200 OK
+# - Contact information updated
+
+### 5.3 Update capacity
+PUT {{baseUrl}}/complexes/{{complexId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "capacity": {
+    "doctors": 60,
+    "staff": 120,
+    "patients": 600
+  }
+}
+
+# Expected Response:
+# - 200 OK
+# - Capacity updated
+
+### 5.4 Update working hours
+PUT {{baseUrl}}/complexes/{{complexId}}/working-hours
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "workingHours": [
+    {
+      "dayOfWeek": "sunday",
+      "isWorkingDay": true,
+      "openingTime": "07:00",
+      "closingTime": "22:00"
+    },
+    {
+      "dayOfWeek": "monday",
+      "isWorkingDay": true,
+      "openingTime": "07:00",
+      "closingTime": "22:00"
+    },
+    {
+      "dayOfWeek": "tuesday",
+      "isWorkingDay": true,
+      "openingTime": "07:00",
+      "closingTime": "22:00"
+    },
+    {
+      "dayOfWeek": "wednesday",
+      "isWorkingDay": true,
+      "openingTime": "07:00",
+      "closingTime": "22:00"
+    },
+    {
+      "dayOfWeek": "thursday",
+      "isWorkingDay": true,
+      "openingTime": "07:00",
+      "closingTime": "22:00"
+    },
+    {
+      "dayOfWeek": "friday",
+      "isWorkingDay": false
+    },
+    {
+      "dayOfWeek": "saturday",
+      "isWorkingDay": true,
+      "openingTime": "09:00",
+      "closingTime": "18:00"
+    }
+  ]
+}
+
+# Expected Response:
+# - 200 OK
+# - Working hours updated
+
+###############################################################################
+# 6. Assign Person-in-Charge (BZR-34)
+###############################################################################
+
+@employeeId = <copy_employee_id>
+
+### 6.1 Assign PIC to complex
+PATCH {{baseUrl}}/complexes/{{complexId}}/pic
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "personInChargeId": "{{employeeId}}"
+}
+
+# Expected Response:
+# - 200 OK
+# - PIC assigned successfully
+# - Message: {
+#     ar: "تم تعيين المسؤول بنجاح",
+#     en: "Person-in-charge assigned successfully"
+#   }
+
+### 6.2 Verify PIC assigned
+GET {{baseUrl}}/complexes/{{complexId}}
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Complex includes personInChargeId
+# - Populated PIC details
+
+### 6.3 Get available employees for PIC
+GET {{baseUrl}}/employees?role=admin,manager&status=active&complexId={{complexId}}
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - List of eligible employees for PIC role
+
+###############################################################################
+# 7. Get Complex Statistics
+###############################################################################
+
+### 7.1 Get scheduled appointments count (BZR-31)
+GET {{baseUrl}}/complexes/{{complexId}}/statistics/appointments
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - {
+#     scheduledAppointments: <count>,
+#     completedAppointments: <count>,
+#     cancelledAppointments: <count>,
+#     totalAppointments: <count>
+#   }
+
+### 7.2 Get clinics assigned count (BZR-32)
+GET {{baseUrl}}/complexes/{{complexId}}/statistics/clinics
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - {
+#     totalClinics: <count>,
+#     activeClinics: <count>,
+#     inactiveClinics: <count>
+#   }
+
+### 7.3 Get capacity status (BZR-33, BZR-35)
+GET {{baseUrl}}/complexes/{{complexId}}/capacity
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - {
+#     doctors: {
+#       capacity: 60,
+#       current: 45,
+#       available: 15,
+#       utilizationPercentage: 75,
+#       isExceeded: false
+#     },
+#     staff: {
+#       capacity: 120,
+#       current: 95,
+#       available: 25,
+#       utilizationPercentage: 79,
+#       isExceeded: false
+#     },
+#     patients: {
+#       capacity: 600,
+#       current: 450,
+#       available: 150,
+#       utilizationPercentage: 75,
+#       isExceeded: false
+#     }
+#   }
+
+###############################################################################
+# 8. Delete Complex
+###############################################################################
+
+### 8.1 Attempt to delete complex with active clinics (should fail)
+DELETE {{baseUrl}}/complexes/{{complexId}}
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 400 Bad Request
+# - Error code: COMPLEX_003
+# - Message: {
+#     ar: "لا يمكن حذف المجمع الذي يحتوي على عيادات نشطة",
+#     en: "Cannot delete complex with active clinics"
+#   }
+# - Details: {
+#     activeClinicsCount: <count>
+#   }
+
+### 8.2 Delete complex (after removing/transferring clinics)
+DELETE {{baseUrl}}/complexes/{{complexId}}
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Complex deleted (soft delete)
+# - Message: {
+#     ar: "تم حذف المجمع بنجاح",
+#     en: "Complex deleted successfully"
+#   }
+
+###############################################################################
+# 9. Validation Errors
+###############################################################################
+
+### 9.1 Create complex without required fields
+POST {{baseUrl}}/complexes
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": {
+    "en": "Test Complex"
+  }
+}
+
+# Expected Response:
+# - 400 Bad Request
+# - Validation errors for missing fields
+
+### 9.2 Create complex exceeding plan limit (BZR-28)
+POST {{baseUrl}}/complexes
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": {
+    "ar": "مجمع ثاني",
+    "en": "Second Complex"
+  },
+  "subscriptionId": "{{subscriptionId}}"
+}
+
+# Expected Response (for Complex Plan):
+# - 400 Bad Request
+# - Error code: COMPLEX_001
+# - Message: {
+#     ar: "تم الوصول إلى الحد الأقصى للمجمعات في خطتك",
+#     en: "Complex limit reached for your plan"
+#   }
+
+### 9.3 Assign invalid PIC
+PATCH {{baseUrl}}/complexes/{{complexId}}/pic
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "personInChargeId": "invalid-id"
+}
+
+# Expected Response:
+# - 400 Bad Request
+# - Error code: COMPLEX_002
+# - Message: {
+#     ar: "المسؤول المحدد غير صالح",
+#     en: "Invalid person-in-charge"
+#   }
+

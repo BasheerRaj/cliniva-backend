@@ -1,0 +1,167 @@
+### M1 - Authentication: Normal Login Flow
+### Use Case: UC-1a2b3c4 - Normal Login
+### Description: User logs in with email and password
+
+@baseUrl = http://localhost:3001/api/v1
+@email = admin@cliniva.com
+@password = Admin@123
+
+###############################################################################
+# 1. Normal Login - Success Case
+###############################################################################
+
+### 1.1 Login with valid credentials
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "password": "{{password}}",
+  "rememberMe": false
+}
+
+# Expected Response:
+# - 200 OK
+# - Returns user object with tokens
+# - accessToken (24h expiry)
+# - refreshToken (7d expiry)
+
+# Save the accessToken from response for subsequent requests
+@accessToken = <copy_access_token_from_response>
+@refreshToken = <copy_refresh_token_from_response>
+@userId = <copy_user_id_from_response>
+
+###############################################################################
+# 2. Get Current User Profile
+###############################################################################
+
+### 2.1 Get logged-in user profile
+GET {{baseUrl}}/auth/profile
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Returns complete user profile
+# - Includes subscription, organization, complex, clinic info
+
+###############################################################################
+# 3. Verify Token is Working
+###############################################################################
+
+### 3.1 Access protected endpoint
+GET {{baseUrl}}/users/{{userId}}
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Returns user details
+
+###############################################################################
+# 4. Login with Remember Me
+###############################################################################
+
+### 4.1 Login with rememberMe=true (30 days session)
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "password": "{{password}}",
+  "rememberMe": true
+}
+
+# Expected Response:
+# - 200 OK
+# - Returns tokens with extended expiry
+# - refreshToken expires in 30 days
+
+###############################################################################
+# 5. Error Cases
+###############################################################################
+
+### 5.1 Login with invalid email
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "invalid@email.com",
+  "password": "{{password}}"
+}
+
+# Expected Response:
+# - 401 Unauthorized
+# - Error code: AUTH_001
+# - Bilingual error message
+
+### 5.2 Login with invalid password
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "password": "WrongPassword123"
+}
+
+# Expected Response:
+# - 401 Unauthorized
+# - Error code: AUTH_001
+# - Bilingual error message
+
+### 5.3 Login with missing email
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "password": "{{password}}"
+}
+
+# Expected Response:
+# - 400 Bad Request
+# - Validation error for email field
+
+### 5.4 Login with invalid email format
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "not-an-email",
+  "password": "{{password}}"
+}
+
+# Expected Response:
+# - 400 Bad Request
+# - Validation error: invalid email format
+
+### 5.5 Login with deactivated account
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "deactivated@cliniva.com",
+  "password": "Password123"
+}
+
+# Expected Response:
+# - 403 Forbidden
+# - Error code: AUTH_006
+# - Message: Account deactivated
+
+###############################################################################
+# 6. Logout
+###############################################################################
+
+### 6.1 Logout successfully
+POST {{baseUrl}}/auth/logout
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Success message in Arabic and English
+
+### 6.2 Verify token is invalidated after logout
+GET {{baseUrl}}/auth/profile
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 401 Unauthorized
+# - Token is no longer valid

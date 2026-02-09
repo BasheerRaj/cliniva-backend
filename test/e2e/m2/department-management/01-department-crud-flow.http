@@ -1,0 +1,473 @@
+### M2 - Department Management: CRUD Operations Flow
+### Description: Complete flow for managing departments
+
+@baseUrl = http://localhost:3001
+@adminEmail = admin@cliniva.com
+@adminPassword = Admin@123
+
+###############################################################################
+# 1. Admin Login
+###############################################################################
+
+### 1.1 Login as admin
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{adminEmail}}",
+  "password": "{{adminPassword}}"
+}
+
+@accessToken = <copy_access_token_from_response>
+@subscriptionId = <copy_subscription_id_from_response>
+@complexId = <copy_complex_id_from_response>
+
+###############################################################################
+# 2. Create Department
+###############################################################################
+
+### 2.1 Create department (success)
+POST {{baseUrl}}/departments
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": {
+    "ar": "قسم القلب والأوعية الدموية",
+    "en": "Cardiology Department"
+  },
+  "description": {
+    "ar": "قسم متخصص في أمراض القلب والأوعية الدموية",
+    "en": "Department specialized in cardiovascular diseases"
+  },
+  "subscriptionId": "{{subscriptionId}}",
+  "complexId": "{{complexId}}",
+  "code": "CARD",
+  "isActive": true
+}
+
+# Expected Response:
+# - 201 Created
+# - Department created successfully
+# - Message: {
+#     ar: "تم إنشاء القسم بنجاح",
+#     en: "Department created successfully"
+#   }
+
+@departmentId = <copy_department_id_from_response>
+
+### 2.2 Create another department
+POST {{baseUrl}}/departments
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": {
+    "ar": "قسم الأطفال",
+    "en": "Pediatrics Department"
+  },
+  "description": {
+    "ar": "قسم متخصص في طب الأطفال",
+    "en": "Department specialized in pediatric medicine"
+  },
+  "subscriptionId": "{{subscriptionId}}",
+  "complexId": "{{complexId}}",
+  "code": "PED",
+  "isActive": true
+}
+
+@pediatricsDeptId = <copy_department_id_from_response>
+
+###############################################################################
+# 3. Get Department Details
+###############################################################################
+
+### 3.1 Get department by ID
+GET {{baseUrl}}/departments/{{departmentId}}
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Complete department information including:
+#   - Basic info (name, description, code)
+#   - Assigned complex
+#   - Status
+#   - Statistics:
+#     - clinicsCount
+#     - doctorsCount
+#     - staffCount
+
+### 3.2 Get department with clinics
+GET {{baseUrl}}/departments/{{departmentId}}?includeClinics=true
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Department with list of associated clinics
+
+###############################################################################
+# 4. List Departments
+###############################################################################
+
+### 4.1 Get all departments
+GET {{baseUrl}}/departments
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - List of departments with pagination
+
+### 4.2 Get departments by complex
+GET {{baseUrl}}/departments?complexId={{complexId}}
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Departments for specified complex
+
+### 4.3 Get departments by subscription
+GET {{baseUrl}}/departments?subscriptionId={{subscriptionId}}
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Departments for specified subscription
+
+### 4.4 Get active departments only
+GET {{baseUrl}}/departments?status=active
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Only active departments
+
+### 4.5 Search departments by name
+GET {{baseUrl}}/departments?search=cardio
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Departments matching search term
+
+###############################################################################
+# 5. Update Department
+###############################################################################
+
+### 5.1 Update basic information
+PUT {{baseUrl}}/departments/{{departmentId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": {
+    "ar": "قسم أمراض القلب",
+    "en": "Cardiac Diseases Department"
+  },
+  "description": {
+    "ar": "قسم متطور لأمراض القلب والأوعية الدموية",
+    "en": "Advanced department for cardiovascular diseases"
+  }
+}
+
+# Expected Response:
+# - 200 OK
+# - Department updated successfully
+# - Message: {
+#     ar: "تم تحديث القسم بنجاح",
+#     en: "Department updated successfully"
+#   }
+
+### 5.2 Update department code
+PUT {{baseUrl}}/departments/{{departmentId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "code": "CARDIO"
+}
+
+# Expected Response:
+# - 200 OK
+# - Department code updated
+
+### 5.3 Verify department updated
+GET {{baseUrl}}/departments/{{departmentId}}
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Shows updated information
+
+###############################################################################
+# 6. Deactivate Department
+###############################################################################
+
+### 6.1 Deactivate department
+PATCH {{baseUrl}}/departments/{{departmentId}}/deactivate
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "reason": "Restructuring"
+}
+
+# Expected Response:
+# - 200 OK
+# - Department deactivated
+# - Message: {
+#     ar: "تم إلغاء تفعيل القسم بنجاح",
+#     en: "Department deactivated successfully"
+#   }
+# - ⚠️ Warning if has active clinics (should reassign)
+
+### 6.2 Verify department deactivated
+GET {{baseUrl}}/departments/{{departmentId}}
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - isActive: false
+# - deactivatedAt: <timestamp>
+
+### 6.3 Activate department
+PATCH {{baseUrl}}/departments/{{departmentId}}/activate
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Department activated
+# - Message: {
+#     ar: "تم تفعيل القسم بنجاح",
+#     en: "Department activated successfully"
+#   }
+
+###############################################################################
+# 7. Get Department Statistics
+###############################################################################
+
+### 7.1 Get department statistics
+GET {{baseUrl}}/departments/{{departmentId}}/statistics
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - {
+#     clinicsCount: <count>,
+#     activeClinicsCount: <count>,
+#     doctorsCount: <count>,
+#     staffCount: <count>,
+#     patientsCount: <count>,
+#     appointmentsCount: <count>,
+#     scheduledAppointmentsCount: <count>
+#   }
+
+### 7.2 Get clinics in department
+GET {{baseUrl}}/clinics?departmentId={{departmentId}}
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - List of clinics in the department
+
+### 7.3 Get staff in department
+GET {{baseUrl}}/employees?departmentId={{departmentId}}
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - List of employees in the department
+
+###############################################################################
+# 8. Delete Department (BZR-36)
+###############################################################################
+
+### 8.1 Attempt to delete department with active clinics (should fail - BZR-36)
+DELETE {{baseUrl}}/departments/{{departmentId}}
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 400 Bad Request
+# - Error: Cannot delete department with active clinics
+# - Message: {
+#     ar: "لا يمكن حذف القسم الذي يحتوي على عيادات نشطة",
+#     en: "Cannot delete department with active clinics"
+#   }
+# - Details: {
+#     activeClinicsCount: <count>,
+#     clinics: [
+#       { id: "<clinic_id>", name: "Clinic Name" }
+#     ]
+#   }
+
+### 8.2 Get clinics to reassign
+GET {{baseUrl}}/clinics?departmentId={{departmentId}}
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - List of clinics that need reassignment
+
+### 8.3 Reassign clinics to another department
+PUT {{baseUrl}}/clinics/bulk-update-department
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "clinicIds": ["<clinic_id_1>", "<clinic_id_2>"],
+  "newDepartmentId": "{{pediatricsDeptId}}"
+}
+
+# Expected Response:
+# - 200 OK
+# - Clinics reassigned successfully
+
+### 8.4 Delete department (after reassigning clinics)
+DELETE {{baseUrl}}/departments/{{departmentId}}
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Department deleted (soft delete)
+# - Message: {
+#     ar: "تم حذف القسم بنجاح",
+#     en: "Department deleted successfully"
+#   }
+
+### 8.5 Verify department deleted
+GET {{baseUrl}}/departments/{{departmentId}}
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 404 Not Found
+# - Error: Department not found
+
+###############################################################################
+# 9. Validation Errors
+###############################################################################
+
+### 9.1 Create department without required fields
+POST {{baseUrl}}/departments
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": {
+    "en": "Test Department"
+  }
+}
+
+# Expected Response:
+# - 400 Bad Request
+# - Validation errors for missing fields:
+#   - subscriptionId required
+#   - complexId required
+#   - Arabic name required
+
+### 9.2 Create department with duplicate code
+POST {{baseUrl}}/departments
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": {
+    "ar": "قسم اختبار",
+    "en": "Test Department"
+  },
+  "subscriptionId": "{{subscriptionId}}",
+  "complexId": "{{complexId}}",
+  "code": "CARDIO"
+}
+
+# Expected Response:
+# - 400 Bad Request
+# - Error: Department code already exists
+# - Message: {
+#     ar: "رمز القسم موجود بالفعل",
+#     en: "Department code already exists"
+#   }
+
+### 9.3 Create department with invalid complex
+POST {{baseUrl}}/departments
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": {
+    "ar": "قسم اختبار",
+    "en": "Test Department"
+  },
+  "subscriptionId": "{{subscriptionId}}",
+  "complexId": "invalid-complex-id",
+  "code": "TEST"
+}
+
+# Expected Response:
+# - 400 Bad Request
+# - Error: Invalid complex ID
+
+### 9.4 Update department with invalid data
+PUT {{baseUrl}}/departments/{{departmentId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "code": ""
+}
+
+# Expected Response:
+# - 400 Bad Request
+# - Error: Department code cannot be empty
+
+###############################################################################
+# 10. Department Dropdown Lists
+###############################################################################
+
+### 10.1 Get departments dropdown for complex
+GET {{baseUrl}}/departments/dropdown?complexId={{complexId}}&status=active
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Simplified list: [{ id, name, code }]
+# - Only active departments
+
+### 10.2 Get all departments dropdown
+GET {{baseUrl}}/departments/dropdown?status=active
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - All active departments across subscription
+
+###############################################################################
+# 11. Bulk Operations
+###############################################################################
+
+### 11.1 Bulk deactivate departments
+POST {{baseUrl}}/departments/bulk-deactivate
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "departmentIds": ["<dept_id_1>", "<dept_id_2>"],
+  "reason": "Organizational restructuring"
+}
+
+# Expected Response:
+# - 200 OK
+# - Success count and failed count
+# - Warnings for departments with active clinics
+
+### 11.2 Bulk activate departments
+POST {{baseUrl}}/departments/bulk-activate
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "departmentIds": ["<dept_id_1>", "<dept_id_2>"]
+}
+
+# Expected Response:
+# - 200 OK
+# - Success count and failed count
+

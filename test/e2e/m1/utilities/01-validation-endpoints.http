@@ -1,0 +1,419 @@
+### M1 - Utilities: Validation Endpoints
+### Description: Email, phone, and entity validation endpoints
+
+@baseUrl = http://localhost:3001
+@adminEmail = admin@cliniva.com
+@adminPassword = Admin@123
+
+###############################################################################
+# 1. Admin Login
+###############################################################################
+
+### 1.1 Login as admin
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{adminEmail}}",
+  "password": "{{adminPassword}}"
+}
+
+@accessToken = <copy_access_token_from_response>
+@userId = <copy_user_id_from_response>
+@subscriptionId = <copy_subscription_id_from_response>
+
+###############################################################################
+# 2. Email Validation
+###############################################################################
+
+### 2.1 Validate email availability (available)
+POST {{baseUrl}}/onboarding/validate-email
+Content-Type: application/json
+
+{
+  "email": "newemail@cliniva.com"
+}
+
+# Expected Response:
+# - 200 OK
+# - { "available": true, "message": "Email is available" }
+
+### 2.2 Validate email availability (already exists)
+POST {{baseUrl}}/onboarding/validate-email
+Content-Type: application/json
+
+{
+  "email": "{{adminEmail}}"
+}
+
+# Expected Response:
+# - 200 OK
+# - { "available": false, "message": "Email already exists" }
+
+### 2.3 Validate email format (invalid)
+POST {{baseUrl}}/onboarding/validate-email
+Content-Type: application/json
+
+{
+  "email": "not-an-email"
+}
+
+# Expected Response:
+# - 400 Bad Request
+# - Validation error: Invalid email format
+
+###############################################################################
+# 3. VAT Number Validation
+###############################################################################
+
+### 3.1 Validate VAT number availability (available)
+POST {{baseUrl}}/onboarding/validate-vat
+Content-Type: application/json
+
+{
+  "vatNumber": "300999888700003"
+}
+
+# Expected Response:
+# - 200 OK
+# - { "available": true, "message": "VAT number is available" }
+
+### 3.2 Validate VAT number (already exists)
+POST {{baseUrl}}/onboarding/validate-vat
+Content-Type: application/json
+
+{
+  "vatNumber": "300123456700003"
+}
+
+# Expected Response:
+# - 200 OK
+# - { "available": false, "message": "VAT number already exists" }
+
+### 3.3 Validate VAT number format (invalid)
+POST {{baseUrl}}/onboarding/validate-vat
+Content-Type: application/json
+
+{
+  "vatNumber": "123"
+}
+
+# Expected Response:
+# - 400 Bad Request
+# - Validation error: Invalid VAT number format
+
+###############################################################################
+# 4. CR Number Validation
+###############################################################################
+
+### 4.1 Validate CR number availability (available)
+POST {{baseUrl}}/onboarding/validate-cr
+Content-Type: application/json
+
+{
+  "crNumber": "9999999999"
+}
+
+# Expected Response:
+# - 200 OK
+# - { "available": true, "message": "CR number is available" }
+
+### 4.2 Validate CR number (already exists)
+POST {{baseUrl}}/onboarding/validate-cr
+Content-Type: application/json
+
+{
+  "crNumber": "1010123456"
+}
+
+# Expected Response:
+# - 200 OK
+# - { "available": false, "message": "CR number already exists" }
+
+###############################################################################
+# 5. Organization Name Validation
+###############################################################################
+
+### 5.1 Validate organization name availability (available)
+POST {{baseUrl}}/onboarding/validate-organization-name
+Content-Type: application/json
+
+{
+  "name": "New Medical Organization"
+}
+
+# Expected Response:
+# - 200 OK
+# - { "available": true, "message": "Organization name is available" }
+
+### 5.2 Validate organization name (already exists)
+POST {{baseUrl}}/onboarding/validate-organization-name
+Content-Type: application/json
+
+{
+  "name": "Al-Shifa Medical Group"
+}
+
+# Expected Response:
+# - 200 OK
+# - { "available": false, "message": "Organization name already exists" }
+
+###############################################################################
+# 6. Complex Name Validation
+###############################################################################
+
+### 6.1 Validate complex name availability (available)
+POST {{baseUrl}}/onboarding/validate-complex-name
+Content-Type: application/json
+
+{
+  "name": "New Medical Complex",
+  "organizationId": "{{organizationId}}"
+}
+
+# Expected Response:
+# - 200 OK
+# - { "available": true, "message": "Complex name is available" }
+
+### 6.2 Validate complex name (already exists in organization)
+POST {{baseUrl}}/onboarding/validate-complex-name
+Content-Type: application/json
+
+{
+  "name": "Al-Shifa Medical Complex - Riyadh",
+  "organizationId": "{{organizationId}}"
+}
+
+# Expected Response:
+# - 200 OK
+# - { "available": false, "message": "Complex name already exists in this organization" }
+
+###############################################################################
+# 7. Clinic Name Validation
+###############################################################################
+
+### 7.1 Validate clinic name availability (available)
+POST {{baseUrl}}/onboarding/validate-clinic-name
+Content-Type: application/json
+
+{
+  "name": "New Clinic",
+  "complexId": "{{complexId}}"
+}
+
+# Expected Response:
+# - 200 OK
+# - { "available": true, "message": "Clinic name is available" }
+
+### 7.2 Validate clinic name (already exists in complex)
+POST {{baseUrl}}/onboarding/validate-clinic-name
+Content-Type: application/json
+
+{
+  "name": "Cardiology Clinic",
+  "complexId": "{{complexId}}"
+}
+
+# Expected Response:
+# - 200 OK
+# - { "available": false, "message": "Clinic name already exists in this complex" }
+
+###############################################################################
+# 8. Service Name Validation
+###############################################################################
+
+### 8.1 Validate multiple service names
+POST {{baseUrl}}/services/validate-names
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "names": [
+    "General Consultation",
+    "Blood Test",
+    "X-Ray"
+  ]
+}
+
+# Expected Response:
+# - 200 OK
+# - Returns availability status for each name
+# - { "results": [{ "name": "...", "available": true/false }] }
+
+###############################################################################
+# 9. User Entity Check
+###############################################################################
+
+### 9.1 Check user entities by subscription
+POST {{baseUrl}}/users/check-entities
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "subscriptionId": "{{subscriptionId}}"
+}
+
+# Expected Response:
+# - 200 OK
+# - Returns organization, complex, clinic IDs if they exist
+# - {
+#     "hasOrganization": true/false,
+#     "organizationId": "...",
+#     "hasComplex": true/false,
+#     "complexId": "...",
+#     "hasClinic": true/false,
+#     "clinicId": "..."
+#   }
+
+### 9.2 Check user entities by user ID
+POST {{baseUrl}}/users/check-entities-by-id
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "userId": "{{userId}}"
+}
+
+# Expected Response:
+# - 200 OK
+# - Returns user's associated entities
+# - Includes subscription plan information
+
+###############################################################################
+# 10. Onboarding Data Validation
+###############################################################################
+
+### 10.1 Validate complete onboarding data
+POST {{baseUrl}}/onboarding/validate
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "planType": "company",
+  "organization": {
+    "name": "Test Organization",
+    "email": "test@org.com",
+    "vatNumber": "300999888700004",
+    "crNumber": "9999999998"
+  },
+  "complex": {
+    "name": "Test Complex",
+    "email": "test@complex.com"
+  },
+  "clinic": {
+    "name": "Test Clinic",
+    "email": "test@clinic.com",
+    "maxStaff": 10,
+    "maxDoctors": 5,
+    "maxPatients": 100,
+    "sessionDuration": 30
+  }
+}
+
+# Expected Response:
+# - 200 OK
+# - Validation results for all entities
+# - Lists any conflicts or errors
+
+### 10.2 Validate onboarding step
+POST {{baseUrl}}/onboarding/validate-step
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "step": "organization",
+  "data": {
+    "name": "Test Organization",
+    "email": "test@org.com",
+    "vatNumber": "300999888700005"
+  }
+}
+
+# Expected Response:
+# - 200 OK
+# - Validation result for specific step
+# - { "valid": true/false, "errors": [] }
+
+###############################################################################
+# 11. Plan Limits Validation
+###############################################################################
+
+### 11.1 Validate plan limits
+GET {{baseUrl}}/onboarding/validate-plan-limits?subscriptionId={{subscriptionId}}
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Returns current usage vs plan limits
+# - {
+#     "plan": "company",
+#     "limits": {
+#       "maxOrganizations": 1,
+#       "maxComplexes": 999,
+#       "maxClinics": 999
+#     },
+#     "current": {
+#       "organizations": 1,
+#       "complexes": 2,
+#       "clinics": 5
+#     },
+#     "canCreate": {
+#       "organization": false,
+#       "complex": true,
+#       "clinic": true
+#     }
+#   }
+
+###############################################################################
+# 12. User Access Validation
+###############################################################################
+
+### 12.1 Validate entity access
+GET {{baseUrl}}/user-access/validate/{{userId}}/clinic/{{clinicId}}
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - { "hasAccess": true/false, "role": "...", "permissions": [...] }
+
+### 12.2 Check single permission
+POST {{baseUrl}}/user-access/check-permission
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "userId": "{{userId}}",
+  "permission": "users:create",
+  "scopeType": "clinic",
+  "scopeId": "{{clinicId}}"
+}
+
+# Expected Response:
+# - 200 OK
+# - { "hasPermission": true/false }
+
+### 12.3 Check multiple permissions
+POST {{baseUrl}}/user-access/check-permissions
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "userId": "{{userId}}",
+  "permissions": [
+    "users:create",
+    "users:update",
+    "users:delete"
+  ],
+  "scopeType": "clinic",
+  "scopeId": "{{clinicId}}"
+}
+
+# Expected Response:
+# - 200 OK
+# - {
+#     "results": [
+#       { "permission": "users:create", "hasPermission": true },
+#       { "permission": "users:update", "hasPermission": true },
+#       { "permission": "users:delete", "hasPermission": false }
+#     ]
+#   }

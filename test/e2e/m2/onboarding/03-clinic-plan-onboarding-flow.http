@@ -1,0 +1,304 @@
+### M2 - Onboarding: Clinic Plan Flow
+### Use Case: UC-9a8c7b6 - Setup Clinic Plan
+### Description: Onboarding flow for Clinic Plan (Single Clinic only, no Complex/Organization)
+
+@baseUrl = http://localhost:3001
+
+###############################################################################
+# 1. User Registration
+###############################################################################
+
+### 1.1 Register new user (owner)
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "email": "clinic.owner@cliniva.com",
+  "password": "ClinicOwner@123",
+  "confirmPassword": "ClinicOwner@123",
+  "firstName": "Youssef",
+  "lastName": "Al-Malki",
+  "phone": "+966503456789",
+  "dateOfBirth": "1992-11-25",
+  "gender": "male",
+  "nationality": "Saudi Arabia",
+  "role": "owner"
+}
+
+### 1.2 Login
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "clinic.owner@cliniva.com",
+  "password": "ClinicOwner@123"
+}
+
+@accessToken = <copy_access_token_from_response>
+@userId = <copy_user_id_from_response>
+
+###############################################################################
+# 2. Select Clinic Plan
+###############################################################################
+
+### 2.1 Get subscription plans
+GET {{baseUrl}}/subscription-plans
+Authorization: Bearer {{accessToken}}
+
+@clinicPlanId = <copy_clinic_plan_id_from_response>
+
+### 2.2 Create subscription with Clinic Plan
+POST {{baseUrl}}/subscriptions
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "subscriptionPlanId": "{{clinicPlanId}}",
+  "userId": "{{userId}}",
+  "paymentMethod": "credit_card",
+  "billingCycle": "monthly"
+}
+
+@subscriptionId = <copy_subscription_id_from_response>
+
+###############################################################################
+# 3. Create Single Clinic (No Complex/Organization)
+###############################################################################
+
+### 3.1 Create clinic directly (BZR-30: Only 1 clinic allowed)
+POST {{baseUrl}}/clinics
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": "Dammam Dental Clinic",
+  "headDoctorName": "Dr. Layla Al-Dosari",
+  "specialization": "Dentistry",
+  "licenseNumber": "DENT-2024-001",
+  "pin": "9876",
+  "logoUrl": "https://example.com/logos/dammam-dental.png",
+  "website": "https://dammam-dental.com",
+  "yearEstablished": 2020,
+  "mission": "Excellence in dental care",
+  "vision": "Best dental clinic in Eastern Province",
+  "overview": "Comprehensive dental services for all ages",
+  "goals": "Serve 500+ patients monthly",
+  "ceoName": "Dr. Layla Al-Dosari",
+  "phoneNumbers": [
+    {
+      "type": "main",
+      "number": "+966133456789",
+      "isPrimary": true
+    },
+    {
+      "type": "emergency",
+      "number": "+966133456790",
+      "isPrimary": false
+    }
+  ],
+  "email": "info@dammam-dental.com",
+  "address": {
+    "street": "King Fahd Street",
+    "city": "Dammam",
+    "state": "Eastern Province",
+    "country": "Saudi Arabia",
+    "postalCode": "34567",
+    "coordinates": {
+      "latitude": 26.4207,
+      "longitude": 50.0888
+    }
+  },
+  "emergencyContact": {
+    "name": "Emergency Dental Services",
+    "phone": "+966133456790",
+    "email": "emergency@dammam-dental.com"
+  },
+  "socialMediaLinks": {
+    "facebook": "https://facebook.com/dammam.dental",
+    "instagram": "https://instagram.com/dammam_dental",
+    "twitter": "https://twitter.com/dammam_dental"
+  },
+  "vatNumber": "300345678900003",
+  "crNumber": "3030345678",
+  "termsConditionsUrl": "https://dammam-dental.com/terms",
+  "privacyPolicyUrl": "https://dammam-dental.com/privacy",
+  "subscriptionId": "{{subscriptionId}}",
+  "maxStaff": 5,
+  "maxDoctors": 3,
+  "maxPatients": 50,
+  "sessionDuration": 45
+}
+
+@clinicId = <copy_clinic_id_from_response>
+
+###############################################################################
+# 4. Configure Clinic Working Hours
+###############################################################################
+
+### 4.1 Set clinic working hours
+POST {{baseUrl}}/working-hours
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "entityType": "clinic",
+  "entityId": "{{clinicId}}",
+  "schedule": [
+    {
+      "dayOfWeek": "sunday",
+      "isWorkingDay": true,
+      "openingTime": "09:00",
+      "closingTime": "18:00",
+      "breakStartTime": "13:00",
+      "breakEndTime": "14:00"
+    },
+    {
+      "dayOfWeek": "monday",
+      "isWorkingDay": true,
+      "openingTime": "09:00",
+      "closingTime": "18:00",
+      "breakStartTime": "13:00",
+      "breakEndTime": "14:00"
+    },
+    {
+      "dayOfWeek": "tuesday",
+      "isWorkingDay": true,
+      "openingTime": "09:00",
+      "closingTime": "18:00",
+      "breakStartTime": "13:00",
+      "breakEndTime": "14:00"
+    },
+    {
+      "dayOfWeek": "wednesday",
+      "isWorkingDay": true,
+      "openingTime": "09:00",
+      "closingTime": "18:00",
+      "breakStartTime": "13:00",
+      "breakEndTime": "14:00"
+    },
+    {
+      "dayOfWeek": "thursday",
+      "isWorkingDay": true,
+      "openingTime": "09:00",
+      "closingTime": "18:00",
+      "breakStartTime": "13:00",
+      "breakEndTime": "14:00"
+    },
+    {
+      "dayOfWeek": "friday",
+      "isWorkingDay": false
+    },
+    {
+      "dayOfWeek": "saturday",
+      "isWorkingDay": true,
+      "openingTime": "10:00",
+      "closingTime": "16:00"
+    }
+  ]
+}
+
+###############################################################################
+# 5. Verify Setup (No Complex/Organization)
+###############################################################################
+
+### 5.1 Get clinic details
+GET {{baseUrl}}/clinics/{{clinicId}}
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Clinic details
+# - complexId should be null
+# - organizationId should be null
+# - Working hours included
+
+### 5.2 Verify user cannot create another clinic (BZR-30)
+POST {{baseUrl}}/clinics
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": "Second Clinic",
+  "subscriptionId": "{{subscriptionId}}",
+  "maxStaff": 5,
+  "maxDoctors": 2,
+  "maxPatients": 30,
+  "sessionDuration": 30
+}
+
+# Expected Response:
+# - 400 Bad Request
+# - Error code: CLINIC_001
+# - Message: Plan allows maximum 1 clinic
+
+### 5.3 Verify user cannot create complex (not allowed in clinic plan)
+POST {{baseUrl}}/complexes
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": "Test Complex",
+  "subscriptionId": "{{subscriptionId}}"
+}
+
+# Expected Response:
+# - 403 Forbidden
+# - Error: Complex creation not allowed in Clinic Plan
+
+### 5.4 Get user profile
+GET {{baseUrl}}/auth/profile
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - User profile
+# - clinicId populated
+# - complexId should be null
+# - organizationId should be null
+
+###############################################################################
+# 6. Complete Onboarding
+###############################################################################
+
+### 6.1 Mark onboarding complete
+PATCH {{baseUrl}}/users/{{userId}}/onboarding
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "onboardingComplete": true,
+  "setupComplete": true
+}
+
+# Expected Response:
+# - 200 OK
+# - Onboarding completed
+# - User can access system
+
+###############################################################################
+# 7. Access Simplified Dashboard (Clinic Plan)
+###############################################################################
+
+### 7.1 Get dashboard (should show only clinic data)
+GET {{baseUrl}}/dashboard
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Dashboard with clinic-specific widgets
+# - No organization or complex sections
+# - Clinic statistics and overview
+
+###############################################################################
+# 8. Verify UI Restrictions
+###############################################################################
+
+### 8.1 Get navigation menu (should hide complex/organization sections)
+GET {{baseUrl}}/navigation
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Navigation menu
+# - Only clinic-related sections visible
+# - Complex and Organization sections hidden

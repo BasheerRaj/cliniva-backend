@@ -1,0 +1,408 @@
+### M1 - User Management: User Search and Filter Flow
+### Description: Complete flow for searching, filtering, and sorting users
+
+@baseUrl = http://localhost:3001
+@adminEmail = admin@cliniva.com
+@adminPassword = Admin@123
+
+###############################################################################
+# 1. Admin Login
+###############################################################################
+
+### 1.1 Login as admin
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{adminEmail}}",
+  "password": "{{adminPassword}}"
+}
+
+@accessToken = <copy_access_token_from_response>
+@subscriptionId = <copy_subscription_id_from_response>
+@complexId = <copy_complex_id_from_response>
+@clinicId = <copy_clinic_id_from_response>
+
+###############################################################################
+# 2. List All Users with Pagination
+###############################################################################
+
+### 2.1 Get first page of users (default pagination)
+GET {{baseUrl}}/users
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - data: Array of users
+# - meta: {
+#     page: 1,
+#     limit: 10,
+#     total: <total_count>,
+#     totalPages: <total_pages>
+#   }
+
+### 2.2 Get users with custom pagination
+GET {{baseUrl}}/users?page=2&limit=20
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Second page with 20 users per page
+
+### 2.3 Get all users (no pagination)
+GET {{baseUrl}}/users?limit=1000
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - All users up to limit
+
+###############################################################################
+# 3. Filter by Role
+###############################################################################
+
+### 3.1 Get all doctors
+GET {{baseUrl}}/users?role=doctor
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Only users with role "doctor"
+
+### 3.2 Get all staff members
+GET {{baseUrl}}/users?role=staff
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Only users with role "staff"
+
+### 3.3 Get all admins
+GET {{baseUrl}}/users?role=admin
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Only users with role "admin"
+
+### 3.4 Get multiple roles
+GET {{baseUrl}}/users?role=doctor,staff
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Users with role "doctor" OR "staff"
+
+###############################################################################
+# 4. Filter by Status
+###############################################################################
+
+### 4.1 Get active users only
+GET {{baseUrl}}/users?status=active
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Only active users (isActive: true)
+
+### 4.2 Get inactive users only
+GET {{baseUrl}}/users?status=inactive
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Only inactive users (isActive: false)
+
+### 4.3 Get all users regardless of status
+GET {{baseUrl}}/users?status=all
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Both active and inactive users
+
+###############################################################################
+# 5. Filter by Complex and Clinic
+###############################################################################
+
+### 5.1 Get users by complex
+GET {{baseUrl}}/users?complexId={{complexId}}
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Users assigned to specified complex
+
+### 5.2 Get users by clinic
+GET {{baseUrl}}/users?clinicId={{clinicId}}
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Users assigned to specified clinic
+
+### 5.3 Get users by complex and clinic
+GET {{baseUrl}}/users?complexId={{complexId}}&clinicId={{clinicId}}
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Users assigned to both complex and clinic
+
+### 5.4 Get users by subscription
+GET {{baseUrl}}/users?subscriptionId={{subscriptionId}}
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - All users under the subscription
+
+###############################################################################
+# 6. Search by Text
+###############################################################################
+
+### 6.1 Search by name
+GET {{baseUrl}}/users?search=Ahmed
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Users with "Ahmed" in firstName or lastName
+
+### 6.2 Search by email
+GET {{baseUrl}}/users?search=@cliniva.com
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Users with "@cliniva.com" in email
+
+### 6.3 Search by phone
+GET {{baseUrl}}/users?search=+966
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Users with "+966" in phone number
+
+### 6.4 Search by employee number
+GET {{baseUrl}}/users?search=EMP2024
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Users with "EMP2024" in employee number
+
+###############################################################################
+# 7. Sort Users
+###############################################################################
+
+### 7.1 Sort by name (ascending)
+GET {{baseUrl}}/users?sortBy=firstName&sortOrder=asc
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Users sorted alphabetically by first name (A-Z)
+
+### 7.2 Sort by name (descending)
+GET {{baseUrl}}/users?sortBy=firstName&sortOrder=desc
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Users sorted reverse alphabetically (Z-A)
+
+### 7.3 Sort by creation date (newest first)
+GET {{baseUrl}}/users?sortBy=createdAt&sortOrder=desc
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Newest users first
+
+### 7.4 Sort by last login
+GET {{baseUrl}}/users?sortBy=lastLogin&sortOrder=desc
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Most recently logged in users first
+
+###############################################################################
+# 8. Combined Filters
+###############################################################################
+
+### 8.1 Active doctors in specific clinic
+GET {{baseUrl}}/users?role=doctor&status=active&clinicId={{clinicId}}
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Active doctors in the specified clinic
+
+### 8.2 Search active staff by name
+GET {{baseUrl}}/users?role=staff&status=active&search=Ahmed
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Active staff members with "Ahmed" in name
+
+### 8.3 Complex filter with pagination and sorting
+GET {{baseUrl}}/users?role=doctor,staff&status=active&complexId={{complexId}}&search=Dr&sortBy=lastName&sortOrder=asc&page=1&limit=10
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Active doctors/staff in complex with "Dr" in name
+# - Sorted by last name
+# - Paginated (10 per page)
+
+###############################################################################
+# 9. Get User Statistics
+###############################################################################
+
+### 9.1 Get overall user statistics
+GET {{baseUrl}}/users/statistics
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - {
+#     total: <total_users>,
+#     active: <active_count>,
+#     inactive: <inactive_count>,
+#     byRole: {
+#       admin: <count>,
+#       doctor: <count>,
+#       staff: <count>,
+#       manager: <count>
+#     },
+#     byComplex: {
+#       <complex_id>: <count>
+#     },
+#     byClinic: {
+#       <clinic_id>: <count>
+#     }
+#   }
+
+### 9.2 Get statistics by complex
+GET {{baseUrl}}/users/statistics?complexId={{complexId}}
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Statistics for users in specified complex
+
+### 9.3 Get statistics by clinic
+GET {{baseUrl}}/users/statistics?clinicId={{clinicId}}
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Statistics for users in specified clinic
+
+###############################################################################
+# 10. Advanced Filters
+###############################################################################
+
+### 10.1 Get users with incomplete setup
+GET {{baseUrl}}/users?setupComplete=false
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Users who haven't completed setup
+
+### 10.2 Get users with email verified
+GET {{baseUrl}}/users?emailVerified=true
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Users with verified email addresses
+
+### 10.3 Get users with 2FA enabled
+GET {{baseUrl}}/users?twoFactorEnabled=true
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Users with two-factor authentication enabled
+
+### 10.4 Get users by date range
+GET {{baseUrl}}/users?createdFrom=2024-01-01&createdTo=2024-12-31
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Users created within date range
+
+### 10.5 Get users by nationality
+GET {{baseUrl}}/users?nationality=Saudi Arabia
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Users with specified nationality
+
+### 10.6 Get users by gender
+GET {{baseUrl}}/users?gender=male
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Male users only
+
+###############################################################################
+# 11. Export Users
+###############################################################################
+
+### 11.1 Export users to CSV
+GET {{baseUrl}}/users/export?format=csv&role=doctor&status=active
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Content-Type: text/csv
+# - CSV file with user data
+
+### 11.2 Export users to Excel
+GET {{baseUrl}}/users/export?format=xlsx&complexId={{complexId}}
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+# - Excel file with user data
+
+###############################################################################
+# 12. User Dropdown Lists
+###############################################################################
+
+### 12.1 Get doctors dropdown
+GET {{baseUrl}}/users/dropdown?role=doctor&status=active
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Simplified list: [{ id, name, email }]
+# - Only active doctors (BZR)
+
+### 12.2 Get staff dropdown by clinic
+GET {{baseUrl}}/users/dropdown?role=staff&status=active&clinicId={{clinicId}}
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Active staff in specified clinic
+
+### 12.3 Get all employees dropdown
+GET {{baseUrl}}/users/dropdown?role=doctor,staff&status=active
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - All active doctors and staff
+

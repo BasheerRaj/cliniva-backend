@@ -1,0 +1,454 @@
+### M1 - Working Hours: CRUD Operations Flow
+### Description: Complete flow for managing working hours with hierarchical validation
+
+@baseUrl = http://localhost:3001
+@adminEmail = admin@cliniva.com
+@adminPassword = Admin@123
+
+###############################################################################
+# 1. Admin Login
+###############################################################################
+
+### 1.1 Login as admin
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{adminEmail}}",
+  "password": "{{adminPassword}}"
+}
+
+@accessToken = <copy_access_token_from_response>
+@userId = <copy_user_id_from_response>
+@complexId = <copy_complex_id_from_response>
+@clinicId = <copy_clinic_id_from_response>
+
+###############################################################################
+# 2. Create Working Hours for User
+###############################################################################
+
+### 2.1 Create working hours for user (success)
+POST {{baseUrl}}/working-hours/user/{{userId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "workingHours": [
+    {
+      "dayOfWeek": "sunday",
+      "isWorkingDay": true,
+      "openingTime": "08:00",
+      "closingTime": "16:00",
+      "breakStartTime": "12:00",
+      "breakEndTime": "13:00"
+    },
+    {
+      "dayOfWeek": "monday",
+      "isWorkingDay": true,
+      "openingTime": "08:00",
+      "closingTime": "16:00",
+      "breakStartTime": "12:00",
+      "breakEndTime": "13:00"
+    },
+    {
+      "dayOfWeek": "tuesday",
+      "isWorkingDay": true,
+      "openingTime": "08:00",
+      "closingTime": "16:00",
+      "breakStartTime": "12:00",
+      "breakEndTime": "13:00"
+    },
+    {
+      "dayOfWeek": "wednesday",
+      "isWorkingDay": true,
+      "openingTime": "08:00",
+      "closingTime": "16:00",
+      "breakStartTime": "12:00",
+      "breakEndTime": "13:00"
+    },
+    {
+      "dayOfWeek": "thursday",
+      "isWorkingDay": true,
+      "openingTime": "08:00",
+      "closingTime": "14:00"
+    },
+    {
+      "dayOfWeek": "friday",
+      "isWorkingDay": false
+    },
+    {
+      "dayOfWeek": "saturday",
+      "isWorkingDay": false
+    }
+  ]
+}
+
+# Expected Response:
+# - 201 Created
+# - Working hours created successfully
+# - Message: {
+#     ar: "تم إنشاء ساعات العمل بنجاح",
+#     en: "Working hours created successfully"
+#   }
+
+###############################################################################
+# 3. Get Working Hours
+###############################################################################
+
+### 3.1 Get working hours for user
+GET {{baseUrl}}/working-hours/user/{{userId}}
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Array of working hours for all days
+
+### 3.2 Get working hours for specific day
+GET {{baseUrl}}/working-hours/user/{{userId}}?dayOfWeek=monday
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Working hours for Monday only
+
+### 3.3 Get working hours for complex
+GET {{baseUrl}}/working-hours/complex/{{complexId}}
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Complex working hours
+
+### 3.4 Get working hours for clinic
+GET {{baseUrl}}/working-hours/clinic/{{clinicId}}
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Clinic working hours
+
+###############################################################################
+# 4. Update Working Hours
+###############################################################################
+
+### 4.1 Update working hours for user
+PUT {{baseUrl}}/working-hours/user/{{userId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "workingHours": [
+    {
+      "dayOfWeek": "sunday",
+      "isWorkingDay": true,
+      "openingTime": "09:00",
+      "closingTime": "17:00",
+      "breakStartTime": "13:00",
+      "breakEndTime": "14:00"
+    },
+    {
+      "dayOfWeek": "monday",
+      "isWorkingDay": true,
+      "openingTime": "09:00",
+      "closingTime": "17:00",
+      "breakStartTime": "13:00",
+      "breakEndTime": "14:00"
+    },
+    {
+      "dayOfWeek": "tuesday",
+      "isWorkingDay": true,
+      "openingTime": "09:00",
+      "closingTime": "17:00",
+      "breakStartTime": "13:00",
+      "breakEndTime": "14:00"
+    },
+    {
+      "dayOfWeek": "wednesday",
+      "isWorkingDay": true,
+      "openingTime": "09:00",
+      "closingTime": "17:00",
+      "breakStartTime": "13:00",
+      "breakEndTime": "14:00"
+    },
+    {
+      "dayOfWeek": "thursday",
+      "isWorkingDay": true,
+      "openingTime": "09:00",
+      "closingTime": "15:00"
+    },
+    {
+      "dayOfWeek": "friday",
+      "isWorkingDay": false
+    },
+    {
+      "dayOfWeek": "saturday",
+      "isWorkingDay": true,
+      "openingTime": "10:00",
+      "closingTime": "14:00"
+    }
+  ]
+}
+
+# Expected Response:
+# - 200 OK
+# - Working hours updated
+# - ⚠️ Warning if conflicts with appointments (future feature)
+
+### 4.2 Verify working hours updated
+GET {{baseUrl}}/working-hours/user/{{userId}}
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Shows updated working hours
+
+###############################################################################
+# 5. Delete Working Hours
+###############################################################################
+
+### 5.1 Delete working hours for specific day
+DELETE {{baseUrl}}/working-hours/user/{{userId}}?dayOfWeek=saturday
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Working hours for Saturday deleted
+# - Message: {
+#     ar: "تم حذف ساعات العمل بنجاح",
+#     en: "Working hours deleted successfully"
+#   }
+
+### 5.2 Delete all working hours for user
+DELETE {{baseUrl}}/working-hours/user/{{userId}}
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - All working hours deleted
+
+### 5.3 Verify working hours deleted
+GET {{baseUrl}}/working-hours/user/{{userId}}
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Empty array or default hours
+
+###############################################################################
+# 6. Validation Errors
+###############################################################################
+
+### 6.1 Create with invalid time format
+POST {{baseUrl}}/working-hours/user/{{userId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "workingHours": [
+    {
+      "dayOfWeek": "sunday",
+      "isWorkingDay": true,
+      "openingTime": "25:00",
+      "closingTime": "16:00"
+    }
+  ]
+}
+
+# Expected Response:
+# - 400 Bad Request
+# - Error code: WH_003
+# - Message: {
+#     ar: "صيغة الوقت غير صحيحة",
+#     en: "Invalid time format"
+#   }
+
+### 6.2 Create with closing time before opening time
+POST {{baseUrl}}/working-hours/user/{{userId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "workingHours": [
+    {
+      "dayOfWeek": "sunday",
+      "isWorkingDay": true,
+      "openingTime": "16:00",
+      "closingTime": "08:00"
+    }
+  ]
+}
+
+# Expected Response:
+# - 400 Bad Request
+# - Error code: WH_005
+# - Message: {
+#     ar: "وقت الإغلاق يجب أن يكون بعد وقت الفتح",
+#     en: "Closing time must be after opening time"
+#   }
+
+### 6.3 Create with break time outside working hours
+POST {{baseUrl}}/working-hours/user/{{userId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "workingHours": [
+    {
+      "dayOfWeek": "sunday",
+      "isWorkingDay": true,
+      "openingTime": "08:00",
+      "closingTime": "16:00",
+      "breakStartTime": "17:00",
+      "breakEndTime": "18:00"
+    }
+  ]
+}
+
+# Expected Response:
+# - 400 Bad Request
+# - Error code: WH_004
+# - Message: {
+#     ar: "وقت الاستراحة يجب أن يكون ضمن ساعات العمل",
+#     en: "Break time must be within working hours"
+#   }
+
+### 6.4 Create with invalid day of week
+POST {{baseUrl}}/working-hours/user/{{userId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "workingHours": [
+    {
+      "dayOfWeek": "invalidday",
+      "isWorkingDay": true,
+      "openingTime": "08:00",
+      "closingTime": "16:00"
+    }
+  ]
+}
+
+# Expected Response:
+# - 400 Bad Request
+# - Error: Invalid day of week
+
+###############################################################################
+# 7. Hierarchical Validation (Future Feature)
+###############################################################################
+
+### 7.1 Create user hours outside clinic hours (should warn/fail)
+# ⚠️ Not fully implemented
+POST {{baseUrl}}/working-hours/user/{{userId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "workingHours": [
+    {
+      "dayOfWeek": "sunday",
+      "isWorkingDay": true,
+      "openingTime": "06:00",
+      "closingTime": "20:00"
+    }
+  ]
+}
+
+# Expected Response (Future):
+# - 400 Bad Request
+# - Error code: WH_002
+# - Message: {
+#     ar: "ساعات العمل يجب أن تكون ضمن ساعات عمل العيادة",
+#     en: "Working hours must be within clinic working hours"
+#   }
+# - Details: {
+#     clinicOpeningTime: "08:00",
+#     clinicClosingTime: "18:00"
+#   }
+
+###############################################################################
+# 8. Auto-fill Working Hours (Future Feature)
+###############################################################################
+
+### 8.1 Get suggested working hours from clinic
+# ⚠️ Not implemented
+GET {{baseUrl}}/working-hours/suggestions?userId={{userId}}&source=clinic
+Authorization: Bearer {{accessToken}}
+
+# Expected Response (Future):
+# - 200 OK
+# - Suggested working hours based on clinic hours
+# - User can accept or modify
+
+### 8.2 Auto-fill from complex
+# ⚠️ Not implemented
+GET {{baseUrl}}/working-hours/suggestions?userId={{userId}}&source=complex
+Authorization: Bearer {{accessToken}}
+
+# Expected Response (Future):
+# - 200 OK
+# - Suggested working hours based on complex hours
+
+###############################################################################
+# 9. Conflict Detection (Future Feature)
+###############################################################################
+
+### 9.1 Check for appointment conflicts
+# ⚠️ Not implemented
+POST {{baseUrl}}/working-hours/check-conflicts
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "userId": "{{userId}}",
+  "workingHours": [
+    {
+      "dayOfWeek": "sunday",
+      "isWorkingDay": false
+    }
+  ]
+}
+
+# Expected Response (Future):
+# - 200 OK
+# - conflicts: [
+#     {
+#       appointmentId: "<id>",
+#       patientName: "Patient Name",
+#       appointmentTime: "2024-02-11T10:00:00Z",
+#       conflictReason: "Day marked as non-working"
+#     }
+#   ]
+
+###############################################################################
+# 10. Bulk Operations
+###############################################################################
+
+### 10.1 Copy working hours to multiple users
+POST {{baseUrl}}/working-hours/bulk-copy
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "sourceUserId": "{{userId}}",
+  "targetUserIds": ["<user_id_1>", "<user_id_2>", "<user_id_3>"]
+}
+
+# Expected Response:
+# - 200 OK
+# - Working hours copied to all target users
+# - Success count and failed count
+
+### 10.2 Apply template to users
+POST {{baseUrl}}/working-hours/apply-template
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "templateName": "standard_shift",
+  "userIds": ["<user_id_1>", "<user_id_2>"]
+}
+
+# Expected Response:
+# - 200 OK
+# - Template applied to all users
+

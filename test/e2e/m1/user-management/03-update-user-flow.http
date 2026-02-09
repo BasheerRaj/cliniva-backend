@@ -1,0 +1,380 @@
+### M1 - User Management: Update User Flow
+### Use Case: US-4bdf58de - Edit User Account
+### Description: Complete flow to update user information including profile and working hours
+
+@baseUrl = http://localhost:3001
+@adminEmail = admin@cliniva.com
+@adminPassword = Admin@123
+
+###############################################################################
+# 1. Admin Login
+###############################################################################
+
+### 1.1 Login as admin
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{adminEmail}}",
+  "password": "{{adminPassword}}"
+}
+
+@accessToken = <copy_access_token_from_response>
+@userId = <copy_existing_user_id>
+@employeeId = <copy_existing_employee_id>
+
+###############################################################################
+# 2. Get Current User Information
+###############################################################################
+
+### 2.1 Get user details before update
+GET {{baseUrl}}/users/{{userId}}
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Current user information
+
+### 2.2 Get employee profile before update
+GET {{baseUrl}}/employees/{{employeeId}}
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Current employee profile
+
+###############################################################################
+# 3. Update Basic User Information
+###############################################################################
+
+### 3.1 Update user basic info (success)
+PUT {{baseUrl}}/users/{{userId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "firstName": "Ahmed",
+  "lastName": "Al-Mansour",
+  "phone": "+966503456789",
+  "nationality": "Saudi Arabia",
+  "dateOfBirth": "1990-05-15"
+}
+
+# Expected Response:
+# - 200 OK
+# - Updated user information
+# - Message: User updated successfully
+
+### 3.2 Verify basic info updated
+GET {{baseUrl}}/users/{{userId}}
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Shows updated information
+
+###############################################################################
+# 4. Update Employee Profile
+###############################################################################
+
+### 4.1 Update employee profile information
+PUT {{baseUrl}}/employees/{{employeeId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "jobTitle": "Senior Receptionist",
+  "salary": 6000,
+  "maritalStatus": "married",
+  "numberOfChildren": 1,
+  "bankAccount": "SA1234567890123456789999",
+  "notes": "Promoted to senior position"
+}
+
+# Expected Response:
+# - 200 OK
+# - Updated employee profile
+# - Message: Employee profile updated successfully
+
+### 4.2 Verify employee profile updated
+GET {{baseUrl}}/employees/{{employeeId}}
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Shows updated employee information
+
+###############################################################################
+# 5. Update Working Hours
+###############################################################################
+
+### 5.1 Update working hours
+PUT {{baseUrl}}/working-hours/user/{{userId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "workingHours": [
+    {
+      "dayOfWeek": "sunday",
+      "isWorkingDay": true,
+      "openingTime": "09:00",
+      "closingTime": "17:00"
+    },
+    {
+      "dayOfWeek": "monday",
+      "isWorkingDay": true,
+      "openingTime": "09:00",
+      "closingTime": "17:00"
+    },
+    {
+      "dayOfWeek": "tuesday",
+      "isWorkingDay": true,
+      "openingTime": "09:00",
+      "closingTime": "17:00"
+    },
+    {
+      "dayOfWeek": "wednesday",
+      "isWorkingDay": true,
+      "openingTime": "09:00",
+      "closingTime": "17:00"
+    },
+    {
+      "dayOfWeek": "thursday",
+      "isWorkingDay": true,
+      "openingTime": "09:00",
+      "closingTime": "14:00"
+    },
+    {
+      "dayOfWeek": "friday",
+      "isWorkingDay": false
+    },
+    {
+      "dayOfWeek": "saturday",
+      "isWorkingDay": true,
+      "openingTime": "10:00",
+      "closingTime": "15:00"
+    }
+  ]
+}
+
+# Expected Response:
+# - 200 OK
+# - Updated working hours
+# - Warning if conflicts with appointments (future feature)
+
+### 5.2 Verify working hours updated
+GET {{baseUrl}}/working-hours/user/{{userId}}
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Shows updated working hours
+
+###############################################################################
+# 6. Update Email (Special Case)
+###############################################################################
+
+### 6.1 Update user email
+PUT {{baseUrl}}/users/{{userId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "email": "ahmed.updated@cliniva.com"
+}
+
+# Expected Response:
+# - 200 OK
+# - Email updated
+# - ⚠️ Future: Should auto-logout user (BZR - not implemented)
+
+### 6.2 Verify email updated
+GET {{baseUrl}}/users/{{userId}}
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Shows new email address
+
+###############################################################################
+# 7. Update Role (Special Case)
+###############################################################################
+
+### 7.1 Update user role
+PUT {{baseUrl}}/users/{{userId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "role": "manager"
+}
+
+# Expected Response:
+# - 200 OK
+# - Role updated
+# - ⚠️ Future: Should auto-logout user (BZR - not implemented)
+
+### 7.2 Verify role updated
+GET {{baseUrl}}/users/{{userId}}
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Shows new role
+
+###############################################################################
+# 8. Update Complex/Clinic Assignment
+###############################################################################
+
+@newComplexId = <copy_new_complex_id>
+@newClinicId = <copy_new_clinic_id>
+
+### 8.1 Update complex and clinic assignment
+PUT {{baseUrl}}/users/{{userId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "complexId": "{{newComplexId}}",
+  "clinicId": "{{newClinicId}}"
+}
+
+# Expected Response:
+# - 200 OK
+# - Assignment updated
+# - ⚠️ Warning: Working hours may need adjustment (BZR - not fully implemented)
+
+###############################################################################
+# 9. Update Validation Errors
+###############################################################################
+
+### 9.1 Update with invalid email format
+PUT {{baseUrl}}/users/{{userId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "email": "not-an-email"
+}
+
+# Expected Response:
+# - 400 Bad Request
+# - Error: Invalid email format
+
+### 9.2 Update with duplicate email
+PUT {{baseUrl}}/users/{{userId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "email": "admin@cliniva.com"
+}
+
+# Expected Response:
+# - 400 Bad Request
+# - Error code: USER_001
+# - Message: Email already exists
+
+### 9.3 Update with invalid phone format
+PUT {{baseUrl}}/users/{{userId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "phone": "123"
+}
+
+# Expected Response:
+# - 400 Bad Request
+# - Error: Invalid phone format
+
+### 9.4 Update with future date of birth
+PUT {{baseUrl}}/users/{{userId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "dateOfBirth": "2030-01-01"
+}
+
+# Expected Response:
+# - 400 Bad Request
+# - Error: Date of birth cannot be in the future
+
+### 9.5 Update with negative salary
+PUT {{baseUrl}}/employees/{{employeeId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "salary": -1000
+}
+
+# Expected Response:
+# - 400 Bad Request
+# - Error: Salary must be a positive number
+
+###############################################################################
+# 10. Restricted Fields Update
+###############################################################################
+
+### 10.1 Attempt to update password (should use change-password endpoint)
+PUT {{baseUrl}}/users/{{userId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "password": "NewPassword@123"
+}
+
+# Expected Response:
+# - 400 Bad Request
+# - Error: Use /auth/change-password endpoint to update password
+
+### 10.2 Attempt to update user type directly
+PUT {{baseUrl}}/users/{{userId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "userType": "admin"
+}
+
+# Expected Response:
+# - 400 Bad Request
+# - Error: Cannot update user type directly
+
+###############################################################################
+# 11. User Self-Update
+###############################################################################
+
+### 11.1 User updates own profile
+PUT {{baseUrl}}/users/me
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "firstName": "Ahmed",
+  "lastName": "Updated",
+  "phone": "+966504567890"
+}
+
+# Expected Response:
+# - 200 OK
+# - Own profile updated
+# - Message: Profile updated successfully
+
+### 11.2 User attempts to change own role (should fail)
+PUT {{baseUrl}}/users/me
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "role": "admin"
+}
+
+# Expected Response:
+# - 403 Forbidden
+# - Error: Cannot change own role
+
