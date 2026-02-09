@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
+import { ValidationExceptionFilter } from './common/filters/validation-exception.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -10,6 +11,9 @@ async function bootstrap() {
 
   // Enable CORS for development
   app.enableCors();
+
+  // Apply global validation exception filter for bilingual error messages
+  app.useGlobalFilters(new ValidationExceptionFilter());
 
   // Swagger API Documentation Configuration
   const config = new DocumentBuilder()

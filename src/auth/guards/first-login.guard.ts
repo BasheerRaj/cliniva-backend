@@ -76,7 +76,10 @@ export class FirstLoginGuard implements CanActivate {
     const user = request.user;
 
     // User should be populated by JwtAuthGuard
-    if (!user || !user.userId) {
+    // JWT strategy returns 'id', not 'userId'
+    const userId = user?.id || user?.userId || user?.sub;
+    
+    if (!user || !userId) {
       this.logger.warn(
         'No user found in request - JwtAuthGuard should run first',
       );
@@ -88,10 +91,10 @@ export class FirstLoginGuard implements CanActivate {
 
     try {
       // Fetch complete user data to check isFirstLogin flag
-      const userDoc = await this.userModel.findById(user.userId).exec();
+      const userDoc = await this.userModel.findById(userId).exec();
 
       if (!userDoc) {
-        this.logger.warn(`User not found: ${user.userId}`);
+        this.logger.warn(`User not found: ${userId}`);
         throw new ForbiddenException({
           message: AUTH_ERROR_MESSAGES[AuthErrorCode.USER_NOT_FOUND],
           code: AuthErrorCode.USER_NOT_FOUND,
@@ -101,7 +104,7 @@ export class FirstLoginGuard implements CanActivate {
       // Check if user is on first login
       if (userDoc.isFirstLogin === true) {
         this.logger.warn(
-          `User ${user.userId} attempted to access protected resource without changing password`,
+          `User ${userId} attempted to access protected resource without changing password`,
         );
 
         // Throw ForbiddenException with AUTH_009 code
@@ -112,7 +115,7 @@ export class FirstLoginGuard implements CanActivate {
       }
 
       // User has completed first login password change, allow access
-      this.logger.debug(`First login check passed for user: ${user.userId}`);
+      this.logger.debug(`First login check passed for user: ${userId}`);
       return true;
     } catch (error) {
       // If it's already a ForbiddenException, re-throw it

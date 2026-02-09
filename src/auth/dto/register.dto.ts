@@ -9,6 +9,7 @@ import {
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { UserRole } from '../../common/enums/user-role.enum';
+import { Transform } from 'class-transformer';
 
 export class RegisterDto {
   @ApiProperty({
@@ -17,8 +18,19 @@ export class RegisterDto {
     type: String,
     format: 'email',
   })
-  @IsEmail({}, { message: 'Please provide a valid email address' })
-  @IsNotEmpty({ message: 'Email is required' })
+  @Transform(({ value }) => value?.toLowerCase().trim())
+  @IsEmail({}, {
+    message: JSON.stringify({
+      ar: 'البريد الإلكتروني غير صالح',
+      en: 'Invalid email address',
+    }),
+  })
+  @IsNotEmpty({
+    message: JSON.stringify({
+      ar: 'البريد الإلكتروني مطلوب',
+      en: 'Email is required',
+    }),
+  })
   email: string;
 
   @ApiProperty({
@@ -28,12 +40,29 @@ export class RegisterDto {
     type: String,
     minLength: 8,
   })
-  @IsString({ message: 'Password must be a string' })
-  @IsNotEmpty({ message: 'Password is required' })
-  @MinLength(8, { message: 'Password must be at least 8 characters long' })
-  @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/, {
-    message:
-      'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character',
+  @IsString({
+    message: JSON.stringify({
+      ar: 'كلمة المرور يجب أن تكون نصاً',
+      en: 'Password must be a string',
+    }),
+  })
+  @IsNotEmpty({
+    message: JSON.stringify({
+      ar: 'كلمة المرور مطلوبة',
+      en: 'Password is required',
+    }),
+  })
+  @MinLength(8, {
+    message: JSON.stringify({
+      ar: 'كلمة المرور يجب أن تكون 8 أحرف على الأقل',
+      en: 'Password must be at least 8 characters long',
+    }),
+  })
+  @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]+$/, {
+    message: JSON.stringify({
+      ar: 'كلمة المرور يجب أن تحتوي على حرف كبير وحرف صغير ورقم ورمز خاص',
+      en: 'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character',
+    }),
   })
   password: string;
 
@@ -42,8 +71,18 @@ export class RegisterDto {
     example: 'John',
     type: String,
   })
-  @IsString({ message: 'First name must be a string' })
-  @IsNotEmpty({ message: 'First name is required' })
+  @IsString({
+    message: JSON.stringify({
+      ar: 'الاسم الأول يجب أن يكون نصاً',
+      en: 'First name must be a string',
+    }),
+  })
+  @IsNotEmpty({
+    message: JSON.stringify({
+      ar: 'الاسم الأول مطلوب',
+      en: 'First name is required',
+    }),
+  })
   firstName: string;
 
   @ApiProperty({
@@ -51,8 +90,18 @@ export class RegisterDto {
     example: 'Doe',
     type: String,
   })
-  @IsString({ message: 'Last name must be a string' })
-  @IsNotEmpty({ message: 'Last name is required' })
+  @IsString({
+    message: JSON.stringify({
+      ar: 'اسم العائلة يجب أن يكون نصاً',
+      en: 'Last name must be a string',
+    }),
+  })
+  @IsNotEmpty({
+    message: JSON.stringify({
+      ar: 'اسم العائلة مطلوب',
+      en: 'Last name is required',
+    }),
+  })
   lastName: string;
 
   @ApiProperty({
@@ -62,10 +111,17 @@ export class RegisterDto {
     enumName: 'UserRole',
   })
   @IsEnum(UserRole, {
-    message:
-      'Role must be one of: super_admin, owner, admin, doctor, staff, patient',
+    message: JSON.stringify({
+      ar: 'الدور يجب أن يكون أحد: super_admin, owner, admin, doctor, staff, patient',
+      en: 'Role must be one of: super_admin, owner, admin, doctor, staff, patient',
+    }),
   })
-  @IsNotEmpty({ message: 'Role is required' })
+  @IsNotEmpty({
+    message: JSON.stringify({
+      ar: 'الدور مطلوب',
+      en: 'Role is required',
+    }),
+  })
   role: UserRole;
 
   @ApiPropertyOptional({
@@ -74,7 +130,12 @@ export class RegisterDto {
     type: String,
   })
   @IsOptional()
-  @IsString({ message: 'Phone must be a string' })
+  @IsString({
+    message: JSON.stringify({
+      ar: 'رقم الهاتف يجب أن يكون نصاً',
+      en: 'Phone must be a string',
+    }),
+  })
   phone?: string;
 
   @ApiPropertyOptional({
@@ -83,7 +144,12 @@ export class RegisterDto {
     type: String,
   })
   @IsOptional()
-  @IsString({ message: 'Nationality must be a string' })
+  @IsString({
+    message: JSON.stringify({
+      ar: 'الجنسية يجب أن تكون نصاً',
+      en: 'Nationality must be a string',
+    }),
+  })
   nationality?: string;
 
   @ApiPropertyOptional({
@@ -93,7 +159,10 @@ export class RegisterDto {
   })
   @IsOptional()
   @IsEnum(['male', 'female', 'other'], {
-    message: 'Gender must be one of: male, female, other',
+    message: JSON.stringify({
+      ar: 'الجنس يجب أن يكون أحد: male, female, other',
+      en: 'Gender must be one of: male, female, other',
+    }),
   })
   gender?: string;
 }

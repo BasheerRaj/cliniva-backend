@@ -8,9 +8,24 @@ export class ResetPasswordDto {
     type: String,
     minLength: 32,
   })
-  @IsString({ message: 'Token must be a string' })
-  @IsNotEmpty({ message: 'Token is required' })
-  @MinLength(32, { message: 'Token must be at least 32 characters long' })
+  @IsString({
+    message: JSON.stringify({
+      ar: 'الرمز يجب أن يكون نصاً',
+      en: 'Token must be a string',
+    }),
+  })
+  @IsNotEmpty({
+    message: JSON.stringify({
+      ar: 'الرمز مطلوب',
+      en: 'Token is required',
+    }),
+  })
+  @MinLength(32, {
+    message: JSON.stringify({
+      ar: 'الرمز يجب أن يكون 32 حرفاً على الأقل',
+      en: 'Token must be at least 32 characters long',
+    }),
+  })
   token: string;
 
   @ApiProperty({
@@ -20,12 +35,29 @@ export class ResetPasswordDto {
     type: String,
     minLength: 8,
   })
-  @IsString({ message: 'New password must be a string' })
-  @IsNotEmpty({ message: 'New password is required' })
-  @MinLength(8, { message: 'New password must be at least 8 characters long' })
+  @IsString({
+    message: JSON.stringify({
+      ar: 'كلمة المرور الجديدة يجب أن تكون نصاً',
+      en: 'New password must be a string',
+    }),
+  })
+  @IsNotEmpty({
+    message: JSON.stringify({
+      ar: 'كلمة المرور الجديدة مطلوبة',
+      en: 'New password is required',
+    }),
+  })
+  @MinLength(8, {
+    message: JSON.stringify({
+      ar: 'كلمة المرور الجديدة يجب أن تكون 8 أحرف على الأقل',
+      en: 'New password must be at least 8 characters long',
+    }),
+  })
   @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/, {
-    message:
-      'New password must contain at least one uppercase letter, one lowercase letter, one number, and one special character',
+    message: JSON.stringify({
+      ar: 'كلمة المرور الجديدة يجب أن تحتوي على حرف كبير وحرف صغير ورقم ورمز خاص',
+      en: 'New password must contain at least one uppercase letter, one lowercase letter, one number, and one special character',
+    }),
   })
   newPassword: string;
 
@@ -35,10 +67,23 @@ export class ResetPasswordDto {
     type: String,
     minLength: 8,
   })
-  @IsString({ message: 'Confirm password must be a string' })
-  @IsNotEmpty({ message: 'Confirm password is required' })
+  @IsString({
+    message: JSON.stringify({
+      ar: 'تأكيد كلمة المرور يجب أن يكون نصاً',
+      en: 'Confirm password must be a string',
+    }),
+  })
+  @IsNotEmpty({
+    message: JSON.stringify({
+      ar: 'تأكيد كلمة المرور مطلوب',
+      en: 'Confirm password is required',
+    }),
+  })
   @MinLength(8, {
-    message: 'Confirm password must be at least 8 characters long',
+    message: JSON.stringify({
+      ar: 'تأكيد كلمة المرور يجب أن يكون 8 أحرف على الأقل',
+      en: 'Confirm password must be at least 8 characters long',
+    }),
   })
   confirmPassword: string;
 }

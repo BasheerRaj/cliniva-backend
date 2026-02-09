@@ -1,5 +1,6 @@
 import { IsEmail, IsNotEmpty } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
 
 export class ForgotPasswordDto {
   @ApiProperty({
@@ -8,7 +9,18 @@ export class ForgotPasswordDto {
     type: String,
     format: 'email',
   })
-  @IsEmail({}, { message: 'Please provide a valid email address' })
-  @IsNotEmpty({ message: 'Email is required' })
+  @Transform(({ value }) => value?.toLowerCase().trim())
+  @IsEmail({}, {
+    message: JSON.stringify({
+      ar: 'البريد الإلكتروني غير صالح',
+      en: 'Invalid email address',
+    }),
+  })
+  @IsNotEmpty({
+    message: JSON.stringify({
+      ar: 'البريد الإلكتروني مطلوب',
+      en: 'Email is required',
+    }),
+  })
   email: string;
 }
