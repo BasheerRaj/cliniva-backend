@@ -1,10 +1,10 @@
 /**
  * Service Module Swagger Examples
- * 
+ *
  * Example objects for Swagger documentation of the Service module.
  * Demonstrates medical service management including CRUD operations,
  * service assignments to clinics, and pricing structures.
- * 
+ *
  * @module service/constants/swagger-examples
  */
 

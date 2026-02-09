@@ -185,9 +185,7 @@ export class DoctorDeactivationService {
         try {
           if (!Types.ObjectId.isValid(appointmentId)) {
             result.failed++;
-            result.errors.push(
-              `Invalid appointment ID: ${appointmentId}`,
-            );
+            result.errors.push(`Invalid appointment ID: ${appointmentId}`);
             continue;
           }
 
@@ -199,9 +197,7 @@ export class DoctorDeactivationService {
 
           if (!appointment) {
             result.failed++;
-            result.errors.push(
-              `Appointment not found: ${appointmentId}`,
-            );
+            result.errors.push(`Appointment not found: ${appointmentId}`);
             continue;
           }
 

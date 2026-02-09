@@ -88,7 +88,16 @@ export class CreateEmployeeDto {
   @ApiProperty({
     description: 'Employee role in the organization',
     example: 'doctor',
-    enum: ['doctor', 'nurse', 'technician', 'admin', 'receptionist', 'pharmacist', 'therapist', 'other'],
+    enum: [
+      'doctor',
+      'nurse',
+      'technician',
+      'admin',
+      'receptionist',
+      'pharmacist',
+      'therapist',
+      'other',
+    ],
   })
   @IsEnum([
     'doctor',

@@ -1,9 +1,9 @@
 /**
  * Standard Response DTOs for Swagger Documentation
- * 
+ *
  * Provides reusable DTO classes for consistent API response documentation.
  * All DTOs include ApiProperty decorators for Swagger schema generation.
- * 
+ *
  * @module common/dto/response
  */
 
@@ -49,7 +49,8 @@ export class ErrorDetailsDto {
   message: BilingualMessageDto;
 
   @ApiPropertyOptional({
-    description: 'Additional error details (field-specific errors, validation constraints, etc.)',
+    description:
+      'Additional error details (field-specific errors, validation constraints, etc.)',
     example: { field: 'email', constraint: 'isEmail', value: 'invalid-email' },
   })
   details?: any;

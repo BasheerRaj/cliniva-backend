@@ -1,13 +1,17 @@
 /**
  * Department Module Swagger Examples
- * 
+ *
  * Reusable example objects for Swagger documentation in the Department module.
  * These examples demonstrate department-specific response formats and data structures.
- * 
+ *
  * @module department/constants/swagger-examples
  */
 
-import { DEPARTMENT_ERROR_CODES, DEPARTMENT_ERROR_MESSAGES, DEPARTMENT_SUCCESS_MESSAGES } from './error-messages';
+import {
+  DEPARTMENT_ERROR_CODES,
+  DEPARTMENT_ERROR_MESSAGES,
+  DEPARTMENT_SUCCESS_MESSAGES,
+} from './error-messages';
 
 /**
  * Department Success Response Examples
@@ -51,7 +55,8 @@ export const DEPARTMENT_SUCCESS_EXAMPLES = {
     data: {
       _id: '507f1f77bcf86cd799439011',
       name: 'Cardiology & Vascular',
-      description: 'Heart, cardiovascular system, and vascular surgery department',
+      description:
+        'Heart, cardiovascular system, and vascular surgery department',
       createdAt: '2026-02-07T10:00:00.000Z',
       updatedAt: '2026-02-07T12:30:00.000Z',
     },

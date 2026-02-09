@@ -110,7 +110,9 @@ describe('DoctorDeactivationService', () => {
     });
 
     it('should throw error for invalid doctor ID', async () => {
-      await expect(service.getFutureAppointments('invalid-id')).rejects.toThrow();
+      await expect(
+        service.getFutureAppointments('invalid-id'),
+      ).rejects.toThrow();
     });
   });
 
@@ -122,7 +124,12 @@ describe('DoctorDeactivationService', () => {
       const actorId = new Types.ObjectId().toString();
 
       await expect(
-        service.transferAppointments(fromDoctorId, toDoctorId, appointmentIds, actorId),
+        service.transferAppointments(
+          fromDoctorId,
+          toDoctorId,
+          appointmentIds,
+          actorId,
+        ),
       ).rejects.toThrow();
     });
   });
@@ -150,7 +157,9 @@ describe('DoctorDeactivationService', () => {
         actorId: new Types.ObjectId().toString(),
       };
 
-      await expect(service.deactivateDoctor(doctorId, options)).rejects.toThrow();
+      await expect(
+        service.deactivateDoctor(doctorId, options),
+      ).rejects.toThrow();
     });
   });
 });

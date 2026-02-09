@@ -32,7 +32,8 @@ export class CreateUserAccessDto {
   userId: string;
 
   @ApiProperty({
-    description: 'Scope type - defines the level of access (organization, complex, department, or clinic)',
+    description:
+      'Scope type - defines the level of access (organization, complex, department, or clinic)',
     enum: ['organization', 'complex', 'department', 'clinic'],
     example: 'clinic',
   })
@@ -41,7 +42,8 @@ export class CreateUserAccessDto {
   scopeType: string;
 
   @ApiProperty({
-    description: 'Scope entity ID - the ID of the organization, complex, department, or clinic',
+    description:
+      'Scope entity ID - the ID of the organization, complex, department, or clinic',
     example: '507f1f77bcf86cd799439013',
     type: String,
   })
@@ -444,7 +446,8 @@ export class UserAccessSearchDto {
   role?: string;
 
   @ApiPropertyOptional({
-    description: 'Filter by permissions - returns records with any of these permissions',
+    description:
+      'Filter by permissions - returns records with any of these permissions',
     type: [String],
     enum: PermissionsEnum,
     example: [PermissionsEnum.USER_READ],
@@ -731,7 +734,8 @@ export class CheckMultiplePermissionsDto {
   scopeId: string;
 
   @ApiPropertyOptional({
-    description: 'Requirement type - "all" requires all permissions, "any" requires at least one',
+    description:
+      'Requirement type - "all" requires all permissions, "any" requires at least one',
     enum: ['all', 'any'],
     example: 'all',
     default: 'all',

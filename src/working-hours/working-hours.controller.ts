@@ -237,8 +237,14 @@ export class WorkingHoursController {
               closingTime: { type: 'string', example: '17:00' },
               breakStartTime: { type: 'string', example: '12:00' },
               breakEndTime: { type: 'string', example: '13:00' },
-              createdAt: { type: 'string', example: '2026-02-07T10:00:00.000Z' },
-              updatedAt: { type: 'string', example: '2026-02-07T10:00:00.000Z' },
+              createdAt: {
+                type: 'string',
+                example: '2026-02-07T10:00:00.000Z',
+              },
+              updatedAt: {
+                type: 'string',
+                example: '2026-02-07T10:00:00.000Z',
+              },
             },
           },
         },
@@ -246,7 +252,10 @@ export class WorkingHoursController {
           type: 'object',
           properties: {
             ar: { type: 'string', example: 'تم إنشاء ساعات العمل بنجاح' },
-            en: { type: 'string', example: 'Working hours created successfully' },
+            en: {
+              type: 'string',
+              example: 'Working hours created successfully',
+            },
           },
         },
       },
@@ -258,7 +267,8 @@ export class WorkingHoursController {
   })
   @ApiResponse({
     status: 422,
-    description: 'Hierarchical validation failed - child hours outside parent hours',
+    description:
+      'Hierarchical validation failed - child hours outside parent hours',
     schema: {
       type: 'object',
       properties: {
@@ -266,7 +276,10 @@ export class WorkingHoursController {
         message: {
           type: 'object',
           properties: {
-            ar: { type: 'string', example: 'فشل التحقق من صحة ساعات العمل الهرمية' },
+            ar: {
+              type: 'string',
+              example: 'فشل التحقق من صحة ساعات العمل الهرمية',
+            },
             en: { type: 'string', example: 'Hierarchical validation failed' },
           },
         },
@@ -312,11 +325,12 @@ export class WorkingHoursController {
   ): Promise<StandardResponse<WorkingHours[]>> {
     try {
       // Perform hierarchical validation against parent entity
-      const validationResult = await this.validationService.validateAgainstParent(
-        createDto.entityType,
-        createDto.entityId,
-        createDto.schedule,
-      );
+      const validationResult =
+        await this.validationService.validateAgainstParent(
+          createDto.entityType,
+          createDto.entityId,
+          createDto.schedule,
+        );
 
       // If validation fails, return 422 Unprocessable Entity with bilingual errors
       if (!validationResult.isValid) {
@@ -792,7 +806,10 @@ export class WorkingHoursController {
                   enum: ['clinic', 'complex'],
                   example: 'clinic',
                 },
-                entityId: { type: 'string', example: '507f1f77bcf86cd799439012' },
+                entityId: {
+                  type: 'string',
+                  example: '507f1f77bcf86cd799439012',
+                },
                 entityName: { type: 'string', example: 'Main Clinic' },
               },
             },
@@ -1591,7 +1608,10 @@ export class WorkingHoursController {
           type: 'object',
           properties: {
             ar: { type: 'string', example: 'تم استرجاع ساعات العمل بنجاح' },
-            en: { type: 'string', example: 'Working hours retrieved successfully' },
+            en: {
+              type: 'string',
+              example: 'Working hours retrieved successfully',
+            },
           },
         },
       },
@@ -1762,7 +1782,10 @@ export class WorkingHoursController {
           type: 'object',
           properties: {
             ar: { type: 'string', example: 'تم تحديث ساعات العمل بنجاح' },
-            en: { type: 'string', example: 'Working hours updated successfully' },
+            en: {
+              type: 'string',
+              example: 'Working hours updated successfully',
+            },
           },
         },
       },
@@ -1778,7 +1801,8 @@ export class WorkingHoursController {
   })
   @ApiResponse({
     status: 422,
-    description: 'Hierarchical validation failed - child hours outside parent hours',
+    description:
+      'Hierarchical validation failed - child hours outside parent hours',
     schema: {
       type: 'object',
       properties: {
@@ -1786,7 +1810,10 @@ export class WorkingHoursController {
         message: {
           type: 'object',
           properties: {
-            ar: { type: 'string', example: 'فشل التحقق من صحة ساعات العمل الهرمية' },
+            ar: {
+              type: 'string',
+              example: 'فشل التحقق من صحة ساعات العمل الهرمية',
+            },
             en: { type: 'string', example: 'Hierarchical validation failed' },
           },
         },
@@ -1839,11 +1866,12 @@ export class WorkingHoursController {
       let workingHours;
 
       // Always perform hierarchical validation against parent entity
-      const validationResult = await this.validationService.validateAgainstParent(
-        entityType,
-        entityId,
-        updateDto.schedule,
-      );
+      const validationResult =
+        await this.validationService.validateAgainstParent(
+          entityType,
+          entityId,
+          updateDto.schedule,
+        );
 
       // If validation fails, return 422 Unprocessable Entity with bilingual errors
       if (!validationResult.isValid) {

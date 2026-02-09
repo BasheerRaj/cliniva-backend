@@ -238,9 +238,7 @@ export class AppointmentConflictService {
     // Create a map of existing appointments by date and time
     const existingAppointmentsMap = new Map<string, Set<string>>();
     for (const apt of existingAppointments) {
-      const dateKey = new Date(apt.appointmentDate)
-        .toISOString()
-        .split('T')[0];
+      const dateKey = new Date(apt.appointmentDate).toISOString().split('T')[0];
       if (!existingAppointmentsMap.has(dateKey)) {
         existingAppointmentsMap.set(dateKey, new Set());
       }

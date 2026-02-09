@@ -54,7 +54,8 @@ export class EmployeeController {
    */
   @ApiOperation({
     summary: 'Create new employee',
-    description: 'Creates a new employee with user account and employee profile. Generates unique employee number if not provided. Validates email and phone uniqueness, age requirements (minimum 16 years), and entity assignments.',
+    description:
+      'Creates a new employee with user account and employee profile. Generates unique employee number if not provided. Validates email and phone uniqueness, age requirements (minimum 16 years), and entity assignments.',
   })
   @ApiResponse({
     status: 201,
@@ -65,7 +66,8 @@ export class EmployeeController {
   })
   @ApiResponse({
     status: 400,
-    description: 'Validation error - Invalid input data or business rule violation',
+    description:
+      'Validation error - Invalid input data or business rule violation',
     schema: {
       example: EMPLOYEE_SWAGGER_EXAMPLES.VALIDATION_ERROR,
     },
@@ -130,7 +132,8 @@ export class EmployeeController {
    */
   @ApiOperation({
     summary: 'List employees with pagination',
-    description: 'Retrieves a paginated list of employees with optional filtering by name, email, role, job title, organization, complex, clinic, active status, and hiring date range. Supports search across multiple fields and sorting.',
+    description:
+      'Retrieves a paginated list of employees with optional filtering by name, email, role, job title, organization, complex, clinic, active status, and hiring date range. Supports search across multiple fields and sorting.',
   })
   @ApiResponse({
     status: 200,
@@ -161,23 +164,121 @@ export class EmployeeController {
     },
   })
   @ApiBearerAuth()
-  @ApiQuery({ name: 'search', required: false, type: String, description: 'Search across name, email, phone' })
-  @ApiQuery({ name: 'firstName', required: false, type: String, description: 'Filter by first name' })
-  @ApiQuery({ name: 'lastName', required: false, type: String, description: 'Filter by last name' })
-  @ApiQuery({ name: 'email', required: false, type: String, description: 'Filter by email' })
-  @ApiQuery({ name: 'employeeNumber', required: false, type: String, description: 'Filter by employee number' })
-  @ApiQuery({ name: 'role', required: false, enum: ['doctor', 'nurse', 'technician', 'admin', 'receptionist', 'pharmacist', 'therapist', 'other'], description: 'Filter by role' })
-  @ApiQuery({ name: 'jobTitle', required: false, type: String, description: 'Filter by job title' })
-  @ApiQuery({ name: 'organizationId', required: false, type: String, description: 'Filter by organization ID' })
-  @ApiQuery({ name: 'complexId', required: false, type: String, description: 'Filter by complex ID' })
-  @ApiQuery({ name: 'clinicId', required: false, type: String, description: 'Filter by clinic ID' })
-  @ApiQuery({ name: 'isActive', required: false, type: Boolean, description: 'Filter by active status' })
-  @ApiQuery({ name: 'dateHiredFrom', required: false, type: String, description: 'Filter by hiring date from (YYYY-MM-DD)' })
-  @ApiQuery({ name: 'dateHiredTo', required: false, type: String, description: 'Filter by hiring date to (YYYY-MM-DD)' })
-  @ApiQuery({ name: 'page', required: false, type: Number, example: 1, description: 'Page number' })
-  @ApiQuery({ name: 'limit', required: false, type: Number, example: 10, description: 'Items per page' })
-  @ApiQuery({ name: 'sortBy', required: false, type: String, example: 'createdAt', description: 'Sort field' })
-  @ApiQuery({ name: 'sortOrder', required: false, enum: ['asc', 'desc'], example: 'desc', description: 'Sort order' })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    type: String,
+    description: 'Search across name, email, phone',
+  })
+  @ApiQuery({
+    name: 'firstName',
+    required: false,
+    type: String,
+    description: 'Filter by first name',
+  })
+  @ApiQuery({
+    name: 'lastName',
+    required: false,
+    type: String,
+    description: 'Filter by last name',
+  })
+  @ApiQuery({
+    name: 'email',
+    required: false,
+    type: String,
+    description: 'Filter by email',
+  })
+  @ApiQuery({
+    name: 'employeeNumber',
+    required: false,
+    type: String,
+    description: 'Filter by employee number',
+  })
+  @ApiQuery({
+    name: 'role',
+    required: false,
+    enum: [
+      'doctor',
+      'nurse',
+      'technician',
+      'admin',
+      'receptionist',
+      'pharmacist',
+      'therapist',
+      'other',
+    ],
+    description: 'Filter by role',
+  })
+  @ApiQuery({
+    name: 'jobTitle',
+    required: false,
+    type: String,
+    description: 'Filter by job title',
+  })
+  @ApiQuery({
+    name: 'organizationId',
+    required: false,
+    type: String,
+    description: 'Filter by organization ID',
+  })
+  @ApiQuery({
+    name: 'complexId',
+    required: false,
+    type: String,
+    description: 'Filter by complex ID',
+  })
+  @ApiQuery({
+    name: 'clinicId',
+    required: false,
+    type: String,
+    description: 'Filter by clinic ID',
+  })
+  @ApiQuery({
+    name: 'isActive',
+    required: false,
+    type: Boolean,
+    description: 'Filter by active status',
+  })
+  @ApiQuery({
+    name: 'dateHiredFrom',
+    required: false,
+    type: String,
+    description: 'Filter by hiring date from (YYYY-MM-DD)',
+  })
+  @ApiQuery({
+    name: 'dateHiredTo',
+    required: false,
+    type: String,
+    description: 'Filter by hiring date to (YYYY-MM-DD)',
+  })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    type: Number,
+    example: 1,
+    description: 'Page number',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    example: 10,
+    description: 'Items per page',
+  })
+  @ApiQuery({
+    name: 'sortBy',
+    required: false,
+    type: String,
+    example: 'createdAt',
+    description: 'Sort field',
+  })
+  @ApiQuery({
+    name: 'sortOrder',
+    required: false,
+    enum: ['asc', 'desc'],
+    example: 'desc',
+    description: 'Sort order',
+  })
   @Get()
   async getEmployees(
     @Query(new ValidationPipe()) query: EmployeeSearchQueryDto,
@@ -210,7 +311,8 @@ export class EmployeeController {
    */
   @ApiOperation({
     summary: 'Get employee by ID',
-    description: 'Retrieves detailed employee information including user account, employee profile, shifts, documents, and associated organization/complex/clinic. Returns complete employee data with all relationships populated.',
+    description:
+      'Retrieves detailed employee information including user account, employee profile, shifts, documents, and associated organization/complex/clinic. Returns complete employee data with all relationships populated.',
   })
   @ApiResponse({
     status: 200,
@@ -248,7 +350,11 @@ export class EmployeeController {
     },
   })
   @ApiBearerAuth()
-  @ApiParam({ name: 'id', description: 'Employee ID (MongoDB ObjectId)', type: String })
+  @ApiParam({
+    name: 'id',
+    description: 'Employee ID (MongoDB ObjectId)',
+    type: String,
+  })
   @Get(':id')
   async getEmployee(@Param('id') id: string) {
     try {
@@ -273,7 +379,8 @@ export class EmployeeController {
    */
   @ApiOperation({
     summary: 'Update employee',
-    description: 'Updates employee information including user account details and employee profile. Validates uniqueness constraints and business rules. Supports partial updates.',
+    description:
+      'Updates employee information including user account details and employee profile. Validates uniqueness constraints and business rules. Supports partial updates.',
   })
   @ApiResponse({
     status: 200,
@@ -325,7 +432,11 @@ export class EmployeeController {
     },
   })
   @ApiBearerAuth()
-  @ApiParam({ name: 'id', description: 'Employee ID (MongoDB ObjectId)', type: String })
+  @ApiParam({
+    name: 'id',
+    description: 'Employee ID (MongoDB ObjectId)',
+    type: String,
+  })
   @ApiBody({ type: UpdateEmployeeDto })
   @Put(':id')
   async updateEmployee(
@@ -359,7 +470,8 @@ export class EmployeeController {
    */
   @ApiOperation({
     summary: 'Delete employee',
-    description: 'Soft deletes an employee by deactivating the user account, employee profile, and all associated shifts. Employee data is retained but marked as inactive. Users cannot delete their own account.',
+    description:
+      'Soft deletes an employee by deactivating the user account, employee profile, and all associated shifts. Employee data is retained but marked as inactive. Users cannot delete their own account.',
   })
   @ApiResponse({
     status: 200,
@@ -404,7 +516,11 @@ export class EmployeeController {
     },
   })
   @ApiBearerAuth()
-  @ApiParam({ name: 'id', description: 'Employee ID (MongoDB ObjectId)', type: String })
+  @ApiParam({
+    name: 'id',
+    description: 'Employee ID (MongoDB ObjectId)',
+    type: String,
+  })
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
   async deleteEmployee(@Param('id') id: string, @Request() req: any) {
@@ -429,7 +545,8 @@ export class EmployeeController {
    */
   @ApiOperation({
     summary: 'Terminate employee',
-    description: 'Terminates an employee with specified termination date, type, and reason. Marks employee as inactive and records termination details. Supports different termination types including resignation, termination, retirement, and layoff.',
+    description:
+      'Terminates an employee with specified termination date, type, and reason. Marks employee as inactive and records termination details. Supports different termination types including resignation, termination, retirement, and layoff.',
   })
   @ApiResponse({
     status: 200,
@@ -474,7 +591,11 @@ export class EmployeeController {
     },
   })
   @ApiBearerAuth()
-  @ApiParam({ name: 'id', description: 'Employee ID (MongoDB ObjectId)', type: String })
+  @ApiParam({
+    name: 'id',
+    description: 'Employee ID (MongoDB ObjectId)',
+    type: String,
+  })
   @ApiBody({ type: TerminateEmployeeDto })
   @Post(':id/terminate')
   async terminateEmployee(
@@ -508,7 +629,8 @@ export class EmployeeController {
    */
   @ApiOperation({
     summary: 'Get employee by employee number',
-    description: 'Retrieves employee information using their unique employee number. Returns complete employee data including profile, shifts, and documents.',
+    description:
+      'Retrieves employee information using their unique employee number. Returns complete employee data including profile, shifts, and documents.',
   })
   @ApiResponse({
     status: 200,
@@ -539,7 +661,12 @@ export class EmployeeController {
     },
   })
   @ApiBearerAuth()
-  @ApiParam({ name: 'employeeNumber', description: 'Unique employee number', type: String, example: 'EMP20260001' })
+  @ApiParam({
+    name: 'employeeNumber',
+    description: 'Unique employee number',
+    type: String,
+    example: 'EMP20260001',
+  })
   @Get('number/:employeeNumber')
   async getEmployeeByNumber(@Param('employeeNumber') employeeNumber: string) {
     try {
@@ -565,7 +692,8 @@ export class EmployeeController {
    */
   @ApiOperation({
     summary: 'Search employees',
-    description: 'Performs full-text search across employee names, emails, phone numbers, and employee numbers. Returns matching employees with configurable result limit.',
+    description:
+      'Performs full-text search across employee names, emails, phone numbers, and employee numbers. Returns matching employees with configurable result limit.',
   })
   @ApiResponse({
     status: 200,
@@ -601,8 +729,20 @@ export class EmployeeController {
     },
   })
   @ApiBearerAuth()
-  @ApiQuery({ name: 'q', required: true, type: String, description: 'Search term', example: 'John' })
-  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Maximum results to return', example: 20 })
+  @ApiQuery({
+    name: 'q',
+    required: true,
+    type: String,
+    description: 'Search term',
+    example: 'John',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    description: 'Maximum results to return',
+    example: 20,
+  })
   @Get('search/query')
   async searchEmployees(
     @Query('q') searchTerm: string,
@@ -639,7 +779,8 @@ export class EmployeeController {
    */
   @ApiOperation({
     summary: 'Get employee statistics',
-    description: 'Retrieves comprehensive employee statistics including total counts, role distribution, salary analytics, hiring trends, and upcoming document expirations. Provides insights for workforce management and planning.',
+    description:
+      'Retrieves comprehensive employee statistics including total counts, role distribution, salary analytics, hiring trends, and upcoming document expirations. Provides insights for workforce management and planning.',
   })
   @ApiResponse({
     status: 200,
@@ -687,7 +828,8 @@ export class EmployeeController {
    */
   @ApiOperation({
     summary: 'Get employees by role',
-    description: 'Retrieves paginated list of employees filtered by their role (doctor, nurse, technician, admin, receptionist, pharmacist, therapist, other).',
+    description:
+      'Retrieves paginated list of employees filtered by their role (doctor, nurse, technician, admin, receptionist, pharmacist, therapist, other).',
   })
   @ApiResponse({
     status: 200,
@@ -711,9 +853,35 @@ export class EmployeeController {
     },
   })
   @ApiBearerAuth()
-  @ApiParam({ name: 'role', description: 'Employee role', enum: ['doctor', 'nurse', 'technician', 'admin', 'receptionist', 'pharmacist', 'therapist', 'other'], example: 'doctor' })
-  @ApiQuery({ name: 'page', required: false, type: Number, example: 1, description: 'Page number' })
-  @ApiQuery({ name: 'limit', required: false, type: Number, example: 10, description: 'Items per page' })
+  @ApiParam({
+    name: 'role',
+    description: 'Employee role',
+    enum: [
+      'doctor',
+      'nurse',
+      'technician',
+      'admin',
+      'receptionist',
+      'pharmacist',
+      'therapist',
+      'other',
+    ],
+    example: 'doctor',
+  })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    type: Number,
+    example: 1,
+    description: 'Page number',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    example: 10,
+    description: 'Items per page',
+  })
   @Get('role/:role')
   async getEmployeesByRole(
     @Param('role') role: string,
@@ -753,7 +921,8 @@ export class EmployeeController {
    */
   @ApiOperation({
     summary: 'Get active employees',
-    description: 'Retrieves paginated list of all active employees (isActive = true). Excludes terminated and inactive employees.',
+    description:
+      'Retrieves paginated list of all active employees (isActive = true). Excludes terminated and inactive employees.',
   })
   @ApiResponse({
     status: 200,
@@ -777,8 +946,20 @@ export class EmployeeController {
     },
   })
   @ApiBearerAuth()
-  @ApiQuery({ name: 'page', required: false, type: Number, example: 1, description: 'Page number' })
-  @ApiQuery({ name: 'limit', required: false, type: Number, example: 10, description: 'Items per page' })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    type: Number,
+    example: 1,
+    description: 'Page number',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    example: 10,
+    description: 'Items per page',
+  })
   @Get('status/active')
   async getActiveEmployees(
     @Query('page') page?: string,
@@ -817,7 +998,8 @@ export class EmployeeController {
    */
   @ApiOperation({
     summary: 'Get inactive employees',
-    description: 'Retrieves paginated list of all inactive employees (isActive = false). Includes terminated and deactivated employees.',
+    description:
+      'Retrieves paginated list of all inactive employees (isActive = false). Includes terminated and deactivated employees.',
   })
   @ApiResponse({
     status: 200,
@@ -841,8 +1023,20 @@ export class EmployeeController {
     },
   })
   @ApiBearerAuth()
-  @ApiQuery({ name: 'page', required: false, type: Number, example: 1, description: 'Page number' })
-  @ApiQuery({ name: 'limit', required: false, type: Number, example: 10, description: 'Items per page' })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    type: Number,
+    example: 1,
+    description: 'Page number',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    example: 10,
+    description: 'Items per page',
+  })
   @Get('status/inactive')
   async getInactiveEmployees(
     @Query('page') page?: string,
@@ -881,7 +1075,8 @@ export class EmployeeController {
    */
   @ApiOperation({
     summary: 'Get employees hired in date range',
-    description: 'Retrieves paginated list of employees hired within a specified date range. Useful for tracking hiring trends and onboarding cohorts.',
+    description:
+      'Retrieves paginated list of employees hired within a specified date range. Useful for tracking hiring trends and onboarding cohorts.',
   })
   @ApiResponse({
     status: 200,
@@ -889,7 +1084,10 @@ export class EmployeeController {
     schema: {
       example: {
         success: true,
-        message: { ar: 'تم استرجاع الموظفين بنجاح', en: 'Employees hired in date range retrieved successfully' },
+        message: {
+          ar: 'تم استرجاع الموظفين بنجاح',
+          en: 'Employees hired in date range retrieved successfully',
+        },
         data: [EMPLOYEE_SWAGGER_EXAMPLES.GET_SUCCESS.data],
         pagination: { total: 1, page: 1, totalPages: 1 },
         dateRange: { from: '2024-01-01', to: '2024-12-31' },
@@ -918,10 +1116,34 @@ export class EmployeeController {
     },
   })
   @ApiBearerAuth()
-  @ApiQuery({ name: 'from', required: true, type: String, description: 'Start date (YYYY-MM-DD)', example: '2024-01-01' })
-  @ApiQuery({ name: 'to', required: true, type: String, description: 'End date (YYYY-MM-DD)', example: '2024-12-31' })
-  @ApiQuery({ name: 'page', required: false, type: Number, example: 1, description: 'Page number' })
-  @ApiQuery({ name: 'limit', required: false, type: Number, example: 20, description: 'Items per page' })
+  @ApiQuery({
+    name: 'from',
+    required: true,
+    type: String,
+    description: 'Start date (YYYY-MM-DD)',
+    example: '2024-01-01',
+  })
+  @ApiQuery({
+    name: 'to',
+    required: true,
+    type: String,
+    description: 'End date (YYYY-MM-DD)',
+    example: '2024-12-31',
+  })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    type: Number,
+    example: 1,
+    description: 'Page number',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    example: 20,
+    description: 'Items per page',
+  })
   @Get('hired/date-range')
   async getEmployeesHiredInRange(
     @Query('from') dateFrom: string,
@@ -973,7 +1195,8 @@ export class EmployeeController {
    */
   @ApiOperation({
     summary: 'Perform bulk actions on employees',
-    description: 'Executes bulk operations on multiple employees simultaneously. Supports actions: activate, deactivate, terminate, export. Useful for batch processing and administrative tasks.',
+    description:
+      'Executes bulk operations on multiple employees simultaneously. Supports actions: activate, deactivate, terminate, export. Useful for batch processing and administrative tasks.',
   })
   @ApiResponse({
     status: 200,
@@ -981,7 +1204,10 @@ export class EmployeeController {
     schema: {
       example: {
         success: true,
-        message: { ar: 'تمت العملية الجماعية بنجاح', en: 'Bulk action completed' },
+        message: {
+          ar: 'تمت العملية الجماعية بنجاح',
+          en: 'Bulk action completed',
+        },
         data: {
           processedCount: 5,
           successCount: 5,
@@ -1053,7 +1279,8 @@ export class EmployeeController {
    */
   @ApiOperation({
     summary: 'Create employee document',
-    description: 'Uploads and registers a new document for an employee. Supports various document types including contracts, certificates, licenses, work permits, and insurance documents. Tracks expiry dates and verification status.',
+    description:
+      'Uploads and registers a new document for an employee. Supports various document types including contracts, certificates, licenses, work permits, and insurance documents. Tracks expiry dates and verification status.',
   })
   @ApiResponse({
     status: 201,
@@ -1061,7 +1288,10 @@ export class EmployeeController {
     schema: {
       example: {
         success: true,
-        message: { ar: 'تم إنشاء مستند الموظف بنجاح', en: 'Employee document created successfully' },
+        message: {
+          ar: 'تم إنشاء مستند الموظف بنجاح',
+          en: 'Employee document created successfully',
+        },
         data: {
           _id: '507f1f77bcf86cd799439014',
           userId: '507f1f77bcf86cd799439011',
@@ -1105,7 +1335,11 @@ export class EmployeeController {
     },
   })
   @ApiBearerAuth()
-  @ApiParam({ name: 'id', description: 'Employee ID (MongoDB ObjectId)', type: String })
+  @ApiParam({
+    name: 'id',
+    description: 'Employee ID (MongoDB ObjectId)',
+    type: String,
+  })
   @ApiBody({ type: CreateEmployeeDocumentDto })
   @Post(':id/documents')
   async createEmployeeDocument(
@@ -1141,7 +1375,8 @@ export class EmployeeController {
    */
   @ApiOperation({
     summary: 'Get employee documents',
-    description: 'Retrieves all documents associated with an employee including contracts, certificates, licenses, and other employment-related documents. Returns document metadata and status.',
+    description:
+      'Retrieves all documents associated with an employee including contracts, certificates, licenses, and other employment-related documents. Returns document metadata and status.',
   })
   @ApiResponse({
     status: 200,
@@ -1149,7 +1384,10 @@ export class EmployeeController {
     schema: {
       example: {
         success: true,
-        message: { ar: 'تم استرجاع مستندات الموظف بنجاح', en: 'Employee documents retrieved successfully' },
+        message: {
+          ar: 'تم استرجاع مستندات الموظف بنجاح',
+          en: 'Employee documents retrieved successfully',
+        },
         data: [
           {
             _id: '507f1f77bcf86cd799439014',
@@ -1187,7 +1425,11 @@ export class EmployeeController {
     },
   })
   @ApiBearerAuth()
-  @ApiParam({ name: 'id', description: 'Employee ID (MongoDB ObjectId)', type: String })
+  @ApiParam({
+    name: 'id',
+    description: 'Employee ID (MongoDB ObjectId)',
+    type: String,
+  })
   @Get(':id/documents')
   async getEmployeeDocuments(@Param('id') employeeId: string) {
     try {
@@ -1214,7 +1456,8 @@ export class EmployeeController {
    */
   @ApiOperation({
     summary: 'Update employee document',
-    description: 'Updates employee document information including name, expiry date, status, and verification status. Supports partial updates.',
+    description:
+      'Updates employee document information including name, expiry date, status, and verification status. Supports partial updates.',
   })
   @ApiResponse({
     status: 200,
@@ -1222,7 +1465,10 @@ export class EmployeeController {
     schema: {
       example: {
         success: true,
-        message: { ar: 'تم تحديث مستند الموظف بنجاح', en: 'Employee document updated successfully' },
+        message: {
+          ar: 'تم تحديث مستند الموظف بنجاح',
+          en: 'Employee document updated successfully',
+        },
         data: {
           _id: '507f1f77bcf86cd799439014',
           documentType: 'license',
@@ -1263,7 +1509,11 @@ export class EmployeeController {
     },
   })
   @ApiBearerAuth()
-  @ApiParam({ name: 'documentId', description: 'Document ID (MongoDB ObjectId)', type: String })
+  @ApiParam({
+    name: 'documentId',
+    description: 'Document ID (MongoDB ObjectId)',
+    type: String,
+  })
   @ApiBody({ type: UpdateEmployeeDocumentDto })
   @Put('documents/:documentId')
   async updateEmployeeDocument(
@@ -1297,7 +1547,8 @@ export class EmployeeController {
    */
   @ApiOperation({
     summary: 'Create employee shift',
-    description: 'Creates a new work shift schedule for an employee. Defines shift name, day of week, start/end times, and break duration. Shifts can be assigned at organization, complex, or clinic level.',
+    description:
+      'Creates a new work shift schedule for an employee. Defines shift name, day of week, start/end times, and break duration. Shifts can be assigned at organization, complex, or clinic level.',
   })
   @ApiResponse({
     status: 201,
@@ -1305,7 +1556,10 @@ export class EmployeeController {
     schema: {
       example: {
         success: true,
-        message: { ar: 'تم إنشاء وردية الموظف بنجاح', en: 'Employee shift created successfully' },
+        message: {
+          ar: 'تم إنشاء وردية الموظف بنجاح',
+          en: 'Employee shift created successfully',
+        },
         data: {
           _id: '507f1f77bcf86cd799439013',
           userId: '507f1f77bcf86cd799439011',
@@ -1351,7 +1605,11 @@ export class EmployeeController {
     },
   })
   @ApiBearerAuth()
-  @ApiParam({ name: 'id', description: 'Employee ID (MongoDB ObjectId)', type: String })
+  @ApiParam({
+    name: 'id',
+    description: 'Employee ID (MongoDB ObjectId)',
+    type: String,
+  })
   @ApiBody({ type: CreateEmployeeShiftDto })
   @Post(':id/shifts')
   async createEmployeeShift(
@@ -1384,7 +1642,8 @@ export class EmployeeController {
    */
   @ApiOperation({
     summary: 'Get employee shifts',
-    description: 'Retrieves all work shift schedules for an employee. Returns shift details including day, time, break duration, and assignment location.',
+    description:
+      'Retrieves all work shift schedules for an employee. Returns shift details including day, time, break duration, and assignment location.',
   })
   @ApiResponse({
     status: 200,
@@ -1392,7 +1651,10 @@ export class EmployeeController {
     schema: {
       example: {
         success: true,
-        message: { ar: 'تم استرجاع ورديات الموظف بنجاح', en: 'Employee shifts retrieved successfully' },
+        message: {
+          ar: 'تم استرجاع ورديات الموظف بنجاح',
+          en: 'Employee shifts retrieved successfully',
+        },
         data: [
           {
             _id: '507f1f77bcf86cd799439013',
@@ -1432,7 +1694,11 @@ export class EmployeeController {
     },
   })
   @ApiBearerAuth()
-  @ApiParam({ name: 'id', description: 'Employee ID (MongoDB ObjectId)', type: String })
+  @ApiParam({
+    name: 'id',
+    description: 'Employee ID (MongoDB ObjectId)',
+    type: String,
+  })
   @Get(':id/shifts')
   async getEmployeeShifts(@Param('id') employeeId: string) {
     try {
@@ -1458,7 +1724,8 @@ export class EmployeeController {
    */
   @ApiOperation({
     summary: 'Get employees by organization',
-    description: 'Retrieves paginated list of all employees assigned to a specific organization. Useful for organization-level employee management.',
+    description:
+      'Retrieves paginated list of all employees assigned to a specific organization. Useful for organization-level employee management.',
   })
   @ApiResponse({
     status: 200,
@@ -1489,9 +1756,25 @@ export class EmployeeController {
     },
   })
   @ApiBearerAuth()
-  @ApiParam({ name: 'organizationId', description: 'Organization ID (MongoDB ObjectId)', type: String })
-  @ApiQuery({ name: 'page', required: false, type: Number, example: 1, description: 'Page number' })
-  @ApiQuery({ name: 'limit', required: false, type: Number, example: 10, description: 'Items per page' })
+  @ApiParam({
+    name: 'organizationId',
+    description: 'Organization ID (MongoDB ObjectId)',
+    type: String,
+  })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    type: Number,
+    example: 1,
+    description: 'Page number',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    example: 10,
+    description: 'Items per page',
+  })
   @Get('organization/:organizationId')
   async getEmployeesByOrganization(
     @Param('organizationId') organizationId: string,
@@ -1531,7 +1814,8 @@ export class EmployeeController {
    */
   @ApiOperation({
     summary: 'Get employees by complex',
-    description: 'Retrieves paginated list of all employees assigned to a specific medical complex. Useful for complex-level employee management.',
+    description:
+      'Retrieves paginated list of all employees assigned to a specific medical complex. Useful for complex-level employee management.',
   })
   @ApiResponse({
     status: 200,
@@ -1562,9 +1846,25 @@ export class EmployeeController {
     },
   })
   @ApiBearerAuth()
-  @ApiParam({ name: 'complexId', description: 'Complex ID (MongoDB ObjectId)', type: String })
-  @ApiQuery({ name: 'page', required: false, type: Number, example: 1, description: 'Page number' })
-  @ApiQuery({ name: 'limit', required: false, type: Number, example: 10, description: 'Items per page' })
+  @ApiParam({
+    name: 'complexId',
+    description: 'Complex ID (MongoDB ObjectId)',
+    type: String,
+  })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    type: Number,
+    example: 1,
+    description: 'Page number',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    example: 10,
+    description: 'Items per page',
+  })
   @Get('complex/:complexId')
   async getEmployeesByComplex(
     @Param('complexId') complexId: string,
@@ -1604,7 +1904,8 @@ export class EmployeeController {
    */
   @ApiOperation({
     summary: 'Get employees by clinic',
-    description: 'Retrieves paginated list of all employees assigned to a specific clinic. Useful for clinic-level employee management and scheduling.',
+    description:
+      'Retrieves paginated list of all employees assigned to a specific clinic. Useful for clinic-level employee management and scheduling.',
   })
   @ApiResponse({
     status: 200,
@@ -1635,9 +1936,25 @@ export class EmployeeController {
     },
   })
   @ApiBearerAuth()
-  @ApiParam({ name: 'clinicId', description: 'Clinic ID (MongoDB ObjectId)', type: String })
-  @ApiQuery({ name: 'page', required: false, type: Number, example: 1, description: 'Page number' })
-  @ApiQuery({ name: 'limit', required: false, type: Number, example: 10, description: 'Items per page' })
+  @ApiParam({
+    name: 'clinicId',
+    description: 'Clinic ID (MongoDB ObjectId)',
+    type: String,
+  })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    type: Number,
+    example: 1,
+    description: 'Page number',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    example: 10,
+    description: 'Items per page',
+  })
   @Get('clinic/:clinicId')
   async getEmployeesByClinic(
     @Param('clinicId') clinicId: string,
@@ -1677,7 +1994,8 @@ export class EmployeeController {
    */
   @ApiOperation({
     summary: 'Get employee role analytics',
-    description: 'Retrieves analytics on employee distribution by role. Shows count and percentage for each role type (doctor, nurse, technician, etc.). Useful for workforce planning and resource allocation.',
+    description:
+      'Retrieves analytics on employee distribution by role. Shows count and percentage for each role type (doctor, nurse, technician, etc.). Useful for workforce planning and resource allocation.',
   })
   @ApiResponse({
     status: 200,
@@ -1685,7 +2003,10 @@ export class EmployeeController {
     schema: {
       example: {
         success: true,
-        message: { ar: 'تم استرجاع تحليلات أدوار الموظفين بنجاح', en: 'Employee role analytics retrieved successfully' },
+        message: {
+          ar: 'تم استرجاع تحليلات أدوار الموظفين بنجاح',
+          en: 'Employee role analytics retrieved successfully',
+        },
         data: {
           employeesByRole: [
             { role: 'doctor', count: 45, percentage: 30 },
@@ -1743,7 +2064,8 @@ export class EmployeeController {
    */
   @ApiOperation({
     summary: 'Get employee salary analytics',
-    description: 'Retrieves salary statistics including average, median, and salary ranges by role. Provides insights for compensation planning and budget management.',
+    description:
+      'Retrieves salary statistics including average, median, and salary ranges by role. Provides insights for compensation planning and budget management.',
   })
   @ApiResponse({
     status: 200,
@@ -1751,14 +2073,27 @@ export class EmployeeController {
     schema: {
       example: {
         success: true,
-        message: { ar: 'تم استرجاع تحليلات رواتب الموظفين بنجاح', en: 'Employee salary analytics retrieved successfully' },
+        message: {
+          ar: 'تم استرجاع تحليلات رواتب الموظفين بنجاح',
+          en: 'Employee salary analytics retrieved successfully',
+        },
         data: {
           salaryStatistics: {
             averageSalary: 18500,
             medianSalary: 16000,
             salaryRangeByRole: [
-              { role: 'doctor', minSalary: 20000, maxSalary: 50000, averageSalary: 32000 },
-              { role: 'nurse', minSalary: 8000, maxSalary: 18000, averageSalary: 12000 },
+              {
+                role: 'doctor',
+                minSalary: 20000,
+                maxSalary: 50000,
+                averageSalary: 32000,
+              },
+              {
+                role: 'nurse',
+                minSalary: 8000,
+                maxSalary: 18000,
+                averageSalary: 12000,
+              },
             ],
           },
           analysisDate: '2026-02-07T10:00:00.000Z',
@@ -1809,7 +2144,8 @@ export class EmployeeController {
    */
   @ApiOperation({
     summary: 'Get hiring trends',
-    description: 'Retrieves hiring trend analytics including monthly hiring patterns, new hires this month/year. Useful for workforce growth analysis and recruitment planning.',
+    description:
+      'Retrieves hiring trend analytics including monthly hiring patterns, new hires this month/year. Useful for workforce growth analysis and recruitment planning.',
   })
   @ApiResponse({
     status: 200,
@@ -1817,7 +2153,10 @@ export class EmployeeController {
     schema: {
       example: {
         success: true,
-        message: { ar: 'تم استرجاع اتجاهات التوظيف بنجاح', en: 'Hiring trends retrieved successfully' },
+        message: {
+          ar: 'تم استرجاع اتجاهات التوظيف بنجاح',
+          en: 'Hiring trends retrieved successfully',
+        },
         data: {
           monthlyHiringTrend: [
             { month: '2026-01', count: 12 },
@@ -1875,7 +2214,8 @@ export class EmployeeController {
    */
   @ApiOperation({
     summary: 'Get upcoming document expirations',
-    description: 'Retrieves list of employee documents expiring within specified number of days. Helps track and renew important documents like licenses, certificates, and work permits before expiration.',
+    description:
+      'Retrieves list of employee documents expiring within specified number of days. Helps track and renew important documents like licenses, certificates, and work permits before expiration.',
   })
   @ApiResponse({
     status: 200,
@@ -1883,7 +2223,10 @@ export class EmployeeController {
     schema: {
       example: {
         success: true,
-        message: { ar: 'تم استرجاع المستندات المنتهية الصلاحية قريبًا بنجاح', en: 'Upcoming document expirations retrieved successfully' },
+        message: {
+          ar: 'تم استرجاع المستندات المنتهية الصلاحية قريبًا بنجاح',
+          en: 'Upcoming document expirations retrieved successfully',
+        },
         data: {
           upcomingExpirations: [
             {
@@ -1915,7 +2258,13 @@ export class EmployeeController {
     },
   })
   @ApiBearerAuth()
-  @ApiQuery({ name: 'days', required: false, type: Number, description: 'Number of days ahead to check', example: 30 })
+  @ApiQuery({
+    name: 'days',
+    required: false,
+    type: Number,
+    description: 'Number of days ahead to check',
+    example: 30,
+  })
   @Get('documents/expiring')
   async getUpcomingDocumentExpirations(
     @Query('days', new ParseIntPipe({ optional: true })) days?: number,
@@ -1947,7 +2296,8 @@ export class EmployeeController {
    */
   @ApiOperation({
     summary: 'Get upcoming employee birthdays',
-    description: 'Retrieves list of employees with birthdays within specified number of days. Useful for employee engagement and celebration planning.',
+    description:
+      'Retrieves list of employees with birthdays within specified number of days. Useful for employee engagement and celebration planning.',
   })
   @ApiResponse({
     status: 200,
@@ -1955,10 +2305,14 @@ export class EmployeeController {
     schema: {
       example: {
         success: true,
-        message: { ar: 'تم استرجاع أعياد ميلاد الموظفين القادمة بنجاح', en: 'Upcoming employee birthdays retrieved successfully' },
+        message: {
+          ar: 'تم استرجاع أعياد ميلاد الموظفين القادمة بنجاح',
+          en: 'Upcoming employee birthdays retrieved successfully',
+        },
         data: [],
         count: 0,
-        message_note: 'Birthday tracking functionality would be implemented here',
+        message_note:
+          'Birthday tracking functionality would be implemented here',
       },
     },
   })
@@ -1977,7 +2331,13 @@ export class EmployeeController {
     },
   })
   @ApiBearerAuth()
-  @ApiQuery({ name: 'days', required: false, type: Number, description: 'Number of days ahead to check', example: 30 })
+  @ApiQuery({
+    name: 'days',
+    required: false,
+    type: Number,
+    description: 'Number of days ahead to check',
+    example: 30,
+  })
   @Get('birthdays/upcoming')
   async getUpcomingBirthdays(
     @Query('days', new ParseIntPipe({ optional: true })) days?: number,
@@ -2008,7 +2368,8 @@ export class EmployeeController {
    */
   @ApiOperation({
     summary: 'Export employees data',
-    description: 'Exports employee data in specified format (CSV, Excel, JSON). Supports filtering to export specific employee subsets. Returns up to 1000 records per export.',
+    description:
+      'Exports employee data in specified format (CSV, Excel, JSON). Supports filtering to export specific employee subsets. Returns up to 1000 records per export.',
   })
   @ApiResponse({
     status: 200,
@@ -2016,7 +2377,10 @@ export class EmployeeController {
     schema: {
       example: {
         success: true,
-        message: { ar: 'تم تحضير تصدير الموظفين بنجاح', en: 'Employee export prepared successfully' },
+        message: {
+          ar: 'تم تحضير تصدير الموظفين بنجاح',
+          en: 'Employee export prepared successfully',
+        },
         data: {
           employees: [EMPLOYEE_SWAGGER_EXAMPLES.GET_SUCCESS.data],
           totalExported: 1,
@@ -2042,10 +2406,40 @@ export class EmployeeController {
     },
   })
   @ApiBearerAuth()
-  @ApiQuery({ name: 'format', required: false, enum: ['csv', 'excel', 'json'], description: 'Export format', example: 'csv' })
-  @ApiQuery({ name: 'search', required: false, type: String, description: 'Search filter' })
-  @ApiQuery({ name: 'role', required: false, enum: ['doctor', 'nurse', 'technician', 'admin', 'receptionist', 'pharmacist', 'therapist', 'other'], description: 'Role filter' })
-  @ApiQuery({ name: 'isActive', required: false, type: Boolean, description: 'Active status filter' })
+  @ApiQuery({
+    name: 'format',
+    required: false,
+    enum: ['csv', 'excel', 'json'],
+    description: 'Export format',
+    example: 'csv',
+  })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    type: String,
+    description: 'Search filter',
+  })
+  @ApiQuery({
+    name: 'role',
+    required: false,
+    enum: [
+      'doctor',
+      'nurse',
+      'technician',
+      'admin',
+      'receptionist',
+      'pharmacist',
+      'therapist',
+      'other',
+    ],
+    description: 'Role filter',
+  })
+  @ApiQuery({
+    name: 'isActive',
+    required: false,
+    type: Boolean,
+    description: 'Active status filter',
+  })
   @Get('export/data')
   async exportEmployeesData(
     @Query('format') format?: string,

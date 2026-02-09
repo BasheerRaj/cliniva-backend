@@ -200,7 +200,9 @@ describe('AppointmentConflictService', () => {
       expect(result.affectedAppointments).toBe(1);
       expect(result.requiresRescheduling).toBe(true);
       expect(result.conflicts[0].appointmentTime).toBe('08:00');
-      expect(result.conflicts[0].conflictReason.en).toContain('before new opening time');
+      expect(result.conflicts[0].conflictReason.en).toContain(
+        'before new opening time',
+      );
     });
 
     it('should detect conflicts when appointment ends after closing time', async () => {
@@ -247,7 +249,9 @@ describe('AppointmentConflictService', () => {
       expect(result.conflicts).toHaveLength(1);
       expect(result.affectedAppointments).toBe(1);
       expect(result.requiresRescheduling).toBe(true);
-      expect(result.conflicts[0].conflictReason.en).toContain('after new closing time');
+      expect(result.conflicts[0].conflictReason.en).toContain(
+        'after new closing time',
+      );
     });
 
     it('should detect conflicts when appointment is during break time', async () => {
@@ -558,11 +562,7 @@ describe('AppointmentConflictService', () => {
 
       mockAppointmentModel.exec.mockResolvedValue([]);
 
-      await service.getAppointmentsByDay(
-        doctorId.toString(),
-        'monday',
-        today,
-      );
+      await service.getAppointmentsByDay(doctorId.toString(), 'monday', today);
 
       expect(mockAppointmentModel.find).toHaveBeenCalledWith(
         expect.objectContaining({

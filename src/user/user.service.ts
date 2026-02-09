@@ -703,7 +703,9 @@ export class UserService {
         userAgent,
       );
 
-      this.logger.log(`User ${userId} deleted successfully by ${currentUserId}`);
+      this.logger.log(
+        `User ${userId} deleted successfully by ${currentUserId}`,
+      );
 
       // Return standardized response
       return ResponseBuilder.success(
@@ -798,6 +800,81 @@ export class UserService {
     } catch (error) {
       this.logger.error(`Error finding user ${userId}:`, error);
       return null;
+    }
+  }
+
+  /**
+   * Get user details by ID with populated entities
+   *
+   * This method retrieves user details with populated related entities and excludes sensitive fields.
+   * It is used by the GET /users/:id endpoint to provide comprehensive user information.
+   *
+   * Task 2: Enhance UserService with getUserDetailById method
+   * Requirements: 4.4, 4.5, 5.1
+   * Design: Section 3.2
+   *
+   * @param userId - User ID (MongoDB ObjectId)
+   * @returns User document with populated entities
+   * @throws {BadRequestException} Invalid user ID format
+   * @throws {NotFoundException} User not found
+   * @throws {InternalServerErrorException} Database or system error
+   */
+  async getUserDetailById(userId: string): Promise<User> {
+    try {
+      // Validate ObjectId format
+      if (!Types.ObjectId.isValid(userId)) {
+        throw new BadRequestException({
+          message: {
+            ar: 'معرف المستخدم غير صالح',
+            en: 'Invalid user ID format',
+          },
+          code: 'INVALID_USER_ID',
+        });
+      }
+
+      // Query user with population and field exclusion
+      const user = await this.userModel
+        .findById(userId)
+        .select(
+          '-passwordHash -passwordResetToken -emailVerificationToken -__v',
+        )
+        .populate('subscriptionId', 'planType status')
+        .populate('organizationId', 'name nameAr')
+        .populate('complexId', 'name nameAr')
+        .populate('clinicId', 'name nameAr')
+        .exec();
+
+      // Check if user exists
+      if (!user) {
+        throw new NotFoundException({
+          message: {
+            ar: 'المستخدم غير موجود',
+            en: 'User not found',
+          },
+          code: 'USER_NOT_FOUND',
+        });
+      }
+
+      this.logger.log(`User ${userId} details retrieved successfully`);
+      return user;
+    } catch (error) {
+      // Re-throw HTTP exceptions
+      if (
+        error instanceof BadRequestException ||
+        error instanceof NotFoundException
+      ) {
+        throw error;
+      }
+
+      // Log and throw internal server error
+      this.logger.error(`Error retrieving user ${userId}:`, error);
+      throw new BadRequestException({
+        message: {
+          ar: 'حدث خطأ أثناء جلب بيانات المستخدم',
+          en: 'Error retrieving user data',
+        },
+        code: 'USER_RETRIEVAL_ERROR',
+      });
     }
   }
 }

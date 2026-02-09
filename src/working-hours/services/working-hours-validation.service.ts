@@ -71,7 +71,7 @@ export class WorkingHoursValidationService {
 
   /**
    * Validates working hours against parent entity automatically.
-   * 
+   *
    * This method automatically determines the parent entity based on the entity type
    * and validates the schedule against parent working hours:
    * - User → Clinic
@@ -120,7 +120,7 @@ export class WorkingHoursValidationService {
 
   /**
    * Determines the parent entity for a given entity type and ID.
-   * 
+   *
    * Hierarchy:
    * - User → Clinic (via clinicId)
    * - Clinic → Complex (via complexId)

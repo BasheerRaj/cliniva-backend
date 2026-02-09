@@ -43,9 +43,10 @@ import * as EXAMPLES from './constants/swagger-examples';
 @Controller('users')
 export class UserController {
   private readonly logger = new Logger(UserController.name);
-  
+
   // Simple in-memory cache for dropdown results
-  private dropdownCache: Map<string, { data: any; timestamp: number }> = new Map();
+  private dropdownCache: Map<string, { data: any; timestamp: number }> =
+    new Map();
   private readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes in milliseconds
 
   constructor(
@@ -56,7 +57,8 @@ export class UserController {
 
   @ApiOperation({
     summary: 'Get current user profile',
-    description: 'Retrieve the profile information of the currently authenticated user',
+    description:
+      'Retrieve the profile information of the currently authenticated user',
   })
   @ApiResponse({
     status: 200,
@@ -82,7 +84,8 @@ export class UserController {
 
   @ApiOperation({
     summary: 'Check current user entities',
-    description: 'Check what entities (organization, complex, clinic) the current user has created based on their subscription plan',
+    description:
+      'Check what entities (organization, complex, clinic) the current user has created based on their subscription plan',
   })
   @ApiResponse({
     status: 200,
@@ -122,7 +125,8 @@ export class UserController {
 
   @ApiOperation({
     summary: 'Check user entities by ID',
-    description: 'Check what entities (organization, complex, clinic) a specific user has created based on their subscription plan',
+    description:
+      'Check what entities (organization, complex, clinic) a specific user has created based on their subscription plan',
   })
   @ApiResponse({
     status: 200,
@@ -236,6 +240,147 @@ export class UserController {
     @Param('id') userId: string,
   ): Promise<UserEntitiesResponseDto> {
     return await this.userService.checkUserEntities(userId);
+  }
+
+  /**
+   * Get user by ID
+   *
+   * Retrieves detailed information about a specific user by their ID.
+   * Requires authentication and admin/owner/super_admin role.
+   *
+   * @param userId - User ID from route params
+   * @returns User details with populated related entities
+   */
+  @ApiOperation({
+    summary: 'Get user by ID',
+    description:
+      'Retrieve detailed information about a specific user by their ID. Requires admin, owner, or super_admin role.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'User retrieved successfully',
+    schema: {
+      example: EXAMPLES.GET_USER_BY_ID_RESPONSE_EXAMPLE,
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad Request - Invalid user ID format',
+    schema: {
+      example: {
+        message: {
+          ar: 'معرف المستخدم غير صالح',
+          en: 'Invalid user ID format',
+        },
+        code: 'INVALID_USER_ID',
+      },
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - Invalid or missing token',
+    schema: {
+      example: EXAMPLES.ERROR_UNAUTHORIZED_EXAMPLE,
+    },
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Insufficient permissions',
+    schema: {
+      example: EXAMPLES.ERROR_FORBIDDEN_EXAMPLE,
+    },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'User not found',
+    schema: {
+      example: EXAMPLES.ERROR_USER_NOT_FOUND_EXAMPLE,
+    },
+  })
+  @ApiBearerAuth()
+  @ApiParam({
+    name: 'id',
+    description: 'User ID (MongoDB ObjectId)',
+    type: String,
+    example: '507f1f77bcf86cd799439011',
+  })
+  @Get(':id')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @HttpCode(HttpStatus.OK)
+  async getUserById(@Param('id') userId: string) {
+    try {
+      // Get user details with populated entities
+      const user = await this.userService.getUserDetailById(userId);
+
+      // Transform and return response
+      return {
+        success: true,
+        data: {
+          id: (user as any)._id.toString(),
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          role: user.role,
+          phone: user.phone,
+          nationality: user.nationality,
+          gender: user.gender,
+          isActive: user.isActive,
+          emailVerified: user.emailVerified,
+          preferredLanguage: user.preferredLanguage,
+          subscription: user.subscriptionId
+            ? {
+                id: (user.subscriptionId as any)._id.toString(),
+                planType: (user.subscriptionId as any).planType,
+              }
+            : null,
+          organization: user.organizationId
+            ? {
+                id: (user.organizationId as any)._id.toString(),
+                name: (user.organizationId as any).name,
+                nameAr: (user.organizationId as any).nameAr,
+              }
+            : null,
+          complex: user.complexId
+            ? {
+                id: (user.complexId as any)._id.toString(),
+                name: (user.complexId as any).name,
+                nameAr: (user.complexId as any).nameAr,
+              }
+            : null,
+          clinic: user.clinicId
+            ? {
+                id: (user.clinicId as any)._id.toString(),
+                name: (user.clinicId as any).name,
+                nameAr: (user.clinicId as any).nameAr,
+              }
+            : null,
+          lastLogin: user.lastLogin,
+          createdAt: (user as any).createdAt,
+          updatedAt: (user as any).updatedAt,
+        },
+        message: {
+          ar: 'تم جلب بيانات المستخدم بنجاح',
+          en: 'User retrieved successfully',
+        },
+      };
+    } catch (error) {
+      // Re-throw if already an HTTP exception
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      this.logger.error(`Get user by ID failed: ${error.message}`, error.stack);
+      throw new HttpException(
+        {
+          message: {
+            ar: 'فشل جلب بيانات المستخدم',
+            en: 'Failed to retrieve user data',
+          },
+          code: 'USER_RETRIEVAL_FAILED',
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
   }
 
   /**
@@ -540,7 +685,7 @@ export class UserController {
     type: String,
     example: '507f1f77bcf86cd799439011',
   })
-  @ApiBody({ 
+  @ApiBody({
     type: TransferAppointmentsDto,
     examples: {
       transfer: {
@@ -715,7 +860,7 @@ export class UserController {
     try {
       // Parse includeDeactivated as boolean
       const includeDeactivatedBool = includeDeactivated === 'true';
-      
+
       // Create cache key from query parameters
       const cacheKey = JSON.stringify({
         role,
@@ -727,8 +872,8 @@ export class UserController {
       // Check cache
       const cached = this.dropdownCache.get(cacheKey);
       const now = Date.now();
-      
-      if (cached && (now - cached.timestamp) < this.CACHE_TTL) {
+
+      if (cached && now - cached.timestamp < this.CACHE_TTL) {
         this.logger.log('Returning cached dropdown results');
         return cached.data;
       }
@@ -761,11 +906,11 @@ export class UserController {
       if (this.dropdownCache.size > 100) {
         const keysToDelete: string[] = [];
         this.dropdownCache.forEach((value, key) => {
-          if ((now - value.timestamp) >= this.CACHE_TTL) {
+          if (now - value.timestamp >= this.CACHE_TTL) {
             keysToDelete.push(key);
           }
         });
-        keysToDelete.forEach(key => this.dropdownCache.delete(key));
+        keysToDelete.forEach((key) => this.dropdownCache.delete(key));
       }
 
       return response;

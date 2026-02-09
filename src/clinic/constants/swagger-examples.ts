@@ -1,9 +1,9 @@
 /**
  * Clinic Module Swagger Examples
- * 
+ *
  * Reusable example objects for Swagger documentation in the Clinic module.
  * These examples demonstrate clinic-specific response formats and data structures.
- * 
+ *
  * @module clinic/constants/swagger-examples
  */
 
@@ -53,8 +53,7 @@ export const CLINIC_SUCCESS_EXAMPLES = {
       personInCharge: {
         _id: '507f1f77bcf86cd799439014',
         firstName: 'Ahmed',
-        lastName: 'Al-Saudi'
-,
+        lastName: 'Al-Saudi',
         email: 'ahmed.alsaudi@example.com',
         role: 'owner',
       },

@@ -413,4 +413,3 @@ export const SWAGGER_EXAMPLES = {
     error: 'Invalid appointment ID format',
   },
 };
-

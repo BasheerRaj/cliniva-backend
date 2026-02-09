@@ -488,7 +488,8 @@ export class DepartmentController {
         summary: 'Update Department Description',
         description: 'Update only the department description',
         value: {
-          description: 'Heart, cardiovascular system, and vascular surgery department',
+          description:
+            'Heart, cardiovascular system, and vascular surgery department',
         },
       },
       updateBoth: {
@@ -496,14 +497,16 @@ export class DepartmentController {
         description: 'Update both name and description together',
         value: {
           name: 'Cardiology & Vascular Surgery',
-          description: 'Comprehensive heart, cardiovascular, and vascular surgery department',
+          description:
+            'Comprehensive heart, cardiovascular, and vascular surgery department',
         },
       },
       expandDescription: {
         summary: 'Expand Description',
         description: 'Add more details to existing description',
         value: {
-          description: 'Heart and cardiovascular system department specializing in cardiac care, interventional cardiology, and heart failure management',
+          description:
+            'Heart and cardiovascular system department specializing in cardiac care, interventional cardiology, and heart failure management',
         },
       },
     },
@@ -517,7 +520,8 @@ export class DepartmentController {
         data: {
           _id: '507f1f77bcf86cd799439011',
           name: 'Cardiology & Vascular',
-          description: 'Heart, cardiovascular system, and vascular surgery department',
+          description:
+            'Heart, cardiovascular system, and vascular surgery department',
           createdAt: '2026-02-07T10:00:00.000Z',
           updatedAt: '2026-02-07T12:30:00.000Z',
         },
@@ -530,7 +534,8 @@ export class DepartmentController {
   })
   @ApiResponse({
     status: HttpStatus.BAD_REQUEST,
-    description: 'Validation error, invalid ID format, or department name already exists',
+    description:
+      'Validation error, invalid ID format, or department name already exists',
     schema: {
       oneOf: [
         {

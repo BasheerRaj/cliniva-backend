@@ -143,7 +143,8 @@ Initialize the onboarding process for a new user based on their subscription pla
     examples: {
       companyPlan: {
         summary: 'Company Plan',
-        description: 'Start onboarding for company plan (organization → complex → clinic)',
+        description:
+          'Start onboarding for company plan (organization → complex → clinic)',
         value: ONBOARDING_SWAGGER_EXAMPLES.START_REQUEST,
       },
       complexPlan: {
@@ -1717,7 +1718,8 @@ Save working hours schedule for the medical complex during onboarding.
   })
   @ApiBody({
     type: [ComplexWorkingHoursDto],
-    description: 'Array of working hours for each day of the week (7 days required)',
+    description:
+      'Array of working hours for each day of the week (7 days required)',
     examples: {
       fullWeek: {
         summary: 'Full Week Schedule',
@@ -1946,7 +1948,11 @@ Save working hours schedule for the medical complex during onboarding.
           },
           details: {
             step: 'complex-schedule',
-            requiredSteps: ['complex-overview', 'complex-contact', 'complex-legal'],
+            requiredSteps: [
+              'complex-overview',
+              'complex-contact',
+              'complex-legal',
+            ],
           },
           timestamp: '2026-02-07T10:30:00.000Z',
         },
@@ -2099,7 +2105,8 @@ Save basic clinic information for onboarding process.
     examples: {
       complete: {
         summary: 'Complete Clinic Info',
-        description: 'Full clinic details with all optional fields and services',
+        description:
+          'Full clinic details with all optional fields and services',
         value: ONBOARDING_SWAGGER_EXAMPLES.CLINIC_OVERVIEW_REQUEST,
       },
       minimal: {
@@ -2214,7 +2221,8 @@ Save basic clinic information for onboarding process.
   })
   @ApiResponse({
     status: HttpStatus.NOT_FOUND,
-    description: 'Parent entity not found (complex/department required for company/complex plans)',
+    description:
+      'Parent entity not found (complex/department required for company/complex plans)',
     schema: {
       example: {
         success: false,
@@ -2460,7 +2468,8 @@ Save working hours schedule for the clinic during onboarding. This is the final 
   })
   @ApiBody({
     type: [ClinicWorkingHoursDto],
-    description: 'Array of working hours for each day of the week (7 days required) or inheritance flag',
+    description:
+      'Array of working hours for each day of the week (7 days required) or inheritance flag',
     examples: {
       customHours: {
         summary: 'Custom Working Hours',

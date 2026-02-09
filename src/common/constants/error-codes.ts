@@ -1,9 +1,9 @@
 /**
  * Common Error Codes Registry
- * 
+ *
  * Centralized registry of all standard error codes with bilingual messages.
  * Used across all modules for consistent error handling and Swagger documentation.
- * 
+ *
  * @module common/constants/error-codes
  */
 
@@ -20,7 +20,7 @@ export enum ErrorCode {
   TOKEN_INVALID = 'TOKEN_INVALID',
   TOKEN_BLACKLISTED = 'TOKEN_BLACKLISTED',
   INSUFFICIENT_PERMISSIONS = 'INSUFFICIENT_PERMISSIONS',
-  
+
   // Validation Errors (2xxx)
   VALIDATION_ERROR = 'VALIDATION_ERROR',
   REQUIRED_FIELD = 'REQUIRED_FIELD',
@@ -29,13 +29,13 @@ export enum ErrorCode {
   INVALID_PHONE = 'INVALID_PHONE',
   INVALID_DATE = 'INVALID_DATE',
   INVALID_ENUM_VALUE = 'INVALID_ENUM_VALUE',
-  
+
   // Resource Errors (3xxx)
   NOT_FOUND = 'NOT_FOUND',
   ALREADY_EXISTS = 'ALREADY_EXISTS',
   DUPLICATE_ENTRY = 'DUPLICATE_ENTRY',
   RESOURCE_CONFLICT = 'RESOURCE_CONFLICT',
-  
+
   // Business Logic Errors (4xxx)
   OPERATION_NOT_ALLOWED = 'OPERATION_NOT_ALLOWED',
   BUSINESS_RULE_VIOLATION = 'BUSINESS_RULE_VIOLATION',
@@ -43,14 +43,14 @@ export enum ErrorCode {
   QUOTA_EXCEEDED = 'QUOTA_EXCEEDED',
   SUBSCRIPTION_REQUIRED = 'SUBSCRIPTION_REQUIRED',
   SUBSCRIPTION_EXPIRED = 'SUBSCRIPTION_EXPIRED',
-  
+
   // System Errors (5xxx)
   INTERNAL_ERROR = 'INTERNAL_ERROR',
   DATABASE_ERROR = 'DATABASE_ERROR',
   EXTERNAL_SERVICE_ERROR = 'EXTERNAL_SERVICE_ERROR',
   SERVICE_UNAVAILABLE = 'SERVICE_UNAVAILABLE',
   TIMEOUT_ERROR = 'TIMEOUT_ERROR',
-  
+
   // Rate Limiting (6xxx)
   RATE_LIMIT_EXCEEDED = 'RATE_LIMIT_EXCEEDED',
   TOO_MANY_REQUESTS = 'TOO_MANY_REQUESTS',
@@ -85,7 +85,7 @@ export const STANDARD_ERROR_MESSAGES: Record<ErrorCode, BilingualMessage> = {
     ar: 'ليس لديك الصلاحيات الكافية',
     en: 'Insufficient permissions',
   },
-  
+
   // Validation Errors
   [ErrorCode.VALIDATION_ERROR]: {
     ar: 'خطأ في التحقق من البيانات',
@@ -115,7 +115,7 @@ export const STANDARD_ERROR_MESSAGES: Record<ErrorCode, BilingualMessage> = {
     ar: 'قيمة غير صالحة',
     en: 'Invalid value',
   },
-  
+
   // Resource Errors
   [ErrorCode.NOT_FOUND]: {
     ar: 'العنصر غير موجود',
@@ -133,7 +133,7 @@ export const STANDARD_ERROR_MESSAGES: Record<ErrorCode, BilingualMessage> = {
     ar: 'تعارض في الموارد',
     en: 'Resource conflict',
   },
-  
+
   // Business Logic Errors
   [ErrorCode.OPERATION_NOT_ALLOWED]: {
     ar: 'العملية غير مسموح بها',
@@ -159,7 +159,7 @@ export const STANDARD_ERROR_MESSAGES: Record<ErrorCode, BilingualMessage> = {
     ar: 'انتهت صلاحية الاشتراك',
     en: 'Subscription expired',
   },
-  
+
   // System Errors
   [ErrorCode.INTERNAL_ERROR]: {
     ar: 'حدث خطأ داخلي في الخادم',
@@ -181,7 +181,7 @@ export const STANDARD_ERROR_MESSAGES: Record<ErrorCode, BilingualMessage> = {
     ar: 'انتهت مهلة الطلب',
     en: 'Request timeout',
   },
-  
+
   // Rate Limiting
   [ErrorCode.RATE_LIMIT_EXCEEDED]: {
     ar: 'تم تجاوز الحد المسموح من المحاولات',
@@ -199,7 +199,10 @@ export const STANDARD_ERROR_MESSAGES: Record<ErrorCode, BilingualMessage> = {
  * @returns Bilingual error message
  */
 export function getErrorMessage(code: ErrorCode): BilingualMessage {
-  return STANDARD_ERROR_MESSAGES[code] || STANDARD_ERROR_MESSAGES[ErrorCode.INTERNAL_ERROR];
+  return (
+    STANDARD_ERROR_MESSAGES[code] ||
+    STANDARD_ERROR_MESSAGES[ErrorCode.INTERNAL_ERROR]
+  );
 }
 
 /**

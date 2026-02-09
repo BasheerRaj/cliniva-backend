@@ -12,7 +12,8 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateOrganizationDto {
   @ApiProperty({
-    description: 'Subscription ID for the organization (must be a company plan)',
+    description:
+      'Subscription ID for the organization (must be a company plan)',
     example: '507f1f77bcf86cd799439011',
     type: String,
   })
@@ -107,7 +108,8 @@ export class CreateOrganizationDto {
 
   @ApiPropertyOptional({
     description: 'Organization mission statement',
-    example: 'To provide exceptional healthcare services with compassion and excellence',
+    example:
+      'To provide exceptional healthcare services with compassion and excellence',
     type: String,
   })
   @IsString()
@@ -248,7 +250,8 @@ export class UpdateOrganizationDto {
 
   @ApiPropertyOptional({
     description: 'Organization mission statement',
-    example: 'To provide world-class healthcare services with innovation and compassion',
+    example:
+      'To provide world-class healthcare services with innovation and compassion',
     type: String,
   })
   @IsString()

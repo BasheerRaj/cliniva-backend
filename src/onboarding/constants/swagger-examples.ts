@@ -72,7 +72,7 @@ export const ONBOARDING_SWAGGER_EXAMPLES = {
   },
 
   // ========== ORGANIZATION STEP ==========
-  
+
   // Organization Overview (Step 1 of 3)
   ORGANIZATION_OVERVIEW_REQUEST: {
     name: 'HealthCorp Medical Group',
@@ -258,7 +258,7 @@ export const ONBOARDING_SWAGGER_EXAMPLES = {
   },
 
   // ========== COMPLEX STEP ==========
-  
+
   // Complex Overview (Step 1 of 4 for Complex Plan, Step 4 of 12 for Company Plan)
   COMPLEX_OVERVIEW_REQUEST: {
     name: 'HealthCorp Riyadh Medical Complex',
@@ -338,7 +338,7 @@ export const ONBOARDING_SWAGGER_EXAMPLES = {
   },
 
   // ========== CLINIC STEP ==========
-  
+
   // Clinic Overview (Step 1 of 5 for Clinic Plan, Step 5 of 9 for Complex Plan, Step 7 of 12 for Company Plan)
   CLINIC_OVERVIEW_REQUEST: {
     name: 'Advanced Heart Center',
@@ -352,7 +352,8 @@ export const ONBOARDING_SWAGGER_EXAMPLES = {
     yearEstablished: 2020,
     mission: 'Providing exceptional cardiac care with compassion',
     vision: 'To be the leading cardiac care center in the region',
-    overview: 'State-of-the-art cardiac care facility with advanced diagnostic equipment',
+    overview:
+      'State-of-the-art cardiac care facility with advanced diagnostic equipment',
     goals: 'Serve 5,000 cardiac patients annually by 2027',
     ceoName: 'Dr. Sarah Al-Zahrani',
     services: [
@@ -400,7 +401,8 @@ export const ONBOARDING_SWAGGER_EXAMPLES = {
       yearEstablished: 2020,
       mission: 'Providing exceptional cardiac care with compassion',
       vision: 'To be the leading cardiac care center in the region',
-      overview: 'State-of-the-art cardiac care facility with advanced diagnostic equipment',
+      overview:
+        'State-of-the-art cardiac care facility with advanced diagnostic equipment',
       goals: 'Serve 5,000 cardiac patients annually by 2027',
       ceoName: 'Dr. Sarah Al-Zahrani',
       services: [
@@ -534,7 +536,7 @@ export const ONBOARDING_SWAGGER_EXAMPLES = {
   },
 
   // ========== WORKING HOURS / SCHEDULE ENDPOINTS ==========
-  
+
   // Complex Schedule (Working Hours)
   COMPLEX_SCHEDULE_REQUEST: {
     workingHours: [

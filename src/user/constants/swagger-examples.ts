@@ -86,6 +86,41 @@ export const USER_DETAIL_RESPONSE_EXAMPLE = {
   },
 };
 
+export const GET_USER_BY_ID_RESPONSE_EXAMPLE = {
+  success: true,
+  data: {
+    id: '507f1f77bcf86cd799439011',
+    email: 'john.doe@example.com',
+    firstName: 'John',
+    lastName: 'Doe',
+    role: 'owner',
+    phone: '+966501234567',
+    nationality: 'SA',
+    gender: 'male',
+    isActive: true,
+    emailVerified: true,
+    preferredLanguage: 'en',
+    subscription: {
+      id: '507f1f77bcf86cd799439013',
+      planType: 'company',
+    },
+    organization: {
+      id: '507f1f77bcf86cd799439014',
+      name: 'Healthcare Corp',
+      nameAr: 'شركة الرعاية الصحية',
+    },
+    complex: null,
+    clinic: null,
+    lastLogin: '2026-02-07T09:30:00.000Z',
+    createdAt: '2026-01-15T10:00:00.000Z',
+    updatedAt: '2026-02-07T10:00:00.000Z',
+  },
+  message: {
+    ar: 'تم جلب بيانات المستخدم بنجاح',
+    en: 'User retrieved successfully',
+  },
+};
+
 // ============================================================================
 // CREATE USER EXAMPLES
 // ============================================================================

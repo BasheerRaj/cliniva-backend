@@ -919,7 +919,7 @@ export class AppointmentController {
   @ApiOperation({
     summary: 'Get appointment statistics',
     description:
-      'Retrieves comprehensive appointment statistics including total counts by status, today\'s appointments, upcoming appointments, average duration, top services, top doctors, and urgency level distribution. Useful for dashboard and reporting.',
+      "Retrieves comprehensive appointment statistics including total counts by status, today's appointments, upcoming appointments, average duration, top services, top doctors, and urgency level distribution. Useful for dashboard and reporting.",
   })
   @ApiResponse({
     status: 200,
@@ -1048,7 +1048,8 @@ export class AppointmentController {
         },
         excludeAppointmentId: {
           type: 'string',
-          description: 'Exclude this appointment from conflict check (for rescheduling)',
+          description:
+            'Exclude this appointment from conflict check (for rescheduling)',
           example: '507f1f77bcf86cd799439011',
         },
       },

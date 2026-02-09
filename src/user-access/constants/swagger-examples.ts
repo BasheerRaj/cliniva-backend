@@ -1,9 +1,9 @@
 /**
  * User Access Module - Swagger Examples
- * 
+ *
  * Example objects for Swagger/OpenAPI documentation.
  * Demonstrates request/response formats for user access and RBAC endpoints.
- * 
+ *
  * @module user-access/constants/swagger-examples
  */
 
@@ -162,7 +162,6 @@ export const USER_ACCESS_SUCCESS_EXAMPLES = {
   },
 };
 
-
 /**
  * Permission Management Examples
  */
@@ -218,10 +217,7 @@ export const PERMISSION_EXAMPLES = {
     success: true,
     data: {
       userId: '507f1f77bcf86cd799439012',
-      permissions: [
-        PermissionsEnum.USER_READ,
-        PermissionsEnum.USER_CREATE,
-      ],
+      permissions: [PermissionsEnum.USER_READ, PermissionsEnum.USER_CREATE],
       scopeType: 'clinic',
       scopeId: '507f1f77bcf86cd799439013',
     },

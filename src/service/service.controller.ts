@@ -48,7 +48,8 @@ export class ServiceController {
   })
   @ApiResponse({
     status: 400,
-    description: 'Validation error - Invalid input data or duplicate service name',
+    description:
+      'Validation error - Invalid input data or duplicate service name',
     schema: {
       example: SERVICE_SWAGGER_EXAMPLES.SERVICE_NAME_EXISTS,
     },
@@ -129,7 +130,8 @@ export class ServiceController {
   })
   @ApiResponse({
     status: 200,
-    description: 'Validation completed - Returns validation result with conflicts and suggestions',
+    description:
+      'Validation completed - Returns validation result with conflicts and suggestions',
     schema: {
       example: SERVICE_SWAGGER_EXAMPLES.VALIDATE_NAMES_SUCCESS,
     },

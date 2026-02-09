@@ -53,7 +53,8 @@ export class UserAccessController {
    */
   @ApiOperation({
     summary: 'Create user access record',
-    description: 'Creates a new user access record with role and permissions for a specific scope (organization, complex, department, or clinic). Requires authentication and appropriate permissions.',
+    description:
+      'Creates a new user access record with role and permissions for a specific scope (organization, complex, department, or clinic). Requires authentication and appropriate permissions.',
   })
   @ApiResponse({
     status: 201,
@@ -125,7 +126,8 @@ export class UserAccessController {
    */
   @ApiOperation({
     summary: 'List user access records',
-    description: 'Retrieves a paginated list of user access records with optional filtering by user, scope, role, permissions, and status. Supports search across user names and emails.',
+    description:
+      'Retrieves a paginated list of user access records with optional filtering by user, scope, role, permissions, and status. Supports search across user names and emails.',
   })
   @ApiResponse({
     status: 200,
@@ -148,17 +150,72 @@ export class UserAccessController {
       example: ERROR_EXAMPLES.UNAUTHORIZED,
     },
   })
-  @ApiQuery({ name: 'search', required: false, type: String, description: 'Search across user names and emails' })
-  @ApiQuery({ name: 'userId', required: false, type: String, description: 'Filter by user ID' })
-  @ApiQuery({ name: 'scopeType', required: false, enum: ['organization', 'complex', 'department', 'clinic'], description: 'Filter by scope type' })
-  @ApiQuery({ name: 'scopeId', required: false, type: String, description: 'Filter by scope ID' })
-  @ApiQuery({ name: 'role', required: false, type: String, description: 'Filter by role' })
-  @ApiQuery({ name: 'isActive', required: false, type: Boolean, description: 'Filter by active status' })
-  @ApiQuery({ name: 'isExpired', required: false, type: Boolean, description: 'Filter by expiration status' })
-  @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number (default: 1)' })
-  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Items per page (default: 10, max: 100)' })
-  @ApiQuery({ name: 'sortBy', required: false, type: String, description: 'Sort field (default: createdAt)' })
-  @ApiQuery({ name: 'sortOrder', required: false, enum: ['asc', 'desc'], description: 'Sort order (default: desc)' })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    type: String,
+    description: 'Search across user names and emails',
+  })
+  @ApiQuery({
+    name: 'userId',
+    required: false,
+    type: String,
+    description: 'Filter by user ID',
+  })
+  @ApiQuery({
+    name: 'scopeType',
+    required: false,
+    enum: ['organization', 'complex', 'department', 'clinic'],
+    description: 'Filter by scope type',
+  })
+  @ApiQuery({
+    name: 'scopeId',
+    required: false,
+    type: String,
+    description: 'Filter by scope ID',
+  })
+  @ApiQuery({
+    name: 'role',
+    required: false,
+    type: String,
+    description: 'Filter by role',
+  })
+  @ApiQuery({
+    name: 'isActive',
+    required: false,
+    type: Boolean,
+    description: 'Filter by active status',
+  })
+  @ApiQuery({
+    name: 'isExpired',
+    required: false,
+    type: Boolean,
+    description: 'Filter by expiration status',
+  })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    type: Number,
+    description: 'Page number (default: 1)',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    description: 'Items per page (default: 10, max: 100)',
+  })
+  @ApiQuery({
+    name: 'sortBy',
+    required: false,
+    type: String,
+    description: 'Sort field (default: createdAt)',
+  })
+  @ApiQuery({
+    name: 'sortOrder',
+    required: false,
+    enum: ['asc', 'desc'],
+    description: 'Sort order (default: desc)',
+  })
   @Get()
   async getUserAccess(@Query() query: UserAccessSearchDto) {
     try {
@@ -186,7 +243,8 @@ export class UserAccessController {
    */
   @ApiOperation({
     summary: 'Get user access by ID',
-    description: 'Retrieves a single user access record by its unique identifier. Includes populated user and granter information.',
+    description:
+      'Retrieves a single user access record by its unique identifier. Includes populated user and granter information.',
   })
   @ApiResponse({
     status: 200,
@@ -238,7 +296,8 @@ export class UserAccessController {
    */
   @ApiOperation({
     summary: 'Update user access',
-    description: 'Updates an existing user access record. Can modify role, custom permissions, expiration date, notes, and active status.',
+    description:
+      'Updates an existing user access record. Can modify role, custom permissions, expiration date, notes, and active status.',
   })
   @ApiResponse({
     status: 200,
@@ -306,7 +365,8 @@ export class UserAccessController {
    */
   @ApiOperation({
     summary: 'Delete user access',
-    description: 'Permanently deletes a user access record. This revokes all permissions for the user in the specified scope.',
+    description:
+      'Permanently deletes a user access record. This revokes all permissions for the user in the specified scope.',
   })
   @ApiResponse({
     status: 200,
@@ -365,7 +425,8 @@ export class UserAccessController {
    */
   @ApiOperation({
     summary: 'Get user access for specific user',
-    description: 'Retrieves all access records for a specific user across all scopes. Returns a list of all organizations, complexes, departments, and clinics the user has access to.',
+    description:
+      'Retrieves all access records for a specific user across all scopes. Returns a list of all organizations, complexes, departments, and clinics the user has access to.',
   })
   @ApiResponse({
     status: 200,
@@ -401,7 +462,11 @@ export class UserAccessController {
       example: ERROR_EXAMPLES.UNAUTHORIZED,
     },
   })
-  @ApiParam({ name: 'userId', description: 'User ID to get access records for', type: String })
+  @ApiParam({
+    name: 'userId',
+    description: 'User ID to get access records for',
+    type: String,
+  })
   @Get('user/:userId')
   async getUserAccessForUser(@Param('userId') userId: string) {
     try {
@@ -424,7 +489,8 @@ export class UserAccessController {
    */
   @ApiOperation({
     summary: 'Get user access by scope',
-    description: 'Retrieves all user access records for a specific scope (organization, complex, department, or clinic). Useful for viewing all users who have access to a particular entity.',
+    description:
+      'Retrieves all user access records for a specific scope (organization, complex, department, or clinic). Useful for viewing all users who have access to a particular entity.',
   })
   @ApiResponse({
     status: 200,
@@ -467,7 +533,11 @@ export class UserAccessController {
       example: ERROR_EXAMPLES.UNAUTHORIZED,
     },
   })
-  @ApiParam({ name: 'scopeType', enum: ['organization', 'complex', 'department', 'clinic'], description: 'Type of scope entity' })
+  @ApiParam({
+    name: 'scopeType',
+    enum: ['organization', 'complex', 'department', 'clinic'],
+    description: 'Type of scope entity',
+  })
   @ApiParam({ name: 'scopeId', description: 'Scope entity ID', type: String })
   @Get('scope/:scopeType/:scopeId')
   async getUserAccessByScope(
@@ -501,7 +571,8 @@ export class UserAccessController {
    */
   @ApiOperation({
     summary: 'Check user permission',
-    description: 'Checks if a user has a specific permission in a given scope. Returns true if the user has the permission either through their role or custom permissions.',
+    description:
+      'Checks if a user has a specific permission in a given scope. Returns true if the user has the permission either through their role or custom permissions.',
   })
   @ApiResponse({
     status: 200,
@@ -555,7 +626,8 @@ export class UserAccessController {
    */
   @ApiOperation({
     summary: 'Check multiple permissions',
-    description: 'Checks if a user has multiple permissions in a given scope. Can require all permissions (AND logic) or any permission (OR logic) based on requirementType.',
+    description:
+      'Checks if a user has multiple permissions in a given scope. Can require all permissions (AND logic) or any permission (OR logic) based on requirementType.',
   })
   @ApiResponse({
     status: 200,
@@ -611,7 +683,8 @@ export class UserAccessController {
    */
   @ApiOperation({
     summary: 'Assign permissions to user',
-    description: 'Assigns additional custom permissions to a user in a specific scope. These permissions are added to the user\'s existing role-based permissions.',
+    description:
+      "Assigns additional custom permissions to a user in a specific scope. These permissions are added to the user's existing role-based permissions.",
   })
   @ApiResponse({
     status: 200,
@@ -681,7 +754,8 @@ export class UserAccessController {
    */
   @ApiOperation({
     summary: 'Revoke permissions from user',
-    description: 'Revokes specific custom permissions from a user in a given scope. Requires a reason for audit purposes. Role-based permissions cannot be revoked this way.',
+    description:
+      'Revokes specific custom permissions from a user in a given scope. Requires a reason for audit purposes. Role-based permissions cannot be revoked this way.',
   })
   @ApiResponse({
     status: 200,
@@ -752,7 +826,8 @@ export class UserAccessController {
    */
   @ApiOperation({
     summary: 'Validate user entity access',
-    description: 'Validates if a user can access a specific entity (organization, complex, department, or clinic). Checks hierarchical access permissions.',
+    description:
+      'Validates if a user can access a specific entity (organization, complex, department, or clinic). Checks hierarchical access permissions.',
   })
   @ApiResponse({
     status: 200,
@@ -775,8 +850,16 @@ export class UserAccessController {
       example: ERROR_EXAMPLES.UNAUTHORIZED,
     },
   })
-  @ApiParam({ name: 'userId', description: 'User ID to validate', type: String })
-  @ApiParam({ name: 'entityType', enum: ['organization', 'complex', 'department', 'clinic'], description: 'Type of entity' })
+  @ApiParam({
+    name: 'userId',
+    description: 'User ID to validate',
+    type: String,
+  })
+  @ApiParam({
+    name: 'entityType',
+    enum: ['organization', 'complex', 'department', 'clinic'],
+    description: 'Type of entity',
+  })
   @ApiParam({ name: 'entityId', description: 'Entity ID', type: String })
   @Get('validate/:userId/:entityType/:entityId')
   async validateEntityAccess(
@@ -813,7 +896,8 @@ export class UserAccessController {
    */
   @ApiOperation({
     summary: 'Bulk user access operations',
-    description: 'Performs bulk operations on multiple users: grant access, revoke access, update roles, activate, or deactivate. Returns success/failure count for each operation.',
+    description:
+      'Performs bulk operations on multiple users: grant access, revoke access, update roles, activate, or deactivate. Returns success/failure count for each operation.',
   })
   @ApiResponse({
     status: 200,
@@ -877,7 +961,8 @@ export class UserAccessController {
    */
   @ApiOperation({
     summary: 'Get user access statistics',
-    description: 'Retrieves comprehensive statistics about user access including total users, active users, role distribution, scope distribution, and recent changes.',
+    description:
+      'Retrieves comprehensive statistics about user access including total users, active users, role distribution, scope distribution, and recent changes.',
   })
   @ApiResponse({
     status: 200,
@@ -914,7 +999,8 @@ export class UserAccessController {
    */
   @ApiOperation({
     summary: 'Get security statistics',
-    description: 'Retrieves security-related statistics including login attempts, failed logins, suspicious activities, risk distribution, and device/browser statistics.',
+    description:
+      'Retrieves security-related statistics including login attempts, failed logins, suspicious activities, risk distribution, and device/browser statistics.',
   })
   @ApiResponse({
     status: 200,
@@ -953,7 +1039,8 @@ export class UserAccessController {
    */
   @ApiOperation({
     summary: 'Create access log entry',
-    description: 'Creates a new access log entry for tracking user activities, login attempts, permission checks, and security events.',
+    description:
+      'Creates a new access log entry for tracking user activities, login attempts, permission checks, and security events.',
   })
   @ApiResponse({
     status: 201,
@@ -1001,7 +1088,8 @@ export class UserAccessController {
    */
   @ApiOperation({
     summary: 'Get access logs with filtering',
-    description: 'Retrieves access logs with comprehensive filtering options including user, event type, IP address, status, risk level, and date range. Supports pagination.',
+    description:
+      'Retrieves access logs with comprehensive filtering options including user, event type, IP address, status, risk level, and date range. Supports pagination.',
   })
   @ApiResponse({
     status: 200,
@@ -1024,15 +1112,60 @@ export class UserAccessController {
       example: ERROR_EXAMPLES.UNAUTHORIZED,
     },
   })
-  @ApiQuery({ name: 'userId', required: false, type: String, description: 'Filter by user ID' })
-  @ApiQuery({ name: 'eventTypes', required: false, type: [String], description: 'Filter by event types' })
-  @ApiQuery({ name: 'ipAddress', required: false, type: String, description: 'Filter by IP address' })
-  @ApiQuery({ name: 'status', required: false, enum: ['success', 'failure', 'blocked', 'warning'], description: 'Filter by status' })
-  @ApiQuery({ name: 'riskLevel', required: false, enum: ['low', 'medium', 'high', 'critical'], description: 'Filter by risk level' })
-  @ApiQuery({ name: 'dateFrom', required: false, type: String, description: 'Start date (ISO 8601)' })
-  @ApiQuery({ name: 'dateTo', required: false, type: String, description: 'End date (ISO 8601)' })
-  @ApiQuery({ name: 'page', required: false, type: String, description: 'Page number' })
-  @ApiQuery({ name: 'limit', required: false, type: String, description: 'Items per page' })
+  @ApiQuery({
+    name: 'userId',
+    required: false,
+    type: String,
+    description: 'Filter by user ID',
+  })
+  @ApiQuery({
+    name: 'eventTypes',
+    required: false,
+    type: [String],
+    description: 'Filter by event types',
+  })
+  @ApiQuery({
+    name: 'ipAddress',
+    required: false,
+    type: String,
+    description: 'Filter by IP address',
+  })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    enum: ['success', 'failure', 'blocked', 'warning'],
+    description: 'Filter by status',
+  })
+  @ApiQuery({
+    name: 'riskLevel',
+    required: false,
+    enum: ['low', 'medium', 'high', 'critical'],
+    description: 'Filter by risk level',
+  })
+  @ApiQuery({
+    name: 'dateFrom',
+    required: false,
+    type: String,
+    description: 'Start date (ISO 8601)',
+  })
+  @ApiQuery({
+    name: 'dateTo',
+    required: false,
+    type: String,
+    description: 'End date (ISO 8601)',
+  })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    type: String,
+    description: 'Page number',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: String,
+    description: 'Items per page',
+  })
   @Get('logs')
   async getAccessLogs(@Query() query: AccessLogSearchDto) {
     try {
@@ -1060,7 +1193,8 @@ export class UserAccessController {
    */
   @ApiOperation({
     summary: 'Get access logs for specific user',
-    description: 'Retrieves all access logs for a specific user with optional filtering and pagination.',
+    description:
+      'Retrieves all access logs for a specific user with optional filtering and pagination.',
   })
   @ApiResponse({
     status: 200,
@@ -1083,7 +1217,11 @@ export class UserAccessController {
       example: ERROR_EXAMPLES.UNAUTHORIZED,
     },
   })
-  @ApiParam({ name: 'userId', description: 'User ID to get logs for', type: String })
+  @ApiParam({
+    name: 'userId',
+    description: 'User ID to get logs for',
+    type: String,
+  })
   @Get('logs/user/:userId')
   async getUserAccessLogs(
     @Param('userId') userId: string,
@@ -1114,7 +1252,8 @@ export class UserAccessController {
    */
   @ApiOperation({
     summary: 'Get recent access logs',
-    description: 'Retrieves access logs from the last 24 hours. Useful for monitoring recent activity and security events.',
+    description:
+      'Retrieves access logs from the last 24 hours. Useful for monitoring recent activity and security events.',
   })
   @ApiResponse({
     status: 200,
@@ -1130,7 +1269,12 @@ export class UserAccessController {
       example: ERROR_EXAMPLES.UNAUTHORIZED,
     },
   })
-  @ApiQuery({ name: 'limit', required: false, type: String, description: 'Maximum number of logs to return (default: 50)' })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: String,
+    description: 'Maximum number of logs to return (default: 50)',
+  })
   @Get('logs/recent')
   async getRecentAccessLogs(@Query('limit') limit?: string) {
     try {
@@ -1167,7 +1311,8 @@ export class UserAccessController {
    */
   @ApiOperation({
     summary: 'Get failed login attempts',
-    description: 'Retrieves all failed login attempts. Critical for security monitoring and detecting potential brute force attacks.',
+    description:
+      'Retrieves all failed login attempts. Critical for security monitoring and detecting potential brute force attacks.',
   })
   @ApiResponse({
     status: 200,
@@ -1214,7 +1359,8 @@ export class UserAccessController {
    */
   @ApiOperation({
     summary: 'Get suspicious activities',
-    description: 'Retrieves all access logs flagged as suspicious activities. Requires immediate security review.',
+    description:
+      'Retrieves all access logs flagged as suspicious activities. Requires immediate security review.',
   })
   @ApiResponse({
     status: 200,
@@ -1261,7 +1407,8 @@ export class UserAccessController {
    */
   @ApiOperation({
     summary: 'Get high-risk access logs',
-    description: 'Retrieves all access logs with high risk level. These events require security team attention.',
+    description:
+      'Retrieves all access logs with high risk level. These events require security team attention.',
   })
   @ApiResponse({
     status: 200,
@@ -1308,7 +1455,8 @@ export class UserAccessController {
    */
   @ApiOperation({
     summary: 'Get flagged access logs',
-    description: 'Retrieves all access logs that have been flagged for manual review by security team.',
+    description:
+      'Retrieves all access logs that have been flagged for manual review by security team.',
   })
   @ApiResponse({
     status: 200,
@@ -1357,7 +1505,8 @@ export class UserAccessController {
    */
   @ApiOperation({
     summary: 'Get access patterns analytics',
-    description: 'Analyzes user access patterns over a specified time period. Helps identify trends, anomalies, and usage patterns.',
+    description:
+      'Analyzes user access patterns over a specified time period. Helps identify trends, anomalies, and usage patterns.',
   })
   @ApiResponse({
     status: 200,
@@ -1384,7 +1533,12 @@ export class UserAccessController {
       example: ERROR_EXAMPLES.UNAUTHORIZED,
     },
   })
-  @ApiQuery({ name: 'days', required: false, type: String, description: 'Number of days to analyze (default: 30)' })
+  @ApiQuery({
+    name: 'days',
+    required: false,
+    type: String,
+    description: 'Number of days to analyze (default: 30)',
+  })
   @Get('analytics/patterns')
   async getAccessPatterns(@Query('days') days?: string) {
     try {
@@ -1416,7 +1570,8 @@ export class UserAccessController {
    */
   @ApiOperation({
     summary: 'Get user activity timeline',
-    description: 'Retrieves a chronological timeline of all activities for a specific user over a specified period. Useful for user behavior analysis and audit trails.',
+    description:
+      'Retrieves a chronological timeline of all activities for a specific user over a specified period. Useful for user behavior analysis and audit trails.',
   })
   @ApiResponse({
     status: 200,
@@ -1459,8 +1614,17 @@ export class UserAccessController {
       example: ERROR_EXAMPLES.UNAUTHORIZED,
     },
   })
-  @ApiParam({ name: 'userId', description: 'User ID to get timeline for', type: String })
-  @ApiQuery({ name: 'days', required: false, type: String, description: 'Number of days to include (default: 7)' })
+  @ApiParam({
+    name: 'userId',
+    description: 'User ID to get timeline for',
+    type: String,
+  })
+  @ApiQuery({
+    name: 'days',
+    required: false,
+    type: String,
+    description: 'Number of days to include (default: 7)',
+  })
   @Get('timeline/:userId')
   async getUserActivityTimeline(
     @Param('userId') userId: string,
@@ -1505,7 +1669,8 @@ export class UserAccessController {
    */
   @ApiOperation({
     summary: 'Export access data',
-    description: 'Exports access data in various formats (JSON, CSV, Excel) for reporting and compliance purposes. Supports filtering similar to the logs endpoint.',
+    description:
+      'Exports access data in various formats (JSON, CSV, Excel) for reporting and compliance purposes. Supports filtering similar to the logs endpoint.',
   })
   @ApiResponse({
     status: 200,
@@ -1529,7 +1694,12 @@ export class UserAccessController {
       example: ERROR_EXAMPLES.UNAUTHORIZED,
     },
   })
-  @ApiQuery({ name: 'format', required: false, enum: ['json', 'csv', 'excel'], description: 'Export format (default: json)' })
+  @ApiQuery({
+    name: 'format',
+    required: false,
+    enum: ['json', 'csv', 'excel'],
+    description: 'Export format (default: json)',
+  })
   @Get('export')
   async exportAccessData(
     @Query('format') format?: string,

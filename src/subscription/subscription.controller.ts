@@ -31,7 +31,8 @@ export class SubscriptionController {
 
   @ApiOperation({
     summary: 'Create new subscription',
-    description: 'Creates a new subscription for a user with the specified plan. Validates plan existence, checks for active subscriptions, and updates user onboarding progress. Each user can only have one active subscription at a time.',
+    description:
+      'Creates a new subscription for a user with the specified plan. Validates plan existence, checks for active subscriptions, and updates user onboarding progress. Each user can only have one active subscription at a time.',
   })
   @ApiResponse({
     status: 201,
@@ -88,7 +89,8 @@ export class SubscriptionController {
 
   @ApiOperation({
     summary: 'Get user subscription',
-    description: 'Retrieves the subscription details for a specific user, including populated plan information. Returns null if no subscription exists for the user.',
+    description:
+      'Retrieves the subscription details for a specific user, including populated plan information. Returns null if no subscription exists for the user.',
   })
   @ApiResponse({
     status: 200,
@@ -139,7 +141,8 @@ export class SubscriptionController {
 
   @ApiOperation({
     summary: 'Update subscription status',
-    description: 'Updates the status of an existing subscription. When status is set to "cancelled", the expiration date is automatically set to the current time. Supports active, inactive, and cancelled statuses.',
+    description:
+      'Updates the status of an existing subscription. When status is set to "cancelled", the expiration date is automatically set to the current time. Supports active, inactive, and cancelled statuses.',
   })
   @ApiResponse({
     status: 200,
@@ -205,7 +208,8 @@ export class SubscriptionController {
 
   @ApiOperation({
     summary: 'Get all subscription plans',
-    description: 'Retrieves all available subscription plans with enriched information including features, limitations, and pricing. Plans are categorized into three types: Clinic (single location), Complex (multi-department facility), and Company (enterprise network). Each plan includes detailed feature lists, entity limits, and descriptions to help users choose the appropriate plan.',
+    description:
+      'Retrieves all available subscription plans with enriched information including features, limitations, and pricing. Plans are categorized into three types: Clinic (single location), Complex (multi-department facility), and Company (enterprise network). Each plan includes detailed feature lists, entity limits, and descriptions to help users choose the appropriate plan.',
   })
   @ApiResponse({
     status: 200,

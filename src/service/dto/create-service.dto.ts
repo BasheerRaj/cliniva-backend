@@ -24,7 +24,8 @@ export class CreateServiceDto {
   complexDepartmentId?: string;
 
   @ApiPropertyOptional({
-    description: 'Clinic ID that owns this service (for clinic-specific services)',
+    description:
+      'Clinic ID that owns this service (for clinic-specific services)',
     example: '507f1f77bcf86cd799439040',
     type: String,
   })

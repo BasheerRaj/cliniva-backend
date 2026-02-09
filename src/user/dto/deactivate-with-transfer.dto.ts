@@ -16,7 +16,8 @@ export class DeactivateWithTransferDto {
   transferAppointments: boolean;
 
   @ApiPropertyOptional({
-    description: 'Target doctor ID to transfer appointments to (required if transferAppointments is true)',
+    description:
+      'Target doctor ID to transfer appointments to (required if transferAppointments is true)',
     example: '507f1f77bcf86cd799439016',
     type: String,
   })

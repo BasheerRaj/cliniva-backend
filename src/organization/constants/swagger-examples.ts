@@ -20,7 +20,8 @@ export const CREATE_ORGANIZATION_REQUEST_EXAMPLE = {
   googleLocation: 'https://maps.google.com/?q=24.7136,46.6753',
   logoUrl: '/uploads/logos/healthcare-logo.png',
   yearEstablished: 2020,
-  mission: 'To provide exceptional healthcare services with compassion and excellence',
+  mission:
+    'To provide exceptional healthcare services with compassion and excellence',
   vision: 'To be the leading healthcare provider in the region',
   ceoName: 'Dr. Ahmed Al-Rashid',
   website: 'https://www.healthcaresolutions.com',
@@ -57,7 +58,8 @@ export const GET_ORGANIZATION_SUCCESS_EXAMPLE = {
     googleLocation: 'https://maps.google.com/?q=24.7136,46.6753',
     logoUrl: 'http://localhost:3000/uploads/logos/healthcare-logo.png',
     yearEstablished: 2020,
-    mission: 'To provide exceptional healthcare services with compassion and excellence',
+    mission:
+      'To provide exceptional healthcare services with compassion and excellence',
     vision: 'To be the leading healthcare provider in the region',
     ceoName: 'Dr. Ahmed Al-Rashid',
     website: 'https://www.healthcaresolutions.com',
@@ -77,7 +79,8 @@ export const UPDATE_ORGANIZATION_REQUEST_EXAMPLE = {
   phone: '+966501234568',
   email: 'contact@healthcaresolutions.com',
   address: '456 Medical Plaza, Riyadh, Saudi Arabia',
-  mission: 'To provide world-class healthcare services with innovation and compassion',
+  mission:
+    'To provide world-class healthcare services with innovation and compassion',
   vision: 'To be the premier healthcare provider globally',
   website: 'https://www.healthcaresolutions.international',
 };
@@ -98,7 +101,8 @@ export const UPDATE_ORGANIZATION_SUCCESS_EXAMPLE = {
     googleLocation: 'https://maps.google.com/?q=24.7136,46.6753',
     logoUrl: 'http://localhost:3000/uploads/logos/healthcare-logo.png',
     yearEstablished: 2020,
-    mission: 'To provide world-class healthcare services with innovation and compassion',
+    mission:
+      'To provide world-class healthcare services with innovation and compassion',
     vision: 'To be the premier healthcare provider globally',
     ceoName: 'Dr. Ahmed Al-Rashid',
     website: 'https://www.healthcaresolutions.international',
@@ -160,7 +164,8 @@ export const GET_BY_SUBSCRIPTION_SUCCESS_EXAMPLE = {
     googleLocation: 'https://maps.google.com/?q=24.7136,46.6753',
     logoUrl: 'http://localhost:3000/uploads/logos/healthcare-logo.png',
     yearEstablished: 2020,
-    mission: 'To provide exceptional healthcare services with compassion and excellence',
+    mission:
+      'To provide exceptional healthcare services with compassion and excellence',
     vision: 'To be the leading healthcare provider in the region',
     ceoName: 'Dr. Ahmed Al-Rashid',
     website: 'https://www.healthcaresolutions.com',

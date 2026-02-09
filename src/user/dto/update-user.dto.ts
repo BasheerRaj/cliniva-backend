@@ -15,7 +15,8 @@ import { UserRole } from '../../common/enums/user-role.enum';
  */
 export class UpdateUserDto {
   @ApiPropertyOptional({
-    description: 'User email address (changing this will invalidate all sessions)',
+    description:
+      'User email address (changing this will invalidate all sessions)',
     example: 'john.doe@example.com',
     type: String,
   })

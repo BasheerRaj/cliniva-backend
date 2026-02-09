@@ -462,7 +462,7 @@ export class CapacityDto {
 export class ClinicDto {
   @ApiProperty({
     description: 'Clinic name',
-    example: 'Al-Zahra Women\'s Clinic',
+    example: "Al-Zahra Women's Clinic",
     type: String,
   })
   @IsString()

@@ -71,21 +71,26 @@ async function bootstrap() {
     `,
     )
     .setVersion('1.0')
-    .setContact(
-      'Cliniva Support',
-      'https://cliniva.com',
-      'support@cliniva.com',
-    )
+    .setContact('Cliniva Support', 'https://cliniva.com', 'support@cliniva.com')
     .setLicense('Proprietary', 'https://cliniva.com/license')
     // M1 Tags - Security & User Management
-    .addTag('Authentication', 'User authentication, authorization, and session management')
+    .addTag(
+      'Authentication',
+      'User authentication, authorization, and session management',
+    )
     .addTag('Users', 'User account management and profile operations')
-    .addTag('User Access', 'Role-based access control and permissions management')
+    .addTag(
+      'User Access',
+      'Role-based access control and permissions management',
+    )
     .addTag('Employees', 'Employee profile and information management')
     .addTag('Working Hours', 'Working hours configuration and validation')
     // M2 Tags - Medical Facilities Management
     .addTag('Organizations', 'Organization and company management')
-    .addTag('Complexes', 'Medical complex management with full lifecycle operations')
+    .addTag(
+      'Complexes',
+      'Medical complex management with full lifecycle operations',
+    )
     .addTag('Departments', 'Department management within complexes')
     .addTag('Clinics', 'Clinic management and operations')
     .addTag('Onboarding', 'Step-by-step onboarding flow for new organizations')

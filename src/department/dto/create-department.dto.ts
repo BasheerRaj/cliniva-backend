@@ -14,7 +14,8 @@ export class CreateDepartmentDto {
   name: string;
 
   @ApiPropertyOptional({
-    description: 'Department description providing details about the medical specialty',
+    description:
+      'Department description providing details about the medical specialty',
     example: 'Heart and cardiovascular system department',
     type: String,
     maxLength: 500,
@@ -26,7 +27,8 @@ export class CreateDepartmentDto {
 
 export class UpdateDepartmentDto {
   @ApiPropertyOptional({
-    description: 'Department name (must be unique across the system if changed)',
+    description:
+      'Department name (must be unique across the system if changed)',
     example: 'Cardiology',
     type: String,
     minLength: 1,
@@ -37,7 +39,8 @@ export class UpdateDepartmentDto {
   name?: string;
 
   @ApiPropertyOptional({
-    description: 'Department description providing details about the medical specialty',
+    description:
+      'Department description providing details about the medical specialty',
     example: 'Heart and cardiovascular system department',
     type: String,
     maxLength: 500,

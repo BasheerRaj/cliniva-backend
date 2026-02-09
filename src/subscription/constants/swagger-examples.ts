@@ -1,9 +1,9 @@
 /**
  * Subscription Module Swagger Examples
- * 
+ *
  * Example objects for Swagger documentation in the subscription module.
  * Demonstrates subscription management, plan types, and feature restrictions.
- * 
+ *
  * @module subscription/constants/swagger-examples
  */
 
@@ -49,7 +49,11 @@ export const SUBSCRIPTION_SUCCESS_EXAMPLES = {
         maxClinics: 10,
         maxComplexes: 1,
         maxOrganizations: 0,
-        features: ['Department management', 'Multiple clinics', 'Advanced reporting'],
+        features: [
+          'Department management',
+          'Multiple clinics',
+          'Advanced reporting',
+        ],
         isActive: true,
       },
       status: 'active',
@@ -119,7 +123,8 @@ export const SUBSCRIPTION_SUCCESS_EXAMPLES = {
       maxOrganizations: 0,
       isActive: true,
       isPopular: false,
-      description: 'Simple and affordable solution for independent clinics and small practices',
+      description:
+        'Simple and affordable solution for independent clinics and small practices',
     },
     {
       _id: '507f1f77bcf86cd799439014',
@@ -139,7 +144,8 @@ export const SUBSCRIPTION_SUCCESS_EXAMPLES = {
       maxOrganizations: 0,
       isActive: true,
       isPopular: true,
-      description: 'Ideal for medical complexes with multiple departments and clinics under one roof',
+      description:
+        'Ideal for medical complexes with multiple departments and clinics under one roof',
     },
     {
       _id: '507f1f77bcf86cd799439015',
@@ -159,7 +165,8 @@ export const SUBSCRIPTION_SUCCESS_EXAMPLES = {
       maxOrganizations: 1,
       isActive: true,
       isPopular: false,
-      description: 'Perfect for large healthcare networks managing multiple complexes and locations',
+      description:
+        'Perfect for large healthcare networks managing multiple complexes and locations',
     },
   ],
 };
@@ -292,7 +299,8 @@ export const SUBSCRIPTION_ERROR_EXAMPLES = {
 export const PLAN_TYPE_DESCRIPTIONS = {
   clinic: {
     name: 'Single Clinic Plan',
-    description: 'Simple and affordable solution for independent clinics and small practices',
+    description:
+      'Simple and affordable solution for independent clinics and small practices',
     hierarchy: 'Clinic only',
     features: [
       'Minimal setup',
@@ -307,11 +315,13 @@ export const PLAN_TYPE_DESCRIPTIONS = {
       maxComplexes: 0,
       maxOrganizations: 0,
     },
-    idealFor: 'Independent clinics, small practices, single-location healthcare providers',
+    idealFor:
+      'Independent clinics, small practices, single-location healthcare providers',
   },
   complex: {
     name: 'Complex Plan',
-    description: 'Ideal for medical complexes with multiple departments and clinics under one roof',
+    description:
+      'Ideal for medical complexes with multiple departments and clinics under one roof',
     hierarchy: 'Complex → Departments → Clinics',
     features: [
       'Localized administration',
@@ -327,11 +337,13 @@ export const PLAN_TYPE_DESCRIPTIONS = {
       maxComplexes: 1,
       maxOrganizations: 0,
     },
-    idealFor: 'Medical complexes, multi-specialty centers, healthcare facilities with multiple departments',
+    idealFor:
+      'Medical complexes, multi-specialty centers, healthcare facilities with multiple departments',
   },
   company: {
     name: 'Company Plan',
-    description: 'Perfect for large healthcare networks managing multiple complexes and locations',
+    description:
+      'Perfect for large healthcare networks managing multiple complexes and locations',
     hierarchy: 'Organization → Complexes → Departments → Clinics',
     features: [
       'Centralized admin and reporting',
@@ -347,7 +359,8 @@ export const PLAN_TYPE_DESCRIPTIONS = {
       maxComplexes: null, // Unlimited
       maxOrganizations: 1,
     },
-    idealFor: 'Healthcare networks, hospital chains, large medical organizations with multiple locations',
+    idealFor:
+      'Healthcare networks, hospital chains, large medical organizations with multiple locations',
   },
 };
 

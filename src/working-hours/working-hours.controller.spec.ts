@@ -6,7 +6,10 @@ import { WorkingHoursSuggestionService } from './services/working-hours-suggesti
 import { AppointmentConflictService } from './services/appointment-conflict.service';
 import { WorkingHoursReschedulingService } from './services/working-hours-rescheduling.service';
 import { ValidateWorkingHoursDto } from './dto/validate-working-hours.dto';
-import { CreateWorkingHoursDto, UpdateWorkingHoursDto } from './dto/create-working-hours.dto';
+import {
+  CreateWorkingHoursDto,
+  UpdateWorkingHoursDto,
+} from './dto/create-working-hours.dto';
 import { UnprocessableEntityException } from '@nestjs/common';
 
 describe('WorkingHoursController - Validation Endpoint', () => {
@@ -444,7 +447,7 @@ describe('WorkingHoursController - Validation Endpoint', () => {
         fail('Should have thrown UnprocessableEntityException');
       } catch (error) {
         expect(error).toBeInstanceOf(UnprocessableEntityException);
-        const response = error.getResponse() as any;
+        const response = error.getResponse();
         expect(response.message).toHaveProperty('ar');
         expect(response.message).toHaveProperty('en');
         expect(response.code).toBe('HIERARCHICAL_VALIDATION_FAILED');

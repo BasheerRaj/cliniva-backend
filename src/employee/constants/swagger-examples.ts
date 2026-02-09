@@ -1,9 +1,9 @@
 /**
  * Employee Module Swagger Examples
- * 
+ *
  * Example objects for Swagger documentation of employee management endpoints.
  * All examples follow the standard response format with bilingual messages.
- * 
+ *
  * @module employee/constants/swagger-examples
  */
 
@@ -265,8 +265,18 @@ export const EMPLOYEE_SUCCESS_EXAMPLES = {
         averageSalary: 18500,
         medianSalary: 16000,
         salaryRangeByRole: [
-          { role: 'doctor', minSalary: 20000, maxSalary: 50000, averageSalary: 32000 },
-          { role: 'nurse', minSalary: 8000, maxSalary: 18000, averageSalary: 12000 },
+          {
+            role: 'doctor',
+            minSalary: 20000,
+            maxSalary: 50000,
+            averageSalary: 32000,
+          },
+          {
+            role: 'nurse',
+            minSalary: 8000,
+            maxSalary: 18000,
+            averageSalary: 12000,
+          },
         ],
       },
       monthlyHiringTrend: [

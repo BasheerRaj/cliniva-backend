@@ -2,9 +2,14 @@
 ### Use Case: UC-1a2b3c4 - Normal Login
 ### Description: User logs in with email and password
 
-@baseUrl = http://localhost:3001/api/v1
-@email = admin@cliniva.com
-@password = Admin@123
+@baseUrl=http://localhost:3001/api/v1
+@email=super@admin.in
+@password=SuperAdmin123!
+
+@accessToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2OTg4NmIzNTY5NDE4MTkxYzY4OGQ5ZTgiLCJlbWFpbCI6InN1cGVyQGFkbWluLmluIiwicm9sZSI6InN1cGVyX2FkbWluIiwiaWF0IjoxNzcwNjIyMDQ5LCJleHAiOjE3NzA3MDg0NDl9.IQ4tYnwtDR1BPphQ9HDjiAcLo2094rGbTWQhj49zlPE
+@refreshToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2OTg4NmIzNTY5NDE4MTkxYzY4OGQ5ZTgiLCJlbWFpbCI6InN1cGVyQGFkbWluLmluIiwicm9sZSI6InN1cGVyX2FkbWluIiwiaWF0IjoxNzcwNjIyMDQ5LCJleHAiOjE3NzEyMjY4NDl9.E1Kx6z-hpntsA37SprVXQMdEjL1cM4NuQm2eARyb_TE
+@userId = 69886b3569418191c688d9e8
+
 
 ###############################################################################
 # 1. Normal Login - Success Case
@@ -19,21 +24,6 @@ Content-Type: application/json
   "password": "{{password}}",
   "rememberMe": false
 }
-
-# Expected Response:
-# - 200 OK
-# - Returns user object with tokens
-# - accessToken (24h expiry)
-# - refreshToken (7d expiry)
-
-# Save the accessToken from response for subsequent requests
-@accessToken = <copy_access_token_from_response>
-@refreshToken = <copy_refresh_token_from_response>
-@userId = <copy_user_id_from_response>
-
-###############################################################################
-# 2. Get Current User Profile
-###############################################################################
 
 ### 2.1 Get logged-in user profile
 GET {{baseUrl}}/auth/profile

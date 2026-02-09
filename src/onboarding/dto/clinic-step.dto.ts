@@ -101,7 +101,7 @@ export class ClinicServiceDto {
 export class ClinicOverviewDto {
   @ApiProperty({
     description: 'Clinic name',
-    example: 'Al-Zahra Women\'s Clinic',
+    example: "Al-Zahra Women's Clinic",
     type: String,
   })
   @IsString()
@@ -182,7 +182,7 @@ export class ClinicOverviewDto {
 
   @ApiPropertyOptional({
     description: 'Clinic mission statement',
-    example: 'To provide compassionate women\'s healthcare',
+    example: "To provide compassionate women's healthcare",
     type: String,
   })
   @IsString()
@@ -191,7 +191,7 @@ export class ClinicOverviewDto {
 
   @ApiPropertyOptional({
     description: 'Clinic vision statement',
-    example: 'To be the trusted choice for women\'s health',
+    example: "To be the trusted choice for women's health",
     type: String,
   })
   @IsString()
@@ -200,7 +200,7 @@ export class ClinicOverviewDto {
 
   @ApiPropertyOptional({
     description: 'Clinic overview or description',
-    example: 'A specialized clinic for women\'s health and wellness',
+    example: "A specialized clinic for women's health and wellness",
     type: String,
   })
   @IsString()

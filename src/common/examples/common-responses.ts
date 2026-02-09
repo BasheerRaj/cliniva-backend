@@ -1,9 +1,9 @@
 /**
  * Common Swagger Response Examples
- * 
+ *
  * Reusable example objects for Swagger documentation.
  * These examples demonstrate standard response formats across all modules.
- * 
+ *
  * @module common/examples/common-responses
  */
 
@@ -377,7 +377,11 @@ export const COMMON_SWAGGER_EXAMPLES = {
 /**
  * Helper function to create custom success example
  */
-export function createSuccessExample(data: any, messageAr: string, messageEn: string) {
+export function createSuccessExample(
+  data: any,
+  messageAr: string,
+  messageEn: string,
+) {
   return {
     success: true,
     data,
@@ -413,7 +417,12 @@ export function createErrorExample(
 /**
  * Helper function to create paginated list example
  */
-export function createPaginatedExample(items: any[], page = 1, limit = 10, total?: number) {
+export function createPaginatedExample(
+  items: any[],
+  page = 1,
+  limit = 10,
+  total?: number,
+) {
   const actualTotal = total ?? items.length;
   return {
     success: true,

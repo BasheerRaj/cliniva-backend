@@ -373,7 +373,10 @@ export class AuditService {
         },
       });
     } catch (error) {
-      this.logger.error(`Failed to log user deletion for user ${userId}`, error);
+      this.logger.error(
+        `Failed to log user deletion for user ${userId}`,
+        error,
+      );
     }
   }
 
