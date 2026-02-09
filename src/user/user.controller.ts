@@ -1000,11 +1000,11 @@ export class UserController {
     @Request() req,
   ): Promise<{ success: boolean; message: { ar: string; en: string } }> {
     try {
-      // Extract adminId from JWT payload (populated by JwtAuthGuard)
-      const adminId = req.user?.userId || req.user?.sub;
+      // Extract adminId from JWT payload (JWT strategy returns 'id')
+      const adminId = req.user?.id || req.user?.userId || req.user?.sub;
 
       if (!adminId) {
-        this.logger.error('Admin ID not found in request');
+        this.logger.error('Admin ID not found in request', req.user);
         throw new HttpException(
           {
             message: {
@@ -1131,11 +1131,11 @@ export class UserController {
     message: { ar: string; en: string };
   }> {
     try {
-      // Extract adminId from JWT payload
-      const adminId = req.user?.userId || req.user?.sub;
+      // Extract adminId from JWT payload (JWT strategy returns 'id')
+      const adminId = req.user?.id || req.user?.userId || req.user?.sub;
 
       if (!adminId) {
-        this.logger.error('Admin ID not found in request');
+        this.logger.error('Admin ID not found in request', req.user);
         throw new HttpException(
           {
             message: {

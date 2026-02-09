@@ -20,6 +20,15 @@ export class CreateClinicDto {
   @IsOptional()
   complexDepartmentId?: string;
 
+  @ApiPropertyOptional({
+    description: 'Complex ID (direct reference to complex)',
+    example: '507f1f77bcf86cd799439011',
+    type: String,
+  })
+  @IsString()
+  @IsOptional()
+  complexId?: string;
+
   @ApiProperty({
     description: 'Subscription ID',
     example: '507f1f77bcf86cd799439012',
@@ -28,6 +37,15 @@ export class CreateClinicDto {
   @IsString()
   @IsNotEmpty()
   subscriptionId: string;
+
+  @ApiProperty({
+    description: 'Owner user ID (user who owns/manages this clinic)',
+    example: '507f1f77bcf86cd799439013',
+    type: String,
+  })
+  @IsString()
+  @IsNotEmpty()
+  ownerId: string;
 
   @ApiProperty({
     description: 'Clinic name',

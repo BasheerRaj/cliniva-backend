@@ -33,6 +33,15 @@ export class CreateComplexDto {
   subscriptionId: string;
 
   @ApiProperty({
+    description: 'Owner user ID (user who owns/manages this complex)',
+    example: '507f1f77bcf86cd799439013',
+    type: String,
+  })
+  @IsString()
+  @IsNotEmpty()
+  ownerId: string;
+
+  @ApiProperty({
     description: 'Complex name',
     example: 'Central Medical Complex',
     type: String,

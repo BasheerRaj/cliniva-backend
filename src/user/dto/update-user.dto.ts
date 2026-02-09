@@ -5,6 +5,7 @@ import {
   IsOptional,
   IsString,
   MinLength,
+  IsBoolean,
 } from 'class-validator';
 import { UserRole } from '../../common/enums/user-role.enum';
 
@@ -90,4 +91,22 @@ export class UpdateUserDto {
   @IsOptional()
   @IsEnum(['ar', 'en'])
   preferredLanguage?: 'ar' | 'en';
+
+  @ApiPropertyOptional({
+    description: 'Whether the user has completed the onboarding process',
+    example: true,
+    type: Boolean,
+  })
+  @IsOptional()
+  @IsBoolean()
+  onboardingComplete?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Whether the user has completed the initial setup',
+    example: true,
+    type: Boolean,
+  })
+  @IsOptional()
+  @IsBoolean()
+  setupComplete?: boolean;
 }

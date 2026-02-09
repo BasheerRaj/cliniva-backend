@@ -1,0 +1,36 @@
+### Test Subscription with Monthly Billing Cycle
+POST http://localhost:3000/subscriptions
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "subscriptionPlanId": "{{companyPlanId}}",
+  "userId": "{{userId}}",
+  "paymentMethod": "credit_card",
+  "billingCycle": "monthly"
+}
+
+### Test Subscription with Yearly Billing Cycle
+POST http://localhost:3000/subscriptions
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "subscriptionPlanId": "{{companyPlanId}}",
+  "userId": "{{anotherUserId}}",
+  "paymentMethod": "credit_card",
+  "billingCycle": "yearly"
+}
+
+### Test Subscription with Custom Expiry Date
+POST http://localhost:3000/subscriptions
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "subscriptionPlanId": "{{companyPlanId}}",
+  "userId": "{{yetAnotherUserId}}",
+  "paymentMethod": "credit_card",
+  "billingCycle": "monthly",
+  "expiresAt": "2027-12-31T23:59:59.000Z"
+}

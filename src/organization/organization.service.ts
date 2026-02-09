@@ -13,6 +13,7 @@ import {
   SetupLegalInfoDto,
 } from './dto/create-organization.dto';
 import { ValidationUtil } from '../common/utils/validation.util';
+import { TransactionUtil } from '../common/utils/transaction.util';
 import { SubscriptionService } from '../subscription/subscription.service';
 import { User } from '../database/schemas/user.schema';
 import { UserRole } from '../common/enums/user-role.enum';
@@ -137,12 +138,11 @@ export class OrganizationService {
       throw new BadRequestException('Invalid location format');
     }
 
-    // Use MongoDB transaction to ensure data consistency
-    const session = await this.connection.startSession();
+    // Use MongoDB transaction to ensure data consistency (if replica set is available)
+    const { session, useTransaction } =
+      await TransactionUtil.startTransaction(this.connection);
 
     try {
-      session.startTransaction();
-
       // Prepare organization data with logo normalization
       const organizationData = {
         ...createOrganizationDto,
@@ -160,7 +160,9 @@ export class OrganizationService {
       }
 
       const organization = new this.organizationModel(organizationData);
-      const savedOrganization = await organization.save({ session });
+      const savedOrganization = await organization.save(
+        TransactionUtil.getSessionOptions(session, useTransaction),
+      );
 
       // Update user with organization reference and set as owner
       await this.userModel.findByIdAndUpdate(
@@ -174,13 +176,13 @@ export class OrganizationService {
           setupComplete: true,
           onboardingComplete: true,
         },
-        { session },
+        TransactionUtil.getSessionOptions(session, useTransaction),
       );
 
-      await session.commitTransaction();
+      await TransactionUtil.commitTransaction(session, useTransaction);
       return this.formatOrganizationResponse(savedOrganization);
     } catch (error) {
-      await session.abortTransaction();
+      await TransactionUtil.abortTransaction(session, useTransaction);
 
       // Handle duplicate key errors and other database errors with user-friendly messages
       if (error.code === 11000) {
@@ -207,7 +209,7 @@ export class OrganizationService {
         `Failed to create organization: ${error.message}`,
       );
     } finally {
-      await session.endSession();
+      await TransactionUtil.endSession(session);
     }
   }
 

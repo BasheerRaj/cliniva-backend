@@ -336,7 +336,11 @@ export class ClinicService {
       complexDepartmentId: createClinicDto.complexDepartmentId
         ? new Types.ObjectId(createClinicDto.complexDepartmentId)
         : null,
+      complexId: createClinicDto.complexId
+        ? new Types.ObjectId(createClinicDto.complexId)
+        : null,
       subscriptionId: new Types.ObjectId(createClinicDto.subscriptionId),
+      ownerId: new Types.ObjectId(createClinicDto.ownerId),
     };
 
     const clinic = new this.clinicModel(clinicData);

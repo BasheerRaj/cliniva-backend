@@ -281,6 +281,7 @@ export class ComplexService {
         ? new Types.ObjectId(createComplexDto.organizationId)
         : null,
       subscriptionId: new Types.ObjectId(createComplexDto.subscriptionId),
+      ownerId: new Types.ObjectId(createComplexDto.ownerId),
       status: 'active', // Set default status to 'active'
     };
 

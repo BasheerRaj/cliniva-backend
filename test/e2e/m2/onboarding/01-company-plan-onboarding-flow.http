@@ -4,12 +4,27 @@
 
 @baseUrl = http://localhost:3001/api/v1
 
-@accessToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2OTg5YmVlMjgyYzU5ZDBhYjE3YTdiNjIiLCJlbWFpbCI6ImNvbXBhbnkub3duZXJAY2xpbml2YS5jb20iLCJyb2xlIjoib3duZXIiLCJpYXQiOjE3NzA2MzQ5NzgsImV4cCI6MTc3MDcyMTM3OH0.Mx3g_1a5kLPG9qX_qK5l1Xu7xLMwYeI5WrbtM1lMPuQ
-@userId = 6989bee282c59d0ab17a7b62
+@accessToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2OTg5Y2MzNTBmYTZjNmU3NDFmYTM1MDgiLCJlbWFpbCI6ImNvbXBhbnkub3duZXIxQGNsaW5pdmEuY29tIiwicm9sZSI6Im93bmVyIiwiaWF0IjoxNzcwNjM4Mzg5LCJleHAiOjE3NzA3MjQ3ODl9.Sy8WLYB_dqPBgMalGYygZ8PeT-1g0Z_jk9ny1WhooxI
+@userId = 6989cc350fa6c6e741fa3508
 
 @companyPlanId = 6989c2e2ca3d9aa044ffc4bc
 
-@subscriptionId = 6989c883e85c6be91e02006e
+@subscriptionId = 6989cc5d0fa6c6e741fa3511
+
+@organizationId = 6989d6f47cbd22766fa4bd87
+
+@complexId = 6989d92c3afb0243797a37a0
+@complexId1 = 6989d9903afb0243797a37b0
+@complexId2 = 6989d9c23afb0243797a37c2
+@complexId3 = 6989de1d3afb0243797a37d7
+
+@cardiologyDeptId = 6989c2e2ca3d9aa044ffc4d4
+@pediatricsDeptId = 6989c2e2ca3d9aa044ffc519
+@generalMedicineDeptId = 6989c2e2ca3d9aa044ffc500
+
+@cardiologyClinicId = 6989e31ba2732987ac23cb47
+@pediatricsClinicId = 6989e341a2732987ac23cb54
+
 
 
 ###############################################################################
@@ -21,7 +36,7 @@ POST {{baseUrl}}/auth/register
 Content-Type: application/json
 
 {
-  "email": "company.owner@cliniva.com",
+  "email": "company.owner1@cliniva.com",
   "password": "CompanyOwner@123",
   "confirmPassword": "CompanyOwner@123",
   "firstName": "Mohammed",
@@ -105,14 +120,14 @@ Content-Type: application/json
   "ceoName": "Dr. Abdullah Al-Rashid",
   "phoneNumbers": [
     {
-      "type": "main",
+      "type": "primary",
       "number": "+966112345678",
-      "isPrimary": true
+      "label": "Main Office"
     },
     {
-      "type": "support",
+      "type": "secondary",
       "number": "+966112345679",
-      "isPrimary": false
+      "label": "Support Line"
     }
   ],
   "email": "info@alshifa-medical.com",
@@ -122,10 +137,7 @@ Content-Type: application/json
     "state": "Riyadh Region",
     "country": "Saudi Arabia",
     "postalCode": "12345",
-    "coordinates": {
-      "latitude": 24.7136,
-      "longitude": 46.6753
-    }
+    "googleLocation": "24.7136,46.6753"
   },
   "emergencyContact": {
     "name": "Emergency Department",
@@ -151,7 +163,6 @@ Content-Type: application/json
 # - Organization created successfully
 # - Returns organization ID
 
-@organizationId = <copy_organization_id_from_response>
 
 ###############################################################################
 # 5. Step 2: Create Medical Complex
@@ -163,61 +174,76 @@ Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "name": "Al-Shifa Medical Complex - Riyadh",
-  "managerName": "Dr. Khalid Al-Otaibi",
-  "logoUrl": "https://example.com/logos/complex-riyadh.png",
-  "website": "https://alshifa-medical.com/riyadh",
-  "yearEstablished": 2015,
-  "mission": "Provide comprehensive healthcare services to Riyadh residents",
-  "vision": "Be the leading medical complex in Riyadh",
-  "overview": "State-of-the-art medical complex with multiple specialties",
-  "goals": "Serve 10,000+ patients annually",
-  "ceoName": "Dr. Abdullah Al-Rashid",
+  "name": "Al-Rahma Family Healthcare Center - Medina",
+  "managerName": "Dr. Ayman Al-Mutairi",
+  "logoUrl": "https://example.com/logos/alrahma-medina.png",
+  "website": "https://alrahma-healthcare.com/medina",
+  "yearEstablished": 2012,
+  "mission": "Provide compassionate, family-oriented healthcare services for all age groups",
+  "vision": "To be the most trusted family healthcare center in Medina",
+  "overview": "A comprehensive family healthcare center offering primary care and preventive services",
+  "goals": "Support 20,000+ patient visits annually with a focus on preventive care",
+  "ceoName": "Dr. Hassan Al-Zaid",
   "phoneNumbers": [
     {
-      "type": "main",
-      "number": "+966112345681",
-      "isPrimary": true
+      "type": "primary",
+      "number": "+966148700221",
+      "label": "Main Reception"
+    },
+    {
+      "type": "secondary",
+      "number": "+966148700222",
+      "label": "Appointments Desk"
     }
   ],
-  "email": "riyadh@alshifa-medical.com",
+  "email": "support@alrahma-healthcare.com",
   "address": {
-    "street": "Olaya Street",
-    "city": "Riyadh",
-    "state": "Riyadh Region",
+    "street": "Quba Road",
+    "city": "Medina",
+    "state": "Al Madinah Region",
     "country": "Saudi Arabia",
-    "postalCode": "12345",
-    "coordinates": {
-      "latitude": 24.7136,
-      "longitude": 46.6753
-    }
+    "postalCode": "42316",
+    "googleLocation": "24.5247,39.5692"
   },
   "emergencyContact": {
-    "name": "Complex Emergency",
-    "phone": "+966112345682",
-    "email": "emergency.riyadh@alshifa-medical.com"
+    "name": "24/7 Emergency Unit",
+    "phone": "+966148700223",
+    "email": "emergency@alrahma-healthcare.com"
   },
   "socialMediaLinks": {
-    "facebook": "https://facebook.com/alshifa.riyadh",
-    "twitter": "https://twitter.com/alshifa_riyadh"
+    "facebook": "https://facebook.com/alrahma.medina",
+    "twitter": "https://twitter.com/alrahma_md",
+    "instagram": "https://instagram.com/alrahma.medina"
   },
-  "vatNumber": "300123456700004",
-  "crNumber": "1010123457",
+  "vatNumber": "300321654800001",
+  "crNumber": "4650123987",
   "organizationId": "{{organizationId}}",
   "subscriptionId": "{{subscriptionId}}",
-  "departments": []
+  "ownerId": "{{userId}}",
+  "departments": [
+    "6989c2e2ca3d9aa044ffc4d4",
+    "6989c2e2ca3d9aa044ffc4e1"
+  ]
 }
+
+
 
 # Expected Response:
 # - 201 Created
 # - Complex created successfully
 # - Returns complex ID
 
-@complexId = <copy_complex_id_from_response>
+
 
 ###############################################################################
 # 6. Step 3: Create Departments
 ###############################################################################
+### 6.0.1 Get departments
+
+GET {{baseUrl}}/departments
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
 
 ### 6.1 Create Cardiology Department
 POST {{baseUrl}}/departments
@@ -230,7 +256,6 @@ Content-Type: application/json
   "complexId": "{{complexId}}"
 }
 
-@cardiologyDeptId = <copy_department_id_from_response>
 
 ### 6.2 Create Pediatrics Department
 POST {{baseUrl}}/departments
@@ -243,7 +268,6 @@ Content-Type: application/json
   "complexId": "{{complexId}}"
 }
 
-@pediatricsDeptId = <copy_department_id_from_response>
 
 ### 6.3 Create General Medicine Department
 POST {{baseUrl}}/departments
@@ -256,7 +280,6 @@ Content-Type: application/json
   "complexId": "{{complexId}}"
 }
 
-@generalMedicineDeptId = <copy_department_id_from_response>
 
 ###############################################################################
 # 7. Step 4: Create Clinics
@@ -279,9 +302,9 @@ Content-Type: application/json
   "mission": "Excellence in cardiac care",
   "phoneNumbers": [
     {
-      "type": "main",
+      "type": "primary",
       "number": "+966112345683",
-      "isPrimary": true
+      "label": "Cardiology Clinic"
     }
   ],
   "email": "cardiology@alshifa-medical.com",
@@ -297,13 +320,13 @@ Content-Type: application/json
   "complexId": "{{complexId}}",
   "complexDepartmentId": "{{cardiologyDeptId}}",
   "subscriptionId": "{{subscriptionId}}",
+  "ownerId": "{{userId}}",
   "maxStaff": 10,
   "maxDoctors": 5,
   "maxPatients": 100,
   "sessionDuration": 30
 }
 
-@cardiologyClinicId = <copy_clinic_id_from_response>
 
 ### 7.2 Create Pediatrics Clinic
 POST {{baseUrl}}/clinics
@@ -319,9 +342,9 @@ Content-Type: application/json
   "logoUrl": "https://example.com/logos/pediatrics-clinic.png",
   "phoneNumbers": [
     {
-      "type": "main",
+      "type": "primary",
       "number": "+966112345684",
-      "isPrimary": true
+      "label": "Pediatrics Clinic"
     }
   ],
   "email": "pediatrics@alshifa-medical.com",
@@ -337,13 +360,13 @@ Content-Type: application/json
   "complexId": "{{complexId}}",
   "complexDepartmentId": "{{pediatricsDeptId}}",
   "subscriptionId": "{{subscriptionId}}",
+  "ownerId": "{{userId}}",
   "maxStaff": 8,
   "maxDoctors": 4,
   "maxPatients": 80,
   "sessionDuration": 20
 }
 
-@pediatricsClinicId = <copy_clinic_id_from_response>
 
 ###############################################################################
 # 8. Verify Complete Setup
@@ -382,7 +405,7 @@ Authorization: Bearer {{accessToken}}
 ###############################################################################
 
 ### 9.1 Mark onboarding as complete
-PATCH {{baseUrl}}/users/{{userId}}/onboarding
+PUT {{baseUrl}}/users/{{userId}}
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
@@ -401,8 +424,8 @@ Content-Type: application/json
 ###############################################################################
 
 ### 10.1 Get dashboard data
-GET {{baseUrl}}/dashboard
-Authorization: Bearer {{accessToken}}
+# GET {{baseUrl}}/dashboard
+# Authorization: Bearer {{accessToken}}
 
 # Expected Response:
 # - 200 OK

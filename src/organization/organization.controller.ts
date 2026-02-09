@@ -28,7 +28,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import * as SWAGGER_EXAMPLES from './constants/swagger-examples';
 
 @ApiTags('Organizations')
-@Controller('organization') // Changed from 'organizations' to match frontend call
+@Controller('organizations')
 export class OrganizationController {
   constructor(private readonly organizationService: OrganizationService) {}
 

@@ -1,0 +1,18 @@
+### Debug Capacity Issue
+### Check what clinics exist for the complex
+
+@baseUrl = http://localhost:3001/api/v1
+@accessToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2OTg5Y2MzNTBmYTZjNmU3NDFmYTM1MDgiLCJlbWFpbCI6ImNvbXBhbnkub3duZXIxQGNsaW5pdmEuY29tIiwicm9sZSI6Im93bmVyIiwiaWF0IjoxNzcwNjM4Mzg5LCJleHAiOjE3NzA3MjQ3ODl9.Sy8WLYB_dqPBgMalGYygZ8PeT-1g0Z_jk9ny1WhooxI
+@complexId = 6989d92c3afb0243797a37a0
+
+### 1. Get all clinics for this complex
+GET {{baseUrl}}/clinics?complexId={{complexId}}
+Authorization: Bearer {{accessToken}}
+
+### 2. Get complex details (shows capacity)
+GET {{baseUrl}}/complexes/{{complexId}}
+Authorization: Bearer {{accessToken}}
+
+### 3. List all clinics (no filter)
+GET {{baseUrl}}/clinics
+Authorization: Bearer {{accessToken}}
