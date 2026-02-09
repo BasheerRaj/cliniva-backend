@@ -26,6 +26,12 @@ export class Service extends Document {
 
   @Prop({ default: true })
   isActive?: boolean;
+
+  @Prop()
+  deletedAt?: Date;
+
+  @Prop({ type: Types.ObjectId, ref: 'User' })
+  deletedBy?: Types.ObjectId;
 }
 
 export const ServiceSchema = SchemaFactory.createForClass(Service);
