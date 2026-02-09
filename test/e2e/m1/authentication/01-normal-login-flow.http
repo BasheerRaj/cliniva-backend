@@ -6,8 +6,8 @@
 @email=super@admin.in
 @password=SuperAdmin123!
 
-@accessToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2OTg4NmIzNTY5NDE4MTkxYzY4OGQ5ZTgiLCJlbWFpbCI6InN1cGVyQGFkbWluLmluIiwicm9sZSI6InN1cGVyX2FkbWluIiwiaWF0IjoxNzcwNjIyMDQ5LCJleHAiOjE3NzA3MDg0NDl9.IQ4tYnwtDR1BPphQ9HDjiAcLo2094rGbTWQhj49zlPE
-@refreshToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2OTg4NmIzNTY5NDE4MTkxYzY4OGQ5ZTgiLCJlbWFpbCI6InN1cGVyQGFkbWluLmluIiwicm9sZSI6InN1cGVyX2FkbWluIiwiaWF0IjoxNzcwNjIyMDQ5LCJleHAiOjE3NzEyMjY4NDl9.E1Kx6z-hpntsA37SprVXQMdEjL1cM4NuQm2eARyb_TE
+@accessToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2OTg4NmIzNTY5NDE4MTkxYzY4OGQ5ZTgiLCJlbWFpbCI6InN1cGVyQGFkbWluLmluIiwicm9sZSI6InN1cGVyX2FkbWluIiwiaWF0IjoxNzcwNjI0NTI5LCJleHAiOjE3NzA3MTA5Mjl9.3I_vbnumLIiI_tINa5iXRmx7oCQJJwTdmez0Xe5M8Zg
+@refreshToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2OTg4NmIzNTY5NDE4MTkxYzY4OGQ5ZTgiLCJlbWFpbCI6InN1cGVyQGFkbWluLmluIiwicm9sZSI6InN1cGVyX2FkbWluIiwiaWF0IjoxNzcwNjI0NTI5LCJleHAiOjE3NzEyMjkzMjl9.P0K3QF60uUT8MGDSpCnXilXhENTTad8Rwg1UFmzpW6E
 @userId = 69886b3569418191c688d9e8
 
 
@@ -127,8 +127,8 @@ POST {{baseUrl}}/auth/login
 Content-Type: application/json
 
 {
-  "email": "deactivated@cliniva.com",
-  "password": "Password123"
+  "email": "john.doe@example.com",
+  "password": "SecurePassword123!"
 }
 
 # Expected Response:
@@ -154,4 +154,5 @@ Authorization: Bearer {{accessToken}}
 
 # Expected Response:
 # - 401 Unauthorized
-# - Token is no longer valid
+# - Token blacklisted error (AUTH_012)
+# - Bilingual message: { ar: "الرمز محظور", en: "Token blacklisted" }

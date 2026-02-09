@@ -425,7 +425,7 @@ export class AuthService {
         });
       }
 
-      if (error.name === 'JsonWebTokenError') {
+      if (error.name === 'JsonWebTokenError' || error.name === 'SyntaxError') {
         this.logger.warn('Invalid refresh token');
         throw new UnauthorizedException({
           message: {

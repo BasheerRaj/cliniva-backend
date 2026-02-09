@@ -1,9 +1,18 @@
 ### M1 - Authentication: Token Refresh Flow
 ### Description: Refresh access token using refresh token
 
-@baseUrl = http://localhost:3001
-@email = admin@cliniva.com
-@password = Admin@123
+@baseUrl=http://localhost:3001/api/v1
+@email=super@admin.in
+@password=SuperAdmin123!
+
+@accessToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2OTg4NmIzNTY5NDE4MTkxYzY4OGQ5ZTgiLCJlbWFpbCI6InN1cGVyQGFkbWluLmluIiwicm9sZSI6InN1cGVyX2FkbWluIiwiaWF0IjoxNzcwNjI0NTI5LCJleHAiOjE3NzA3MTA5Mjl9.3I_vbnumLIiI_tINa5iXRmx7oCQJJwTdmez0Xe5M8Zg
+@refreshToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2OTg4NmIzNTY5NDE4MTkxYzY4OGQ5ZTgiLCJlbWFpbCI6InN1cGVyQGFkbWluLmluIiwicm9sZSI6InN1cGVyX2FkbWluIiwiaWF0IjoxNzcwNjI0NTI5LCJleHAiOjE3NzEyMjkzMjl9.P0K3QF60uUT8MGDSpCnXilXhENTTad8Rwg1UFmzpW6E
+@userId = 69886b3569418191c688d9e8
+
+# Save new tokens
+@newAccessToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2OTg4NmIzNTY5NDE4MTkxYzY4OGQ5ZTgiLCJlbWFpbCI6InN1cGVyQGFkbWluLmluIiwicm9sZSI6InN1cGVyX2FkbWluIiwiaWF0IjoxNzcwNjI0ODEyLCJleHAiOjE3NzA3MTEyMTJ9.NATCtckgWRtgJlLdKp2P7Ltx_AJdJb6Om3yDyzx4ThM
+@newRefreshToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2OTg4NmIzNTY5NDE4MTkxYzY4OGQ5ZTgiLCJlbWFpbCI6InN1cGVyQGFkbWluLmluIiwicm9sZSI6InN1cGVyX2FkbWluIiwiaWF0IjoxNzcwNjI0ODEyLCJleHAiOjE3NzEyMjk2MTJ9.QeRAFyhHGELs4vXgXVoGj1bwiEYV_iu829xAe_GHTkE
+
 
 ###############################################################################
 # 1. Initial Login
@@ -18,9 +27,6 @@ Content-Type: application/json
   "password": "{{password}}"
 }
 
-# Save tokens from response
-@accessToken = <copy_access_token_from_response>
-@refreshToken = <copy_refresh_token_from_response>
 
 ###############################################################################
 # 2. Use Access Token
@@ -43,7 +49,7 @@ POST {{baseUrl}}/auth/refresh
 Content-Type: application/json
 
 {
-  "refreshToken": "{{refreshToken}}"
+  "refresh_token": "{{refreshToken}}"
 }
 
 # Expected Response:
@@ -51,9 +57,7 @@ Content-Type: application/json
 # - Returns new accessToken and refreshToken
 # - Old tokens are invalidated
 
-# Save new tokens
-@newAccessToken = <copy_new_access_token_from_response>
-@newRefreshToken = <copy_new_refresh_token_from_response>
+
 
 ###############################################################################
 # 4. Verify New Token Works
@@ -88,7 +92,7 @@ POST {{baseUrl}}/auth/refresh
 Content-Type: application/json
 
 {
-  "refreshToken": "invalid-token-string"
+  "refresh_token": "invalid-token-string"
 }
 
 # Expected Response:
@@ -101,13 +105,26 @@ POST {{baseUrl}}/auth/refresh
 Content-Type: application/json
 
 {
-  "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.expired.token"
+  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyLCJleHAiOjE1MTYyMzkwMjJ9.4Adcj0vfIRa7BHvqRJH6B6Jv8JZXvz5pXJ5Jv8JZXvz"
 }
 
 # Expected Response:
 # - 401 Unauthorized
 # - Error code: AUTH_002
 # - Message: Token expired
+
+### 6.2b Refresh with malformed token (invalid base64 payload)
+POST {{baseUrl}}/auth/refresh
+Content-Type: application/json
+
+{
+  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.expired.token"
+}
+
+# Expected Response:
+# - 401 Unauthorized
+# - Error code: AUTH_003
+# - Message: Invalid token
 
 ### 6.3 Refresh with missing token
 POST {{baseUrl}}/auth/refresh
@@ -129,7 +146,7 @@ Content-Type: application/json
 # In practice, the frontend intercepts 401 responses and refreshes automatically
 
 GET {{baseUrl}}/auth/profile
-Authorization: Bearer expired-token-here
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2OTg4NmIzNTY5NDE4MTkxYzY4OGQ5ZTgiLCJlbWFpbCI6InN1cGVyQGFkbWluLmluIiwicm9sZSI6InN1cGVyX2FkbWluIiwiaWF0IjoxNzcwNjI0NTI5LCJleHAiOjE3NzEyMjkzMjl9.P0K3QF60uUT8MGDSpCnXilXhENTTad8Rwg1UFmzpW6E
 
 # Expected Response:
 # - 401 Unauthorized
