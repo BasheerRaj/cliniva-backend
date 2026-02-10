@@ -88,27 +88,9 @@ export class CreateEmployeeDto {
   @ApiProperty({
     description: 'Employee role in the organization',
     example: 'doctor',
-    enum: [
-      'doctor',
-      'nurse',
-      'technician',
-      'admin',
-      'receptionist',
-      'pharmacist',
-      'therapist',
-      'other',
-    ],
+    enum: ['super_admin', 'owner', 'admin', 'doctor', 'staff', 'patient'],
   })
-  @IsEnum([
-    'doctor',
-    'nurse',
-    'technician',
-    'admin',
-    'receptionist',
-    'pharmacist',
-    'therapist',
-    'other',
-  ])
+  @IsEnum(['super_admin', 'owner', 'admin', 'doctor', 'staff', 'patient'])
   @IsNotEmpty()
   role: string;
 
@@ -732,16 +714,7 @@ export class EmployeeSearchQueryDto {
   @IsOptional()
   employeeNumber?: string;
 
-  @IsEnum([
-    'doctor',
-    'nurse',
-    'technician',
-    'admin',
-    'receptionist',
-    'pharmacist',
-    'therapist',
-    'other',
-  ])
+  @IsEnum(['super_admin', 'owner', 'admin', 'doctor', 'staff', 'patient'])
   @IsOptional()
   role?: string;
 

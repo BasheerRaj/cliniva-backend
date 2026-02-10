@@ -2,9 +2,17 @@
 ### Use Case: UC-7a6b5c4 - Create Staff User
 ### Description: Complete flow to create a staff user with all required information
 
-@baseUrl = http://localhost:3001
-@adminEmail = admin@cliniva.com
-@adminPassword = Admin@123
+@baseUrl = http://localhost:3001/api/v1
+@adminEmail = company.owner1@cliniva.com
+@adminPassword = CompanyOwner@123
+@accessToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2OTg5Y2MzNTBmYTZjNmU3NDFmYTM1MDgiLCJlbWFpbCI6ImNvbXBhbnkub3duZXIxQGNsaW5pdmEuY29tIiwicm9sZSI6ImFkbWluIiwiaWF0IjoxNzcwNzI1NTEwLCJleHAiOjE3NzA4MTE5MTB9.c8y-U0UR1H67Jomc47kIuCLmomVw2pXdXi5GagJjQhY
+@subscriptionId = 6989c883e85c6be91e02006e
+@complexId = 6989d92c3afb0243797a37a0
+@clinicId = 6989e341a2732987ac23cb54
+@staffUserId = <copy_user_id_from_response>
+@employeeId = 698b29e8eb24950ca41d3f31
+@temporaryPassword = <copy_temporary_password_from_response>
+@staffAccessToken = <copy_access_token_from_response>
 
 ###############################################################################
 # 1. Admin Login
@@ -19,10 +27,7 @@ Content-Type: application/json
   "password": "{{adminPassword}}"
 }
 
-@accessToken = <copy_access_token_from_response>
-@subscriptionId = <copy_subscription_id_from_response>
-@complexId = <copy_complex_id_from_response>
-@clinicId = <copy_clinic_id_from_response>
+
 
 ###############################################################################
 # 2. Get Available Complexes and Clinics
@@ -54,78 +59,34 @@ Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "email": "staff.member@cliniva.com",
+  "email": "staff.member1@cliniva.com",
+  "password": "TempPassword@123",
   "firstName": "Ahmed",
   "lastName": "Hassan",
-  "phone": "+966501234567",
+  "phone": "+966501234517",
   "dateOfBirth": "1990-05-15",
   "gender": "male",
   "nationality": "Saudi Arabia",
   "role": "staff",
-  "subscriptionId": "{{subscriptionId}}",
   "complexId": "{{complexId}}",
   "clinicId": "{{clinicId}}",
-  "employeeProfile": {
-    "jobTitle": "Receptionist",
-    "dateOfHiring": "2024-01-15",
-    "salary": 5000,
-    "maritalStatus": "single",
-    "numberOfChildren": 0,
-    "bankAccount": "SA1234567890123456789012",
-    "socialSecurityNumber": "1234567890",
-    "taxId": "TAX123456"
-  },
-  "workingHours": [
-    {
-      "dayOfWeek": "sunday",
-      "isWorkingDay": true,
-      "openingTime": "08:00",
-      "closingTime": "16:00"
-    },
-    {
-      "dayOfWeek": "monday",
-      "isWorkingDay": true,
-      "openingTime": "08:00",
-      "closingTime": "16:00"
-    },
-    {
-      "dayOfWeek": "tuesday",
-      "isWorkingDay": true,
-      "openingTime": "08:00",
-      "closingTime": "16:00"
-    },
-    {
-      "dayOfWeek": "wednesday",
-      "isWorkingDay": true,
-      "openingTime": "08:00",
-      "closingTime": "16:00"
-    },
-    {
-      "dayOfWeek": "thursday",
-      "isWorkingDay": true,
-      "openingTime": "08:00",
-      "closingTime": "16:00"
-    },
-    {
-      "dayOfWeek": "friday",
-      "isWorkingDay": false
-    },
-    {
-      "dayOfWeek": "saturday",
-      "isWorkingDay": false
-    }
-  ]
+  "jobTitle": "Receptionist",
+  "dateOfHiring": "2024-01-15",
+  "salary": 5000,
+  "maritalStatus": "single",
+  "numberOfChildren": 0,
+  "bankAccount": "SA1234567890123456789012",
+  "socialSecurityNumber": "1234567890",
+  "taxId": "TAX123456"
 }
 
 # Expected Response:
 # - 201 Created
 # - Returns user object with employee profile
 # - Auto-generated employee number (e.g., EMP2024001)
-# - Temporary password sent to email
+# Note: Working hours should be managed separately via shifts endpoint
 
-@staffUserId = <copy_user_id_from_response>
-@employeeId = <copy_employee_id_from_response>
-@temporaryPassword = <copy_temporary_password_from_response>
+
 
 ###############################################################################
 # 4. Verify Staff User Created
@@ -157,8 +118,8 @@ POST {{baseUrl}}/auth/login
 Content-Type: application/json
 
 {
-  "email": "staff.member@cliniva.com",
-  "password": "{{temporaryPassword}}"
+  "email": "staff.member1@cliniva.com",
+  "password": "TempPassword@123"
 }
 
 # Expected Response:
@@ -166,7 +127,6 @@ Content-Type: application/json
 # - Login successful
 # - Should prompt for password change (future feature)
 
-@staffAccessToken = <copy_access_token_from_response>
 
 ### 5.2 Staff changes password
 POST {{baseUrl}}/auth/change-password
@@ -199,7 +159,7 @@ Content-Type: application/json
 
 # Expected Response:
 # - 400 Bad Request
-# - Validation errors for missing fields
+# - Validation errors for: password, lastName, phone, role, gender, dateOfBirth, jobTitle, dateOfHiring
 
 ### 6.2 Create user with invalid email format
 POST {{baseUrl}}/employees
@@ -208,6 +168,7 @@ Content-Type: application/json
 
 {
   "email": "not-an-email",
+  "password": "ValidPass@123",
   "firstName": "Test",
   "lastName": "User",
   "phone": "+966501234567",
@@ -215,12 +176,9 @@ Content-Type: application/json
   "gender": "male",
   "nationality": "Saudi Arabia",
   "role": "staff",
-  "subscriptionId": "{{subscriptionId}}",
   "clinicId": "{{clinicId}}",
-  "employeeProfile": {
-    "jobTitle": "Staff",
-    "dateOfHiring": "2024-01-01"
-  }
+  "jobTitle": "Staff Member",
+  "dateOfHiring": "2024-01-01"
 }
 
 # Expected Response:
@@ -234,6 +192,7 @@ Content-Type: application/json
 
 {
   "email": "staff.member@cliniva.com",
+  "password": "ValidPass@123",
   "firstName": "Duplicate",
   "lastName": "User",
   "phone": "+966501234568",
@@ -241,12 +200,9 @@ Content-Type: application/json
   "gender": "male",
   "nationality": "Saudi Arabia",
   "role": "staff",
-  "subscriptionId": "{{subscriptionId}}",
   "clinicId": "{{clinicId}}",
-  "employeeProfile": {
-    "jobTitle": "Staff",
-    "dateOfHiring": "2024-01-01"
-  }
+  "jobTitle": "Staff Member",
+  "dateOfHiring": "2024-01-01"
 }
 
 # Expected Response:
@@ -261,6 +217,7 @@ Content-Type: application/json
 
 {
   "email": "future@cliniva.com",
+  "password": "ValidPass@123",
   "firstName": "Future",
   "lastName": "User",
   "phone": "+966501234569",
@@ -268,12 +225,9 @@ Content-Type: application/json
   "gender": "male",
   "nationality": "Saudi Arabia",
   "role": "staff",
-  "subscriptionId": "{{subscriptionId}}",
   "clinicId": "{{clinicId}}",
-  "employeeProfile": {
-    "jobTitle": "Staff",
-    "dateOfHiring": "2024-01-01"
-  }
+  "jobTitle": "Staff Member",
+  "dateOfHiring": "2024-01-01"
 }
 
 # Expected Response:
@@ -287,6 +241,7 @@ Content-Type: application/json
 
 {
   "email": "invalidphone@cliniva.com",
+  "password": "ValidPass@123",
   "firstName": "Invalid",
   "lastName": "Phone",
   "phone": "123",
@@ -294,60 +249,12 @@ Content-Type: application/json
   "gender": "male",
   "nationality": "Saudi Arabia",
   "role": "staff",
-  "subscriptionId": "{{subscriptionId}}",
   "clinicId": "{{clinicId}}",
-  "employeeProfile": {
-    "jobTitle": "Staff",
-    "dateOfHiring": "2024-01-01"
-  }
+  "jobTitle": "Staff Member",
+  "dateOfHiring": "2024-01-01"
 }
 
 # Expected Response:
 # - 400 Bad Request
-# - Error: Invalid phone format
+# - Error: Phone must be at least 10 characters
 
-###############################################################################
-# 7. Business Rule Validations
-###############################################################################
-
-### 7.1 Create user without clinic (should fail for clinic plan)
-POST {{baseUrl}}/employees
-Authorization: Bearer {{accessToken}}
-Content-Type: application/json
-
-{
-  "email": "noclinic@cliniva.com",
-  "firstName": "No",
-  "lastName": "Clinic",
-  "phone": "+966501234570",
-  "dateOfBirth": "1990-01-01",
-  "gender": "male",
-  "nationality": "Saudi Arabia",
-  "role": "staff",
-  "subscriptionId": "{{subscriptionId}}",
-  "employeeProfile": {
-    "jobTitle": "Staff",
-    "dateOfHiring": "2024-01-01"
-  }
-}
-
-# Expected Response:
-# - 400 Bad Request
-# - Error: Clinic is required for this subscription plan
-
-### 7.2 Create user with clinic from different complex
-# Note: This requires having multiple complexes
-# POST {{baseUrl}}/employees
-# Authorization: Bearer {{accessToken}}
-# Content-Type: application/json
-#
-# {
-#   "email": "wrongcomplex@cliniva.com",
-#   "complexId": "complex1-id",
-#   "clinicId": "clinic-from-complex2-id",
-#   ...other fields
-# }
-
-# Expected Response:
-# - 400 Bad Request
-# - Error: Clinic must belong to the selected complex

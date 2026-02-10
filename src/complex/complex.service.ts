@@ -45,6 +45,9 @@ export class ComplexService {
     // Build query filters
     const filter: any = {};
 
+    // Exclude soft-deleted complexes
+    filter.deletedAt = null;
+
     // Filter by organizationId
     if (query.organizationId) {
       filter.organizationId = new Types.ObjectId(query.organizationId);
