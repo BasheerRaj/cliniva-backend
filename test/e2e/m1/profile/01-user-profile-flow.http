@@ -6,10 +6,59 @@
 @userEmail = staff.member@cliniva.com
 @userPassword = StaffPassword@123
 
-@accessToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2OTg5YmE0Zjg4NDc5YWM0N2FhZmUxMjEiLCJlbWFpbCI6InN0YWZmLm1lbWJlckBjbGluaXZhLmNvbSIsInJvbGUiOiJzdGFmZiIsImlhdCI6MTc3MDYzMzgzMiwiZXhwIjoxNzcwNzIwMjMyfQ.LYUtqJbJiZ1w3crnL5YAJJ1NX952pbkUHDKnYP8efP0
+@accessToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2OThhNTdlZTQ5N2UwOWI1YTkyNTljM2UiLCJlbWFpbCI6InN0YWZmLm1lbWJlckBjbGluaXZhLmNvbSIsInJvbGUiOiJkb2N0b3IiLCJpYXQiOjE3NzA3MDg1NTYsImV4cCI6MTc3MDc5NDk1Nn0.kriWs4kxYrPzDSyloWJni_9TpUCpJQnYMBd8D4rtRNk
+@accessTokenOwner = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2OTg5Y2MzNTBmYTZjNmU3NDFmYTM1MDgiLCJlbWFpbCI6ImNvbXBhbnkub3duZXIxQGNsaW5pdmEuY29tIiwicm9sZSI6Im93bmVyIiwiaWF0IjoxNzcwNjcyODExLCJleHAiOjE3NzA3NTkyMTF9.jNx9YUqVUYOnlyGQ66Mq9QUCXgcr1R1bM-FC6szxAmQ
 @userId = 6989ba4f88479ac47aafe121
 
 @userRole = staff
+@organizationId = 6989d6f47cbd22766fa4bd87
+@complexId = 6989d92c3afb0243797a37a0
+@clinicId = 6989e341a2732987ac23cb54
+@specialty1 = 6989c2e2ca3d9aa044ffc558
+
+@specialty2 = 6989c2e2ca3d9aa044ffc55b
+
+
+###############################################################################
+# 0. Register a User Login
+###############################################################################
+
+POST {{baseUrl}}/employees
+Authorization: Bearer {{accessTokenOwner}}
+Content-Type: application/json
+
+{
+  "email": "{{userEmail}}",
+  "password": "{{userPassword}}",
+  "firstName": "Staff",
+  "lastName": "Member",
+  "phone": "+966502234567",
+  "role": "doctor",
+  "nationality": "Saudi Arabia",
+  "gender": "male",
+  "dateOfBirth": "1990-05-15",
+  "address": "123 Medical Street, Riyadh",
+  "employeeNumber": "EMP20260001",
+  "cardNumber": "CARD123456",
+  "maritalStatus": "married",
+  "numberOfChildren": 2,
+  "profilePictureUrl": "https://example.com/profiles/john-doe.jpg",
+  "jobTitle": "Senior Physician",
+  "dateOfHiring": "2024-01-15",
+  "salary": 25000,
+  "bankAccount": "SA1234567890123456789012",
+  "socialSecurityNumber": "SSN123456789",
+  "taxId": "TAX987654321",
+  "notes": "Specialized in cardiology",
+  "organizationId": "{{organizationId}}",
+  "complexId": "{{complexId}}",
+  "clinicId": "{{clinicId}}",
+  "specialties": [
+    "{{specialty1}}",
+    "{{specialty2}}"
+    ]
+}
+
 
 
 ###############################################################################
@@ -37,13 +86,46 @@ Authorization: Bearer {{accessToken}}
 # Expected Response:
 # - 200 OK
 # - Complete user profile including:
-#   - Basic info (name, email, phone)
-#   - Employee profile
-#   - Working hours
-#   - Assigned complex/clinic
-#   - Role and permissions
-#   - Last login
-#   - Account status
+#   {
+#     "success": true,
+#     "data": {
+#       "id": "698a57ee497e09b5a9259c3e",
+#       "email": "staff.member@cliniva.com",
+#       "firstName": "Ahmed",
+#       "lastName": "Al-Mansour",
+#       "role": "doctor",
+#       "phone": "+966506789012",
+#       "nationality": "Saudi Arabia",
+#       "gender": "male",
+#       "dateOfBirth": "1990-05-15T00:00:00.000Z",
+#       "isActive": true,
+#       "emailVerified": false,
+#       "preferredLanguage": "en",
+#       "profilePictureUrl": "/uploads/profiles/profile-uuid.jpg",
+#       "preferences": {
+#         "language": "en",
+#         "theme": "light",
+#         "notifications": {
+#           "email": true,
+#           "sms": false,
+#           "push": true,
+#           "appointmentReminders": true,
+#           "systemUpdates": false
+#         }
+#       },
+#       "subscription": { "id": "...", "planType": "company" },
+#       "organization": { "id": "...", "name": "...", "nameAr": "..." },
+#       "complex": { "id": "...", "name": "...", "nameAr": "..." },
+#       "clinic": { "id": "...", "name": "...", "nameAr": "..." },
+#       "lastLogin": "2026-02-10T10:30:00.000Z",
+#       "createdAt": "2026-02-01T08:00:00.000Z",
+#       "updatedAt": "2026-02-10T11:00:00.000Z"
+#     },
+#     "message": {
+#       "ar": "تم جلب بيانات المستخدم بنجاح",
+#       "en": "User profile retrieved successfully"
+#     }
+#   }
 
 ### 2.2 Get own employee profile
 GET {{baseUrl}}/employees/me
@@ -97,7 +179,8 @@ Authorization: Bearer {{accessToken}}
 
 # Expected Response:
 # - 200 OK
-# - Shows updated information
+# - Shows updated information with new firstName, lastName, phone, nationality
+# - profilePictureUrl is preserved if it was set
 
 ###############################################################################
 # 4. Update Contact Information
@@ -133,13 +216,38 @@ Content-Type: application/json
 #     ar: "تم إرسال رابط التحقق إلى البريد الإلكتروني الجديد",
 #     en: "Verification link sent to new email"
 #   }
+# - Response includes:
+#   {
+#     "success": true,
+#     "data": {
+#       "emailChangeInitiated": true,
+#       "newEmail": "ahmed.new@cliniva.com"
+#     },
+#     "message": {
+#       "ar": "تم إرسال رابط التحقق إلى البريد الإلكتروني الجديد",
+#       "en": "Verification link sent to new email"
+#     }
+#   }
+#
+# Note: The email change is not complete until the user clicks the verification link
+# sent to the new email address. A separate endpoint (not yet implemented) will be
+# needed to verify the token and complete the email change.
 
 ###############################################################################
 # 5. Change Password
 ###############################################################################
 
-### 5.1 Change password (success)
-POST {{baseUrl}}/auth/change-password
+# IMPORTANT: New employees created via POST /employees have isFirstLogin=true by default.
+# They MUST use /auth/first-login-password-change FIRST to set isFirstLogin=false.
+# After completing first login, they can use /auth/change-password for subsequent changes.
+#
+# Flow:
+# 1. Employee created → isFirstLogin=true
+# 2. First login → Must call /auth/first-login-password-change → isFirstLogin=false
+# 3. Subsequent logins → Can call /auth/change-password
+
+### 5.0 First login password change (required for new employees)
+POST {{baseUrl}}/auth/first-login-password-change
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
@@ -147,6 +255,27 @@ Content-Type: application/json
   "currentPassword": "{{userPassword}}",
   "newPassword": "NewPassword@123",
   "confirmPassword": "NewPassword@123"
+}
+
+# Expected Response:
+# - 200 OK
+# - Password changed successfully
+# - New tokens issued
+# - isFirstLogin set to false
+# - Message: {
+#     ar: "تم تغيير كلمة المرور بنجاح",
+#     en: "Password changed successfully"
+#   }
+
+### 5.1 Change password (success)
+POST {{baseUrl}}/auth/change-password
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "currentPassword": "NewPassword@123",
+  "newPassword": "{{userPassword}}",
+  "confirmPassword": "{{userPassword}}"
 }
 
 # Expected Response:
@@ -163,18 +292,18 @@ Content-Type: application/json
 
 {
   "email": "{{userEmail}}",
-  "password": "NewPassword@123"
+  "password": "{{userPassword}}"
 }
 
 # Expected Response:
 # - 200 OK
 # - Login successful with new password
 
-@newAccessToken = <copy_new_access_token>
+# @newAccessToken = <copy_new_access_token>
 
 ### 5.3 Change password with wrong current password
 POST {{baseUrl}}/auth/change-password
-Authorization: Bearer {{newAccessToken}}
+Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
@@ -193,7 +322,7 @@ Content-Type: application/json
 
 ### 5.4 Change password with mismatched confirmation
 POST {{baseUrl}}/auth/change-password
-Authorization: Bearer {{newAccessToken}}
+Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
@@ -212,7 +341,7 @@ Content-Type: application/json
 
 ### 5.5 Change password with weak password
 POST {{baseUrl}}/auth/change-password
-Authorization: Bearer {{newAccessToken}}
+Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
@@ -244,7 +373,7 @@ Content-Type: application/json
 
 ### 6.1 Update language preference
 PUT {{baseUrl}}/users/me/preferences
-Authorization: Bearer {{newAccessToken}}
+Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
@@ -258,7 +387,7 @@ Content-Type: application/json
 
 ### 6.2 Update theme preference
 PUT {{baseUrl}}/users/me/preferences
-Authorization: Bearer {{newAccessToken}}
+Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
@@ -271,7 +400,7 @@ Content-Type: application/json
 
 ### 6.3 Update notification preferences
 PUT {{baseUrl}}/users/me/preferences
-Authorization: Bearer {{newAccessToken}}
+Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
@@ -290,7 +419,7 @@ Content-Type: application/json
 
 ### 6.4 Get current preferences
 GET {{baseUrl}}/users/me/preferences
-Authorization: Bearer {{newAccessToken}}
+Authorization: Bearer {{accessToken}}
 
 # Expected Response:
 # - 200 OK
@@ -301,36 +430,72 @@ Authorization: Bearer {{newAccessToken}}
 ###############################################################################
 
 ### 7.1 Upload profile picture
-POST {{baseUrl}}/users/me/profile-picture
-Authorization: Bearer {{newAccessToken}}
-Content-Type: multipart/form-data
+# Note: To test this in VS Code REST Client:
+# 1. Create a file named 'test-image.jpg' in the project root
+# 2. Or use an existing image file
+# 3. Update the file path below to match your image location
 
-# Form data:
-# - file: <image_file>
+POST {{baseUrl}}/users/me/profile-picture
+Authorization: Bearer {{accessToken}}
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
+
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="file"; filename="profile.jpg"
+Content-Type: image/jpeg
+
+< d:/client.jpg
+------WebKitFormBoundary7MA4YWxkTrZu0gW--
 
 # Expected Response:
 # - 200 OK
 # - Profile picture uploaded
-# - Returns URL: {
-#     profilePictureUrl: "https://storage.cliniva.com/profiles/user-id.jpg"
+# - Returns: {
+#     success: true,
+#     data: {
+#       profilePictureUrl: "/uploads/profiles/profile-uuid.jpg"
+#     },
+#     message: {
+#       ar: "تم رفع صورة الملف الشخصي بنجاح",
+#       en: "Profile picture uploaded successfully"
+#     }
 #   }
 
 ### 7.2 Get profile with picture
 GET {{baseUrl}}/users/me
-Authorization: Bearer {{newAccessToken}}
+Authorization: Bearer {{accessToken}}
 
 # Expected Response:
 # - 200 OK
-# - Profile includes profilePictureUrl
+# - Profile includes profilePictureUrl field
+# - Example:
+#   {
+#     "success": true,
+#     "data": {
+#       "id": "698a57ee497e09b5a9259c3e",
+#       "email": "staff.member@cliniva.com",
+#       "firstName": "Ahmed",
+#       "lastName": "Al-Mansour",
+#       "profilePictureUrl": "/uploads/profiles/profile-abc123.jpg",
+#       ...
+#     },
+#     "message": {
+#       "ar": "تم جلب بيانات المستخدم بنجاح",
+#       "en": "User profile retrieved successfully"
+#     }
+#   }
 
 ### 7.3 Delete profile picture
 DELETE {{baseUrl}}/users/me/profile-picture
-Authorization: Bearer {{newAccessToken}}
+Authorization: Bearer {{accessToken}}
 
 # Expected Response:
 # - 200 OK
 # - Profile picture removed
 # - profilePictureUrl set to null
+# - Message: {
+#     ar: "تم حذف صورة الملف الشخصي بنجاح",
+#     en: "Profile picture deleted successfully"
+#   }
 
 ###############################################################################
 # 8. View Activity History
@@ -338,7 +503,7 @@ Authorization: Bearer {{newAccessToken}}
 
 ### 8.1 Get own login history
 GET {{baseUrl}}/users/me/login-history
-Authorization: Bearer {{newAccessToken}}
+Authorization: Bearer {{accessToken}}
 
 # Expected Response:
 # - 200 OK
@@ -350,7 +515,7 @@ Authorization: Bearer {{newAccessToken}}
 
 ### 8.2 Get own activity log
 GET {{baseUrl}}/users/me/activity-log?limit=50
-Authorization: Bearer {{newAccessToken}}
+Authorization: Bearer {{accessToken}}
 
 # Expected Response:
 # - 200 OK
@@ -366,7 +531,7 @@ Authorization: Bearer {{newAccessToken}}
 
 ### 9.1 Enable 2FA
 POST {{baseUrl}}/auth/2fa/enable
-Authorization: Bearer {{newAccessToken}}
+Authorization: Bearer {{accessToken}}
 
 # Expected Response:
 # - 200 OK
@@ -379,7 +544,7 @@ Authorization: Bearer {{newAccessToken}}
 
 ### 9.2 Verify 2FA setup
 POST {{baseUrl}}/auth/2fa/verify
-Authorization: Bearer {{newAccessToken}}
+Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
@@ -392,7 +557,7 @@ Content-Type: application/json
 
 ### 9.3 Disable 2FA
 POST {{baseUrl}}/auth/2fa/disable
-Authorization: Bearer {{newAccessToken}}
+Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
@@ -410,7 +575,7 @@ Content-Type: application/json
 
 ### 10.1 Update with invalid phone format
 PUT {{baseUrl}}/users/me
-Authorization: Bearer {{newAccessToken}}
+Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
@@ -423,7 +588,7 @@ Content-Type: application/json
 
 ### 10.2 Update with invalid email format
 PUT {{baseUrl}}/users/me
-Authorization: Bearer {{newAccessToken}}
+Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
@@ -436,7 +601,7 @@ Content-Type: application/json
 
 ### 10.3 Attempt to change role (should fail)
 PUT {{baseUrl}}/users/me
-Authorization: Bearer {{newAccessToken}}
+Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
@@ -449,7 +614,7 @@ Content-Type: application/json
 
 ### 10.4 Attempt to change status (should fail)
 PUT {{baseUrl}}/users/me
-Authorization: Bearer {{newAccessToken}}
+Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {

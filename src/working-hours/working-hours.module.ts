@@ -12,7 +12,11 @@ import { ComplexSchema } from '../database/schemas/complex.schema';
 import { UserSchema } from '../database/schemas/user.schema';
 import { AppointmentSchema } from '../database/schemas/appointment.schema';
 import { NotificationSchema } from '../database/schemas/notification.schema';
+import { SubscriptionSchema } from '../database/schemas/subscription.schema';
+import { SubscriptionPlanSchema } from '../database/schemas/subscription-plan.schema';
 import { CommonModule } from '../common/common.module';
+import { AuthModule } from '../auth/auth.module';
+import { SubscriptionModule } from '../subscription/subscription.module';
 
 @Module({
   imports: [
@@ -23,8 +27,12 @@ import { CommonModule } from '../common/common.module';
       { name: 'Complex', schema: ComplexSchema },
       { name: 'Appointment', schema: AppointmentSchema },
       { name: 'Notification', schema: NotificationSchema },
+      { name: 'Subscription', schema: SubscriptionSchema },
+      { name: 'SubscriptionPlan', schema: SubscriptionPlanSchema },
     ]),
     CommonModule,
+    AuthModule,
+    SubscriptionModule,
   ],
   controllers: [WorkingHoursController],
   providers: [

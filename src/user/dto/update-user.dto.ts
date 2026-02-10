@@ -93,6 +93,15 @@ export class UpdateUserDto {
   preferredLanguage?: 'ar' | 'en';
 
   @ApiPropertyOptional({
+    description: 'Profile picture URL',
+    example: '/uploads/profiles/profile-uuid.jpg',
+    type: String,
+  })
+  @IsOptional()
+  @IsString()
+  profilePictureUrl?: string;
+
+  @ApiPropertyOptional({
     description: 'Whether the user has completed the onboarding process',
     example: true,
     type: Boolean,

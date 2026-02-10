@@ -6,6 +6,8 @@ import {
   Body,
   Param,
   Query,
+  Request,
+  UseGuards,
   HttpStatus,
   HttpCode,
   BadRequestException,
@@ -20,6 +22,7 @@ import {
   ApiBody,
   ApiQuery,
   ApiParam,
+  ApiBearerAuth,
 } from '@nestjs/swagger';
 import { WorkingHoursService } from './working-hours.service';
 import { WorkingHoursValidationService } from './services/working-hours-validation.service';
@@ -48,6 +51,7 @@ import {
 } from './dto/update-with-rescheduling.dto';
 import { WorkingHours } from '../database/schemas/working-hours.schema';
 import { BilingualMessage } from '../common/types/bilingual-message.type';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 /**
  * Standard API response format
@@ -1564,6 +1568,150 @@ export class WorkingHoursController {
       ar: 'تم إنشاء ساعات العمل بنجاح مع التحقق من الكيان الأصلي',
       en: 'Working hours created successfully with parent validation',
     });
+  }
+
+  /**
+   * Get current user's working hours
+   *
+   * This endpoint retrieves the working hours for the currently authenticated user.
+   * Requires JWT authentication.
+   *
+   * @param {any} req - Request object with authenticated user
+   * @returns {Promise<StandardResponse<WorkingHours[]>>} User's working hours
+   *
+   * @example
+   * GET /working-hours/me
+   * Authorization: Bearer <token>
+   */
+  @Get('me')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Get current user working hours',
+    description:
+      'Retrieves the working hours schedule for the currently authenticated user. ' +
+      'Returns all days of the week with their working status and times. ' +
+      'Requires JWT authentication.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'User working hours retrieved successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: true },
+        data: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              _id: { type: 'string', example: '507f1f77bcf86cd799439011' },
+              entityType: { type: 'string', example: 'user' },
+              entityId: { type: 'string', example: '507f1f77bcf86cd799439012' },
+              dayOfWeek: { type: 'string', example: 'monday' },
+              isWorkingDay: { type: 'boolean', example: true },
+              openingTime: { type: 'string', example: '09:00' },
+              closingTime: { type: 'string', example: '17:00' },
+              breakStartTime: { type: 'string', example: '12:00' },
+              breakEndTime: { type: 'string', example: '13:00' },
+              createdAt: {
+                type: 'string',
+                example: '2026-02-07T10:00:00.000Z',
+              },
+              updatedAt: {
+                type: 'string',
+                example: '2026-02-07T10:00:00.000Z',
+              },
+            },
+          },
+        },
+        message: {
+          type: 'object',
+          properties: {
+            ar: { type: 'string', example: 'تم استرجاع ساعات العمل بنجاح' },
+            en: {
+              type: 'string',
+              example: 'Working hours retrieved successfully',
+            },
+          },
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - Invalid or missing token',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'No working hours configured for user',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: false },
+        message: {
+          type: 'object',
+          properties: {
+            ar: { type: 'string', example: 'لم يتم تكوين ساعات العمل للمستخدم' },
+            en: {
+              type: 'string',
+              example: 'No working hours configured for user',
+            },
+          },
+        },
+      },
+    },
+  })
+  async getCurrentUserWorkingHours(
+    @Request() req: any,
+  ): Promise<StandardResponse<WorkingHours[]>> {
+    try {
+      // Extract user ID from JWT token - the strategy returns { id, email, role, ... }
+      const userId = req.user?.id;
+
+      if (!userId) {
+        throw new NotFoundException({
+          message: {
+            ar: 'لم يتم العثور على معرف المستخدم',
+            en: 'User ID not found',
+          },
+          code: 'USER_ID_NOT_FOUND',
+        });
+      }
+
+      // Get working hours for the user
+      const workingHours = await this.workingHoursService.getWorkingHours(
+        'user',
+        userId,
+      );
+
+      if (!workingHours || workingHours.length === 0) {
+        throw new NotFoundException({
+          message: {
+            ar: 'لم يتم تكوين ساعات العمل للمستخدم',
+            en: 'No working hours configured for user',
+          },
+          code: 'WORKING_HOURS_NOT_FOUND',
+        });
+      }
+
+      return this.createSuccessResponse(workingHours, {
+        ar: 'تم استرجاع ساعات العمل بنجاح',
+        en: 'Working hours retrieved successfully',
+      });
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      throw new InternalServerErrorException({
+        message: {
+          ar: 'حدث خطأ أثناء استرجاع ساعات العمل',
+          en: 'Error retrieving working hours',
+        },
+        code: 'WORKING_HOURS_RETRIEVAL_ERROR',
+      });
+    }
   }
 
   /**

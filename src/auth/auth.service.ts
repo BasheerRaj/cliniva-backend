@@ -18,6 +18,7 @@ import { SubscriptionService } from '../subscription/subscription.service';
 import { RateLimitService } from './rate-limit.service';
 import { AuditService } from './audit.service';
 import { SessionService } from './session.service';
+import { EmailService } from './email.service';
 
 @Injectable()
 export class AuthService {
@@ -32,6 +33,7 @@ export class AuthService {
     private readonly rateLimitService: RateLimitService,
     private readonly auditService: AuditService,
     private readonly sessionService: SessionService,
+    private readonly emailService: EmailService,
   ) {}
 
   /**
@@ -883,6 +885,93 @@ export class AuthService {
   }
 
   /**
+   * Initiate email change with verification
+   *
+   * This method initiates an email change process by:
+   * 1. Checking if the new email is already in use
+   * 2. Generating a verification token
+   * 3. Storing the pending email change
+   * 4. Sending verification email to the new address
+   *
+   * @param userId - User ID requesting email change
+   * @param newEmail - New email address
+   * @returns Success response
+   */
+  async initiateEmailChange(userId: string, newEmail: string): Promise<void> {
+    try {
+      // Validate user exists
+      const user = await this.userModel.findById(userId).exec();
+      if (!user) {
+        throw new NotFoundException({
+          message: {
+            ar: 'المستخدم غير موجود',
+            en: 'User not found',
+          },
+          code: 'USER_NOT_FOUND',
+        });
+      }
+
+      // Check if new email is already in use
+      const existingUser = await this.userModel
+        .findOne({ email: newEmail.toLowerCase() })
+        .exec();
+      if (existingUser) {
+        throw new ConflictException({
+          message: {
+            ar: 'البريد الإلكتروني مستخدم بالفعل',
+            en: 'Email already in use',
+          },
+          code: 'EMAIL_ALREADY_IN_USE',
+        });
+      }
+
+      // Generate verification token
+      const verificationToken = crypto.randomBytes(32).toString('hex');
+      const hashedToken = crypto
+        .createHash('sha256')
+        .update(verificationToken)
+        .digest('hex');
+
+      // Store pending email change (expires in 24 hours)
+      user.emailVerificationToken = hashedToken;
+      user.emailVerificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      (user as any).pendingEmail = newEmail.toLowerCase();
+      await user.save();
+
+      // Send verification email
+      const language = user.preferredLanguage || 'en';
+      await this.emailService.sendEmailChangeVerification(
+        newEmail,
+        user.firstName,
+        verificationToken,
+        language,
+      );
+
+      this.logger.log(
+        `Email change initiated for user ${userId}. Verification sent to ${newEmail}`,
+      );
+    } catch (error) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof ConflictException
+      ) {
+        throw error;
+      }
+      this.logger.error(
+        `Email change initiation failed for user ${userId}: ${error.message}`,
+        error.stack,
+      );
+      throw new BadRequestException({
+        message: {
+          ar: 'فشل بدء تغيير البريد الإلكتروني',
+          en: 'Failed to initiate email change',
+        },
+        code: 'EMAIL_CHANGE_INITIATION_FAILED',
+      });
+    }
+  }
+
+  /**
    * Request password reset
    *
    * Requirements: 2.5, 2.6, 2.10, 7.9
@@ -1338,6 +1427,59 @@ export class AuthService {
         },
         code: 'PASSWORD_RESET_EMAIL_FAILED',
       });
+    }
+  }
+
+  /**
+   * Get login history for a user
+   * @param userId - User ID
+   * @param limit - Number of records to return
+   * @returns Array of login audit logs
+   */
+  async getLoginHistory(userId: string, limit: number = 50): Promise<any[]> {
+    try {
+      return await this.auditLogModel
+        .find({
+          userId: new Types.ObjectId(userId),
+          eventType: {
+            $in: ['login_success', 'login_failure'],
+          },
+        })
+        .sort({ timestamp: -1 })
+        .limit(limit)
+        .select('eventType timestamp ipAddress userAgent success details')
+        .lean()
+        .exec();
+    } catch (error) {
+      this.logger.error(
+        `Failed to get login history for user ${userId}: ${error.message}`,
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Get activity log for a user
+   * @param userId - User ID
+   * @param limit - Number of records to return
+   * @returns Array of activity audit logs
+   */
+  async getUserActivityLog(userId: string, limit: number = 50): Promise<any[]> {
+    try {
+      return await this.auditLogModel
+        .find({
+          userId: new Types.ObjectId(userId),
+        })
+        .sort({ timestamp: -1 })
+        .limit(limit)
+        .select('eventType timestamp ipAddress userAgent success details')
+        .lean()
+        .exec();
+    } catch (error) {
+      this.logger.error(
+        `Failed to get activity log for user ${userId}: ${error.message}`,
+      );
+      throw error;
     }
   }
 }

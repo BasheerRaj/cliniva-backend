@@ -193,6 +193,43 @@ export class EmailService {
   }
 
   /**
+   * Send email change verification
+   *
+   * @param newEmail - New email address
+   * @param firstName - User's first name
+   * @param verificationToken - Email verification token
+   * @param language - Preferred language ('ar' or 'en')
+   *
+   * Requirement: Email change verification
+   */
+  async sendEmailChangeVerification(
+    newEmail: string,
+    firstName: string,
+    verificationToken: string,
+    language: 'ar' | 'en',
+  ): Promise<void> {
+    try {
+      this.logger.log(
+        `Sending email change verification to ${newEmail} in ${language}`,
+      );
+
+      // TODO: Implement actual email sending with templates
+      this.logger.debug(
+        `Email change verification would be sent to ${newEmail}`,
+      );
+      this.logger.debug(
+        `Verification token: ${verificationToken.substring(0, 8)}...`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to send email change verification to ${newEmail}: ${error.message}`,
+        error.stack,
+      );
+      throw new Error('Failed to send email change verification');
+    }
+  }
+
+  /**
    * Send appointment notification
    *
    * @param email - Recipient email address

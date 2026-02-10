@@ -45,6 +45,15 @@ export class User extends Document {
   @Prop({ default: false })
   emailVerified: boolean;
 
+  @Prop()
+  emailVerificationToken?: string;
+
+  @Prop()
+  emailVerificationExpires?: Date;
+
+  @Prop()
+  pendingEmail?: string;
+
   @Prop({ default: false })
   twoFactorEnabled: boolean;
 
@@ -75,6 +84,36 @@ export class User extends Document {
 
   @Prop({ enum: ['ar', 'en'] })
   preferredLanguage?: 'ar' | 'en';
+
+  @Prop()
+  profilePictureUrl?: string;
+
+  // User preferences
+  @Prop({
+    type: {
+      language: { type: String, enum: ['ar', 'en'], default: 'en' },
+      theme: { type: String, enum: ['light', 'dark', 'auto'], default: 'light' },
+      notifications: {
+        email: { type: Boolean, default: true },
+        sms: { type: Boolean, default: false },
+        push: { type: Boolean, default: true },
+        appointmentReminders: { type: Boolean, default: true },
+        systemUpdates: { type: Boolean, default: false },
+      },
+    },
+    default: {},
+  })
+  preferences?: {
+    language?: 'ar' | 'en';
+    theme?: 'light' | 'dark' | 'auto';
+    notifications?: {
+      email?: boolean;
+      sms?: boolean;
+      push?: boolean;
+      appointmentReminders?: boolean;
+      systemUpdates?: boolean;
+    };
+  };
 
   // Onboarding and setup fields
   @Prop({ default: false })

@@ -877,4 +877,112 @@ export class UserService {
       });
     }
   }
+
+  /**
+   * Get user preferences
+   */
+  async getUserPreferences(userId: string) {
+    try {
+      const user = await this.userModel.findById(userId).select('preferences preferredLanguage').exec();
+
+      if (!user) {
+        throw new NotFoundException({
+          message: ERROR_MESSAGES.USER_NOT_FOUND,
+          code: 'USER_NOT_FOUND',
+        });
+      }
+
+      // Return preferences with defaults
+      const preferences = user.preferences || {};
+      return {
+        language: preferences.language || user.preferredLanguage || 'en',
+        theme: preferences.theme || 'light',
+        notifications: {
+          email: preferences.notifications?.email ?? true,
+          sms: preferences.notifications?.sms ?? false,
+          push: preferences.notifications?.push ?? true,
+          appointmentReminders: preferences.notifications?.appointmentReminders ?? true,
+          systemUpdates: preferences.notifications?.systemUpdates ?? false,
+        },
+      };
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+
+      this.logger.error(`Error retrieving preferences for user ${userId}:`, error);
+      throw new BadRequestException({
+        message: {
+          ar: 'حدث خطأ أثناء جلب التفضيلات',
+          en: 'Error retrieving preferences',
+        },
+        code: 'PREFERENCES_RETRIEVAL_ERROR',
+      });
+    }
+  }
+
+  /**
+   * Update user preferences
+   */
+  async updateUserPreferences(userId: string, preferencesDto: any) {
+    try {
+      const user = await this.userModel.findById(userId).exec();
+
+      if (!user) {
+        throw new NotFoundException({
+          message: ERROR_MESSAGES.USER_NOT_FOUND,
+          code: 'USER_NOT_FOUND',
+        });
+      }
+
+      // Initialize preferences if not exists
+      if (!user.preferences) {
+        user.preferences = {};
+      }
+
+      // Update language
+      if (preferencesDto.language) {
+        user.preferences.language = preferencesDto.language;
+        user.preferredLanguage = preferencesDto.language; // Keep in sync
+      }
+
+      // Update theme
+      if (preferencesDto.theme) {
+        user.preferences.theme = preferencesDto.theme;
+      }
+
+      // Update notifications
+      if (preferencesDto.notifications) {
+        if (!user.preferences.notifications) {
+          user.preferences.notifications = {};
+        }
+        Object.assign(user.preferences.notifications, preferencesDto.notifications);
+      }
+
+      await user.save();
+
+      this.logger.log(`Preferences updated for user ${userId}`);
+
+      return ResponseBuilder.success(
+        user.preferences,
+        {
+          ar: 'تم تحديث التفضيلات بنجاح',
+          en: 'Preferences updated successfully',
+        },
+      );
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+
+      this.logger.error(`Error updating preferences for user ${userId}:`, error);
+      throw new BadRequestException({
+        message: {
+          ar: 'حدث خطأ أثناء تحديث التفضيلات',
+          en: 'Error updating preferences',
+        },
+        code: 'PREFERENCES_UPDATE_ERROR',
+      });
+    }
+  }
 }

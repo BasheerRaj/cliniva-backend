@@ -387,7 +387,7 @@ export class EmployeeService {
     // Create user account
     const userData = {
       email: createEmployeeDto.email,
-      password: hashedPassword,
+      passwordHash: hashedPassword,
       firstName: createEmployeeDto.firstName,
       lastName: createEmployeeDto.lastName,
       phone: createEmployeeDto.phone,

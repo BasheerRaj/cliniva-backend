@@ -14,6 +14,9 @@ import {
   Request,
   Logger,
   HttpException,
+  UploadedFile,
+  UseInterceptors,
+  BadRequestException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -23,7 +26,13 @@ import {
   ApiParam,
   ApiQuery,
   ApiBody,
+  ApiConsumes,
 } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import { extname } from 'path';
+import { v4 as uuidv4 } from 'uuid';
+import * as fs from 'fs';
 import { UserService } from './user.service';
 import { UserDropdownService } from './user-dropdown.service';
 import {
@@ -31,6 +40,7 @@ import {
   UserEntitiesResponseDto,
 } from './dto/check-user-entities.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { UpdatePreferencesDto } from './dto/update-preferences.dto';
 import { UpdateUserStatusDto } from './dto/update-user-status.dto';
 import { DeactivateWithTransferDto } from './dto/deactivate-with-transfer.dto';
 import { TransferAppointmentsDto } from './dto/transfer-appointments.dto';
@@ -78,8 +88,958 @@ export class UserController {
   @Get('me')
   @UseGuards(JwtAuthGuard)
   async getCurrentUser(@Request() req: any) {
-    console.log('🔍 JWT User from request:', req.user);
-    return { user: req.user, message: 'Authentication working!' };
+    try {
+      const userId = req.user?.id || req.user?.userId || req.user?.sub;
+
+      if (!userId) {
+        throw new HttpException(
+          {
+            message: {
+              ar: 'معرف المستخدم غير موجود',
+              en: 'User ID not found',
+            },
+            code: 'USER_ID_NOT_FOUND',
+          },
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      // Get complete user profile with populated relations
+      const user = await this.userService.getUserDetailById(userId);
+
+      return {
+        success: true,
+        data: {
+          id: (user as any)._id.toString(),
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          role: user.role,
+          phone: user.phone,
+          nationality: user.nationality,
+          gender: user.gender,
+          dateOfBirth: user.dateOfBirth,
+          isActive: user.isActive,
+          emailVerified: user.emailVerified,
+          preferredLanguage: user.preferredLanguage,
+          profilePictureUrl: user.profilePictureUrl,
+          preferences: user.preferences,
+          subscription: user.subscriptionId
+            ? {
+                id: (user.subscriptionId as any)._id.toString(),
+                planType: (user.subscriptionId as any).planType,
+              }
+            : null,
+          organization: user.organizationId
+            ? {
+                id: (user.organizationId as any)._id.toString(),
+                name: (user.organizationId as any).name,
+                nameAr: (user.organizationId as any).nameAr,
+              }
+            : null,
+          complex: user.complexId
+            ? {
+                id: (user.complexId as any)._id.toString(),
+                name: (user.complexId as any).name,
+                nameAr: (user.complexId as any).nameAr,
+              }
+            : null,
+          clinic: user.clinicId
+            ? {
+                id: (user.clinicId as any)._id.toString(),
+                name: (user.clinicId as any).name,
+                nameAr: (user.clinicId as any).nameAr,
+              }
+            : null,
+          lastLogin: user.lastLogin,
+          createdAt: (user as any).createdAt,
+          updatedAt: (user as any).updatedAt,
+        },
+        message: {
+          ar: 'تم جلب بيانات المستخدم بنجاح',
+          en: 'User profile retrieved successfully',
+        },
+      };
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      this.logger.error(
+        `Get current user failed: ${error.message}`,
+        error.stack,
+      );
+      throw new HttpException(
+        {
+          message: {
+            ar: 'فشل جلب بيانات المستخدم',
+            en: 'Failed to retrieve user profile',
+          },
+          code: 'USER_RETRIEVAL_FAILED',
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @ApiOperation({
+    summary: 'Update current user profile',
+    description:
+      'Update the profile information of the currently authenticated user. Users can only update their own basic information (name, phone, nationality).',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Profile updated successfully',
+    schema: {
+      example: {
+        success: true,
+        data: {
+          id: '507f1f77bcf86cd799439011',
+          email: 'user@cliniva.com',
+          firstName: 'Ahmed',
+          lastName: 'Al-Mansour',
+          phone: '+966506789012',
+          nationality: 'Saudi Arabia',
+        },
+        message: {
+          ar: 'تم تحديث الملف الشخصي بنجاح',
+          en: 'Profile updated successfully',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Validation error',
+    schema: {
+      example: EXAMPLES.ERROR_VALIDATION_EXAMPLE,
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - Invalid or missing token',
+    schema: {
+      example: EXAMPLES.ERROR_UNAUTHORIZED_EXAMPLE,
+    },
+  })
+  @ApiBearerAuth()
+  @ApiBody({
+    description: 'Profile update data (only basic fields allowed)',
+    schema: {
+      type: 'object',
+      properties: {
+        firstName: { type: 'string', example: 'Ahmed' },
+        lastName: { type: 'string', example: 'Al-Mansour' },
+        phone: { type: 'string', example: '+966506789012' },
+        nationality: { type: 'string', example: 'Saudi Arabia' },
+      },
+    },
+  })
+  @Put('me')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async updateCurrentUserProfile(
+    @Body() updateData: Partial<UpdateUserDto>,
+    @Request() req: any,
+  ) {
+    try {
+      // Get userId from JWT token
+      const userId = req.user?.id || req.user?.userId || req.user?.sub;
+
+      if (!userId) {
+        this.logger.error('User ID not found in request');
+        throw new HttpException(
+          {
+            message: {
+              ar: 'معرف المستخدم غير موجود',
+              en: 'User ID not found',
+            },
+            code: 'USER_ID_NOT_FOUND',
+          },
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      // Handle email change separately (requires verification)
+      if (updateData.email) {
+        // Initiate email change with verification
+        await this.authService.initiateEmailChange(userId, updateData.email);
+        
+        return {
+          success: true,
+          data: {
+            emailChangeInitiated: true,
+            newEmail: updateData.email,
+          },
+          message: {
+            ar: 'تم إرسال رابط التحقق إلى البريد الإلكتروني الجديد',
+            en: 'Verification link sent to new email',
+          },
+        };
+      }
+
+      // Only allow updating specific fields for self-update
+      const allowedFields = ['firstName', 'lastName', 'phone', 'nationality'];
+      const filteredData: Partial<UpdateUserDto> = {};
+      
+      for (const field of allowedFields) {
+        if (updateData[field] !== undefined) {
+          filteredData[field] = updateData[field];
+        }
+      }
+
+      // Prevent users from changing sensitive fields
+      if (Object.keys(filteredData).length === 0) {
+        throw new HttpException(
+          {
+            message: {
+              ar: 'لا توجد حقول صالحة للتحديث',
+              en: 'No valid fields to update',
+            },
+            code: 'NO_VALID_FIELDS',
+          },
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      // Update user profile
+      const updatedUser = await this.userService.updateUser(
+        userId,
+        filteredData,
+        userId, // User is updating their own profile
+      );
+
+      return {
+        success: true,
+        data: {
+          id: updatedUser._id,
+          email: updatedUser.email,
+          firstName: updatedUser.firstName,
+          lastName: updatedUser.lastName,
+          phone: updatedUser.phone,
+          nationality: updatedUser.nationality,
+        },
+        message: {
+          ar: 'تم تحديث الملف الشخصي بنجاح',
+          en: 'Profile updated successfully',
+        },
+      };
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      this.logger.error(
+        `Update profile failed: ${error.message}`,
+        error.stack,
+      );
+      throw new HttpException(
+        {
+          message: {
+            ar: 'فشل تحديث الملف الشخصي',
+            en: 'Failed to update profile',
+          },
+          code: 'PROFILE_UPDATE_FAILED',
+        },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+  }
+
+  @ApiOperation({
+    summary: 'Upload profile picture',
+    description: 'Upload a profile picture for the currently authenticated user. Only image files are allowed (JPEG, PNG, GIF, WebP, SVG). Maximum file size: 5MB.',
+  })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary',
+          description: 'Profile picture image file',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Profile picture uploaded successfully',
+    schema: {
+      example: {
+        success: true,
+        data: {
+          profilePictureUrl: '/uploads/profiles/user-123.jpg',
+        },
+        message: {
+          ar: 'تم رفع صورة الملف الشخصي بنجاح',
+          en: 'Profile picture uploaded successfully',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad Request - Invalid file type or size',
+    schema: {
+      example: {
+        message: {
+          ar: 'نوع الملف غير صالح. يجب أن تكون الصورة بصيغة JPEG أو PNG أو GIF أو WebP أو SVG',
+          en: 'Invalid file type. Profile picture must be an image (JPEG, PNG, GIF, WebP, or SVG)',
+        },
+        code: 'INVALID_FILE_TYPE',
+      },
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized',
+  })
+  @ApiBearerAuth()
+  @Post('me/profile-picture')
+  @UseGuards(JwtAuthGuard)
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: diskStorage({
+        destination: (req, file, cb) => {
+          const uploadPath = './uploads/profiles';
+          if (!fs.existsSync(uploadPath)) {
+            fs.mkdirSync(uploadPath, { recursive: true });
+          }
+          cb(null, uploadPath);
+        },
+        filename: (req, file, cb) => {
+          const uniqueName = `profile-${uuidv4()}${extname(file.originalname)}`;
+          cb(null, uniqueName);
+        },
+      }),
+      fileFilter: (req, file, cb) => {
+        const allowedTypes = [
+          'image/jpeg',
+          'image/jpg',
+          'image/png',
+          'image/gif',
+          'image/webp',
+          'image/svg+xml',
+        ];
+        if (allowedTypes.includes(file.mimetype)) {
+          cb(null, true);
+        } else {
+          cb(
+            new BadRequestException({
+              message: {
+                ar: 'نوع الملف غير صالح. يجب أن تكون الصورة بصيغة JPEG أو PNG أو GIF أو WebP أو SVG',
+                en: 'Invalid file type. Profile picture must be an image (JPEG, PNG, GIF, WebP, or SVG)',
+              },
+              code: 'INVALID_FILE_TYPE',
+            }),
+            false,
+          );
+        }
+      },
+      limits: {
+        fileSize: 5 * 1024 * 1024, // 5MB
+      },
+    }),
+  )
+  async uploadProfilePicture(
+    @UploadedFile() file: Express.Multer.File,
+    @Request() req: any,
+  ) {
+    try {
+      if (!file) {
+        throw new BadRequestException({
+          message: {
+            ar: 'لم يتم رفع أي ملف',
+            en: 'No file uploaded',
+          },
+          code: 'NO_FILE_UPLOADED',
+        });
+      }
+
+      const userId = req.user?.id || req.user?.userId || req.user?.sub;
+      if (!userId) {
+        // Clean up uploaded file
+        if (fs.existsSync(file.path)) {
+          fs.unlinkSync(file.path);
+        }
+        throw new HttpException(
+          {
+            message: {
+              ar: 'معرف المستخدم غير موجود',
+              en: 'User ID not found',
+            },
+            code: 'USER_ID_NOT_FOUND',
+          },
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      // Get current user to check for old profile picture
+      const user = await this.userService.findById(userId);
+      if (user && user.profilePictureUrl) {
+        // Delete old profile picture if it exists
+        const oldPath = `.${user.profilePictureUrl}`;
+        if (fs.existsSync(oldPath)) {
+          fs.unlinkSync(oldPath);
+        }
+      }
+
+      // Store relative path
+      const relativePath = `/uploads/profiles/${file.filename}`;
+
+      // Update user profile with new picture URL
+      await this.userService.updateUser(
+        userId,
+        { profilePictureUrl: relativePath },
+        userId,
+      );
+
+      return {
+        success: true,
+        data: {
+          profilePictureUrl: relativePath,
+        },
+        message: {
+          ar: 'تم رفع صورة الملف الشخصي بنجاح',
+          en: 'Profile picture uploaded successfully',
+        },
+      };
+    } catch (error) {
+      // Clean up uploaded file on error
+      if (file && file.path && fs.existsSync(file.path)) {
+        fs.unlinkSync(file.path);
+      }
+
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      this.logger.error(
+        `Upload profile picture failed: ${error.message}`,
+        error.stack,
+      );
+      throw new HttpException(
+        {
+          message: {
+            ar: 'فشل رفع صورة الملف الشخصي',
+            en: 'Failed to upload profile picture',
+          },
+          code: 'PROFILE_PICTURE_UPLOAD_FAILED',
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @ApiOperation({
+    summary: 'Delete profile picture',
+    description: 'Delete the profile picture of the currently authenticated user',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Profile picture deleted successfully',
+    schema: {
+      example: {
+        success: true,
+        message: {
+          ar: 'تم حذف صورة الملف الشخصي بنجاح',
+          en: 'Profile picture deleted successfully',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized',
+  })
+  @ApiBearerAuth()
+  @Delete('me/profile-picture')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async deleteProfilePicture(@Request() req: any) {
+    try {
+      const userId = req.user?.id || req.user?.userId || req.user?.sub;
+      if (!userId) {
+        throw new HttpException(
+          {
+            message: {
+              ar: 'معرف المستخدم غير موجود',
+              en: 'User ID not found',
+            },
+            code: 'USER_ID_NOT_FOUND',
+          },
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      // Get current user to find profile picture
+      const user = await this.userService.findById(userId);
+      if (user && user.profilePictureUrl) {
+        // Delete profile picture file
+        const filePath = `.${user.profilePictureUrl}`;
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+        }
+
+        // Update user profile to remove picture URL
+        await this.userService.updateUser(
+          userId,
+          { profilePictureUrl: undefined },
+          userId,
+        );
+      }
+
+      return {
+        success: true,
+        message: {
+          ar: 'تم حذف صورة الملف الشخصي بنجاح',
+          en: 'Profile picture deleted successfully',
+        },
+      };
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      this.logger.error(
+        `Delete profile picture failed: ${error.message}`,
+        error.stack,
+      );
+      throw new HttpException(
+        {
+          message: {
+            ar: 'فشل حذف صورة الملف الشخصي',
+            en: 'Failed to delete profile picture',
+          },
+          code: 'PROFILE_PICTURE_DELETE_FAILED',
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @ApiOperation({
+    summary: 'Get current user login history',
+    description: 'Retrieve login history for the currently authenticated user including successful and failed login attempts',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Login history retrieved successfully',
+    schema: {
+      example: {
+        success: true,
+        data: {
+          logins: [
+            {
+              timestamp: '2026-02-10T10:30:00.000Z',
+              ipAddress: '192.168.1.100',
+              userAgent: 'Mozilla/5.0...',
+              success: true,
+              eventType: 'login_success',
+            },
+            {
+              timestamp: '2026-02-09T14:20:00.000Z',
+              ipAddress: '192.168.1.100',
+              userAgent: 'Mozilla/5.0...',
+              success: false,
+              eventType: 'login_failure',
+              reason: 'Invalid password',
+            },
+          ],
+          total: 2,
+        },
+        message: {
+          ar: 'تم جلب سجل تسجيل الدخول بنجاح',
+          en: 'Login history retrieved successfully',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    description: 'Number of records to return (default: 50, max: 100)',
+    example: 50,
+  })
+  @ApiBearerAuth()
+  @Get('me/login-history')
+  @UseGuards(JwtAuthGuard)
+  async getLoginHistory(
+    @Request() req: any,
+    @Query('limit') limit?: number,
+  ) {
+    try {
+      const userId = req.user?.id || req.user?.userId || req.user?.sub;
+
+      if (!userId) {
+        throw new HttpException(
+          {
+            message: {
+              ar: 'معرف المستخدم غير موجود',
+              en: 'User ID not found',
+            },
+            code: 'USER_ID_NOT_FOUND',
+          },
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      // Get login-related audit logs
+      const loginLogs = await this.authService.getLoginHistory(
+        userId,
+        Math.min(limit || 50, 100),
+      );
+
+      return {
+        success: true,
+        data: {
+          logins: loginLogs.map((log: any) => ({
+            timestamp: log.timestamp,
+            ipAddress: log.ipAddress,
+            userAgent: log.userAgent,
+            success: log.success,
+            eventType: log.eventType,
+            reason: log.details?.reason,
+          })),
+          total: loginLogs.length,
+        },
+        message: {
+          ar: 'تم جلب سجل تسجيل الدخول بنجاح',
+          en: 'Login history retrieved successfully',
+        },
+      };
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      this.logger.error(
+        `Get login history failed: ${error.message}`,
+        error.stack,
+      );
+      throw new HttpException(
+        {
+          message: {
+            ar: 'فشل جلب سجل تسجيل الدخول',
+            en: 'Failed to retrieve login history',
+          },
+          code: 'LOGIN_HISTORY_RETRIEVAL_FAILED',
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @ApiOperation({
+    summary: 'Get current user activity log',
+    description: 'Retrieve activity log for the currently authenticated user including profile updates, password changes, and other important actions',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Activity log retrieved successfully',
+    schema: {
+      example: {
+        success: true,
+        data: {
+          activities: [
+            {
+              timestamp: '2026-02-10T11:00:00.000Z',
+              eventType: 'password_change',
+              action: 'Password changed',
+              ipAddress: '192.168.1.100',
+              userAgent: 'Mozilla/5.0...',
+              details: {
+                changeType: 'user_initiated',
+              },
+            },
+            {
+              timestamp: '2026-02-10T10:30:00.000Z',
+              eventType: 'login_success',
+              action: 'User logged in successfully',
+              ipAddress: '192.168.1.100',
+              userAgent: 'Mozilla/5.0...',
+            },
+          ],
+          total: 2,
+        },
+        message: {
+          ar: 'تم جلب سجل النشاط بنجاح',
+          en: 'Activity log retrieved successfully',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    description: 'Number of records to return (default: 50, max: 100)',
+    example: 50,
+  })
+  @ApiBearerAuth()
+  @Get('me/activity-log')
+  @UseGuards(JwtAuthGuard)
+  async getActivityLog(
+    @Request() req: any,
+    @Query('limit') limit?: number,
+  ) {
+    try {
+      const userId = req.user?.id || req.user?.userId || req.user?.sub;
+
+      if (!userId) {
+        throw new HttpException(
+          {
+            message: {
+              ar: 'معرف المستخدم غير موجود',
+              en: 'User ID not found',
+            },
+            code: 'USER_ID_NOT_FOUND',
+          },
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      // Get all audit logs for the user
+      const activityLogs = await this.authService.getUserActivityLog(
+        userId,
+        Math.min(limit || 50, 100),
+      );
+
+      return {
+        success: true,
+        data: {
+          activities: activityLogs.map((log: any) => ({
+            timestamp: log.timestamp,
+            eventType: log.eventType,
+            action: log.details?.action || this.getActionDescription(log.eventType),
+            ipAddress: log.ipAddress,
+            userAgent: log.userAgent,
+            details: log.details,
+            success: log.success,
+          })),
+          total: activityLogs.length,
+        },
+        message: {
+          ar: 'تم جلب سجل النشاط بنجاح',
+          en: 'Activity log retrieved successfully',
+        },
+      };
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      this.logger.error(
+        `Get activity log failed: ${error.message}`,
+        error.stack,
+      );
+      throw new HttpException(
+        {
+          message: {
+            ar: 'فشل جلب سجل النشاط',
+            en: 'Failed to retrieve activity log',
+          },
+          code: 'ACTIVITY_LOG_RETRIEVAL_FAILED',
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  /**
+   * Helper method to get action description from event type
+   */
+  private getActionDescription(eventType: string): string {
+    const descriptions: Record<string, string> = {
+      login_success: 'Logged in successfully',
+      login_failure: 'Login attempt failed',
+      logout: 'Logged out',
+      password_change: 'Password changed',
+      password_reset_request: 'Password reset requested',
+      password_reset_complete: 'Password reset completed',
+      session_invalidation: 'Sessions invalidated',
+      email_change: 'Email changed',
+      role_change: 'Role changed',
+      user_status_change: 'Account status changed',
+      user_updated: 'Profile updated',
+    };
+
+    return descriptions[eventType] || 'Activity recorded';
+  }
+
+  @ApiOperation({
+    summary: 'Get current user preferences',
+    description: 'Retrieve preferences for the currently authenticated user including language, theme, and notification settings',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Preferences retrieved successfully',
+    schema: {
+      example: {
+        success: true,
+        data: {
+          language: 'ar',
+          theme: 'dark',
+          notifications: {
+            email: true,
+            sms: false,
+            push: true,
+            appointmentReminders: true,
+            systemUpdates: false,
+          },
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized',
+  })
+  @ApiBearerAuth()
+  @Get('me/preferences')
+  @UseGuards(JwtAuthGuard)
+  async getCurrentUserPreferences(@Request() req: any) {
+    try {
+      const userId = req.user?.id || req.user?.userId || req.user?.sub;
+
+      if (!userId) {
+        throw new HttpException(
+          {
+            message: {
+              ar: 'معرف المستخدم غير موجود',
+              en: 'User ID not found',
+            },
+            code: 'USER_ID_NOT_FOUND',
+          },
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      const preferences = await this.userService.getUserPreferences(userId);
+
+      return {
+        success: true,
+        data: preferences,
+      };
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      this.logger.error(`Get preferences failed: ${error.message}`, error.stack);
+      throw new HttpException(
+        {
+          message: {
+            ar: 'فشل جلب التفضيلات',
+            en: 'Failed to retrieve preferences',
+          },
+          code: 'PREFERENCES_RETRIEVAL_FAILED',
+        },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+  }
+
+  @ApiOperation({
+    summary: 'Update current user preferences',
+    description: 'Update preferences for the currently authenticated user',
+  })
+  @ApiBody({
+    schema: {
+      example: {
+        language: 'ar',
+        theme: 'dark',
+        notifications: {
+          email: true,
+          sms: false,
+          push: true,
+          appointmentReminders: true,
+          systemUpdates: false,
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Preferences updated successfully',
+    schema: {
+      example: {
+        success: true,
+        data: {
+          language: 'ar',
+          theme: 'dark',
+          notifications: {
+            email: true,
+            sms: false,
+            push: true,
+            appointmentReminders: true,
+            systemUpdates: false,
+          },
+        },
+        message: {
+          ar: 'تم تحديث التفضيلات بنجاح',
+          en: 'Preferences updated successfully',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized',
+  })
+  @ApiBearerAuth()
+  @Put('me/preferences')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async updateCurrentUserPreferences(
+    @Body() preferencesDto: any,
+    @Request() req: any,
+  ) {
+    try {
+      const userId = req.user?.id || req.user?.userId || req.user?.sub;
+
+      if (!userId) {
+        throw new HttpException(
+          {
+            message: {
+              ar: 'معرف المستخدم غير موجود',
+              en: 'User ID not found',
+            },
+            code: 'USER_ID_NOT_FOUND',
+          },
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      return await this.userService.updateUserPreferences(userId, preferencesDto);
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      this.logger.error(`Update preferences failed: ${error.message}`, error.stack);
+      throw new HttpException(
+        {
+          message: {
+            ar: 'فشل تحديث التفضيلات',
+            en: 'Failed to update preferences',
+          },
+          code: 'PREFERENCES_UPDATE_FAILED',
+        },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
   }
 
   @ApiOperation({
