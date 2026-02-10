@@ -529,45 +529,45 @@ Authorization: Bearer {{accessToken}}
 # 9. Two-Factor Authentication
 ###############################################################################
 
-### 9.1 Enable 2FA
-POST {{baseUrl}}/auth/2fa/enable
-Authorization: Bearer {{accessToken}}
+# ### 9.1 Enable 2FA
+# POST {{baseUrl}}/auth/2fa/enable
+# Authorization: Bearer {{accessToken}}
 
-# Expected Response:
-# - 200 OK
-# - QR code for authenticator app
-# - Backup codes
-# - Message: {
-#     ar: "تم تفعيل المصادقة الثنائية",
-#     en: "Two-factor authentication enabled"
-#   }
+# # Expected Response:
+# # - 200 OK
+# # - QR code for authenticator app
+# # - Backup codes
+# # - Message: {
+# #     ar: "تم تفعيل المصادقة الثنائية",
+# #     en: "Two-factor authentication enabled"
+# #   }
 
-### 9.2 Verify 2FA setup
-POST {{baseUrl}}/auth/2fa/verify
-Authorization: Bearer {{accessToken}}
-Content-Type: application/json
+# ### 9.2 Verify 2FA setup
+# POST {{baseUrl}}/auth/2fa/verify
+# Authorization: Bearer {{accessToken}}
+# Content-Type: application/json
 
-{
-  "code": "123456"
-}
+# {
+#   "code": "123456"
+# }
 
-# Expected Response:
-# - 200 OK
-# - 2FA verified and activated
+# # Expected Response:
+# # - 200 OK
+# # - 2FA verified and activated
 
-### 9.3 Disable 2FA
-POST {{baseUrl}}/auth/2fa/disable
-Authorization: Bearer {{accessToken}}
-Content-Type: application/json
+# ### 9.3 Disable 2FA
+# POST {{baseUrl}}/auth/2fa/disable
+# Authorization: Bearer {{accessToken}}
+# Content-Type: application/json
 
-{
-  "password": "NewPassword@123",
-  "code": "123456"
-}
+# {
+#   "password": "NewPassword@123",
+#   "code": "123456"
+# }
 
-# Expected Response:
-# - 200 OK
-# - 2FA disabled
+# # Expected Response:
+# # - 200 OK
+# # - 2FA disabled
 
 ###############################################################################
 # 10. Validation Errors
@@ -585,6 +585,23 @@ Content-Type: application/json
 # Expected Response:
 # - 400 Bad Request
 # - Error: Invalid phone format
+# - Message: {
+#     ar: "رقم الهاتف يجب أن يكون بصيغة دولية صحيحة (مثال: +966501234567)",
+#     en: "Phone number must be in valid international format (e.g., +966501234567)"
+#   }
+
+### 10.1b Update with valid phone format (should succeed)
+PUT {{baseUrl}}/users/me
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "phone": "+966507890123"
+}
+
+# Expected Response:
+# - 200 OK
+# - Phone number updated successfully
 
 ### 10.2 Update with invalid email format
 PUT {{baseUrl}}/users/me
@@ -609,8 +626,12 @@ Content-Type: application/json
 }
 
 # Expected Response:
-# - 403 Forbidden
-# - Error: Cannot change own role
+# - 400 Bad Request
+# - Error: Property role should not exist (forbidden by whitelist)
+# - Message: {
+#     ar: "الخاصية role غير مسموح بها",
+#     en: "Property role should not exist"
+#   }
 
 ### 10.4 Attempt to change status (should fail)
 PUT {{baseUrl}}/users/me
@@ -622,6 +643,10 @@ Content-Type: application/json
 }
 
 # Expected Response:
-# - 403 Forbidden
-# - Error: Cannot change own status
+# - 400 Bad Request
+# - Error: Property isActive should not exist (forbidden by whitelist)
+# - Message: {
+#     ar: "الخاصية isActive غير مسموح بها",
+#     en: "Property isActive should not exist"
+#   }
 

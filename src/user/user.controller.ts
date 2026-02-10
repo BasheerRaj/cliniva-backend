@@ -40,6 +40,7 @@ import {
   UserEntitiesResponseDto,
 } from './dto/check-user-entities.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { UpdateOwnProfileDto } from './dto/update-own-profile.dto';
 import { UpdatePreferencesDto } from './dto/update-preferences.dto';
 import { UpdateUserStatusDto } from './dto/update-user-status.dto';
 import { DeactivateWithTransferDto } from './dto/deactivate-with-transfer.dto';
@@ -239,7 +240,7 @@ export class UserController {
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
   async updateCurrentUserProfile(
-    @Body() updateData: Partial<UpdateUserDto>,
+    @Body() updateData: UpdateOwnProfileDto,
     @Request() req: any,
   ) {
     try {
@@ -255,6 +256,21 @@ export class UserController {
               en: 'User ID not found',
             },
             code: 'USER_ID_NOT_FOUND',
+          },
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      // Check if any fields were provided
+      const hasFields = Object.keys(updateData).length > 0;
+      if (!hasFields) {
+        throw new HttpException(
+          {
+            message: {
+              ar: 'لا توجد حقول صالحة للتحديث',
+              en: 'No valid fields to update',
+            },
+            code: 'NO_VALID_FIELDS',
           },
           HttpStatus.BAD_REQUEST,
         );
@@ -278,29 +294,15 @@ export class UserController {
         };
       }
 
-      // Only allow updating specific fields for self-update
-      const allowedFields = ['firstName', 'lastName', 'phone', 'nationality'];
+      // At this point, validation has already passed via the DTO
+      // Only fields defined in UpdateOwnProfileDto can reach here
       const filteredData: Partial<UpdateUserDto> = {};
       
-      for (const field of allowedFields) {
-        if (updateData[field] !== undefined) {
-          filteredData[field] = updateData[field];
-        }
-      }
-
-      // Prevent users from changing sensitive fields
-      if (Object.keys(filteredData).length === 0) {
-        throw new HttpException(
-          {
-            message: {
-              ar: 'لا توجد حقول صالحة للتحديث',
-              en: 'No valid fields to update',
-            },
-            code: 'NO_VALID_FIELDS',
-          },
-          HttpStatus.BAD_REQUEST,
-        );
-      }
+      // Copy validated fields
+      if (updateData.firstName !== undefined) filteredData.firstName = updateData.firstName;
+      if (updateData.lastName !== undefined) filteredData.lastName = updateData.lastName;
+      if (updateData.phone !== undefined) filteredData.phone = updateData.phone;
+      if (updateData.nationality !== undefined) filteredData.nationality = updateData.nationality;
 
       // Update user profile
       const updatedUser = await this.userService.updateUser(
