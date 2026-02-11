@@ -2,10 +2,24 @@
 ### Use Case: UC-d4ws5c5 - Create Doctor User
 ### Description: Complete flow to create a doctor user with specialization and certifications
 
-@baseUrl = http://localhost:3001
-@adminEmail = admin@cliniva.com
-@adminPassword = Admin@123
+@baseUrl = http://localhost:3001/api/v1
+@adminEmail = company.owner1@cliniva.com
+@adminPassword = CompanyOwner@123
+@accessToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2OTg5Y2MzNTBmYTZjNmU3NDFmYTM1MDgiLCJlbWFpbCI6ImNvbXBhbnkub3duZXIxQGNsaW5pdmEuY29tIiwicm9sZSI6ImFkbWluIiwiaWF0IjoxNzcwNzM2ODM0LCJleHAiOjE3NzA4MjMyMzR9.rMRTdgHItJRlFLH_7nI45dzawsWlyCF-4miT1rfHe10
+@subscriptionId = 6989c883e85c6be91e02006e
+@complexId = 6989d92c3afb0243797a37a0
+@clinicId = 6989e341a2732987ac23cb54
 
+# @accessToken = <copy_access_token_from_response>
+
+@specialtyId = 6989c2e2ca3d9aa044ffc528
+
+@doctorUserId = 698b5793e27c1e27f3c26c4c
+@doctorEmployeeId = 698b5793e27c1e27f3c26c4e
+@temporaryPassword = <copy_temporary_password_from_response>
+@doctorAccessToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2OThiNTc5M2UyN2MxZTI3ZjNjMjZjNGMiLCJlbWFpbCI6ImRyLm1vaGFtbWVkQGNsaW5pdmEuY29tIiwicm9sZSI6ImRvY3RvciIsImlhdCI6MTc3MDczOTkxMiwiZXhwIjoxNzcwODI2MzEyfQ.ONqWHOmTAcmC50a5bulRK4guPu6nrR3nN7QPR-A1l9A
+
+@documentId  = 698c24d48dbd5daa0c255f20
 ###############################################################################
 # 1. Admin Login
 ###############################################################################
@@ -19,10 +33,6 @@ Content-Type: application/json
   "password": "{{adminPassword}}"
 }
 
-@accessToken = <copy_access_token_from_response>
-@subscriptionId = <copy_subscription_id_from_response>
-@complexId = <copy_complex_id_from_response>
-@clinicId = <copy_clinic_id_from_response>
 
 ###############################################################################
 # 2. Get Available Specialties
@@ -36,7 +46,6 @@ Authorization: Bearer {{accessToken}}
 # - 200 OK
 # - List of medical specialties
 
-@specialtyId = <copy_specialty_id_from_response>
 
 ###############################################################################
 # 3. Create Doctor User - Success Case
@@ -49,6 +58,7 @@ Content-Type: application/json
 
 {
   "email": "dr.mohammed@cliniva.com",
+  "password": "DoctorTemp@123",
   "firstName": "Mohammed",
   "lastName": "Al-Rashid",
   "phone": "+966502345678",
@@ -56,120 +66,38 @@ Content-Type: application/json
   "gender": "male",
   "nationality": "Saudi Arabia",
   "role": "doctor",
-  "subscriptionId": "{{subscriptionId}}",
   "complexId": "{{complexId}}",
   "clinicId": "{{clinicId}}",
-  "employeeProfile": {
-    "jobTitle": "Cardiologist",
-    "dateOfHiring": "2024-01-01",
-    "salary": 25000,
-    "maritalStatus": "married",
-    "numberOfChildren": 2,
-    "bankAccount": "SA9876543210987654321098",
-    "socialSecurityNumber": "9876543210",
-    "taxId": "TAX987654",
-    "licenseNumber": "MED-2024-12345",
-    "licenseExpiryDate": "2026-12-31",
-    "specialtyId": "{{specialtyId}}",
-    "yearsOfExperience": 10,
-    "certifications": [
-      {
-        "name": "Board Certification in Cardiology",
-        "issuingOrganization": "Saudi Commission for Health Specialties",
-        "issueDate": "2015-06-01",
-        "expiryDate": "2025-06-01",
-        "certificateNumber": "SCFHS-CARD-2015-001"
-      },
-      {
-        "name": "Advanced Cardiac Life Support (ACLS)",
-        "issuingOrganization": "American Heart Association",
-        "issueDate": "2023-01-15",
-        "expiryDate": "2025-01-15",
-        "certificateNumber": "AHA-ACLS-2023-456"
-      }
-    ],
-    "education": [
-      {
-        "degree": "MD",
-        "institution": "King Saud University",
-        "graduationYear": 2010,
-        "fieldOfStudy": "Medicine"
-      },
-      {
-        "degree": "Fellowship",
-        "institution": "Johns Hopkins Hospital",
-        "graduationYear": 2014,
-        "fieldOfStudy": "Cardiology"
-      }
-    ]
-  },
-  "workingHours": [
-    {
-      "dayOfWeek": "sunday",
-      "isWorkingDay": true,
-      "openingTime": "09:00",
-      "closingTime": "17:00",
-      "breakStartTime": "13:00",
-      "breakEndTime": "14:00"
-    },
-    {
-      "dayOfWeek": "monday",
-      "isWorkingDay": true,
-      "openingTime": "09:00",
-      "closingTime": "17:00",
-      "breakStartTime": "13:00",
-      "breakEndTime": "14:00"
-    },
-    {
-      "dayOfWeek": "tuesday",
-      "isWorkingDay": true,
-      "openingTime": "09:00",
-      "closingTime": "17:00",
-      "breakStartTime": "13:00",
-      "breakEndTime": "14:00"
-    },
-    {
-      "dayOfWeek": "wednesday",
-      "isWorkingDay": true,
-      "openingTime": "09:00",
-      "closingTime": "17:00",
-      "breakStartTime": "13:00",
-      "breakEndTime": "14:00"
-    },
-    {
-      "dayOfWeek": "thursday",
-      "isWorkingDay": true,
-      "openingTime": "09:00",
-      "closingTime": "13:00"
-    },
-    {
-      "dayOfWeek": "friday",
-      "isWorkingDay": false
-    },
-    {
-      "dayOfWeek": "saturday",
-      "isWorkingDay": false
-    }
-  ]
+  "jobTitle": "Cardiologist",
+  "dateOfHiring": "2024-01-01",
+  "salary": 25000,
+  "maritalStatus": "married",
+  "numberOfChildren": 2,
+  "bankAccount": "SA9876543210987654321098",
+  "socialSecurityNumber": "9876543210",
+  "taxId": "TAX987654",
+  "specialties": ["{{specialtyId}}"],
+  "notes": "Board certified cardiologist with 10 years of experience. Specialized in interventional cardiology."
 }
 
 # Expected Response:
 # - 201 Created
 # - Returns doctor user with employee profile
 # - Auto-generated employee number
-# - Specialty assigned
-# - Certifications stored
+# - Specialty assigned via specialties array
+# 
+# Note: The employee endpoint uses a flat structure.
+# Certifications, education, and license details should be added via separate endpoints:
+# - POST /employees/:id/documents for licenses and certifications
+# - Working hours are managed via the working-hours endpoint
 
-@doctorUserId = <copy_user_id_from_response>
-@doctorEmployeeId = <copy_employee_id_from_response>
-@temporaryPassword = <copy_temporary_password_from_response>
 
 ###############################################################################
 # 4. Verify Doctor User Created
 ###############################################################################
 
 ### 4.1 Get doctor details
-GET {{baseUrl}}/employees/{{doctorEmployeeId}}
+GET {{baseUrl}}/employees/{{doctorUserId}}
 Authorization: Bearer {{accessToken}}
 
 # Expected Response:
@@ -179,7 +107,7 @@ Authorization: Bearer {{accessToken}}
 # - Education history included
 
 ### 4.2 Get doctor by user ID
-GET {{baseUrl}}/users/{{doctorUserId}}
+GET {{baseUrl}}/users/{{doctorEmployeeId}}
 Authorization: Bearer {{accessToken}}
 
 # Expected Response:
@@ -196,7 +124,7 @@ Content-Type: application/json
 
 {
   "email": "dr.mohammed@cliniva.com",
-  "password": "{{temporaryPassword}}"
+  "password": "DoctorTemp@123"
 }
 
 # Expected Response:
@@ -204,7 +132,6 @@ Content-Type: application/json
 # - Login successful
 # - Should prompt for password change
 
-@doctorAccessToken = <copy_access_token_from_response>
 
 ### 5.2 Doctor changes password
 POST {{baseUrl}}/auth/change-password
@@ -240,6 +167,7 @@ Content-Type: application/json
 
 {
   "email": "dr.nospecialty@cliniva.com",
+  "password": "DoctorTemp@123",
   "firstName": "No",
   "lastName": "Specialty",
   "phone": "+966502345679",
@@ -247,90 +175,346 @@ Content-Type: application/json
   "gender": "male",
   "nationality": "Saudi Arabia",
   "role": "doctor",
-  "subscriptionId": "{{subscriptionId}}",
+  "complexId": "{{complexId}}",
   "clinicId": "{{clinicId}}",
-  "employeeProfile": {
-    "jobTitle": "Doctor",
-    "dateOfHiring": "2024-01-01",
-    "salary": 20000
-  }
+  "jobTitle": "Doctor",
+  "dateOfHiring": "2024-01-01",
+  "salary": 20000
 }
 
 # Expected Response:
-# - 400 Bad Request
-# - Error: Specialty is required for doctors
+# - 201 Created (specialties are optional in the DTO)
+# - Warning: Doctors should have at least one specialty assigned
 
-### 6.2 Create doctor with expired license
+### 6.2 Create doctor with missing required fields
 POST {{baseUrl}}/employees
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "email": "dr.expired@cliniva.com",
-  "firstName": "Expired",
-  "lastName": "License",
+  "email": "dr.incomplete@cliniva.com",
+  "password": "DoctorTemp@123",
+  "firstName": "Incomplete",
+  "lastName": "Data",
   "phone": "+966502345680",
   "dateOfBirth": "1985-01-01",
   "gender": "male",
   "nationality": "Saudi Arabia",
   "role": "doctor",
-  "subscriptionId": "{{subscriptionId}}",
-  "clinicId": "{{clinicId}}",
-  "employeeProfile": {
-    "jobTitle": "Doctor",
-    "dateOfHiring": "2024-01-01",
-    "salary": 20000,
-    "specialtyId": "{{specialtyId}}",
-    "licenseNumber": "MED-EXPIRED",
-    "licenseExpiryDate": "2020-01-01"
-  }
+  "complexId": "{{complexId}}",
+  "clinicId": "{{clinicId}}"
 }
 
 # Expected Response:
 # - 400 Bad Request
-# - Warning: Medical license has expired
+# - Error: jobTitle and dateOfHiring are required
 
-### 6.3 Create doctor with invalid certification dates
+### 6.3 Create doctor with duplicate email
 POST {{baseUrl}}/employees
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "email": "dr.invalidcert@cliniva.com",
-  "firstName": "Invalid",
-  "lastName": "Cert",
+  "email": "dr.mohammed@cliniva.com",
+  "password": "DoctorTemp@123",
+  "firstName": "Duplicate",
+  "lastName": "Email",
   "phone": "+966502345681",
   "dateOfBirth": "1985-01-01",
   "gender": "male",
   "nationality": "Saudi Arabia",
   "role": "doctor",
-  "subscriptionId": "{{subscriptionId}}",
+  "complexId": "{{complexId}}",
   "clinicId": "{{clinicId}}",
-  "employeeProfile": {
-    "jobTitle": "Doctor",
-    "dateOfHiring": "2024-01-01",
-    "salary": 20000,
-    "specialtyId": "{{specialtyId}}",
-    "certifications": [
-      {
-        "name": "Invalid Cert",
-        "issuingOrganization": "Test Org",
-        "issueDate": "2025-01-01",
-        "expiryDate": "2024-01-01"
-      }
-    ]
-  }
+  "jobTitle": "Doctor",
+  "dateOfHiring": "2024-01-01",
+  "salary": 20000,
+  "specialties": ["{{specialtyId}}"]
 }
 
 # Expected Response:
 # - 400 Bad Request
-# - Error: Expiry date must be after issue date
+# - Error: Email already exists
 
 ###############################################################################
-# 7. Doctor-Specific Features
+# 7. Additional Employee Endpoints
 ###############################################################################
 
-### 7.1 Get doctor's appointment schedule
+### 7.1 Get all employees (with pagination and filters)
+GET {{baseUrl}}/employees?page=1&limit=10&role=doctor&isActive=true
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Paginated list of employees
+
+### 7.2 Get employee by ID
+GET {{baseUrl}}/employees/{{doctorEmployeeId}}
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Complete employee details
+
+### 7.3 Get employee by employee number
+GET {{baseUrl}}/employees/number/EMP20260004
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Employee details by employee number
+
+### 7.4 Search employees
+GET {{baseUrl}}/employees/search/query?q=Mohammed&limit=20
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Search results matching query
+
+### 7.5 Get employees by role
+GET {{baseUrl}}/employees/role/doctor?page=1&limit=10
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - All doctors in the system
+
+### 7.6 Get active employees
+GET {{baseUrl}}/employees/status/active?page=1&limit=10
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - All active employees
+
+### 7.7 Get inactive employees
+GET {{baseUrl}}/employees/status/inactive?page=1&limit=10
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - All inactive employees
+
+### 7.8 Get employees by clinic
+GET {{baseUrl}}/employees/clinic/{{clinicId}}?page=1&limit=10
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - All employees assigned to the clinic
+
+### 7.9 Get employees by complex
+GET {{baseUrl}}/employees/complex/{{complexId}}?page=1&limit=10
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - All employees assigned to the complex
+
+### 7.10 Get employee statistics
+GET {{baseUrl}}/employees/stats/overview
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Comprehensive employee statistics
+
+### 7.11 Get employee role analytics
+GET {{baseUrl}}/employees/analytics/roles
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Role distribution analytics
+
+### 7.12 Get employee salary analytics
+GET {{baseUrl}}/employees/analytics/salary
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Salary statistics by role
+
+### 7.13 Get hiring trends
+GET {{baseUrl}}/employees/analytics/hiring-trends
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Monthly hiring trends
+
+### 7.14 Get upcoming document expirations
+GET {{baseUrl}}/employees/documents/expiring?days=30
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Documents expiring in next 30 days
+
+### 7.15 Get upcoming birthdays
+# GET {{baseUrl}}/employees/birthdays/upcoming?days=30
+# Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Employee birthdays in next 30 days
+
+### 7.16 Update employee
+PUT {{baseUrl}}/employees/{{doctorUserId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "jobTitle": "Senior Cardiologist",
+  "salary": 30000,
+  "notes": "Promoted to Senior Cardiologist"
+}
+
+# Expected Response:
+# - 200 OK
+# - Updated employee details
+
+### 7.17 Bulk employee actions
+POST {{baseUrl}}/employees/bulk-action
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "employeeIds": ["{{doctorUserId}}"],
+  "action": "activate",
+  "reason": "Reactivating employee"
+}
+
+# Expected Response:
+# - 200 OK
+# - Bulk action results
+
+# ### 7.18 Export employees data
+# GET {{baseUrl}}/employees/export/data?format=json&role=doctor
+# Authorization: Bearer {{accessToken}}
+
+# # Expected Response:
+# # - 200 OK
+# # - Exported employee data
+
+
+###############################################################################
+# 8. Add Doctor Documents (Licenses & Certifications)
+###############################################################################
+
+### 8.1 Add medical license document
+POST {{baseUrl}}/employees/{{doctorUserId}}/documents
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "userId": "{{doctorUserId}}",
+  "documentType": "license",
+  "documentName": "Medical License - Saudi Arabia",
+  "fileUrl": "https://example.com/documents/medical-license.pdf",
+  "fileName": "medical-license.pdf",
+  "fileSize": 524288,
+  "mimeType": "application/pdf",
+  "issueDate": "2015-01-01",
+  "expiryDate": "2026-12-31",
+  "issuingAuthority": "Saudi Commission for Health Specialties",
+  "documentNumber": "MED-2024-12345",
+  "notes": "Board certification in Cardiology"
+}
+
+# Expected Response:
+# - 201 Created
+# - Document added to employee profile
+
+### 8.2 Add ACLS certification
+POST {{baseUrl}}/employees/{{doctorUserId}}/documents
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "userId": "{{doctorUserId}}",
+  "documentType": "certificate",
+  "documentName": "Advanced Cardiac Life Support (ACLS)",
+  "fileUrl": "https://example.com/documents/acls-cert.pdf",
+  "fileName": "acls-certification.pdf",
+  "fileSize": 256000,
+  "mimeType": "application/pdf",
+  "issueDate": "2023-01-15",
+  "expiryDate": "2025-01-15",
+  "issuingAuthority": "American Heart Association",
+  "documentNumber": "AHA-ACLS-2023-456",
+  "notes": "ACLS Provider certification"
+}
+
+# Expected Response:
+# - 201 Created
+# - Certification added
+
+### 8.3 Get all doctor documents
+GET {{baseUrl}}/employees/{{doctorUserId}}/documents
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - List of all documents with expiry status
+
+
+### 8.4 Update document
+PUT {{baseUrl}}/employees/documents/{{documentId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "expiryDate": "2027-12-31",
+  "status": "active",
+  "isVerified": true,
+  "notes": "License renewed"
+}
+
+# Expected Response:
+# - 200 OK
+# - Updated document details
+
+
+###############################################################################
+# 9. Employee Shifts Management
+###############################################################################
+
+### 9.1 Create employee shift
+POST {{baseUrl}}/employees/{{doctorUserId}}/shifts
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "userId": "{{doctorUserId}}",
+  "entityType": "clinic",
+  "entityId": "{{clinicId}}",
+  "shiftName": "Morning Shift",
+  "dayOfWeek": "sunday",
+  "startTime": "08:00",
+  "endTime": "14:00",
+  "breakDurationMinutes": 30
+}
+
+# Expected Response:
+# - 201 Created
+# - Shift created successfully
+
+### 9.2 Get employee shifts
+GET {{baseUrl}}/employees/{{doctorUserId}}/shifts
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - List of all employee shifts
+
+
+###############################################################################
+# 10. Doctor-Specific Features
+###############################################################################
+
+### 10.1 Get doctor's appointment schedule
 GET {{baseUrl}}/appointments?doctorId={{doctorUserId}}
 Authorization: Bearer {{doctorAccessToken}}
 
@@ -338,22 +522,48 @@ Authorization: Bearer {{doctorAccessToken}}
 # - 200 OK
 # - List of doctor's appointments
 
-### 7.2 Get doctor's available time slots
-GET {{baseUrl}}/appointments/available-slots?doctorId={{doctorUserId}}&date=2024-02-15
+### 10.2 Get doctor's available time slots
+GET {{baseUrl}}/appointments/availability/{{doctorUserId}}?date=2026-02-15
 Authorization: Bearer {{accessToken}}
 
 # Expected Response:
 # - 200 OK
 # - Available time slots based on working hours
+# - Shows working hours, breaks, and booked slots
 
-### 7.3 Get doctor statistics
-GET {{baseUrl}}/employees/{{doctorEmployeeId}}/statistics
+### 10.3 Get doctor statistics
+# GET {{baseUrl}}/employees/{{doctorUserId}}/statistics
+# Authorization: Bearer {{accessToken}}
+
+# # Expected Response:
+# # - 200 OK
+# # - Total appointments
+# # - Completed appointments
+# # - Cancelled appointments
+# # - Average rating (if implemented)
+
+### 10.4 Terminate employee
+POST {{baseUrl}}/employees/{{doctorEmployeeId}}/terminate
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "terminationDate": "2026-12-31",
+  "terminationType": "resignation",
+  "reason": "Relocating to another city for personal reasons",
+  "eligibleForRehire": true,
+  "finalNotes": "Excellent performance during tenure"
+}
+
+# Expected Response:
+# - 200 OK
+# - Employee terminated successfully
+
+### 10.5 Delete employee (soft delete)
+DELETE {{baseUrl}}/employees/{{doctorEmployeeId}}
 Authorization: Bearer {{accessToken}}
 
 # Expected Response:
 # - 200 OK
-# - Total appointments
-# - Completed appointments
-# - Cancelled appointments
-# - Average rating (if implemented)
+# - Employee deactivated successfully
 

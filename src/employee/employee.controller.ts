@@ -1416,19 +1416,28 @@ export class EmployeeController {
       // Ensure the document is for the correct employee
       createDocumentDto.userId = employeeId;
 
+      // Get the authenticated user ID (JWT strategy returns 'id' property)
+      const uploadedByUserId = req.user?.id;
+
       const document = await this.employeeService.createEmployeeDocument(
         createDocumentDto,
-        req.user?.userId,
+        uploadedByUserId,
       );
       return {
         success: true,
-        message: 'Employee document created successfully',
+        message: {
+          ar: 'تم إنشاء مستند الموظف بنجاح',
+          en: 'Employee document created successfully',
+        },
         data: document,
       };
     } catch (error) {
       return {
         success: false,
-        message: 'Failed to create employee document',
+        message: {
+          ar: 'فشل في إنشاء مستند الموظف',
+          en: 'Failed to create employee document',
+        },
         error: error.message,
       };
     }

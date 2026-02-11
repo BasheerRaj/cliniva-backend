@@ -702,7 +702,9 @@ export class AppointmentService {
           time: timeStr,
           isAvailable: !isBooked,
           reason: isBooked ? 'Already booked' : undefined,
-          existingAppointmentId: (existingAppointment as any)._id.toString(),
+          existingAppointmentId: existingAppointment
+            ? (existingAppointment as any)._id.toString()
+            : undefined,
         });
       }
     }

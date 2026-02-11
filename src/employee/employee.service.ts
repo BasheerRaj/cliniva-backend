@@ -987,14 +987,16 @@ export class EmployeeService {
   async getEmployeeByNumber(employeeNumber: string): Promise<any> {
     const profile = await this.employeeProfileModel
       .findOne({ employeeNumber, isActive: true })
-      .populate('userId')
       .exec();
 
     if (!profile) {
       throw new NotFoundException('Employee not found');
     }
 
-    return await this.getEmployeeById(profile.userId.toString());
+    // Extract userId as string - profile.userId is always an ObjectId when not populated
+    const userId = profile.userId.toString();
+
+    return await this.getEmployeeById(userId);
   }
 
   /**
@@ -1379,12 +1381,21 @@ export class EmployeeService {
       throw new NotFoundException('Employee not found');
     }
 
+    // Validate uploadedBy is provided
+    if (!uploadedByUserId) {
+      throw new BadRequestException({
+        message: {
+          ar: 'معرف المستخدم الذي قام بالرفع مطلوب',
+          en: 'Uploaded by user ID is required',
+        },
+        code: 'UPLOADED_BY_REQUIRED',
+      });
+    }
+
     const documentData = {
       ...createDocumentDto,
       userId: new Types.ObjectId(createDocumentDto.userId),
-      uploadedBy: uploadedByUserId
-        ? new Types.ObjectId(uploadedByUserId)
-        : undefined,
+      uploadedBy: new Types.ObjectId(uploadedByUserId),
       status: 'active',
       isVerified: false,
       isActive: true,
