@@ -1,9 +1,19 @@
 ### M1 - Working Hours: CRUD Operations Flow
 ### Description: Complete flow for managing working hours with hierarchical validation
 
-@baseUrl = http://localhost:3001
-@adminEmail = admin@cliniva.com
-@adminPassword = Admin@123
+@baseUrl = http://localhost:3001/api/v1
+@adminEmail = company.owner1@cliniva.com
+@adminPassword = CompanyOwner@123
+@accessToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2OTg5Y2MzNTBmYTZjNmU3NDFmYTM1MDgiLCJlbWFpbCI6ImNvbXBhbnkub3duZXIxQGNsaW5pdmEuY29tIiwicm9sZSI6ImFkbWluIiwiaWF0IjoxNzcwNzM2ODM0LCJleHAiOjE3NzA4MjMyMzR9.rMRTdgHItJRlFLH_7nI45dzawsWlyCF-4miT1rfHe10
+@subscriptionId = 6989c883e85c6be91e02006e
+@complexId = 6989d92c3afb0243797a37a0
+@clinicId = 6989e341a2732987ac23cb54
+
+# @accessToken = <copy_access_token_from_response>
+
+@specialtyId = 6989c2e2ca3d9aa044ffc528
+
+@doctorUserId = 698b5793e27c1e27f3c26c4c
 
 ###############################################################################
 # 1. Admin Login
@@ -18,22 +28,24 @@ Content-Type: application/json
   "password": "{{adminPassword}}"
 }
 
-@accessToken = <copy_access_token_from_response>
-@userId = <copy_user_id_from_response>
-@complexId = <copy_complex_id_from_response>
-@clinicId = <copy_clinic_id_from_response>
+# @accessToken = <copy_access_token_from_response>
+# @userId = <copy_user_id_from_response>
+# @complexId = <copy_complex_id_from_response>
+# @clinicId = <copy_clinic_id_from_response>
 
 ###############################################################################
 # 2. Create Working Hours for User
 ###############################################################################
 
 ### 2.1 Create working hours for user (success)
-POST {{baseUrl}}/working-hours/user/{{userId}}
+POST {{baseUrl}}/working-hours
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "workingHours": [
+  "entityType": "user",
+  "entityId": "{{doctorUserId}}",
+  "schedule": [
     {
       "dayOfWeek": "sunday",
       "isWorkingDay": true,
@@ -96,7 +108,7 @@ Content-Type: application/json
 ###############################################################################
 
 ### 3.1 Get working hours for user
-GET {{baseUrl}}/working-hours/user/{{userId}}
+GET {{baseUrl}}/working-hours/user/{{doctorUserId}}
 Authorization: Bearer {{accessToken}}
 
 # Expected Response:
@@ -104,7 +116,7 @@ Authorization: Bearer {{accessToken}}
 # - Array of working hours for all days
 
 ### 3.2 Get working hours for specific day
-GET {{baseUrl}}/working-hours/user/{{userId}}?dayOfWeek=monday
+GET {{baseUrl}}/working-hours/user/{{doctorUserId}}?dayOfWeek=monday
 Authorization: Bearer {{accessToken}}
 
 # Expected Response:
@@ -132,12 +144,12 @@ Authorization: Bearer {{accessToken}}
 ###############################################################################
 
 ### 4.1 Update working hours for user
-PUT {{baseUrl}}/working-hours/user/{{userId}}
+PUT {{baseUrl}}/working-hours/user/{{doctorUserId}}
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "workingHours": [
+  "schedule": [
     {
       "dayOfWeek": "sunday",
       "isWorkingDay": true,
@@ -195,7 +207,7 @@ Content-Type: application/json
 # - ⚠️ Warning if conflicts with appointments (future feature)
 
 ### 4.2 Verify working hours updated
-GET {{baseUrl}}/working-hours/user/{{userId}}
+GET {{baseUrl}}/working-hours/user/{{doctorUserId}}
 Authorization: Bearer {{accessToken}}
 
 # Expected Response:
@@ -207,7 +219,7 @@ Authorization: Bearer {{accessToken}}
 ###############################################################################
 
 ### 5.1 Delete working hours for specific day
-DELETE {{baseUrl}}/working-hours/user/{{userId}}?dayOfWeek=saturday
+DELETE {{baseUrl}}/working-hours/user/{{doctorUserId}}?dayOfWeek=saturday
 Authorization: Bearer {{accessToken}}
 
 # Expected Response:
@@ -219,7 +231,7 @@ Authorization: Bearer {{accessToken}}
 #   }
 
 ### 5.2 Delete all working hours for user
-DELETE {{baseUrl}}/working-hours/user/{{userId}}
+DELETE {{baseUrl}}/working-hours/user/{{doctorUserId}}
 Authorization: Bearer {{accessToken}}
 
 # Expected Response:
@@ -227,7 +239,7 @@ Authorization: Bearer {{accessToken}}
 # - All working hours deleted
 
 ### 5.3 Verify working hours deleted
-GET {{baseUrl}}/working-hours/user/{{userId}}
+GET {{baseUrl}}/working-hours/user/{{doctorUserId}}
 Authorization: Bearer {{accessToken}}
 
 # Expected Response:
@@ -239,12 +251,14 @@ Authorization: Bearer {{accessToken}}
 ###############################################################################
 
 ### 6.1 Create with invalid time format
-POST {{baseUrl}}/working-hours/user/{{userId}}
+POST {{baseUrl}}/working-hours
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "workingHours": [
+  "entityType": "user",
+  "entityId": "{{doctorUserId}}",
+  "schedule": [
     {
       "dayOfWeek": "sunday",
       "isWorkingDay": true,
@@ -263,12 +277,14 @@ Content-Type: application/json
 #   }
 
 ### 6.2 Create with closing time before opening time
-POST {{baseUrl}}/working-hours/user/{{userId}}
+POST {{baseUrl}}/working-hours
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "workingHours": [
+  "entityType": "user",
+  "entityId": "{{doctorUserId}}",
+  "schedule": [
     {
       "dayOfWeek": "sunday",
       "isWorkingDay": true,
@@ -287,12 +303,14 @@ Content-Type: application/json
 #   }
 
 ### 6.3 Create with break time outside working hours
-POST {{baseUrl}}/working-hours/user/{{userId}}
+POST {{baseUrl}}/working-hours
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "workingHours": [
+  "entityType": "user",
+  "entityId": "{{doctorUserId}}",
+  "schedule": [
     {
       "dayOfWeek": "sunday",
       "isWorkingDay": true,
@@ -313,12 +331,14 @@ Content-Type: application/json
 #   }
 
 ### 6.4 Create with invalid day of week
-POST {{baseUrl}}/working-hours/user/{{userId}}
+POST {{baseUrl}}/working-hours
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "workingHours": [
+  "entityType": "user",
+  "entityId": "{{doctorUserId}}",
+  "schedule": [
     {
       "dayOfWeek": "invalidday",
       "isWorkingDay": true,
@@ -338,12 +358,14 @@ Content-Type: application/json
 
 ### 7.1 Create user hours outside clinic hours (should warn/fail)
 # ⚠️ Not fully implemented
-POST {{baseUrl}}/working-hours/user/{{userId}}
+POST {{baseUrl}}/working-hours
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "workingHours": [
+  "entityType": "user",
+  "entityId": "{{doctorUserId}}",
+  "schedule": [
     {
       "dayOfWeek": "sunday",
       "isWorkingDay": true,
@@ -371,7 +393,7 @@ Content-Type: application/json
 
 ### 8.1 Get suggested working hours from clinic
 # ⚠️ Not implemented
-GET {{baseUrl}}/working-hours/suggestions?userId={{userId}}&source=clinic
+GET {{baseUrl}}/working-hours/suggestions/user/{{doctorUserId}}
 Authorization: Bearer {{accessToken}}
 
 # Expected Response (Future):
@@ -381,7 +403,7 @@ Authorization: Bearer {{accessToken}}
 
 ### 8.2 Auto-fill from complex
 # ⚠️ Not implemented
-GET {{baseUrl}}/working-hours/suggestions?userId={{userId}}&source=complex
+GET {{baseUrl}}/working-hours/suggestions/user/{{doctorUserId}}
 Authorization: Bearer {{accessToken}}
 
 # Expected Response (Future):
@@ -399,8 +421,8 @@ Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "userId": "{{userId}}",
-  "workingHours": [
+  "userId": "{{doctorUserId}}",
+  "schedule": [
     {
       "dayOfWeek": "sunday",
       "isWorkingDay": false

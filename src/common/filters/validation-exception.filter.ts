@@ -49,7 +49,15 @@ export class ValidationExceptionFilter implements ExceptionFilter {
       // Parse bilingual messages from validation errors
       const errors = exceptionResponse.message.map((msg: string) => {
         try {
-          // Try to parse as JSON (bilingual message)
+          // Extract JSON from messages like "schedule.0.{...}" or just "{...}"
+          const jsonMatch = msg.match(/(\{.*\})/);
+          if (jsonMatch) {
+            const parsed = JSON.parse(jsonMatch[1]);
+            if (parsed.ar && parsed.en) {
+              return parsed;
+            }
+          }
+          // Try to parse the whole message as JSON
           const parsed = JSON.parse(msg);
           if (parsed.ar && parsed.en) {
             return parsed;
@@ -57,8 +65,9 @@ export class ValidationExceptionFilter implements ExceptionFilter {
           // If not bilingual, return as-is
           return { ar: msg, en: msg };
         } catch {
-          // If parsing fails, return as-is
-          return { ar: msg, en: msg };
+          // Remove property path prefix (e.g., "schedule.0.") from error messages
+          const cleanMsg = msg.replace(/^[\w.]+\.\d+\./, '');
+          return { ar: cleanMsg, en: cleanMsg };
         }
       });
 

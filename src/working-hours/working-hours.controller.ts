@@ -3,6 +3,7 @@ import {
   Post,
   Get,
   Put,
+  Delete,
   Body,
   Param,
   Query,
@@ -52,6 +53,8 @@ import {
 import { WorkingHours } from '../database/schemas/working-hours.schema';
 import { BilingualMessage } from '../common/types/bilingual-message.type';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model, Types } from 'mongoose';
 
 /**
  * Standard API response format
@@ -67,6 +70,8 @@ interface StandardResponse<T = any> {
 @Controller('working-hours')
 export class WorkingHoursController {
   constructor(
+    @InjectModel('WorkingHours')
+    private readonly workingHoursModel: Model<WorkingHours>,
     private readonly workingHoursService: WorkingHoursService,
     private readonly validationService: WorkingHoursValidationService,
     private readonly suggestionService: WorkingHoursSuggestionService,
@@ -1715,6 +1720,40 @@ export class WorkingHoursController {
   }
 
   /**
+   * Retrieves complex working hours.
+   *
+   * @param {string} complexId - Complex ID
+   * @returns {Promise<StandardResponse>} Complex working hours
+   */
+  @Get('complex/:complexId')
+  @ApiOperation({
+    summary: 'Get complex working hours',
+    description: 'Retrieves working hours for a specific medical complex.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Complex working hours retrieved successfully',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Complex not found',
+  })
+  async getComplexWorkingHours(
+    @Param('complexId') complexId: string,
+  ): Promise<StandardResponse> {
+    // Use the general getWorkingHours method with entityType='complex'
+    const workingHours = await this.workingHoursService.getWorkingHours(
+      'complex',
+      complexId,
+    );
+
+    return this.createSuccessResponse(workingHours, {
+      ar: 'تم استرجاع ساعات عمل المجمع بنجاح',
+      en: 'Complex working hours retrieved successfully',
+    });
+  }
+
+  /**
    * Retrieves working hours for an entity.
    *
    * @param {string} entityType - Entity type
@@ -1726,7 +1765,23 @@ export class WorkingHoursController {
     summary: 'Get working hours for an entity',
     description:
       'Retrieves the working hours schedule for a specific entity (clinic, complex, or user). ' +
-      'Returns all days of the week with their working status and times.',
+      'Returns all days of the week with their working status and times. ' +
+      'Optionally filter by specific day of week.',
+  })
+  @ApiQuery({
+    name: 'dayOfWeek',
+    required: false,
+    enum: [
+      'sunday',
+      'monday',
+      'tuesday',
+      'wednesday',
+      'thursday',
+      'friday',
+      'saturday',
+    ],
+    description: 'Filter by specific day of week',
+    example: 'monday',
   })
   @ApiResponse({
     status: 200,
@@ -1772,44 +1827,23 @@ export class WorkingHoursController {
   async getWorkingHours(
     @Param('entityType') entityType: string,
     @Param('entityId') entityId: string,
+    @Query('dayOfWeek') dayOfWeek?: string,
   ): Promise<StandardResponse<WorkingHours[]>> {
-    const workingHours = await this.workingHoursService.getWorkingHours(
+    let workingHours = await this.workingHoursService.getWorkingHours(
       entityType,
       entityId,
     );
 
+    // Filter by dayOfWeek if provided
+    if (dayOfWeek) {
+      workingHours = workingHours.filter(
+        (wh) => wh.dayOfWeek.toLowerCase() === dayOfWeek.toLowerCase(),
+      );
+    }
+
     return this.createSuccessResponse(workingHours, {
       ar: 'تم استرجاع ساعات العمل بنجاح',
       en: 'Working hours retrieved successfully',
-    });
-  }
-
-  /**
-   * Retrieves complex working hours.
-   *
-   * @param {string} complexId - Complex ID
-   * @returns {Promise<StandardResponse>} Complex working hours
-   */
-  @Get('complex/:complexId')
-  @ApiOperation({
-    summary: 'Get complex working hours',
-    description: 'Retrieves working hours for a specific medical complex.',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Complex working hours retrieved successfully',
-  })
-  @ApiResponse({
-    status: 404,
-    description: 'Complex not found',
-  })
-  async getComplexWorkingHours(
-    @Param('complexId') complexId: string,
-  ): Promise<StandardResponse> {
-    // For now, return a simple response until the service method exists
-    return this.createSuccessResponse([], {
-      ar: 'تم استرجاع ساعات عمل المجمع بنجاح',
-      en: 'Complex working hours retrieved successfully',
     });
   }
 
@@ -2069,6 +2103,122 @@ export class WorkingHoursController {
       }
       // Re-throw other errors
       throw error;
+    }
+  }
+
+  /**
+   * Delete working hours for an entity.
+   * Optionally delete only specific day of week.
+   *
+   * @param {string} entityType - Entity type (user, clinic, complex)
+   * @param {string} entityId - Entity ID
+   * @param {string} dayOfWeek - Optional: specific day to delete
+   * @returns {Promise<StandardResponse>} Deletion confirmation
+   */
+  @Delete(':entityType/:entityId')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Delete working hours for an entity',
+    description:
+      'Deletes working hours for an entity. ' +
+      'If dayOfWeek query parameter is provided, deletes only that specific day. ' +
+      'Otherwise, deletes all working hours for the entity.',
+  })
+  @ApiQuery({
+    name: 'dayOfWeek',
+    required: false,
+    enum: [
+      'sunday',
+      'monday',
+      'tuesday',
+      'wednesday',
+      'thursday',
+      'friday',
+      'saturday',
+    ],
+    description: 'Optional: Delete only specific day of week',
+    example: 'saturday',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Working hours deleted successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: true },
+        data: {
+          type: 'object',
+          properties: {
+            deletedCount: { type: 'number', example: 1 },
+          },
+        },
+        message: {
+          type: 'object',
+          properties: {
+            ar: { type: 'string', example: 'تم حذف ساعات العمل بنجاح' },
+            en: {
+              type: 'string',
+              example: 'Working hours deleted successfully',
+            },
+          },
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Entity not found or no working hours to delete',
+  })
+  async deleteWorkingHours(
+    @Param('entityType') entityType: string,
+    @Param('entityId') entityId: string,
+    @Query('dayOfWeek') dayOfWeek?: string,
+  ): Promise<StandardResponse> {
+    try {
+      const filter: any = {
+        entityType,
+        entityId: new Types.ObjectId(entityId),
+      };
+
+      // If dayOfWeek is specified, only delete that day
+      if (dayOfWeek) {
+        filter.dayOfWeek = dayOfWeek.toLowerCase();
+      }
+
+      const result = await this.workingHoursModel.deleteMany(filter).exec();
+
+      if (result.deletedCount === 0) {
+        throw new NotFoundException({
+          message: {
+            ar: 'لم يتم العثور على ساعات عمل للحذف',
+            en: 'No working hours found to delete',
+          },
+          code: 'WORKING_HOURS_NOT_FOUND',
+        });
+      }
+
+      return this.createSuccessResponse(
+        { deletedCount: result.deletedCount },
+        {
+          ar: dayOfWeek
+            ? `تم حذف ساعات العمل ليوم ${dayOfWeek} بنجاح`
+            : 'تم حذف جميع ساعات العمل بنجاح',
+          en: dayOfWeek
+            ? `Working hours for ${dayOfWeek} deleted successfully`
+            : 'All working hours deleted successfully',
+        },
+      );
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      throw new InternalServerErrorException({
+        message: {
+          ar: 'فشل حذف ساعات العمل',
+          en: 'Failed to delete working hours',
+        },
+        code: 'DELETE_FAILED',
+      });
     }
   }
 }
