@@ -7,7 +7,9 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Service } from '../database/schemas/service.schema';
 import { ClinicService } from '../database/schemas/clinic-service.schema';
+import { Appointment } from '../database/schemas/appointment.schema';
 import { CreateServiceDto, AssignServicesDto } from './dto/create-service.dto';
+import { UpdateServiceDto } from './dto/update-service.dto';
 
 @Injectable()
 export class ServiceService {
@@ -15,6 +17,8 @@ export class ServiceService {
     @InjectModel('Service') private readonly serviceModel: Model<Service>,
     @InjectModel('ClinicService')
     private readonly clinicServiceModel: Model<ClinicService>,
+    @InjectModel('Appointment')
+    private readonly appointmentModel: Model<Appointment>,
   ) {}
 
   async createService(createDto: CreateServiceDto): Promise<Service> {
@@ -34,6 +38,7 @@ export class ServiceService {
     // Check for duplicates only within the same clinic or complex department
     const duplicateValidationQuery: any = {
       name: { $regex: new RegExp(`^${createDto.name.trim()}$`, 'i') }, // Case-insensitive exact match
+      deletedAt: { $exists: false },
     };
 
     // If this is for a specific complex department, check within that department only
@@ -103,6 +108,7 @@ export class ServiceService {
       .find({
         complexDepartmentId: new Types.ObjectId(complexDepartmentId),
       })
+      .populate('deletedBy', 'firstName lastName')
       .exec();
   }
 
@@ -138,6 +144,7 @@ export class ServiceService {
       // Build query to check against existing services
       const query: any = {
         name: { $in: cleanedNames.map((name) => new RegExp(`^${name}$`, 'i')) },
+        deletedAt: { $exists: false },
       };
 
       if (complexDepartmentId) {
@@ -182,7 +189,10 @@ export class ServiceService {
         query.complexDepartmentId = { $exists: false };
       }
 
-      return await this.serviceModel.find(query).exec();
+      return await this.serviceModel
+        .find(query)
+        .populate('deletedBy', 'firstName lastName')
+        .exec();
     } catch (error) {
       console.error('Error getting services for clinic:', error);
       return [];
@@ -229,7 +239,13 @@ export class ServiceService {
         clinicId: new Types.ObjectId(clinicId),
         isActive: true,
       })
-      .populate('serviceId')
+      .populate({
+        path: 'serviceId',
+        populate: {
+          path: 'deletedBy',
+          select: 'firstName lastName',
+        },
+      })
       .exec();
 
     return clinicServices.map((cs) => cs.serviceId as unknown as Service);
@@ -241,14 +257,264 @@ export class ServiceService {
       .find({
         clinicId: new Types.ObjectId(clinicId),
       })
+      .populate('deletedBy', 'firstName lastName')
       .exec();
   }
 
   async getService(serviceId: string): Promise<Service> {
-    const service = await this.serviceModel.findById(serviceId);
+    const service = await this.serviceModel
+      .findOne({
+        _id: new Types.ObjectId(serviceId),
+      })
+      .populate('deletedBy', 'firstName lastName')
+      .exec();
     if (!service) {
       throw new NotFoundException('Service not found');
     }
     return service;
+  }
+
+  async updateService(
+    serviceId: string,
+    updateDto: UpdateServiceDto,
+  ): Promise<Service> {
+    const service = await this.serviceModel.findOne({
+      _id: new Types.ObjectId(serviceId),
+      deletedAt: { $exists: false },
+    });
+    if (!service) {
+      throw new NotFoundException({
+        message: {
+          ar: 'الخدمة غير موجودة',
+          en: 'Service not found',
+        },
+      });
+    }
+
+    // Detect critical changes that affect appointments
+    const criticalChanges = this.detectCriticalChanges(service, updateDto);
+
+    // If there are critical changes, check for active appointments
+    if (criticalChanges.length > 0) {
+      const affectedAppointments = await this.findAffectedAppointments(
+        serviceId,
+      );
+
+      if (affectedAppointments.length > 0 && !updateDto.confirmRescheduling) {
+        throw new BadRequestException({
+          message: {
+            ar: `هذا التعديل سيؤثر على ${affectedAppointments.length} مواعيد نشطة. يرجى التأكيد لإعادة الجدولة`,
+            en: `This change will affect ${affectedAppointments.length} active appointments. Please confirm to reschedule`,
+          },
+          requiresConfirmation: true,
+          affectedAppointmentsCount: affectedAppointments.length,
+          affectedAppointmentIds: affectedAppointments.map((a) =>
+            (a._id as Types.ObjectId).toString(),
+          ),
+        });
+      }
+
+      // Mark appointments for rescheduling if confirmed
+      if (updateDto.confirmRescheduling && affectedAppointments.length > 0) {
+        await this.markAppointmentsForRescheduling(affectedAppointments);
+      }
+    }
+
+    // Validate name uniqueness if name is being changed
+    if (updateDto.name && updateDto.name.trim() !== service.name) {
+      if (updateDto.name.trim().length < 2) {
+        throw new BadRequestException(
+          'Service name must be at least 2 characters long',
+        );
+      }
+
+      if (updateDto.name.length > 100) {
+        throw new BadRequestException(
+          'Service name cannot exceed 100 characters',
+        );
+      }
+
+      // Check for duplicate name
+      const duplicateValidationQuery: any = {
+        name: { $regex: new RegExp(`^${updateDto.name.trim()}$`, 'i') },
+        _id: { $ne: new Types.ObjectId(serviceId) },
+        deletedAt: { $exists: false },
+      };
+
+      if (service.complexDepartmentId) {
+        duplicateValidationQuery.complexDepartmentId =
+          service.complexDepartmentId;
+        duplicateValidationQuery.clinicId = { $exists: false };
+      } else if (service.clinicId) {
+        duplicateValidationQuery.clinicId = service.clinicId;
+        duplicateValidationQuery.complexDepartmentId = { $exists: false };
+      }
+
+      const existing = await this.serviceModel.findOne(
+        duplicateValidationQuery,
+      );
+      if (existing) {
+        throw new BadRequestException(
+          `Service "${updateDto.name}" already exists. Please choose a different name.`,
+        );
+      }
+    }
+
+    // Update service fields
+    if (updateDto.name !== undefined) {
+      service.name = updateDto.name.trim();
+    }
+    if (updateDto.description !== undefined) {
+      service.description = updateDto.description?.trim() || undefined;
+    }
+    if (updateDto.durationMinutes !== undefined) {
+      service.durationMinutes = updateDto.durationMinutes;
+    }
+    if (updateDto.price !== undefined) {
+      service.price = updateDto.price;
+    }
+
+    // Handle complexDepartmentId change
+    if (updateDto.complexDepartmentId !== undefined) {
+      if (updateDto.complexDepartmentId) {
+        service.complexDepartmentId = new Types.ObjectId(
+          updateDto.complexDepartmentId,
+        );
+        service.clinicId = undefined; // Clear clinicId if setting complexDepartmentId
+      } else {
+        service.complexDepartmentId = undefined;
+      }
+    }
+
+    // Handle clinicId change
+    if (updateDto.clinicId !== undefined) {
+      if (updateDto.clinicId) {
+        service.clinicId = new Types.ObjectId(updateDto.clinicId);
+        service.complexDepartmentId = undefined; // Clear complexDepartmentId if setting clinicId
+      } else {
+        service.clinicId = undefined;
+      }
+    }
+
+    const savedService = await service.save();
+    // Populate deletedBy if it exists
+    if (savedService.deletedBy) {
+      await savedService.populate('deletedBy', 'firstName lastName');
+    }
+    return savedService;
+  }
+
+  async deleteService(serviceId: string, userId?: string): Promise<void> {
+    const service = await this.serviceModel.findOne({
+      _id: new Types.ObjectId(serviceId),
+      deletedAt: { $exists: false },
+    });
+    if (!service) {
+      throw new NotFoundException({
+        message: {
+          ar: 'الخدمة غير موجودة',
+          en: 'Service not found',
+        },
+      });
+    }
+
+    // Check for active appointments
+    const activeAppointments = await this.appointmentModel.countDocuments({
+      serviceId: new Types.ObjectId(serviceId),
+      status: { $in: ['scheduled', 'confirmed'] },
+      appointmentDate: { $gte: new Date() },
+      deletedAt: { $exists: false },
+    });
+
+    if (activeAppointments > 0) {
+      throw new BadRequestException({
+        message: {
+          ar: `لا يمكن حذف الخدمة لأنها تحتوي على ${activeAppointments} مواعيد نشطة`,
+          en: `Cannot delete service because it has ${activeAppointments} active appointments`,
+        },
+        activeAppointmentsCount: activeAppointments,
+      });
+    }
+
+    // Soft delete - set deletedAt, deletedBy, and isActive to false
+    service.deletedAt = new Date();
+    service.isActive = false;
+    if (userId) {
+      service.deletedBy = new Types.ObjectId(userId);
+    }
+    await service.save();
+  }
+
+  /**
+   * Detects critical changes that would affect appointments
+   */
+  private detectCriticalChanges(
+    service: Service,
+    updateDto: UpdateServiceDto,
+  ): string[] {
+    const changes: string[] = [];
+
+    if (
+      updateDto.complexDepartmentId !== undefined &&
+      updateDto.complexDepartmentId !==
+        service.complexDepartmentId?.toString()
+    ) {
+      changes.push('complexDepartmentId');
+    }
+
+    if (
+      updateDto.clinicId !== undefined &&
+      updateDto.clinicId !== service.clinicId?.toString()
+    ) {
+      changes.push('clinicId');
+    }
+
+    // Duration changes might affect appointment scheduling
+    if (
+      updateDto.durationMinutes !== undefined &&
+      updateDto.durationMinutes !== service.durationMinutes
+    ) {
+      changes.push('durationMinutes');
+    }
+
+    return changes;
+  }
+
+  /**
+   * Finds appointments that would be affected by service changes
+   */
+  private async findAffectedAppointments(
+    serviceId: string,
+  ): Promise<Appointment[]> {
+    return await this.appointmentModel
+      .find({
+        serviceId: new Types.ObjectId(serviceId),
+        status: { $in: ['scheduled', 'confirmed'] },
+        appointmentDate: { $gte: new Date() },
+        deletedAt: { $exists: false },
+      })
+      .exec();
+  }
+
+  /**
+   * Marks appointments for rescheduling
+   */
+  private async markAppointmentsForRescheduling(
+    appointments: Appointment[],
+  ): Promise<void> {
+    if (appointments.length === 0) {
+      return;
+    }
+
+    await this.appointmentModel.updateMany(
+      { _id: { $in: appointments.map((a) => a._id) } },
+      {
+        $set: {
+          status: 'scheduled', // Keep as scheduled but mark for rescheduling
+          markedForReschedulingAt: new Date(),
+          rescheduledReason: 'Service details changed - requires rescheduling',
+        },
+      },
+    );
   }
 }

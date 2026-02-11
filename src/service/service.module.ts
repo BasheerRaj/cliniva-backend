@@ -4,6 +4,7 @@ import { ServiceController } from './service.controller';
 import { ServiceService } from './service.service';
 import { ServiceSchema } from '../database/schemas/service.schema';
 import { ClinicServiceSchema } from '../database/schemas/clinic-service.schema';
+import { AppointmentSchema } from '../database/schemas/appointment.schema';
 import { CommonModule } from '../common/common.module';
 
 @Module({
@@ -11,6 +12,7 @@ import { CommonModule } from '../common/common.module';
     MongooseModule.forFeature([
       { name: 'Service', schema: ServiceSchema },
       { name: 'ClinicService', schema: ClinicServiceSchema },
+      { name: 'Appointment', schema: AppointmentSchema },
     ]),
     CommonModule,
   ],

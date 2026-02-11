@@ -10,6 +10,7 @@ import {
   HttpCode,
   HttpStatus,
   Query,
+  Request,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -22,6 +23,7 @@ import {
 } from '@nestjs/swagger';
 import { ServiceService } from './service.service';
 import { CreateServiceDto, AssignServicesDto } from './dto/create-service.dto';
+import { UpdateServiceDto } from './dto/update-service.dto';
 import { Service } from '../database/schemas/service.schema';
 import { ClinicService } from '../database/schemas/clinic-service.schema';
 import { SERVICE_SWAGGER_EXAMPLES } from './constants/swagger-examples';
@@ -118,6 +120,141 @@ export class ServiceController {
   @Get(':id')
   async getServiceById(@Param('id') id: string): Promise<Service> {
     return this.serviceService.getService(id);
+  }
+
+  /**
+   * Update service
+   */
+  @ApiOperation({
+    summary: 'Update service',
+    description:
+      'Updates an existing medical service. If changes affect active appointments (e.g., department/clinic change, duration change), confirmation is required to proceed with rescheduling.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Service updated successfully',
+    schema: {
+      example: SERVICE_SWAGGER_EXAMPLES.UPDATE_SERVICE_SUCCESS,
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description:
+      'Validation error or requires confirmation for appointment rescheduling',
+    schema: {
+      example: {
+        statusCode: 400,
+        message: {
+          ar: 'هذا التعديل سيؤثر على 5 مواعيد نشطة. يرجى التأكيد لإعادة الجدولة',
+          en: 'This change will affect 5 active appointments. Please confirm to reschedule',
+        },
+        requiresConfirmation: true,
+        affectedAppointmentsCount: 5,
+      },
+    },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Service not found',
+    schema: {
+      example: SERVICE_SWAGGER_EXAMPLES.SERVICE_NOT_FOUND,
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - Authentication required',
+    schema: {
+      example: SERVICE_SWAGGER_EXAMPLES.UNAUTHORIZED,
+    },
+  })
+  @ApiBearerAuth()
+  @ApiParam({
+    name: 'id',
+    description: 'Service ID',
+    type: String,
+    example: '507f1f77bcf86cd799439011',
+  })
+  @ApiBody({ type: UpdateServiceDto })
+  @Put(':id')
+  async updateService(
+    @Param('id') id: string,
+    @Body(new ValidationPipe({ transform: true, whitelist: true }))
+    updateServiceDto: UpdateServiceDto,
+  ): Promise<Service> {
+    return this.serviceService.updateService(id, updateServiceDto);
+  }
+
+  /**
+   * Delete service
+   */
+  @ApiOperation({
+    summary: 'Delete service',
+    description:
+      'Soft deletes a medical service. Cannot delete if service has active appointments (scheduled or confirmed). The service is marked as deleted with a timestamp.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Service deleted successfully',
+    schema: {
+      example: SERVICE_SWAGGER_EXAMPLES.DELETE_SERVICE_SUCCESS,
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Cannot delete service with active appointments',
+    schema: {
+      example: {
+        statusCode: 400,
+        message: {
+          ar: 'لا يمكن حذف الخدمة لأنها تحتوي على 3 مواعيد نشطة',
+          en: 'Cannot delete service because it has 3 active appointments',
+        },
+        activeAppointmentsCount: 3,
+      },
+    },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Service not found',
+    schema: {
+      example: SERVICE_SWAGGER_EXAMPLES.SERVICE_NOT_FOUND,
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - Authentication required',
+    schema: {
+      example: SERVICE_SWAGGER_EXAMPLES.UNAUTHORIZED,
+    },
+  })
+  @ApiBearerAuth()
+  @ApiParam({
+    name: 'id',
+    description: 'Service ID',
+    type: String,
+    example: '507f1f77bcf86cd799439011',
+  })
+  @Delete(':id')
+  @HttpCode(HttpStatus.OK)
+  async deleteService(
+    @Param('id') id: string,
+    @Request() req: any,
+  ): Promise<{
+    success: boolean;
+    message: { ar: string; en: string };
+    deletedAt: Date;
+  }> {
+    const userId = req.user?.id || req.user?.userId || req.user?.sub;
+    await this.serviceService.deleteService(id, userId);
+
+    return {
+      success: true,
+      message: {
+        ar: 'تم حذف الخدمة بنجاح',
+        en: 'Service deleted successfully',
+      },
+      deletedAt: new Date(),
+    };
   }
 
   /**
