@@ -11,6 +11,7 @@ import {
   HttpStatus,
   Query,
   Request,
+  UseGuards,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -27,7 +28,7 @@ import { UpdateServiceDto } from './dto/update-service.dto';
 import { Service } from '../database/schemas/service.schema';
 import { ClinicService } from '../database/schemas/clinic-service.schema';
 import { SERVICE_SWAGGER_EXAMPLES } from './constants/swagger-examples';
-
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 @ApiTags('Services')
 @Controller('services')
 export class ServiceController {
@@ -187,10 +188,103 @@ export class ServiceController {
   /**
    * Delete service
    */
+  // @ApiOperation({
+  //   summary: 'Delete service',
+  //   description:
+  //     'Soft deletes a medical service. Cannot delete if service has active appointments (scheduled or confirmed). The service is marked as deleted with a timestamp.',
+  // })
+  // @ApiResponse({
+  //   status: 200,
+  //   description: 'Service deleted successfully',
+  //   schema: {
+  //     example: SERVICE_SWAGGER_EXAMPLES.DELETE_SERVICE_SUCCESS,
+  //   },
+  // })
+  // @ApiResponse({
+  //   status: 400,
+  //   description: 'Cannot delete service with active appointments',
+  //   schema: {
+  //     example: {
+  //       statusCode: 400,
+  //       message: {
+  //         ar: 'لا يمكن حذف الخدمة لأنها تحتوي على 3 مواعيد نشطة',
+  //         en: 'Cannot delete service because it has 3 active appointments',
+  //       },
+  //       activeAppointmentsCount: 3,
+  //     },
+  //   },
+  // })
+  // @ApiResponse({
+  //   status: 404,
+  //   description: 'Service not found',
+  //   schema: {
+  //     example: SERVICE_SWAGGER_EXAMPLES.SERVICE_NOT_FOUND,
+  //   },
+  // })
+  // @ApiResponse({
+  //   status: 401,
+  //   description: 'Unauthorized - Authentication required',
+  //   schema: {
+  //     example: SERVICE_SWAGGER_EXAMPLES.UNAUTHORIZED,
+  //   },
+  // })
+  // @ApiBearerAuth()
+  // @ApiParam({
+  //   name: 'id',
+  //   description: 'Service ID',
+  //   type: String,
+  //   example: '507f1f77bcf86cd799439011',
+  // })
+  // @Delete(':id')
+  // @HttpCode(HttpStatus.OK)
+  // async deleteService(
+  //   @Param('id') id: string,
+  //   @Request() req: any,
+  // ): Promise<{
+  //   success: boolean;
+  //   message: { ar: string; en: string };
+  //   deletedAt: Date;
+  // }> {
+  //   const userId = req.user?.id;
+  //   const userId2 = req.user?.userId;
+  //   ;
+
+  //   console.log('userId__consolecheck', userId);
+  //   console.log('userid2__consolecheck', userId2);
+  //   await this.serviceService.deleteService(id, userId2);
+
+  //   return {
+  //     success: true,
+  //     message: {
+  //       ar: 'تم حذف الخدمة بنجاح',
+  //       en: 'Service deleted successfully',
+  //     },
+  //     deletedAt: new Date(),
+  //   };
+  // }
+
+  /**
+   * Delete a service (soft delete)
+   */
+  @Delete(':id')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth()
   @ApiOperation({
-    summary: 'Delete service',
-    description:
-      'Soft deletes a medical service. Cannot delete if service has active appointments (scheduled or confirmed). The service is marked as deleted with a timestamp.',
+    summary: 'Delete a service (soft delete)',
+    description: `
+      Soft deletes a service. Cannot delete if service has active appointments.
+      
+      **Business Rules:**
+      - Cannot delete service with active appointments (scheduled, confirmed, or in_progress)
+      - Uses soft delete (adds deletedAt timestamp)
+      - Tracks who deleted the service
+    `,
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'Service MongoDB ObjectId',
+    example: '507f1f77bcf86cd799439011',
   })
   @ApiResponse({
     status: 200,
@@ -203,14 +297,14 @@ export class ServiceController {
     status: 400,
     description: 'Cannot delete service with active appointments',
     schema: {
-      example: {
-        statusCode: 400,
-        message: {
-          ar: 'لا يمكن حذف الخدمة لأنها تحتوي على 3 مواعيد نشطة',
-          en: 'Cannot delete service because it has 3 active appointments',
-        },
-        activeAppointmentsCount: 3,
-      },
+      example: SERVICE_SWAGGER_EXAMPLES.BUSINESS_RULE_VIOLATION,
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized',
+    schema: {
+      example: SERVICE_SWAGGER_EXAMPLES.UNAUTHORIZED,
     },
   })
   @ApiResponse({
@@ -220,33 +314,16 @@ export class ServiceController {
       example: SERVICE_SWAGGER_EXAMPLES.SERVICE_NOT_FOUND,
     },
   })
-  @ApiResponse({
-    status: 401,
-    description: 'Unauthorized - Authentication required',
-    schema: {
-      example: SERVICE_SWAGGER_EXAMPLES.UNAUTHORIZED,
-    },
-  })
-  @ApiBearerAuth()
-  @ApiParam({
-    name: 'id',
-    description: 'Service ID',
-    type: String,
-    example: '507f1f77bcf86cd799439011',
-  })
-  @Delete(':id')
-  @HttpCode(HttpStatus.OK)
   async deleteService(
     @Param('id') id: string,
-    @Request() req: any,
+    @Request() req?: any,
   ): Promise<{
     success: boolean;
     message: { ar: string; en: string };
     deletedAt: Date;
   }> {
-    const userId = req.user?.id || req.user?.userId || req.user?.sub;
+    const userId = req?.user?.id;
     await this.serviceService.deleteService(id, userId);
-
     return {
       success: true,
       message: {

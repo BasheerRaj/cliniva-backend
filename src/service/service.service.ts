@@ -108,7 +108,6 @@ export class ServiceService {
       .find({
         complexDepartmentId: new Types.ObjectId(complexDepartmentId),
       })
-      .populate('deletedBy', 'firstName lastName')
       .exec();
   }
 
@@ -191,7 +190,6 @@ export class ServiceService {
 
       return await this.serviceModel
         .find(query)
-        .populate('deletedBy', 'firstName lastName')
         .exec();
     } catch (error) {
       console.error('Error getting services for clinic:', error);
@@ -239,13 +237,7 @@ export class ServiceService {
         clinicId: new Types.ObjectId(clinicId),
         isActive: true,
       })
-      .populate({
-        path: 'serviceId',
-        populate: {
-          path: 'deletedBy',
-          select: 'firstName lastName',
-        },
-      })
+      .populate('serviceId')
       .exec();
 
     return clinicServices.map((cs) => cs.serviceId as unknown as Service);
@@ -257,7 +249,6 @@ export class ServiceService {
       .find({
         clinicId: new Types.ObjectId(clinicId),
       })
-      .populate('deletedBy', 'firstName lastName')
       .exec();
   }
 
@@ -266,7 +257,6 @@ export class ServiceService {
       .findOne({
         _id: new Types.ObjectId(serviceId),
       })
-      .populate('deletedBy', 'firstName lastName')
       .exec();
     if (!service) {
       throw new NotFoundException('Service not found');
@@ -397,10 +387,6 @@ export class ServiceService {
     }
 
     const savedService = await service.save();
-    // Populate deletedBy if it exists
-    if (savedService.deletedBy) {
-      await savedService.populate('deletedBy', 'firstName lastName');
-    }
     return savedService;
   }
 
@@ -436,13 +422,12 @@ export class ServiceService {
       });
     }
 
-    // Soft delete - set deletedAt, deletedBy, and isActive to false
-    service.deletedAt = new Date();
-    service.isActive = false;
-    if (userId) {
-      service.deletedBy = new Types.ObjectId(userId);
-    }
-    await service.save();
+    await this.serviceModel.findByIdAndUpdate(serviceId, {
+      deletedAt: new Date(),
+      deletedBy: userId ? new Types.ObjectId(userId) : undefined,
+      isActive: false,
+    });
+
   }
 
   /**

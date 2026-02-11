@@ -5,7 +5,11 @@ import { ServiceService } from './service.service';
 import { ServiceSchema } from '../database/schemas/service.schema';
 import { ClinicServiceSchema } from '../database/schemas/clinic-service.schema';
 import { AppointmentSchema } from '../database/schemas/appointment.schema';
+import { UserSchema } from '../database/schemas/user.schema';
+import { SubscriptionSchema } from '../database/schemas/subscription.schema';
+import { SubscriptionPlanSchema } from '../database/schemas/subscription-plan.schema';
 import { CommonModule } from '../common/common.module';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
   imports: [
@@ -13,8 +17,12 @@ import { CommonModule } from '../common/common.module';
       { name: 'Service', schema: ServiceSchema },
       { name: 'ClinicService', schema: ClinicServiceSchema },
       { name: 'Appointment', schema: AppointmentSchema },
+      { name: 'User', schema: UserSchema },
+      { name: 'Subscription', schema: SubscriptionSchema },
+      { name: 'SubscriptionPlan', schema: SubscriptionPlanSchema },
     ]),
     CommonModule,
+    AuthModule,
   ],
   controllers: [ServiceController],
   providers: [ServiceService],
