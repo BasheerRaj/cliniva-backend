@@ -543,7 +543,7 @@ Authorization: Bearer {{accessToken}}
 # # - Average rating (if implemented)
 
 ### 10.4 Terminate employee
-POST {{baseUrl}}/employees/{{doctorEmployeeId}}/terminate
+POST {{baseUrl}}/employees/{{doctorUserId}}/terminate
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
@@ -560,7 +560,7 @@ Content-Type: application/json
 # - Employee terminated successfully
 
 ### 10.5 Delete employee (soft delete)
-DELETE {{baseUrl}}/employees/{{doctorEmployeeId}}
+DELETE {{baseUrl}}/employees/{{doctorUserId}}
 Authorization: Bearer {{accessToken}}
 
 # Expected Response:
