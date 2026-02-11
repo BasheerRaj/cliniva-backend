@@ -217,9 +217,18 @@ export class ValidationUtil {
   }
 
   static validatePhone(phone: string): boolean {
-    // Saudi Arabia phone number format: +966XXXXXXXXX or 05XXXXXXXX
-    const phoneRegex = /^(\+966|0)?[5-9]\d{8}$/;
-    return phoneRegex.test(phone.replace(/[\s-]/g, ''));
+    // Accept international phone numbers in E.164 format
+    // Format: +[country code][number] (e.g., +1234567890, +966501234567, +31970102907)
+    // - Must start with +
+    // - Followed by 1-3 digit country code
+    // - Followed by 4-14 digits for the phone number
+    // - Total length: 8-18 characters (including +)
+    const internationalPhoneRegex = /^\+[1-9]\d{1,14}$/;
+    
+    // Remove spaces and dashes for validation
+    const cleanPhone = phone.replace(/[\s-]/g, '');
+    
+    return internationalPhoneRegex.test(cleanPhone);
   }
 
   static validateGoogleLocation(location: string): boolean {
