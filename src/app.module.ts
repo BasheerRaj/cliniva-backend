@@ -29,6 +29,7 @@ import { ScheduleModule } from './schedule/schedule.module';
 import { DoctorSpecialtiesModule } from './doctor-specialties/doctor-specialties.module';
 import { EmergencyContactsModule } from './emergency-contacts/emergency-contacts.module';
 import { DoctorServiceModule } from './doctor-service/doctor-service.module';
+import { ServiceOfferModule } from './service-offer/service-offer.module';
 
 @Module({
   imports: [
@@ -64,6 +65,7 @@ import { DoctorServiceModule } from './doctor-service/doctor-service.module';
     DoctorSpecialtiesModule,
     EmergencyContactsModule,
     DoctorServiceModule,
+    ServiceOfferModule,
   ],
   controllers: [AppController],
   providers: [AppService],

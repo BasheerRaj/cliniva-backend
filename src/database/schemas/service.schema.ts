@@ -28,6 +28,21 @@ export class Service extends Document {
   isActive?: boolean;
 
   @Prop()
+  deactivatedAt?: Date;
+
+  @Prop({ type: Types.ObjectId, ref: 'User' })
+  deactivatedBy?: Types.ObjectId;
+
+  @Prop()
+  deactivationReason?: string;
+
+  @Prop({ default: 0 })
+  activeAppointmentsCount?: number;
+
+  @Prop({ default: 0 })
+  totalAppointmentsCount?: number;
+
+  @Prop()
   deletedAt?: Date;
 
   @Prop({ type: Types.ObjectId, ref: 'User' })

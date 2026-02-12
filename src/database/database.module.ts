@@ -6,6 +6,7 @@ import { DatabaseController } from './database.controller';
 import { DatabaseSeederService } from './seeders/database-seeder.service';
 import { EntitiesSeederService } from './seeders/entities.seeder';
 import { DatabaseInitializerService } from './database-initializer.service';
+import { ServiceOffer, ServiceOfferSchema } from '../service-offer/schemas/service-offer.schema';
 
 // Import all schemas
 import {
@@ -136,6 +137,7 @@ import {
       { name: Offer.name, schema: OfferSchema },
       { name: OfferTarget.name, schema: OfferTargetSchema },
       { name: AppointmentOffer.name, schema: AppointmentOfferSchema },
+      { name: ServiceOffer.name, schema: ServiceOfferSchema },
 
       // Billing & Payment Management
       { name: Invoice.name, schema: InvoiceSchema },

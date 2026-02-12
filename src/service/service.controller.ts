@@ -26,6 +26,8 @@ import {
 import { ServiceService } from './service.service';
 import { CreateServiceDto, AssignServicesDto } from './dto/create-service.dto';
 import { UpdateServiceDto } from './dto/update-service.dto';
+import { ChangeServiceStatusDto } from './dto/change-service-status.dto';
+import { BulkStatusChangeDto } from './dto/bulk-status-change.dto';
 import { Service } from '../database/schemas/service.schema';
 import { ClinicService } from '../database/schemas/clinic-service.schema';
 import { SERVICE_SWAGGER_EXAMPLES } from './constants/swagger-examples';
@@ -737,4 +739,216 @@ export class ServiceController {
     return [];
   }
 
+  /**
+   * Change service status (activate/deactivate)
+   */
+  @ApiOperation({
+    summary: 'Change service status',
+    description:
+      'Changes service active status. If deactivating with active appointments, marks them for rescheduling. Requires confirmation if service has active appointments.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Service status changed successfully',
+    schema: {
+      example: {
+        _id: '507f1f77bcf86cd799439011',
+        name: 'General Consultation',
+        isActive: false,
+        deactivatedAt: '2026-01-31T12:00:00.000Z',
+        deactivatedBy: '507f1f77bcf86cd799439015',
+        deactivationReason: 'Service temporarily unavailable',
+        affectedAppointments: {
+          count: 8,
+          status: 'needs_rescheduling',
+          notificationsSent: true,
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Requires confirmation or missing reason',
+    schema: {
+      example: {
+        statusCode: 400,
+        message: {
+          ar: 'الخدمة لديها 8 مواعيد نشطة. يرجى التأكيد لإعادة الجدولة',
+          en: 'Service has 8 active appointments. Please confirm to reschedule',
+        },
+        requiresConfirmation: true,
+        activeAppointmentsCount: 8,
+      },
+    },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Service not found',
+    schema: {
+      example: SERVICE_SWAGGER_EXAMPLES.SERVICE_NOT_FOUND,
+    },
+  })
+  @ApiBearerAuth()
+  @ApiParam({
+    name: 'id',
+    description: 'Service ID',
+    type: String,
+    example: '507f1f77bcf86cd799439011',
+  })
+  @ApiBody({ type: ChangeServiceStatusDto })
+  @Patch(':id/status')
+  async changeServiceStatus(
+    @Param('id') id: string,
+    @Body(new ValidationPipe({ transform: true, whitelist: true }))
+    dto: ChangeServiceStatusDto,
+    @Request() req: any,
+  ): Promise<any> {
+    const userId = req?.user?.id || req?.user?.userId;
+    return this.serviceService.changeServiceStatus(id, dto, userId);
+  }
+
+  /**
+   * Get service status history
+   */
+  @ApiOperation({
+    summary: 'Get service status history',
+    description:
+      'Returns history of status changes for audit purposes. Note: Full implementation requires a separate StatusHistory schema.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Status history retrieved successfully',
+    schema: {
+      example: [
+        {
+          changedAt: '2026-01-31T12:00:00.000Z',
+          changedBy: {
+            _id: '507f1f77bcf86cd799439015',
+            firstName: 'Admin',
+            lastName: 'User',
+          },
+          previousStatus: true,
+          newStatus: false,
+          reason: 'Service temporarily unavailable',
+          affectedAppointmentsCount: 8,
+        },
+      ],
+    },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Service not found',
+    schema: {
+      example: SERVICE_SWAGGER_EXAMPLES.SERVICE_NOT_FOUND,
+    },
+  })
+  @ApiBearerAuth()
+  @ApiParam({
+    name: 'id',
+    description: 'Service ID',
+    type: String,
+    example: '507f1f77bcf86cd799439011',
+  })
+  @Get(':id/status-history')
+  async getStatusHistory(@Param('id') id: string): Promise<any[]> {
+    return this.serviceService.getStatusHistory(id);
+  }
+
+  /**
+   * Get active services only
+   */
+  @ApiOperation({
+    summary: 'Get active services',
+    description:
+      'Returns only active services. Used for appointment booking dropdowns. Can be filtered by complex department or clinic.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Active services retrieved successfully',
+    schema: {
+      example: [
+        {
+          _id: '507f1f77bcf86cd799439011',
+          name: 'General Consultation',
+          description: 'Standard medical consultation',
+          durationMinutes: 30,
+          price: 150,
+          isActive: true,
+          activeAppointmentsCount: 5,
+          totalAppointmentsCount: 120,
+        },
+      ],
+    },
+  })
+  @ApiBearerAuth()
+  @ApiQuery({
+    name: 'complexDepartmentId',
+    required: false,
+    description: 'Filter by complex department ID',
+    type: String,
+    example: '507f1f77bcf86cd799439020',
+  })
+  @ApiQuery({
+    name: 'clinicId',
+    required: false,
+    description: 'Filter by clinic ID',
+    type: String,
+    example: '507f1f77bcf86cd799439040',
+  })
+  @Get('active')
+  async getActiveServices(
+    @Query('complexDepartmentId') complexDepartmentId?: string,
+    @Query('clinicId') clinicId?: string,
+  ): Promise<Service[]> {
+    return this.serviceService.getActiveServices(
+      complexDepartmentId,
+      clinicId,
+    );
+  }
+
+  /**
+   * Bulk status change for multiple services
+   */
+  @ApiOperation({
+    summary: 'Bulk status change',
+    description:
+      'Changes status for multiple services at once. Useful for temporary closures. Requires confirmation if services have active appointments.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Bulk status change completed',
+    schema: {
+      example: {
+        success: true,
+        updated: 5,
+        failed: 0,
+        totalAffectedAppointments: 23,
+        results: [
+          {
+            serviceId: '507f1f77bcf86cd799439011',
+            success: true,
+            affectedAppointments: 8,
+          },
+        ],
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Validation error',
+    schema: {
+      example: SERVICE_SWAGGER_EXAMPLES.VALIDATION_ERROR,
+    },
+  })
+  @ApiBearerAuth()
+  @ApiBody({ type: BulkStatusChangeDto })
+  @Patch('bulk-status')
+  async bulkStatusChange(
+    @Body(new ValidationPipe({ transform: true, whitelist: true }))
+    dto: BulkStatusChangeDto,
+    @Request() req: any,
+  ): Promise<any> {
+    const userId = req?.user?.id || req?.user?.userId;
+    return this.serviceService.bulkStatusChange(dto, userId);
+  }
 }

@@ -8,8 +8,10 @@ import { AppointmentSchema } from '../database/schemas/appointment.schema';
 import { UserSchema } from '../database/schemas/user.schema';
 import { SubscriptionSchema } from '../database/schemas/subscription.schema';
 import { SubscriptionPlanSchema } from '../database/schemas/subscription-plan.schema';
+import { NotificationSchema } from '../database/schemas/notification.schema';
 import { CommonModule } from '../common/common.module';
 import { AuthModule } from '../auth/auth.module';
+import { ServiceOfferModule } from '../service-offer/service-offer.module';
 
 @Module({
   imports: [
@@ -20,9 +22,11 @@ import { AuthModule } from '../auth/auth.module';
       { name: 'User', schema: UserSchema },
       { name: 'Subscription', schema: SubscriptionSchema },
       { name: 'SubscriptionPlan', schema: SubscriptionPlanSchema },
+      { name: 'Notification', schema: NotificationSchema },
     ]),
     CommonModule,
     AuthModule,
+    ServiceOfferModule,
   ],
   controllers: [ServiceController],
   providers: [ServiceService],
