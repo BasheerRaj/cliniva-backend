@@ -309,6 +309,10 @@ export class WorkingHoursValidationService {
   ): Promise<ValidationResult> {
     const errors: ValidationError[] = [];
 
+    console.log('🔍 [Validation] Starting hierarchical validation');
+    console.log('📋 [Validation] Child schedule:', JSON.stringify(childSchedule, null, 2));
+    console.log('🏢 [Validation] Parent entity:', parentEntityType, parentEntityId);
+
     // First validate the child schedule format
     const basicValidation = ValidationUtil.validateWorkingHours(childSchedule);
     if (!basicValidation.isValid) {
@@ -331,8 +335,11 @@ export class WorkingHoursValidationService {
       parentEntityId,
     );
 
+    console.log('📅 [Validation] Parent schedule:', JSON.stringify(parentSchedule, null, 2));
+
     // If parent has no working hours set, allow any child hours
     if (parentSchedule.length === 0) {
+      console.log('⚠️ [Validation] No parent working hours found - allowing any child hours');
       return { isValid: true, errors: [] };
     }
 
@@ -347,8 +354,16 @@ export class WorkingHoursValidationService {
       const dayKey = childDay.dayOfWeek.toLowerCase();
       const parentDay = parentMap.get(dayKey);
 
-      // If child is working but parent is not, that's invalid
-      if (childDay.isWorkingDay && parentDay && !parentDay.isWorkingDay) {
+      console.log(`🔍 [Validation] Checking ${childDay.dayOfWeek}:`, {
+        childWorking: childDay.isWorkingDay,
+        parentWorking: parentDay?.isWorkingDay,
+        childHours: childDay.isWorkingDay ? `${childDay.openingTime}-${childDay.closingTime}` : 'closed',
+        parentHours: parentDay?.isWorkingDay ? `${parentDay.openingTime}-${parentDay.closingTime}` : 'closed',
+      });
+
+      // If child is working but parent day doesn't exist or parent is not working, that's invalid
+      if (childDay.isWorkingDay && (!parentDay || !parentDay.isWorkingDay)) {
+        console.log(`❌ [Validation] ${childDay.dayOfWeek}: Child working but parent closed or not defined`);
         errors.push({
           dayOfWeek: childDay.dayOfWeek,
           message: createDynamicMessage(
@@ -371,11 +386,17 @@ export class WorkingHoursValidationService {
           childEntityName,
           parentEntityType,
         );
+        if (dayErrors.length > 0) {
+          console.log(`❌ [Validation] ${childDay.dayOfWeek}: Time constraint violations:`, dayErrors);
+        }
         errors.push(...dayErrors);
       }
     }
 
-    return { isValid: errors.length === 0, errors };
+    const result = { isValid: errors.length === 0, errors };
+    console.log('✅ [Validation] Final result:', result.isValid ? 'VALID' : 'INVALID', `(${errors.length} errors)`);
+    
+    return result;
   }
 
   /**

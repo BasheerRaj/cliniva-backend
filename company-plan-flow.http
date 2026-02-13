@@ -1,0 +1,613 @@
+###
+### Cliniva E2E Testing Flow - M1 and M2 Modules
+### Company Plan Complete Journey
+###
+### Description:
+### This HTTP file provides comprehensive end-to-end testing for all M1 (Security & User Management)
+### and M2 (Medical Facilities Management) module functionality. It simulates a complete company plan
+### onboarding journey followed by all CRUD operations and business rule validations.
+###
+### Prerequisites:
+### ✓ Backend server running on http://localhost:3000
+### ✓ MongoDB running and accessible
+### ✓ Fresh database (empty or with only super admin user)
+### ✓ VS Code REST Client extension installed
+### ✓ Super admin credentials available
+### ✓ All M1 and M2 endpoints implemented and functional
+###
+### Execution Instructions:
+### 1. Ensure all prerequisites are met
+### 2. Start from the top and execute requests sequentially
+### 3. Wait for each request to complete before running the next
+### 4. Variables are automatically captured from responses
+### 5. Verify response status codes and data after each request
+### 6. Check that variables are populated correctly (shown in REST Client output)
+### 7. If a request fails, check the error message and fix the issue before continuing
+### 8. You can restart from any section by manually setting required variables
+###
+### Expected Duration: ~5-10 minutes for complete flow
+###
+### Sections:
+### 1. Authentication Flow (M1)
+### 2. Onboarding Flow - Company Plan (M2)
+### 3. Working Hours Management (M1)
+### 4. User Management (M1)
+### 5. Complex Management (M2)
+### 6. Clinic Management (M2)
+### 7. Department Management (M2)
+### 8. Validation & Error Scenarios
+### 9. Complex Operational Scenarios
+### 10. Security & Authorization Tests
+###
+
+### ============================================
+### VARIABLES - Captured from responses
+### ============================================
+### These variables are automatically populated from API responses
+### You can also set them manually if needed to restart from a specific section
+
+# Base Configuration
+@baseUrl = http://localhost:3001/api/v1
+@contentType = application/json
+
+# Authentication Variables
+# @accessToken = 
+# @refreshToken = 
+# @userId = 
+# @resetToken = 
+@adminEmail = superadmin@cliniva.com
+
+# Subscription & Plan Variables
+@subscriptionId = 
+@planId = 
+
+# Organization Variables (Company Plan)
+@organizationId = 
+@organizationName = 
+
+# Complex Variables
+@complexId = 
+@complexName = 
+
+# Department Variables
+@departmentId = 
+@departmentName = 
+@department2Id = 
+@complexDepartmentId = 
+
+# Clinic Variables
+@clinicId = 
+@clinicName = 
+@clinic2Id = 
+
+# Employee Variables
+@doctorId = 
+@adminId = 
+@managerId = 
+@staffId = 
+
+# Working Hours Variables
+@orgWorkingHoursId = 
+@complexWorkingHoursId = 
+@clinicWorkingHoursId = 
+@userWorkingHoursId = 
+
+# Additional Test Entities
+@complex2Id = 
+@clinic2Id = 
+
+### ============================================
+### SECTION 1: AUTHENTICATION FLOW (M1)
+### ============================================
+### Tests: Login, token refresh, password management, logout
+### Business Rules: Session management, token validity, rate limiting
+### Expected Performance: < 500ms per request
+
+### ============================================
+### SECTION 2: ONBOARDING FLOW - COMPANY PLAN (M2)
+### ============================================
+### Tests: Complete company plan onboarding journey
+### Flow: Subscription → Organization → Complex → Department → Clinic
+### Business Rules: BZR-25, BZR-26, BZR-27, BZR-28, BZR-29, BZR-30
+### Expected Performance: < 1s per entity creation
+
+### ============================================
+### SECTION 3: WORKING HOURS MANAGEMENT (M1)
+### ============================================
+### Tests: Hierarchical working hours setup and validation
+### Flow: Organization → Complex → Clinic → User working hours
+### Business Rules: BZR-42, BZR-43, BZR-f1c0a9e4, BZR-u5a0f7d3, BZR-h5e4c7a0, BZR-r2b4e5c7
+### Expected Performance: < 1s per creation, < 2s for validation
+
+### ============================================
+### SECTION 4: USER MANAGEMENT (M1)
+### ============================================
+### Tests: Employee CRUD, role management, status changes
+### Business Rules: BZR-n0c4e9f2, BZR-m3d5a8b7, BZR-q4f3e1b8, BZR-q0d8a9f1, BZR-5e6f7a8b
+### Expected Performance: < 1s per operation
+
+### ============================================
+### SECTION 5: COMPLEX MANAGEMENT (M2)
+### ============================================
+### Tests: Complex CRUD, capacity tracking, PIC assignment, status management
+### Business Rules: BZR-28, BZR-33, BZR-34, BZR-35, BZR-36, BZR-38
+### Expected Performance: < 1s for CRUD, < 2s for calculations
+
+### ============================================
+### SECTION 6: CLINIC MANAGEMENT (M2)
+### ============================================
+### Tests: Clinic CRUD, capacity tracking, working hours validation, status management
+### Business Rules: BZR-30, BZR-39, BZR-40, BZR-41, BZR-42, BZR-44
+### Expected Performance: < 1s for CRUD, < 2s for calculations
+
+### ============================================
+### SECTION 7: DEPARTMENT MANAGEMENT (M2)
+### ============================================
+### Tests: Department CRUD, deletion restrictions
+### Business Rules: BZR-36
+### Expected Performance: < 1s per operation
+
+### ============================================
+### SECTION 8: VALIDATION & ERROR SCENARIOS
+### ============================================
+### Tests: Business rule violations, invalid data, constraint violations
+### Expected: 400/403/409 errors with bilingual messages and error codes
+
+### ============================================
+### SECTION 9: COMPLEX OPERATIONAL SCENARIOS
+### ============================================
+### Tests: Multi-step workflows, cascading operations, data integrity
+### Expected Performance: < 3s for complex operations
+
+### ============================================
+### SECTION 10: SECURITY & AUTHORIZATION TESTS
+### ============================================
+### Tests: Authentication, authorization, session management
+### Expected: 401/403 errors for unauthorized access
+
+### ============================================
+### TROUBLESHOOTING TIPS
+### ============================================
+###
+### Issue: Variable not captured
+### Solution: Check response structure, ensure field exists, verify @name directive
+###
+### Issue: 401 Unauthorized
+### Solution: Re-run login request to get fresh access token
+###
+### Issue: 404 Not Found
+### Solution: Verify entity was created, check captured ID variable
+###
+### Issue: 400 Bad Request
+### Solution: Check request body format, verify required fields, check validation rules
+###
+### Issue: Request fails with connection error
+### Solution: Verify backend server is running on http://localhost:3000
+###
+### Issue: Database constraint violation
+### Solution: Reset database to fresh state, ensure no duplicate data
+###
+### Restart from specific section:
+### 1. Identify required variables for that section
+### 2. Either run previous sections to populate variables
+### 3. Or manually set variables from database/previous responses
+###
+### ============================================
+### PERFORMANCE EXPECTATIONS
+### ============================================
+###
+### Authentication: < 500ms
+### Entity Creation: < 1s
+### List with Pagination: < 1s
+### Complex Calculations: < 2s
+### Status Changes with Transfers: < 3s
+###
+### If response times exceed expectations:
+### - Check database indexes
+### - Review query optimization
+### - Check server load
+### - Verify network latency
+###
+### ============================================
+### BILINGUAL MESSAGE VALIDATION
+### ============================================
+###
+### All responses should include bilingual messages:
+### Success: { message: { ar: "...", en: "..." } }
+### Error: { error: { code: "...", message: { ar: "...", en: "..." } } }
+###
+### Checkpoints for bilingual validation:
+### ✓ All success responses
+### ✓ All error responses
+### ✓ All validation errors
+### ✓ All business rule violations
+###
+### Error code format: [MODULE]_[NUMBER]
+### Examples: AUTH_001, CLINIC_002, VALIDATION_003
+###
+### ============================================
+### END OF HEADER - REQUESTS START BELOW
+### ============================================
+
+
+### ============================================
+### SECTION 1: AUTHENTICATION FLOW (M1)
+### ============================================
+
+### M1-AUTH-001: Super Admin Login
+# Purpose: Authenticate as super admin to obtain access and refresh tokens
+# Expected: 200 OK with tokens and user information
+# Validates: Requirements 2.1, 2.2 - Basic authentication flow
+# Business Rules: Session creation, token generation
+# Performance: < 500ms
+
+
+POST {{baseUrl}}/auth/forgot-password
+Content-Type: application/json
+
+{
+  "email": "{{adminEmail}}"
+}
+
+### 
+@token = 9e6393c24cc4e049acefcca27420870d6fa9b43473460662ed156aeccc513436
+
+###
+POST {{baseUrl}}/auth/reset-password
+Content-Type: application/json
+
+{
+  "token": "{{token}}",
+  "newPassword": "SuperAdmin123!",
+  "confirmPassword": "SuperAdmin123!"
+}
+
+### 
+# @name login
+# Verification: Check that response contains access_token, refresh_token, and user object
+# Expected Response Structure (actual API response):
+# {
+#   "access_token": "jwt-token-string",
+#   "refresh_token": "jwt-refresh-token-string",
+#   "expires_in": 86400,
+#   "user": {
+#     "id": "user-id",
+#     "email": "superadmin@cliniva.com",
+#     "role": "super_admin",
+#     "isFirstLogin": false,
+#     ...
+#   }
+# }
+# @name login
+POST {{baseUrl}}/auth/login
+Content-Type: {{contentType}}
+
+{
+  "email": "{{adminEmail}}",
+  "password": "SuperAdmin123!"
+}
+
+
+
+### Extract tokens and user ID from login response
+# Note: Make sure to run the login request above first before using these variables
+# The response structure is: { access_token, refresh_token, expires_in, user: { id, ... } }
+@accessToken1 = {{login.response.body.access_token}}
+@refreshToken1 = {{login.response.body.refresh_token}}
+@userId = {{login.response.body.user.id}}
+
+
+### M1-AUTH-002: Refresh Access Token
+# Purpose: Test token refresh mechanism to obtain new access and refresh tokens
+# Expected: 200 OK with new tokens
+# Validates: Requirement 2.3 - Token refresh flow
+# Business Rules: Token rotation, session continuity
+# Performance: < 500ms
+
+
+# @name refreshTokencall
+# Verification: Check that response contains new access_token and refresh_token
+# Expected Response Structure (actual API response):
+# {
+#   "access_token": "new-jwt-token-string",
+#   "refresh_token": "new-jwt-refresh-token-string",
+#   "expires_in": 86400
+# }
+
+POST {{baseUrl}}/auth/refresh
+Content-Type: {{contentType}}
+
+{
+  "refresh_token": "{{refreshToken1}}"
+}
+
+### Update tokens with new values from refresh response
+@accessToken = {{refreshTokencall.response.body.access_token}}
+@refreshToken = {{refreshTokencall.response.body.refresh_token}}
+
+
+### M1-AUTH-003: First Login Password Change
+# Purpose: Change password on first login (isFirstLogin: true)
+# Expected: 200 OK with new tokens and isFirstLogin: false
+# Validates: Requirements 8.1, 8.6 - First login password change flow
+# Business Rules: Current password verification, new password validation, isFirstLogin flag update
+# Performance: < 500ms
+# Note: This endpoint is for users with isFirstLogin: true
+
+# @name firstLoginPasswordChange
+# Verification: Check that password was changed and new tokens were issued
+# Expected Response Structure:
+# {
+#   "access_token": "new-jwt-token-string",
+#   "refresh_token": "new-jwt-refresh-token-string",
+#   "expires_in": 86400,
+#   "user": {
+#     "id": "user-id",
+#     "email": "superadmin@cliniva.com",
+#     "isFirstLogin": false,
+#     ...
+#   }
+# }
+POST {{baseUrl}}/auth/first-login-password-change
+Authorization: Bearer {{accessToken1}}
+Content-Type: {{contentType}}
+
+{
+  "currentPassword": "SuperAdmin123!",
+  "newPassword": "NewPassword123!",
+  "confirmPassword": "NewPassword123!"
+}
+
+### Update tokens after first login password change
+@accessToken = {{firstLoginPasswordChange.response.body.access_token}}
+@refreshToken = {{firstLoginPasswordChange.response.body.refresh_token}}
+
+
+### M1-AUTH-004: Change Password (Regular User)
+# Purpose: Test password change functionality for regular authenticated user (after first login)
+# Expected: 200 OK with success message
+# Validates: Requirements 8.2, 8.6 - Password change flow
+# Business Rules: Current password verification, new password validation
+# Performance: < 500ms
+# Note: This endpoint is for users with isFirstLogin: false
+
+# @name changePassword
+# Verification: Check that password was changed successfully
+# Expected Response Structure:
+# {
+#   "success": true,
+#   "message": {
+#     "ar": "تم تغيير كلمة المرور بنجاح",
+#     "en": "Password changed successfully"
+#   }
+# }
+POST {{baseUrl}}/auth/change-password
+Authorization: Bearer {{accessToken1}}
+Content-Type: {{contentType}}
+
+{
+  "currentPassword": "NewPassword123!",
+  "newPassword": "SuperAdmin123!",
+  "confirmPassword": "SuperAdmin123!"
+}
+
+
+
+
+### M1-AUTH-005: Re-login After Password Change
+# Purpose: Login with new password after password change
+# Expected: 200 OK with new tokens
+# Validates: Password change was successful
+# Performance: < 500ms
+
+POST {{baseUrl}}/auth/login
+Content-Type: {{contentType}}
+
+{
+  "email": "superadmin@cliniva.com",
+  "password": "AnotherPassword123!"
+}
+
+# @name relogin
+# Update tokens after re-login
+@accessToken = {{relogin.response.body.access_token}}
+@refreshToken = {{relogin.response.body.refresh_token}}
+
+
+### M1-AUTH-006: Forgot Password Request
+# Purpose: Request password reset token via email
+# Expected: 200 OK with reset token (in development) or email sent confirmation
+# Validates: Requirements 2.6 - Password reset request flow
+# Business Rules: Email validation, reset token generation, rate limiting
+# Performance: < 1s (includes email sending)
+
+POST {{baseUrl}}/auth/forgot-password
+Content-Type: {{contentType}}
+
+{
+  "email": "superadmin@cliniva.com"
+}
+
+# @name forgotPassword
+# Verification: Check that reset token was generated or email was sent
+# Expected Response Structure:
+# {
+#   "success": true,
+#   "message": {
+#     "ar": "تم إرسال رابط إعادة تعيين كلمة المرور إلى بريدك الإلكتروني",
+#     "en": "Password reset link has been sent to your email"
+#   }
+# }
+
+### Extract reset token from forgot password response (if available in development)
+@resetToken = from log console
+
+
+### M1-AUTH-007: Reset Password with Token
+# Purpose: Reset password using the reset token
+# Expected: 200 OK with password updated confirmation
+# Validates: Requirements 2.7 - Password reset completion flow
+# Business Rules: Token validation, token expiration, password validation
+# Performance: < 500ms
+
+POST {{baseUrl}}/auth/reset-password
+Content-Type: {{contentType}}
+
+{
+  "token": "{{resetToken}}",
+  "newPassword": "ResetPassword123!",
+  "confirmPassword": "ResetPassword123!"
+}
+
+# @name resetPassword
+# Verification: Check that password was reset successfully
+# Expected Response Structure:
+# {
+#   "success": true,
+#   "message": {
+#     "ar": "تم إعادة تعيين كلمة المرور بنجاح",
+#     "en": "Password reset successfully"
+#   }
+# }
+
+
+### M1-AUTH-008: Login with Reset Password
+# Purpose: Verify password reset by logging in with new password
+# Expected: 200 OK with tokens
+# Validates: Password reset was successful
+# Performance: < 500ms
+
+POST {{baseUrl}}/auth/login
+Content-Type: {{contentType}}
+
+{
+  "email": "superadmin@cliniva.com",
+  "password": "ResetPassword123!"
+}
+
+# @name loginAfterReset
+# Update tokens after successful login with reset password
+@accessToken = {{loginAfterReset.response.body.access_token}}
+@refreshToken = {{loginAfterReset.response.body.refresh_token}}
+
+
+### M1-AUTH-008: Change Password Back to Original
+# Purpose: Reset password back to original for consistency in remaining tests
+# Expected: 200 OK
+# Performance: < 500ms
+
+POST {{baseUrl}}/auth/change-password
+Authorization: Bearer {{accessToken}}
+Content-Type: {{contentType}}
+
+{
+  "currentPassword": "ResetPassword123!",
+  "newPassword": "SuperAdmin123!",
+  "confirmPassword": "SuperAdmin123!"
+}
+
+# @name resetToOriginal
+
+
+### M1-AUTH-009: Final Login with Original Password
+# Purpose: Login with original password to continue with remaining tests
+# Expected: 200 OK with tokens
+# Performance: < 500ms
+
+POST {{baseUrl}}/auth/login
+Content-Type: {{contentType}}
+
+{
+  "email": "superadmin@cliniva.com",
+  "password": "SuperAdmin123!"
+}
+
+# @name finalLogin
+# Update tokens for use in remaining tests
+@accessToken = {{finalLogin.response.body.access_token}}
+@refreshToken = {{finalLogin.response.body.refresh_token}}
+@userId = {{finalLogin.response.body.user.id}}
+
+
+### M1-AUTH-010: Logout
+# Purpose: Test logout functionality and session invalidation
+# Expected: 200 OK with logout confirmation
+# Validates: Requirement 2.8 - Logout flow, session invalidation
+# Business Rules: Token invalidation, session cleanup, refresh token revocation
+# Performance: < 500ms
+# Note: After logout, the access token should be invalid for subsequent requests
+
+POST {{baseUrl}}/auth/logout
+Authorization: Bearer {{accessToken1}}
+Content-Type: {{contentType}}
+
+# @name logout
+# Verification: Check that logout was successful and session was invalidated
+# Expected Response Structure:
+# {
+#   "success": true,
+#   "message": {
+#     "ar": "تم تسجيل الخروج بنجاح",
+#     "en": "Logout successful"
+#   }
+# }
+
+
+### M1-AUTH-011: Verify Session Invalidation After Logout
+# Purpose: Verify that the access token is invalid after logout
+# Expected: 401 Unauthorized
+# Validates: Session invalidation enforcement
+# Performance: < 500ms
+
+GET {{baseUrl}}/auth/profile
+Authorization: Bearer {{accessToken1}}
+
+# Expected: 401 Unauthorized with error message
+# {
+#   "success": false,
+#   "error": {
+#     "code": "AUTH_002",
+#     "message": {
+#       "ar": "الجلسة غير صالحة أو منتهية الصلاحية",
+#       "en": "Invalid or expired session"
+#     }
+#   }
+# }
+
+
+### M1-AUTH-012: Re-login for Remaining Tests
+# Purpose: Login again to get valid tokens for remaining test sections
+# Expected: 200 OK with tokens
+# Performance: < 500ms
+
+# @name reloginForTests
+# Update tokens for use in remaining test sections
+POST {{baseUrl}}/auth/login
+Content-Type: {{contentType}}
+
+{
+  "email": "superadmin@cliniva.com",
+  "password": "SuperAdmin123!"
+}
+### 
+
+@accessToken3 = {{reloginForTests.response.body.access_token}}
+@refreshToken3 = {{reloginForTests.response.body.refresh_token}}
+@userId = {{reloginForTests.response.body.user.id}}
+
+
+### ============================================
+### END OF SECTION 1: AUTHENTICATION FLOW (M1)
+### ============================================
+### Summary:
+### ✓ Super admin login with token capture
+### ✓ Token refresh mechanism
+### ✓ Password change (authenticated)
+### ✓ Forgot password request
+### ✓ Password reset with token
+### ✓ Logout and session invalidation
+### ✓ Session invalidation verification
+###
+### All authentication flows tested successfully.
+### Tokens are now ready for use in subsequent sections.
+### ============================================

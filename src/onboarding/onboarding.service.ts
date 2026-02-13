@@ -28,6 +28,7 @@ import { ClinicService } from '../clinic/clinic.service';
 import { DepartmentService } from '../department/department.service';
 import { ServiceService } from '../service/service.service';
 import { WorkingHoursService } from '../working-hours/working-hours.service';
+import { WorkingHoursValidationService } from '../working-hours/services/working-hours-validation.service';
 import { ContactService } from '../contact/contact.service';
 import { DynamicInfoService } from '../dynamic-info/dynamic-info.service';
 import { UserAccessService } from '../user-access/user-access.service';
@@ -58,6 +59,7 @@ import {
   ClinicLegalInfoDto,
   ClinicWorkingHoursDto,
   OnboardingStepProgressDto,
+  OnboardingStepType,
   StepSaveResponseDto,
 } from './dto';
 
@@ -120,6 +122,7 @@ export class OnboardingService {
     private readonly departmentService: DepartmentService,
     private readonly serviceService: ServiceService,
     private readonly legacyWorkingHoursService: WorkingHoursService,
+    private readonly workingHoursValidationService: WorkingHoursValidationService,
     private readonly contactService: ContactService,
     private readonly dynamicInfoService: DynamicInfoService,
     private readonly userAccessService: UserAccessService,
@@ -473,13 +476,23 @@ export class OnboardingService {
           const subscription =
             await this.subscriptionService.getSubscriptionByUser(userId);
           if (subscription) {
-            const plan = await this.subscriptionService.getSubscriptionPlan(
-              subscription.planId.toString(),
-            );
-            planType = plan?.name || null;
+            // Check if planId is populated (object) or just an ID
+            if (subscription.planId) {
+              if (typeof subscription.planId === 'object' && 'name' in subscription.planId) {
+                // planId is populated with SubscriptionPlan document
+                planType = (subscription.planId as any).name || null;
+              } else {
+                // planId is just an ObjectId, need to fetch the plan
+                const plan = await this.subscriptionService.getSubscriptionPlan(
+                  subscription.planId.toString(),
+                );
+                planType = plan?.name || null;
+              }
+            }
           }
         } catch (error) {
           // Ignore subscription lookup errors for now
+          console.error('Error fetching subscription plan:', error.message);
         }
       }
 
@@ -737,15 +750,109 @@ export class OnboardingService {
         throw new BadRequestException('User not found');
       }
 
-      // Return basic progress for now - can be enhanced in later iterations
+      // Get subscription to determine plan type
+      const subscription = await this.subscriptionService.getSubscriptionByUser(userId);
+      let planType: 'company' | 'complex' | 'clinic' = 'clinic';
+      
+      if (subscription) {
+        // Check if planId is populated (object) or just an ID
+        if (subscription.planId) {
+          if (typeof subscription.planId === 'object' && 'name' in subscription.planId) {
+            // planId is populated with SubscriptionPlan document
+            const planName = (subscription.planId as any).name?.toLowerCase();
+            if (planName === 'company') planType = 'company';
+            else if (planName === 'complex') planType = 'complex';
+            else planType = 'clinic';
+          } else {
+            // planId is just an ObjectId, need to fetch the plan
+            const plan = await this.subscriptionPlanModel.findById(
+              subscription.planId,
+            );
+            if (plan) {
+              const planName = plan.name?.toLowerCase();
+              if (planName === 'company') planType = 'company';
+              else if (planName === 'complex') planType = 'complex';
+              else planType = 'clinic';
+            }
+          }
+        }
+      }
+
+      // Determine total steps based on plan type
+      const stepCounts = {
+        company: 9,  // org(3) + complex(4) + clinic(2)
+        complex: 6,  // complex(4) + clinic(2)
+        clinic: 3,   // clinic(3)
+      };
+
+      // Get completed steps from user's onboardingProgress
+      const completedSteps = user.onboardingProgress || [];
+      
+      // Determine current step based on completed steps and plan type
+      let currentStep = 'organization-overview';
+      if (planType === 'company') {
+        if (!completedSteps.includes('organization-overview')) {
+          currentStep = 'organization-overview';
+        } else if (!completedSteps.includes('organization-contact')) {
+          currentStep = 'organization-contact';
+        } else if (!completedSteps.includes('organization-legal')) {
+          currentStep = 'organization-legal';
+        } else if (!completedSteps.includes('complex-overview')) {
+          currentStep = 'complex-overview';
+        } else if (!completedSteps.includes('complex-contact')) {
+          currentStep = 'complex-contact';
+        } else if (!completedSteps.includes('complex-legal')) {
+          currentStep = 'complex-legal';
+        } else if (!completedSteps.includes('complex-schedule')) {
+          currentStep = 'complex-schedule';
+        } else if (!completedSteps.includes('clinic-overview')) {
+          currentStep = 'clinic-overview';
+        } else if (!completedSteps.includes('clinic-contact')) {
+          currentStep = 'clinic-contact';
+        } else if (!completedSteps.includes('clinic-legal')) {
+          currentStep = 'clinic-legal';
+        } else if (!completedSteps.includes('clinic-schedule')) {
+          currentStep = 'clinic-schedule';
+        } else {
+          currentStep = 'completed';
+        }
+      } else if (planType === 'complex') {
+        if (!completedSteps.includes('complex-overview')) {
+          currentStep = 'complex-overview';
+        } else if (!completedSteps.includes('complex-contact')) {
+          currentStep = 'complex-contact';
+        } else if (!completedSteps.includes('complex-legal')) {
+          currentStep = 'complex-legal';
+        } else if (!completedSteps.includes('complex-schedule')) {
+          currentStep = 'complex-schedule';
+        } else if (!completedSteps.includes('clinic-overview')) {
+          currentStep = 'clinic-overview';
+        } else if (!completedSteps.includes('clinic-contact')) {
+          currentStep = 'clinic-contact';
+        } else {
+          currentStep = 'completed';
+        }
+      } else {
+        // clinic plan
+        if (!completedSteps.includes('clinic-overview')) {
+          currentStep = 'clinic-overview';
+        } else if (!completedSteps.includes('clinic-contact')) {
+          currentStep = 'clinic-contact';
+        } else if (!completedSteps.includes('clinic-schedule')) {
+          currentStep = 'clinic-schedule';
+        } else {
+          currentStep = 'completed';
+        }
+      }
+
       return {
         userId,
-        currentStep: 'organization-overview',
-        planType: 'company',
-        completedSteps: [],
-        totalSteps: 9,
-        currentStepNumber: 1,
-        canSkipCurrent: true,
+        currentStep: currentStep as OnboardingStepType,
+        planType,
+        completedSteps,
+        totalSteps: stepCounts[planType],
+        currentStepNumber: completedSteps.length + 1,
+        canSkipCurrent: planType === 'company' && currentStep === 'complex-overview',
       };
     } catch (error) {
       console.error('Error getting step progress:', error);
@@ -805,6 +912,9 @@ export class OnboardingService {
           updateData,
         );
 
+        // Mark step as complete
+        await this.progressService.markStepComplete(userId, 'organization-overview');
+
         return {
           success: true,
           entityId: (updatedOrg._id as any).toString(),
@@ -843,6 +953,9 @@ export class OnboardingService {
           organizationData as any,
           userId,
         );
+
+        // Mark step as complete
+        await this.progressService.markStepComplete(userId, 'organization-overview');
 
         return {
           success: true,
@@ -895,6 +1008,9 @@ export class OnboardingService {
         updateData as any,
       );
 
+      // Mark step as complete
+      await this.progressService.markStepComplete(userId, 'organization-contact');
+
       return {
         success: true,
         entityId: (updatedOrg._id as any).toString(),
@@ -937,6 +1053,9 @@ export class OnboardingService {
         (userOrg._id as any).toString(),
         updateData,
       );
+
+      // Mark step as complete
+      await this.progressService.markStepComplete(userId, 'organization-legal');
 
       // Determine next step based on subscription plan
       const subscription =
@@ -1297,6 +1416,9 @@ export class OnboardingService {
         await this.createDepartmentsForComplex(complexId, dto.departmentIds);
       }
 
+      // Mark step as complete
+      await this.progressService.markStepComplete(userId, 'complex-overview');
+
       return {
         success: true,
         entityId: complexId,
@@ -1364,12 +1486,15 @@ export class OnboardingService {
         updateData as any,
       );
 
+      // Mark step as complete
+      await this.progressService.markStepComplete(userId, 'complex-contact');
+
       return {
         success: true,
-        entityId: updatedComplex._id.toString(),
+        entityId: updatedComplex.data._id.toString(),
         canProceed: true,
         nextStep: 'complex_legal',
-        data: updatedComplex,
+        data: updatedComplex.data,
       };
     } catch (error) {
       console.error('Error saving complex contact:', error);
@@ -1435,12 +1560,15 @@ export class OnboardingService {
         // For complex-only plans, this completes the setup
       }
 
+      // Mark step as complete
+      await this.progressService.markStepComplete(userId, 'complex-legal');
+
       return {
         success: true,
-        entityId: updatedComplex._id.toString(),
+        entityId: updatedComplex.data._id.toString(),
         canProceed: true,
         nextStep,
-        data: updatedComplex,
+        data: updatedComplex.data,
       };
     } catch (error) {
       console.error('❌ Error saving complex legal info:', error);
@@ -1500,6 +1628,9 @@ export class OnboardingService {
         complexId,
         workingHoursDto as any,
       );
+
+      // Mark step as complete
+      await this.progressService.markStepComplete(userId, 'complex-schedule');
 
       return {
         updated: true,
@@ -1904,6 +2035,9 @@ export class OnboardingService {
         );
       }
 
+      // Mark step as complete
+      await this.progressService.markStepComplete(userId, 'clinic-overview');
+
       return {
         success: true,
         entityId: clinic._id?.toString(),
@@ -1991,6 +2125,9 @@ export class OnboardingService {
         updateData as any,
       );
       console.log('✅ Clinic contact updated successfully:', updatedClinic._id);
+
+      // Mark step as complete
+      await this.progressService.markStepComplete(userId, 'clinic-contact');
 
       return {
         success: true,
@@ -2180,6 +2317,9 @@ export class OnboardingService {
         updateData as any,
       );
 
+      // Mark step as complete
+      await this.progressService.markStepComplete(userId, 'clinic-legal');
+
       return {
         success: true,
         entityId: (updatedClinic._id as any).toString(),
@@ -2210,16 +2350,24 @@ export class OnboardingService {
       const userClinic = await this.clinicService.findClinicByUser(userId);
 
       if (!userClinic) {
-        throw new BadRequestException(
-          'Clinic not found for user. Please complete clinic overview first.',
-        );
+        throw new BadRequestException({
+          message: {
+            ar: 'لم يتم العثور على العيادة للمستخدم. يرجى إكمال نظرة عامة على العيادة أولاً',
+            en: 'Clinic not found for user. Please complete clinic overview first.',
+          },
+        });
       }
 
       // Get user's subscription to determine plan type
       const subscription =
         await this.subscriptionService.getSubscriptionByUser(userId);
       if (!subscription) {
-        throw new BadRequestException('No subscription found for user');
+        throw new BadRequestException({
+          message: {
+            ar: 'لم يتم العثور على اشتراك للمستخدم',
+            en: 'No subscription found for user',
+          },
+        });
       }
 
       const plan = await this.subscriptionService.getSubscriptionWithPlan(
@@ -2272,6 +2420,49 @@ export class OnboardingService {
           parentComplexId = complexDepartment?.complexId;
         }
 
+        if (!parentComplexId) {
+          throw new BadRequestException({
+            message: {
+              ar: 'لم يتم العثور على المجمع الطبي الأصلي للعيادة',
+              en: 'Parent complex not found for clinic',
+            },
+          });
+        }
+
+        // Validate clinic working hours against complex working hours
+        console.log('🔍 Validating clinic hours against complex hours');
+        console.log('📋 Clinic schedule to validate:', JSON.stringify(workingHours, null, 2));
+        console.log('🏢 Parent complex ID:', (parentComplexId as any).toString());
+        
+        const validationResult =
+          await this.workingHoursValidationService.validateHierarchical(
+            workingHours,
+            'complex',
+            (parentComplexId as any).toString(),
+            userClinic.name || 'Clinic',
+          );
+
+        console.log('✅ Validation result:', JSON.stringify(validationResult, null, 2));
+
+        if (!validationResult.isValid) {
+          // Format validation errors for response
+          const errorMessages = validationResult.errors.map((error) => {
+            return {
+              day: error.dayOfWeek,
+              message: error.message,
+              suggestedRange: error.suggestedRange,
+            };
+          });
+
+          throw new BadRequestException({
+            message: {
+              ar: 'ساعات عمل العيادة يجب أن تكون ضمن ساعات عمل المجمع الطبي',
+              en: 'Clinic working hours must be within complex working hours',
+            },
+            errors: errorMessages,
+          });
+        }
+
         const scheduleData = {
           workingHours: workingHours,
           scheduleType: 'clinic-override',
@@ -2284,6 +2475,9 @@ export class OnboardingService {
           { scheduleData } as any,
         );
 
+        // Mark step as complete
+        await this.progressService.markStepComplete(userId, 'clinic-schedule');
+
         return {
           updated: true,
           workingHours: workingHours,
@@ -2294,7 +2488,18 @@ export class OnboardingService {
       }
     } catch (error) {
       console.error('Error saving clinic schedule:', error);
-      throw new InternalServerErrorException('Failed to save clinic schedule');
+      if (
+        error instanceof BadRequestException ||
+        error instanceof InternalServerErrorException
+      ) {
+        throw error;
+      }
+      throw new InternalServerErrorException({
+        message: {
+          ar: 'فشل في حفظ جدول العيادة',
+          en: 'Failed to save clinic schedule',
+        },
+      });
     }
   }
 

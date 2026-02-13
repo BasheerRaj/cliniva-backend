@@ -17,9 +17,11 @@ export type OnboardingStepType =
   | 'organization-legal'
   | 'complex-overview'
   | 'complex-contact'
+  | 'complex-legal'
   | 'complex-schedule'
   | 'clinic-overview'
   | 'clinic-contact'
+  | 'clinic-legal'
   | 'clinic-schedule'
   | 'completed';
 
@@ -42,9 +44,11 @@ export class OnboardingStepProgressDto {
       'organization-legal',
       'complex-overview',
       'complex-contact',
+      'complex-legal',
       'complex-schedule',
       'clinic-overview',
       'clinic-contact',
+      'clinic-legal',
       'clinic-schedule',
       'completed',
     ],
@@ -57,9 +61,11 @@ export class OnboardingStepProgressDto {
     'organization-legal',
     'complex-overview',
     'complex-contact',
+    'complex-legal',
     'complex-schedule',
     'clinic-overview',
     'clinic-contact',
+    'clinic-legal',
     'clinic-schedule',
     'completed',
   ])

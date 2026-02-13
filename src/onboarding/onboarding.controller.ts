@@ -9,6 +9,7 @@ import {
   Query,
   UseGuards,
   Request,
+  BadRequestException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -2775,6 +2776,12 @@ Save working hours schedule for the clinic during onboarding. This is the final 
         canProceed: true,
       };
     } catch (error) {
+      // If it's a BadRequestException with validation errors, re-throw it
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      
+      // For other errors, return generic error response
       return {
         success: false,
         message: 'Failed to save clinic schedule',
