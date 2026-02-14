@@ -1736,6 +1736,282 @@ Content-Type: {{contentType}}
 ###############################################################################
 
 ###############################################################################
+# SECTION 7.5: WORKING HOURS MANAGEMENT
+###############################################################################
+# Tests: Hierarchical working hours configuration and inheritance
+# Requirements: 4.1, 4.2, 4.3, 4.4, 4.5
+# Hierarchy: Organization → Complex → Clinic → User
+###############################################################################
+
+### 7.5.1 Create Organization-Level Working Hours
+# @name createOrgWorkingHours
+POST {{baseUrl}}/working-hours
+Authorization: Bearer {{ownerAccessToken}}
+Content-Type: {{contentType}}
+
+{
+  "entityType": "organization",
+  "entityId": "{{organizationId}}",
+  "schedule": [
+    {
+      "dayOfWeek": "monday",
+      "isWorkingDay": true,
+      "openingTime": "09:00",
+      "closingTime": "17:00"
+    },
+    {
+      "dayOfWeek": "tuesday",
+      "isWorkingDay": true,
+      "openingTime": "09:00",
+      "closingTime": "17:00"
+    },
+    {
+      "dayOfWeek": "wednesday",
+      "isWorkingDay": true,
+      "openingTime": "09:00",
+      "closingTime": "17:00"
+    },
+    {
+      "dayOfWeek": "thursday",
+      "isWorkingDay": true,
+      "openingTime": "09:00",
+      "closingTime": "17:00"
+    },
+    {
+      "dayOfWeek": "friday",
+      "isWorkingDay": true,
+      "openingTime": "09:00",
+      "closingTime": "17:00"
+    },
+    {
+      "dayOfWeek": "saturday",
+      "isWorkingDay": false
+    },
+    {
+      "dayOfWeek": "sunday",
+      "isWorkingDay": false
+    }
+  ]
+}
+
+# Expected: 201 Created
+# Expected: Organization working hours set to Monday-Friday 9AM-5PM
+# Expected: Bilingual success message
+
+### 7.5.2 Create Complex-Level Working Hours (Override)
+# @name createComplexWorkingHours
+POST {{baseUrl}}/working-hours
+Authorization: Bearer {{ownerAccessToken}}
+Content-Type: {{contentType}}
+
+{
+  "entityType": "complex",
+  "entityId": "{{complex1Id}}",
+  "schedule": [
+    {
+      "dayOfWeek": "monday",
+      "isWorkingDay": true,
+      "openingTime": "08:00",
+      "closingTime": "18:00"
+    },
+    {
+      "dayOfWeek": "tuesday",
+      "isWorkingDay": true,
+      "openingTime": "08:00",
+      "closingTime": "18:00"
+    },
+    {
+      "dayOfWeek": "wednesday",
+      "isWorkingDay": true,
+      "openingTime": "08:00",
+      "closingTime": "18:00"
+    },
+    {
+      "dayOfWeek": "thursday",
+      "isWorkingDay": true,
+      "openingTime": "08:00",
+      "closingTime": "18:00"
+    },
+    {
+      "dayOfWeek": "friday",
+      "isWorkingDay": true,
+      "openingTime": "08:00",
+      "closingTime": "18:00"
+    },
+    {
+      "dayOfWeek": "saturday",
+      "isWorkingDay": false
+    },
+    {
+      "dayOfWeek": "sunday",
+      "isWorkingDay": false
+    }
+  ]
+}
+
+
+### 7.5.3 Create Clinic-Level Working Hours (Override)
+# @name createClinicWorkingHours
+POST {{baseUrl}}/working-hours
+Authorization: Bearer {{ownerAccessToken}}
+Content-Type: {{contentType}}
+
+{
+  "entityType": "clinic",
+  "entityId": "{{clinic1Id}}",
+  "schedule": [
+    {
+      "dayOfWeek": "monday",
+      "isWorkingDay": true,
+      "openingTime": "08:00",
+      "closingTime": "20:00"
+    },
+    {
+      "dayOfWeek": "tuesday",
+      "isWorkingDay": true,
+      "openingTime": "08:00",
+      "closingTime": "20:00"
+    },
+    {
+      "dayOfWeek": "wednesday",
+      "isWorkingDay": true,
+      "openingTime": "08:00",
+      "closingTime": "20:00"
+    },
+    {
+      "dayOfWeek": "thursday",
+      "isWorkingDay": true,
+      "openingTime": "08:00",
+      "closingTime": "20:00"
+    },
+    {
+      "dayOfWeek": "friday",
+      "isWorkingDay": true,
+      "openingTime": "08:00",
+      "closingTime": "20:00"
+    },
+    {
+      "dayOfWeek": "saturday",
+      "isWorkingDay": true,
+      "openingTime": "08:00",
+      "closingTime": "20:00"
+    },
+    {
+      "dayOfWeek": "sunday",
+      "isWorkingDay": false
+    }
+  ]
+}
+
+# Expected: 201 Created
+# Expected: Cardiology Clinic working hours override complex hours (8AM-8PM, Mon-Sat)
+# Expected: Bilingual success message
+
+### 7.5.4 Create User-Level Working Hours (Override)
+# @name createUserWorkingHours
+POST {{baseUrl}}/working-hours
+Authorization: Bearer {{ownerAccessToken}}
+Content-Type: {{contentType}}
+
+{
+  "entityType": "user",
+  "entityId": "{{doctor1Id}}",
+  "schedule": [
+    {
+      "dayOfWeek": "monday",
+      "isWorkingDay": true,
+      "openingTime": "09:00",
+      "closingTime": "15:00"
+    },
+    {
+      "dayOfWeek": "tuesday",
+      "isWorkingDay": true,
+      "openingTime": "09:00",
+      "closingTime": "15:00"
+    },
+    {
+      "dayOfWeek": "wednesday",
+      "isWorkingDay": true,
+      "openingTime": "09:00",
+      "closingTime": "15:00"
+    },
+    {
+      "dayOfWeek": "thursday",
+      "isWorkingDay": false
+    },
+    {
+      "dayOfWeek": "friday",
+      "isWorkingDay": false
+    },
+    {
+      "dayOfWeek": "saturday",
+      "isWorkingDay": false
+    },
+    {
+      "dayOfWeek": "sunday",
+      "isWorkingDay": false
+    }
+  ]
+}
+
+# Expected: 201 Created
+# Expected: Doctor 1 working hours override clinic hours (9AM-3PM, Mon-Wed only)
+# Expected: Bilingual success message
+
+### 7.5.5 Get Effective Working Hours for User (Most Specific)
+# @name getEffectiveUserWorkingHours
+GET {{baseUrl}}/working-hours/user/{{doctor1Id}}
+Authorization: Bearer {{ownerAccessToken}}
+
+# Expected: 200 OK
+# Expected: Returns user-level working hours (most specific in hierarchy)
+# Expected: Monday-Wednesday 9AM-3PM (user override)
+# Expected: Bilingual success message
+
+### 7.5.6 Get Effective Working Hours for Clinic
+# @name getEffectiveClinicWorkingHours
+GET {{baseUrl}}/working-hours/clinic/{{clinic1Id}}
+Authorization: Bearer {{ownerAccessToken}}
+
+# Expected: 200 OK
+# Expected: Returns clinic-level working hours
+# Expected: Monday-Saturday 8AM-8PM (clinic override)
+# Expected: Bilingual success message
+
+### 7.5.7 Verify Working Hours Inheritance - Complex Level
+# @name getComplexWorkingHours
+GET {{baseUrl}}/working-hours/complex/{{complex1Id}}
+Authorization: Bearer {{ownerAccessToken}}
+
+# Expected: 200 OK
+# Expected: Returns complex-level working hours
+# Expected: Monday-Friday 8AM-6PM (complex override)
+# Expected: Bilingual success message
+
+### 7.5.8 Verify Working Hours Inheritance - Organization Level
+# @name getOrgWorkingHours
+GET {{baseUrl}}/working-hours/organization/{{organizationId}}
+Authorization: Bearer {{ownerAccessToken}}
+
+# Expected: 200 OK
+# Expected: Returns organization-level working hours (default)
+# Expected: Monday-Friday 9AM-5PM (organization default)
+# Expected: Bilingual success message
+
+###############################################################################
+# SECTION 7.5 COMPLETE
+###############################################################################
+# ✓ Organization-level working hours created (Mon-Fri 9AM-5PM)
+# ✓ Complex-level working hours created (Mon-Fri 8AM-6PM) - overrides organization
+# ✓ Clinic-level working hours created (Mon-Sat 8AM-8PM) - overrides complex
+# ✓ User-level working hours created (Mon-Wed 9AM-3PM) - overrides clinic
+# ✓ Effective working hours retrieved for user (most specific)
+# ✓ Effective working hours retrieved for clinic
+# ✓ Working hours inheritance verified across all hierarchy levels
+# ✓ Hierarchical override behavior validated
+###############################################################################
+
+###############################################################################
 # SECTION 8: VALIDATION TESTING
 ###############################################################################
 # Tests: Missing fields, invalid formats, duplicates, unauthorized access

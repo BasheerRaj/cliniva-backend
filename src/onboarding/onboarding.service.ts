@@ -2377,11 +2377,23 @@ export class OnboardingService {
           { scheduleData } as any,
         );
 
+        await this.legacyWorkingHoursService.createWorkingHours({
+          entityType: 'clinic',
+          entityId: (userClinic._id as any).toString(),
+          schedule: workingHours as any,
+        });
+
         return {
           updated: true,
           workingHours: workingHours,
           scheduleType: 'clinic-independent',
           clinicId: (updatedClinic._id as any).toString(),
+        } satisfies {
+          updated: boolean;
+          workingHours: ClinicWorkingHoursDto[];
+          scheduleType: string;
+          clinicId: string;
+          parentComplexId?: string;
         };
       } else {
         // Complex/Company plan - clinic inherits from complex but can override
@@ -2441,6 +2453,12 @@ export class OnboardingService {
           });
         }
 
+        await this.legacyWorkingHoursService.createWorkingHours({
+          entityType: 'clinic',
+          entityId: (userClinic._id as any).toString(),
+          schedule: workingHours as any,
+        });
+
         const scheduleData = {
           workingHours: workingHours,
           scheduleType: 'clinic-override',
@@ -2462,6 +2480,12 @@ export class OnboardingService {
           scheduleType: 'clinic-override',
           parentComplexId: (parentComplexId as any)?.toString(),
           clinicId: (updatedClinic._id as any).toString(),
+        } satisfies {
+          updated: boolean;
+          workingHours: ClinicWorkingHoursDto[];
+          scheduleType: string;
+          clinicId: string;
+          parentComplexId?: string;
         };
       }
     } catch (error) {
