@@ -47,7 +47,7 @@
 ###############################################################################
 
 # Base Configuration
-@baseUrl = http://localhost:3001/api/v1
+@baseUrl = http://localhost:4001/api/v1
 @contentType = application/json
 
 # These variables will be populated during test execution
@@ -229,7 +229,7 @@ Authorization: Bearer {{ownerAccessToken}}
 ### Extract Company Plan ID (manually set based on response)
 # Note: In a real scenario, you would extract this from the response
 # For this test, we'll use a placeholder that should be replaced with actual plan ID
-@companyPlanId = 698c5e12fa401315f06e854e
+@companyPlanId = 698fd8acf9d44ef1112ce819
 
 ### 2.3 Create Subscription for Owner
 # @name createSubscription

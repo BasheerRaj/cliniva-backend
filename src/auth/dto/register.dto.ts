@@ -10,6 +10,7 @@ import {
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { Transform } from 'class-transformer';
+import { IsPhoneNumberWithCountryCode } from '../../common/decorators/phone-validation.decorator';
 
 export class RegisterDto {
   @ApiProperty({
@@ -124,18 +125,11 @@ export class RegisterDto {
   })
   role: UserRole;
 
-  @ApiPropertyOptional({
-    description: 'User phone number',
-    example: '+1234567890',
-    type: String,
-  })
-  @IsOptional()
-  @IsString({
-    message: JSON.stringify({
-      ar: 'رقم الهاتف يجب أن يكون نصاً',
-      en: 'Phone must be a string',
-    }),
-  })
+  @IsPhoneNumberWithCountryCode(
+    false,
+    'User phone number with country code (E.164 format)',
+    '+966501234567',
+  )
   phone?: string;
 
   @ApiPropertyOptional({

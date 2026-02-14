@@ -6,6 +6,7 @@ import {
   MinLength,
   Matches,
 } from 'class-validator';
+import { IsPhoneNumberWithCountryCode } from '../../common/decorators/phone-validation.decorator';
 
 /**
  * DTO for users updating their own profile
@@ -45,19 +46,11 @@ export class UpdateOwnProfileDto {
   })
   lastName?: string;
 
-  @ApiPropertyOptional({
-    description: 'User phone number (international format with country code)',
-    example: '+966501234567',
-    type: String,
-  })
-  @IsOptional()
-  @IsString()
-  @Matches(/^\+[1-9]\d{1,14}$/, {
-    message: JSON.stringify({
-      ar: 'رقم الهاتف يجب أن يكون بصيغة دولية صحيحة (مثال: +966501234567)',
-      en: 'Phone number must be in valid international format (e.g., +966501234567)',
-    }),
-  })
+  @IsPhoneNumberWithCountryCode(
+    false,
+    'User phone number (international format with country code)',
+    '+966501234567',
+  )
   phone?: string;
 
   @ApiPropertyOptional({
