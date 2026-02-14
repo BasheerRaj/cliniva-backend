@@ -68,6 +68,7 @@ export class RoleMappingService {
       UserRole.SUPER_ADMIN,
       UserRole.OWNER,
       UserRole.ADMIN,
+      UserRole.MANAGER,
       UserRole.DOCTOR,
       UserRole.STAFF,
       UserRole.PATIENT,
@@ -88,21 +89,23 @@ export class RoleMappingService {
   canManageRole(managerRole: UserRole, targetRole: UserRole): boolean {
     const roleHierarchy: Record<UserRole, UserRole[]> = {
       [UserRole.SUPER_ADMIN]: [
-        UserRole.SUPER_ADMIN,
-        UserRole.OWNER,
+        UserRole.OWNER, // Super admin cannot create another super admin
         UserRole.ADMIN,
+        UserRole.MANAGER,
         UserRole.DOCTOR,
         UserRole.STAFF,
         UserRole.PATIENT,
       ],
       [UserRole.OWNER]: [
         UserRole.ADMIN,
+        UserRole.MANAGER,
         UserRole.DOCTOR,
         UserRole.STAFF,
         UserRole.PATIENT,
       ],
-      [UserRole.ADMIN]: [UserRole.DOCTOR, UserRole.STAFF, UserRole.PATIENT],
-      [UserRole.DOCTOR]: [UserRole.STAFF, UserRole.PATIENT],
+      [UserRole.ADMIN]: [UserRole.MANAGER, UserRole.DOCTOR, UserRole.STAFF, UserRole.PATIENT],
+      [UserRole.MANAGER]: [UserRole.DOCTOR, UserRole.STAFF, UserRole.PATIENT],
+      [UserRole.DOCTOR]: [UserRole.PATIENT],
       [UserRole.STAFF]: [UserRole.PATIENT],
       [UserRole.PATIENT]: [],
     };
@@ -116,21 +119,23 @@ export class RoleMappingService {
   getManageableRoles(role: UserRole): UserRole[] {
     const roleHierarchy: Record<UserRole, UserRole[]> = {
       [UserRole.SUPER_ADMIN]: [
-        UserRole.SUPER_ADMIN,
         UserRole.OWNER,
         UserRole.ADMIN,
+        UserRole.MANAGER,
         UserRole.DOCTOR,
         UserRole.STAFF,
         UserRole.PATIENT,
       ],
       [UserRole.OWNER]: [
         UserRole.ADMIN,
+        UserRole.MANAGER,
         UserRole.DOCTOR,
         UserRole.STAFF,
         UserRole.PATIENT,
       ],
-      [UserRole.ADMIN]: [UserRole.DOCTOR, UserRole.STAFF, UserRole.PATIENT],
-      [UserRole.DOCTOR]: [UserRole.STAFF, UserRole.PATIENT],
+      [UserRole.ADMIN]: [UserRole.MANAGER, UserRole.DOCTOR, UserRole.STAFF, UserRole.PATIENT],
+      [UserRole.MANAGER]: [UserRole.DOCTOR, UserRole.STAFF, UserRole.PATIENT],
+      [UserRole.DOCTOR]: [UserRole.PATIENT],
       [UserRole.STAFF]: [UserRole.PATIENT],
       [UserRole.PATIENT]: [],
     };
@@ -149,6 +154,8 @@ export class RoleMappingService {
         return 'OWNER';
       case UserRole.ADMIN:
         return 'ADMIN';
+      case UserRole.MANAGER:
+        return 'MANAGER';
       case UserRole.DOCTOR:
         return 'DOCTOR';
       case UserRole.STAFF:

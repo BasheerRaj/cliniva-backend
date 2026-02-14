@@ -34,6 +34,7 @@ import {
 } from '../database/schemas/rate-limit-counter.schema';
 import { SubscriptionModule } from '../subscription/subscription.module';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from './guards/optional-jwt-auth.guard';
 import { FirstLoginGuard } from './guards/first-login.guard';
 import { RateLimitGuard } from './guards/rate-limit.guard';
 import { RateLimitService } from './rate-limit.service';
@@ -77,6 +78,7 @@ import { RateLimitService } from './rate-limit.service';
     AuthService,
     JwtStrategy,
     JwtAuthGuard,
+    OptionalJwtAuthGuard,
     FirstLoginGuard,
     RateLimitGuard,
     TokenService,
@@ -91,6 +93,7 @@ import { RateLimitService } from './rate-limit.service';
     JwtStrategy,
     PassportModule,
     JwtAuthGuard,
+    OptionalJwtAuthGuard,
     FirstLoginGuard,
     RateLimitGuard,
     TokenService,
@@ -100,4 +103,4 @@ import { RateLimitService } from './rate-limit.service';
     RateLimitService,
   ],
 })
-export class AuthModule {}
+export class AuthModule { }

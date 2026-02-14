@@ -152,6 +152,10 @@ export class User extends Document {
   @Prop()
   onboardingCompletedAt?: Date;
 
+  // User creation tracking
+  @Prop({ type: Types.ObjectId, ref: 'User' })
+  createdBy?: Types.ObjectId;
+
   // Deactivation tracking fields
   @Prop()
   deactivatedAt?: Date;

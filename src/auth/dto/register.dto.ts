@@ -113,8 +113,8 @@ export class RegisterDto {
   })
   @IsEnum(UserRole, {
     message: JSON.stringify({
-      ar: 'الدور يجب أن يكون أحد: super_admin, owner, admin, doctor, staff, patient',
-      en: 'Role must be one of: super_admin, owner, admin, doctor, staff, patient',
+      ar: 'الدور يجب أن يكون أحد: super_admin, owner, admin, manager, doctor, staff, patient',
+      en: 'Role must be one of: super_admin, owner, admin, manager, doctor, staff, patient',
     }),
   })
   @IsNotEmpty({

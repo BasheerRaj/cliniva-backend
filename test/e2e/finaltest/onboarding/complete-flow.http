@@ -1460,11 +1460,13 @@ Authorization: Bearer {{ownerAccessToken}}
 
 ### 7.1 Create Doctor User 1 (Cardiologist)
 # @name createDoctor1
+# NOTE: Doctors cannot self-register. Must be created by owner, super_admin, or admin.
 POST {{baseUrl}}/auth/register
+Authorization: Bearer {{ownerAccessToken}}
 Content-Type: {{contentType}}
 
 {
-  "email": "dr.khalid.cardiologist@test-healthcare.com",
+  "email": "dr.khalid.cardiologis1t@test-healthcare.com",
   "password": "Doctor123!",
   "firstName": "Khalid",
   "lastName": "Al-Mansour",
@@ -1485,7 +1487,9 @@ Content-Type: {{contentType}}
 
 ### 7.2 Create Doctor User 2 (Pediatrician)
 # @name createDoctor2
+# NOTE: Doctors cannot self-register. Must be created by owner, super_admin, or admin.
 POST {{baseUrl}}/auth/register
+Authorization: Bearer {{ownerAccessToken}}
 Content-Type: {{contentType}}
 
 {
@@ -1510,7 +1514,10 @@ Content-Type: {{contentType}}
 
 ### 7.3 Create Admin User 1
 # @name createAdmin1
+# NOTE: Only owner or super_admin can create an admin.
+# The admin will be associated with the owner's organization/complex/clinic scope.
 POST {{baseUrl}}/auth/register
+Authorization: Bearer {{ownerAccessToken}}
 Content-Type: {{contentType}}
 
 {
@@ -1535,7 +1542,10 @@ Content-Type: {{contentType}}
 
 ### 7.4 Create Manager User 1
 # @name createManager1
+# NOTE: Owner or admin can create a manager.
+# Using owner token here; admin token would also work.
 POST {{baseUrl}}/auth/register
+Authorization: Bearer {{ownerAccessToken}}
 Content-Type: {{contentType}}
 
 {
@@ -1543,15 +1553,16 @@ Content-Type: {{contentType}}
   "password": "Manager123!",
   "firstName": "Ahmed",
   "lastName": "Al-Harbi",
-  "role": "admin",
+  "role": "manager",
   "phone": "+966501234573",
   "nationality": "SA",
   "gender": "male"
 }
 
 # Expected: 201 Created
-# Expected: User created with role 'admin' (manager role may not exist, using admin)
+# Expected: User created with role 'manager'
 # Expected: Returns access_token and refresh_token
+# Expected: User inherits organization scope from owner
 # Expected: Bilingual success message
 
 ### Extract Manager 1 ID and Tokens
@@ -1560,7 +1571,9 @@ Content-Type: {{contentType}}
 
 ### 7.5 Create Staff User 1
 # @name createStaff1
+# NOTE: Staff cannot self-register. Must be created by owner, super_admin, admin, or manager.
 POST {{baseUrl}}/auth/register
+Authorization: Bearer {{ownerAccessToken}}
 Content-Type: {{contentType}}
 
 {

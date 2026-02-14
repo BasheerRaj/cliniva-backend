@@ -3,6 +3,7 @@ import {
   ConflictException,
   UnauthorizedException,
   BadRequestException,
+  ForbiddenException,
   NotFoundException,
   Logger,
 } from '@nestjs/common';
@@ -19,6 +20,12 @@ import { RateLimitService } from './rate-limit.service';
 import { AuditService } from './audit.service';
 import { SessionService } from './session.service';
 import { EmailService } from './email.service';
+import {
+  UserRole,
+  canManageRole,
+  RoleDisplayNames,
+  getManageableRoles,
+} from '../common/enums/user-role.enum';
 
 @Injectable()
 export class AuthService {
@@ -34,13 +41,90 @@ export class AuthService {
     private readonly auditService: AuditService,
     private readonly sessionService: SessionService,
     private readonly emailService: EmailService,
-  ) {}
+  ) { }
 
   /**
    * Register a new user
+   *
+   * Role-based authorization rules:
+   * - No one can create a super_admin (only seeded in DB)
+   * - Only owner or super_admin can create an admin
+   * - Admin can create manager, doctor, staff, patient (associated to same scope)
+   * - Owner/patient can self-register without auth (creatorUser is null)
+   *
+   * @param registerDto - Registration data
+   * @param creatorUser - Optional authenticated user creating this account (null for self-registration)
    */
-  async register(registerDto: RegisterDto): Promise<AuthResponseDto> {
+  async register(
+    registerDto: RegisterDto,
+    creatorUser?: { id: string; role: UserRole; email: string } | null,
+  ): Promise<AuthResponseDto> {
     try {
+      const targetRole = registerDto.role as UserRole;
+
+      // ==========================================
+      // ROLE-BASED AUTHORIZATION CHECKS
+      // ==========================================
+
+      // Rule 1: No one can create a super_admin
+      if (targetRole === UserRole.SUPER_ADMIN) {
+        this.logger.warn(
+          `Attempt to create super_admin by ${creatorUser?.email || 'anonymous'}`,
+        );
+        throw new ForbiddenException({
+          message: {
+            ar: 'لا يمكن إنشاء حساب مدير أعلى. هذا الدور محجوز للنظام فقط',
+            en: 'Cannot create a super admin account. This role is reserved for the system only',
+          },
+          code: 'CANNOT_CREATE_SUPER_ADMIN',
+        });
+      }
+
+      // Rule 2: Determine if auth is required based on target role
+      const selfRegisterableRoles: UserRole[] = [UserRole.OWNER, UserRole.PATIENT];
+      const requiresAuth = !selfRegisterableRoles.includes(targetRole);
+
+      if (requiresAuth && !creatorUser) {
+        this.logger.warn(
+          `Unauthenticated attempt to create user with role '${targetRole}'`,
+        );
+        throw new ForbiddenException({
+          message: {
+            ar: `لا يمكن تسجيل حساب بدور '${targetRole}' بدون مصادقة. يجب أن يتم الإنشاء بواسطة مستخدم مخول`,
+            en: `Cannot self-register with role '${targetRole}'. This account must be created by an authorized user`,
+          },
+          code: 'AUTH_REQUIRED_FOR_ROLE',
+        });
+      }
+
+      // Rule 3: If auth is provided, validate the creator has permission to create this role
+      if (creatorUser) {
+        const creatorRole = creatorUser.role as UserRole;
+        const canCreate = canManageRole(creatorRole, targetRole);
+
+        if (!canCreate) {
+          this.logger.warn(
+            `User ${creatorUser.email} (role: ${creatorRole}) attempted to create user with role '${targetRole}' - DENIED`,
+          );
+          throw new ForbiddenException({
+            message: {
+              ar: `ليس لديك صلاحية لإنشاء حساب بدور '${RoleDisplayNames[targetRole] || targetRole}'. دورك (${RoleDisplayNames[creatorRole] || creatorRole}) لا يسمح بذلك`,
+              en: `You do not have permission to create a user with role '${RoleDisplayNames[targetRole] || targetRole}'. Your role (${RoleDisplayNames[creatorRole] || creatorRole}) does not allow this`,
+            },
+            code: 'INSUFFICIENT_ROLE_PERMISSION',
+            details: {
+              creatorRole: creatorRole,
+              targetRole: targetRole,
+              allowedRoles: getManageableRoles(creatorRole),
+            },
+          });
+        }
+      }
+
+      // ==========================================
+      // EXISTING REGISTRATION LOGIC
+      // ==========================================
+
       // Check if user already exists
       const existingUser = await this.userModel.findOne({
         email: registerDto.email.toLowerCase(),
@@ -59,6 +143,31 @@ export class AuthService {
       // Hash password
       const hashedPassword = await this.hashPassword(registerDto.password);
 
+      // ==========================================
+      // SCOPE ASSOCIATION
+      // ==========================================
+      // When a privileged user creates another user, associate the new user
+      // with the same organization/complex/clinic scope
+      let scopeFields: any = {};
+      if (creatorUser && requiresAuth) {
+        scopeFields.createdBy = creatorUser.id;
+        const creator = await this.userModel.findById(creatorUser.id);
+        if (creator) {
+          if (creator.organizationId) {
+            scopeFields.organizationId = creator.organizationId;
+          }
+          if (creator.complexId) {
+            scopeFields.complexId = creator.complexId;
+          }
+          if (creator.clinicId) {
+            scopeFields.clinicId = creator.clinicId;
+          }
+          this.logger.log(
+            `New user will be associated with creator's scope: org=${creator.organizationId}, complex=${creator.complexId}, clinic=${creator.clinicId}`,
+          );
+        }
+      }
+
       // Create new user
       const newUser = new this.userModel({
         ...registerDto,
@@ -72,10 +181,15 @@ export class AuthService {
         lastPasswordChange: new Date(),
         passwordChangeRequired: false,
         passwordResetUsed: false,
+        // Scope association from creator
+        ...scopeFields,
       });
 
       const savedUser = await newUser.save();
-      this.logger.log(`New user registered: ${savedUser.email}`);
+      this.logger.log(
+        `New user registered: ${savedUser.email} (role: ${savedUser.role})${creatorUser ? ` by ${creatorUser.email}` : ' (self-registration)'
+        }`,
+      );
 
       // Generate tokens
       const tokens = await this.generateTokens(savedUser);
@@ -125,10 +239,17 @@ export class AuthService {
           passwordChangeRequired: savedUser.passwordChangeRequired,
           preferredLanguage: savedUser.preferredLanguage,
           isOwner: savedUser.role === 'owner',
+          // Scope fields
+          organizationId: (savedUser.organizationId as any)?.toString() || null,
+          complexId: (savedUser.complexId as any)?.toString() || null,
+          clinicId: (savedUser.clinicId as any)?.toString() || null,
         },
       };
     } catch (error) {
-      if (error instanceof ConflictException) {
+      if (
+        error instanceof ConflictException ||
+        error instanceof ForbiddenException
+      ) {
         throw error;
       }
       this.logger.error(`Registration failed: ${error.message}`, error.stack);

@@ -26,6 +26,7 @@ import {
 } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from './guards/optional-jwt-auth.guard';
 import {
   FirstLoginGuard,
   SkipFirstLoginCheck,
@@ -83,25 +84,48 @@ import {
 export class AuthController {
   private readonly logger = new Logger(AuthController.name);
 
-  constructor(private readonly authService: AuthService) {}
+  constructor(private readonly authService: AuthService) { }
 
   /**
    * Register a new user
+   *
+   * Role-based authorization rules:
+   * - Owner and Patient can self-register (no auth needed)
+   * - No one can create a super_admin
+   * - Only owner or super_admin can create an admin
+   * - Admin can create manager, doctor, staff, patient
+   * - Created users inherit the creator's organization scope
    */
   @Post('register')
+  @UseGuards(OptionalJwtAuthGuard)
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({
     summary: 'Register a new user',
     description:
-      'Create a new user account with email and password. Returns access and refresh tokens upon successful registration.',
+      'Create a new user account. Owner and Patient can self-register without authentication. ' +
+      'Admin, Manager, Doctor, and Staff roles require an authenticated user with sufficient privileges. ' +
+      'No one can create a super_admin account. ' +
+      'When creating users with elevated roles, pass the Authorization header with a valid JWT token.',
   })
+  @ApiBearerAuth()
   @ApiBody({
     type: RegisterDto,
     description: 'User registration details',
     examples: {
-      default: {
-        summary: 'Register as owner',
+      owner_self_register: {
+        summary: 'Self-register as owner (no auth needed)',
         value: REGISTER_REQUEST_EXAMPLE,
+      },
+      admin_creation: {
+        summary: 'Create admin (requires owner/super_admin auth)',
+        value: {
+          email: 'admin@example.com',
+          password: 'Admin123!',
+          firstName: 'Admin',
+          lastName: 'User',
+          role: 'admin',
+          phone: '+966501234567',
+        },
       },
     },
   })
@@ -110,6 +134,20 @@ export class AuthController {
     description: 'User registered successfully',
     schema: {
       example: REGISTER_RESPONSE_EXAMPLE,
+    },
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - insufficient permissions to create this role',
+    schema: {
+      example: {
+        statusCode: 403,
+        message: {
+          ar: 'ليس لديك صلاحية لإنشاء حساب بهذا الدور',
+          en: 'You do not have permission to create a user with this role',
+        },
+        code: 'INSUFFICIENT_ROLE_PERMISSION',
+      },
     },
   })
   @ApiResponse({
@@ -129,8 +167,18 @@ export class AuthController {
   async register(
     @Body(new ValidationPipe({ transform: true, whitelist: true }))
     registerDto: RegisterDto,
+    @Request() req: any,
   ): Promise<AuthResponseDto> {
-    return this.authService.register(registerDto);
+    // Extract creator user info from JWT if present (populated by OptionalJwtAuthGuard)
+    const creatorUser = req.user
+      ? {
+        id: req.user.id || req.user.userId || req.user.sub,
+        role: req.user.role,
+        email: req.user.email,
+      }
+      : null;
+
+    return this.authService.register(registerDto, creatorUser);
   }
 
   /**

@@ -127,6 +127,11 @@ export const DefaultRolePermissions = {
     ...PermissionGroups.GROUP_FULL_ACCESS,
     ...PermissionGroups.ADMIN_PERMISSIONS,
   ],
+  MANAGER: [
+    ...PermissionGroups.USER_FULL_ACCESS,
+    ...PermissionGroups.GROUP_FULL_ACCESS,
+    ...PermissionGroups.ADMIN_PERMISSIONS,
+  ],
   DOCTOR: [
     PermissionsEnum.USER_READ,
     PermissionsEnum.USER_UPDATE,
