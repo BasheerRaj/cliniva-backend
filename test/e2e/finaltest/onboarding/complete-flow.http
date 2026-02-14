@@ -1556,7 +1556,8 @@ Content-Type: {{contentType}}
   "role": "manager",
   "phone": "+966501234573",
   "nationality": "SA",
-  "gender": "male"
+  "gender": "male",
+  "complexId": "{{complex1Id}}"
 }
 
 # Expected: 201 Created
@@ -2012,7 +2013,108 @@ Authorization: Bearer {{ownerAccessToken}}
 ###############################################################################
 
 ###############################################################################
-# SECTION 8: VALIDATION TESTING
+###############################################################################
+# SECTION 8: COMPLEX MANAGEMENT
+###############################################################################
+# Tests: Complex retrieval, update, PIC assignment, status change, capacity
+# Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6
+###############################################################################
+
+### 8.1 Get Complex 1 Details with Relationships
+# @name getComplex1
+GET {{baseUrl}}/complexes/{{complex1Id}}
+Authorization: Bearer {{ownerAccessToken}}
+
+# Expected: 200 OK
+# Expected: Complex details returned
+# Expected: Departments populated (Cardiology, Pediatrics)
+# Expected: Clinics populated (Cardiology Clinic, etc.)
+# Expected: Bilingual success message
+
+### 8.2 Update Complex 1 Details
+# @name updateComplex1
+PATCH {{baseUrl}}/complexes/{{complex1Id}}
+Authorization: Bearer {{ownerAccessToken}}
+Content-Type: {{contentType}}
+
+{
+  "name": "Main Medical Complex Updated",
+  "vision": "To be the world-class medical complex in the region"
+}
+
+# Expected: 200 OK
+# Expected: Name updated to "Main Medical Complex Updated"
+# Expected: Vision updated
+# Expected: Bilingual success message
+
+### 8.3 Verify Complex 1 Update
+# @name verifyComplex1Update
+GET {{baseUrl}}/complexes/{{complex1Id}}
+Authorization: Bearer {{ownerAccessToken}}
+
+# Expected: 200 OK
+# Expected: Name is "Main Medical Complex Updated"
+
+### 8.4 Assign Person-In-Charge to Complex 1
+# @name assignComplex1PIC
+PATCH {{baseUrl}}/complexes/{{complex1Id}}/pic
+Authorization: Bearer {{ownerAccessToken}}
+Content-Type: {{contentType}}
+
+{
+  "userId": "{{manager1Id}}"
+}
+
+# Expected: 200 OK
+# Expected: Manager 1 assigned as PIC
+# Expected: Bilingual success message
+
+### 8.5 Change Complex 2 Status to Suspended
+# @name suspendComplex2
+PATCH {{baseUrl}}/complexes/{{complex1Id}}/status
+Authorization: Bearer {{ownerAccessToken}}
+Content-Type: {{contentType}}
+
+{
+  "status": "suspended",
+  "deactivationReason": "Scheduled maintenance"
+}
+
+# Expected: 200 OK
+# Expected: Status changed to 'suspended'
+# Expected: Reason recorded
+# Expected: Bilingual success message
+
+### 8.6 Verify Complex 2 Status
+# @name verifyComplex2Status
+GET {{baseUrl}}/complexes/{{complex1Id}}
+Authorization: Bearer {{ownerAccessToken}}
+
+# Expected: 200 OK
+# Expected: Status is 'suspended'
+
+### 8.7 Get Complex 1 Capacity
+# @name getComplex1Capacity
+GET {{baseUrl}}/complexes/{{complex1Id}}/capacity
+Authorization: Bearer {{ownerAccessToken}}
+
+# Expected: 200 OK
+# Expected: Aggregated capacity data returned
+# Expected: Total clinics, total doctors, total patient capacity
+# Expected: Bilingual success message
+
+###############################################################################
+# SECTION 8 COMPLETE
+###############################################################################
+# ✓ Complex retrieval with relationships tested
+# ✓ Complex update tested
+# ✓ PIC assignment tested
+# ✓ Complex status change tested
+# ✓ Complex capacity retrieval tested
+###############################################################################
+
+###############################################################################
+# SECTION 12: VALIDATION TESTING
 ###############################################################################
 # Tests: Missing fields, invalid formats, duplicates, unauthorized access
 # Requirements: 9.1, 9.2, 9.3, 9.4, 9.5, 9.6, 9.7

@@ -165,6 +165,7 @@ export class AuthService {
       // ==========================================
       // When a privileged user creates another user, associate the new user
       // with the same organization/complex/clinic scope
+      // Explicitly provided complexId/clinicId in the DTO take priority over creator's scope
       let scopeFields: any = {};
       if (creatorUser && requiresAuth) {
         scopeFields.createdBy = creatorUser.id;
@@ -173,14 +174,20 @@ export class AuthService {
           if (creator.organizationId) {
             scopeFields.organizationId = creator.organizationId;
           }
-          if (creator.complexId) {
+          // Use explicitly provided complexId from DTO, otherwise inherit from creator
+          if (registerDto.complexId) {
+            scopeFields.complexId = registerDto.complexId;
+          } else if (creator.complexId) {
             scopeFields.complexId = creator.complexId;
           }
-          if (creator.clinicId) {
+          // Use explicitly provided clinicId from DTO, otherwise inherit from creator
+          if (registerDto.clinicId) {
+            scopeFields.clinicId = registerDto.clinicId;
+          } else if (creator.clinicId) {
             scopeFields.clinicId = creator.clinicId;
           }
           this.logger.log(
-            `New user will be associated with creator's scope: org=${creator.organizationId}, complex=${creator.complexId}, clinic=${creator.clinicId}`,
+            `New user will be associated with scope: org=${scopeFields.organizationId || creator.organizationId}, complex=${scopeFields.complexId || creator.complexId}, clinic=${scopeFields.clinicId || creator.clinicId}`,
           );
         }
       }

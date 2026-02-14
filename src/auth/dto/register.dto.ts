@@ -160,6 +160,21 @@ export class RegisterDto {
     }),
   })
   gender?: string;
+
+  @ApiPropertyOptional({
+    description: 'Complex ID (optional) - Associates user with a specific complex',
+    example: '507f1f77bcf86cd799439011',
+    type: String,
+  })
+  @IsOptional()
+  @IsMongoId({
+    message: JSON.stringify({
+      ar: 'معرف المجمع غير صالح',
+      en: 'Invalid complex ID',
+    }),
+  })
+  complexId?: string;
+
   @ApiPropertyOptional({
     description: 'Clinic ID (optional)',
     example: '507f1f77bcf86cd799439011',

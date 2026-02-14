@@ -14,6 +14,7 @@ import {
 import { ListComplexesQueryDto } from './dto/list-complexes-query.dto';
 import { UpdateComplexStatusDto } from './dto/update-complex-status.dto';
 import { ValidationUtil } from '../common/utils/validation.util';
+import { TransactionUtil } from '../common/utils/transaction.util';
 import { SubscriptionService } from '../subscription/subscription.service';
 import {
   CapacityBreakdown,
@@ -29,7 +30,7 @@ export class ComplexService {
     @InjectModel('Complex') private readonly complexModel: Model<Complex>,
     @InjectConnection() private readonly connection: Connection,
     private readonly subscriptionService: SubscriptionService,
-  ) {}
+  ) { }
 
   /**
    * List complexes with pagination, filters, and optional counts
@@ -1113,16 +1114,15 @@ export class ComplexService {
     dto: UpdateComplexStatusDto,
     userId?: string,
   ): Promise<StatusChangeResponse> {
-    // Start MongoDB transaction (Requirement 6.8)
-    const session = await this.connection.startSession();
-    session.startTransaction();
+    // Start MongoDB transaction if supported (Requirement 6.8)
+    const { session, useTransaction } = await TransactionUtil.startTransaction(this.connection);
+    const sessionOpts = TransactionUtil.getSessionOptions(session, useTransaction);
 
     try {
       // Validate complex exists (Requirement 6.1)
-      const complex = await this.complexModel
-        .findById(complexId)
-        .session(session)
-        .exec();
+      const complexQuery = this.complexModel.findById(complexId);
+      if (session) complexQuery.session(session);
+      const complex = await complexQuery.exec();
 
       if (!complex) {
         throw new NotFoundException({
@@ -1146,7 +1146,7 @@ export class ComplexService {
               isActive: true,
               deletedAt: null,
             },
-            { session },
+            sessionOpts,
           )
           .toArray();
 
@@ -1169,10 +1169,9 @@ export class ComplexService {
         // If targetComplexId is provided, validate and transfer clinics
         if (dto.targetComplexId) {
           // Validate target complex exists and is active (Requirement 6.1, COMPLEX_005)
-          const targetComplex = await this.complexModel
-            .findById(dto.targetComplexId)
-            .session(session)
-            .exec();
+          const targetQuery = this.complexModel.findById(dto.targetComplexId);
+          if (session) targetQuery.session(session);
+          const targetComplex = await targetQuery.exec();
 
           if (!targetComplex || targetComplex.status !== 'active') {
             throw new BadRequestException({
@@ -1197,7 +1196,7 @@ export class ComplexService {
               await this.markAppointmentsForRescheduling(
                 clinicIds,
                 dto.deactivationReason ||
-                  'Complex deactivated - clinics transferred',
+                'Complex deactivated - clinics transferred',
                 markedBy,
                 session,
               );
@@ -1220,10 +1219,10 @@ export class ComplexService {
         complex.deactivationReason = undefined;
       }
 
-      await complex.save({ session });
+      await complex.save(sessionOpts);
 
       // Commit transaction (Requirement 6.8)
-      await session.commitTransaction();
+      await TransactionUtil.commitTransaction(session, useTransaction);
 
       // TODO: Send notifications to affected users (Requirement 6.8)
       // This will be implemented when notification service is available
@@ -1258,10 +1257,10 @@ export class ComplexService {
       };
     } catch (error) {
       // Rollback transaction on error (Requirement 6.8)
-      await session.abortTransaction();
+      await TransactionUtil.abortTransaction(session, useTransaction);
       throw error;
     } finally {
-      session.endSession();
+      await TransactionUtil.endSession(session);
     }
   }
 
@@ -1281,6 +1280,7 @@ export class ComplexService {
     complexId: string,
     session: any,
   ): Promise<number> {
+    const sessionOpts = session ? { session } : {};
     // Get all clinics for this complex
     const clinics = await this.complexModel.db
       .collection('clinics')
@@ -1288,7 +1288,7 @@ export class ComplexService {
         {
           complexId: new Types.ObjectId(complexId),
         },
-        { session },
+        sessionOpts,
       )
       .toArray();
 
@@ -1301,7 +1301,7 @@ export class ComplexService {
         {
           complexId: new Types.ObjectId(complexId),
         },
-        { session },
+        sessionOpts,
       )
       .toArray();
 
@@ -1318,7 +1318,7 @@ export class ComplexService {
       {
         $set: { isActive: false },
       },
-      { session },
+      sessionOpts,
     );
 
     return result.modifiedCount;
@@ -1340,6 +1340,7 @@ export class ComplexService {
     targetComplexId: string,
     session: any,
   ): Promise<number> {
+    const sessionOpts = session ? { session } : {};
     // Update all clinic records with new complexId
     const result = await this.complexModel.db.collection('clinics').updateMany(
       {
@@ -1348,7 +1349,7 @@ export class ComplexService {
       {
         $set: { complexId: new Types.ObjectId(targetComplexId) },
       },
-      { session },
+      sessionOpts,
     );
 
     return result.modifiedCount;
@@ -1372,6 +1373,7 @@ export class ComplexService {
     markedBy: Types.ObjectId,
     session: any,
   ): Promise<number> {
+    const sessionOpts = session ? { session } : {};
     // Query appointments for specified clinics that are scheduled or confirmed
     const result = await this.complexModel.db
       .collection('appointments')
@@ -1388,7 +1390,7 @@ export class ComplexService {
             markedBy: markedBy,
           },
         },
-        { session },
+        sessionOpts,
       );
 
     return result.modifiedCount;
@@ -1682,6 +1684,7 @@ export class ComplexService {
     targetComplexId: string,
     session: any,
   ): Promise<number> {
+    const sessionOpts = session ? { session } : {};
     // Query users with clinicId in transferred clinics
     // Update their complexId to target complex
     const result = await this.complexModel.db.collection('users').updateMany(
@@ -1692,7 +1695,7 @@ export class ComplexService {
       {
         $set: { complexId: new Types.ObjectId(targetComplexId) },
       },
-      { session },
+      sessionOpts,
     );
 
     return result.modifiedCount;
@@ -1714,16 +1717,15 @@ export class ComplexService {
     targetComplexId: string,
     clinicIds: string[],
   ): Promise<any> {
-    // Start MongoDB transaction (Requirement 10.4, 13.1, 13.2)
-    const session = await this.connection.startSession();
-    session.startTransaction();
+    // Start MongoDB transaction if supported (Requirement 10.4, 13.1, 13.2)
+    const { session, useTransaction } = await TransactionUtil.startTransaction(this.connection);
+    const sessionOpts = TransactionUtil.getSessionOptions(session, useTransaction);
 
     try {
       // Validate source complex exists (throw COMPLEX_006 if not) - Requirement 10.1
-      const sourceComplex = await this.complexModel
-        .findById(sourceComplexId)
-        .session(session)
-        .exec();
+      const sourceQuery = this.complexModel.findById(sourceComplexId);
+      if (session) sourceQuery.session(session);
+      const sourceComplex = await sourceQuery.exec();
 
       if (!sourceComplex) {
         throw new NotFoundException({
@@ -1733,10 +1735,9 @@ export class ComplexService {
       }
 
       // Validate target complex exists and is active (throw COMPLEX_005 if not) - Requirement 10.2
-      const targetComplex = await this.complexModel
-        .findById(targetComplexId)
-        .session(session)
-        .exec();
+      const targetQuery = this.complexModel.findById(targetComplexId);
+      if (session) targetQuery.session(session);
+      const targetComplex = await targetQuery.exec();
 
       if (!targetComplex || targetComplex.status !== 'active') {
         throw new BadRequestException({
@@ -1755,7 +1756,7 @@ export class ComplexService {
           {
             _id: { $in: clinicObjectIds },
           },
-          { session },
+          sessionOpts,
         )
         .toArray();
 
@@ -1818,7 +1819,7 @@ export class ComplexService {
       }
 
       // Commit transaction (Requirement 10.4, 13.1)
-      await session.commitTransaction();
+      await TransactionUtil.commitTransaction(session, useTransaction);
 
       // Return TransferResponse with counts and conflicts (Requirement 10.9)
       return {
@@ -1836,10 +1837,10 @@ export class ComplexService {
       };
     } catch (error) {
       // Rollback transaction on error (Requirement 13.3)
-      await session.abortTransaction();
+      await TransactionUtil.abortTransaction(session, useTransaction);
       throw error;
     } finally {
-      session.endSession();
+      await TransactionUtil.endSession(session);
     }
   }
 }

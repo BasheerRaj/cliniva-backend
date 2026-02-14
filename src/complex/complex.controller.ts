@@ -45,7 +45,7 @@ import { TransferClinicsDto } from './dto/transfer-clinics.dto';
 @ApiTags('Complex Management')
 @Controller('complexes')
 export class ComplexController {
-  constructor(private readonly complexService: ComplexService) {}
+  constructor(private readonly complexService: ComplexService) { }
 
   /**
    * List complexes with pagination, filters, and optional counts
@@ -468,13 +468,13 @@ export class ComplexController {
         success: true,
         message: complex
           ? {
-              ar: 'تم العثور على المجمع',
-              en: 'Complex found',
-            }
+            ar: 'تم العثور على المجمع',
+            en: 'Complex found',
+          }
           : {
-              ar: 'لم يتم العثور على مجمع لهذا الاشتراك',
-              en: 'No complex found for this subscription',
-            },
+            ar: 'لم يتم العثور على مجمع لهذا الاشتراك',
+            en: 'No complex found for this subscription',
+          },
         data: complex,
       };
     } catch (error) {
@@ -883,6 +883,188 @@ export class ComplexController {
     },
   })
   async updateComplex(
+    @Param('id') id: string,
+    @Body() updateComplexDto: UpdateComplexDto,
+  ) {
+    try {
+      const result = await this.complexService.updateComplex(
+        id,
+        updateComplexDto,
+      );
+
+      // Return the result which includes departmentRestrictions if any
+      return result;
+    } catch (error) {
+      // Handle NotFoundException with bilingual error
+      if (error instanceof NotFoundException) {
+        const errorResponse = error.getResponse() as any;
+        return {
+          success: false,
+          error: {
+            code: errorResponse.code || 'COMPLEX_006',
+            message: errorResponse.message || {
+              ar: 'المجمع غير موجود',
+              en: 'Complex not found',
+            },
+            details: errorResponse.details,
+          },
+        };
+      }
+
+      // Handle BadRequestException with bilingual error
+      if (error instanceof BadRequestException) {
+        const errorResponse = error.getResponse() as any;
+        return {
+          success: false,
+          error: {
+            code: errorResponse.code || 'COMPLEX_999',
+            message: errorResponse.message || {
+              ar: 'فشل تحديث المجمع',
+              en: 'Failed to update complex',
+            },
+            details: errorResponse.details,
+            departmentRestrictions: errorResponse.departmentRestrictions,
+          },
+        };
+      }
+
+      // Handle other errors with generic bilingual message
+      return {
+        success: false,
+        error: {
+          code: 'COMPLEX_999',
+          message: {
+            ar: 'حدث خطأ غير متوقع أثناء تحديث المجمع',
+            en: 'An unexpected error occurred while updating complex',
+          },
+          details: error.message,
+        },
+      };
+    }
+  }
+
+  /**
+   * Partially update complex with validation for department restrictions and PIC
+   * PATCH /complexes/:id
+   *
+   * Requirements: 4.9
+   */
+  @Patch(':id')
+  @ApiOperation({
+    summary: 'Partially update complex information',
+    description: `
+      Partially updates complex information with validation for department restrictions and person-in-charge.
+      
+      **Validations:**
+      - Complex must exist (COMPLEX_006)
+      - Cannot remove departments linked to active clinics (COMPLEX_007)
+      - Person-in-charge must be an employee (COMPLEX_002)
+      - Email format validation (COMPLEX_009)
+      - Phone format validation (COMPLEX_010)
+      
+      **Business Rules:**
+      - BZR-36: Department restriction check
+      - BZR-34: Person-in-charge validation
+      
+      **Special Behavior:**
+      - Returns departmentRestrictions array if departments cannot be removed
+      - Prevents update if restrictions exist
+      
+      **Requirements:** 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 4.8, 4.9
+    `,
+  })
+  @ApiParam({
+    name: 'id',
+    type: String,
+    description: 'Complex ID (MongoDB ObjectId)',
+    example: '507f1f77bcf86cd799439011',
+  })
+  @ApiBody({
+    type: UpdateComplexDto,
+    description: 'Complex update data',
+    examples: {
+      'Basic Update': {
+        value: {
+          name: 'Updated Medical Complex',
+        },
+        summary: 'Update basic complex information',
+      },
+      'Update Vision': {
+        value: {
+          vision: 'To be the world-class medical complex in the region',
+        },
+        summary: 'Update complex vision',
+      },
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Complex updated successfully',
+    schema: {
+      example: {
+        success: true,
+        data: {
+          _id: '507f1f77bcf86cd799439011',
+          name: 'Updated Medical Complex',
+          status: 'active',
+          updatedAt: '2024-01-20T15:30:00.000Z',
+        },
+        message: {
+          ar: 'تم تحديث المجمع بنجاح',
+          en: 'Complex updated successfully',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Validation error or department restrictions',
+    schema: {
+      examples: {
+        'Department Restrictions': {
+          value: {
+            success: false,
+            error: {
+              code: 'COMPLEX_007',
+              message: {
+                ar: 'القسم مرتبط بعيادات ولا يمكن إزالته',
+                en: 'Department linked to clinics and cannot be removed',
+              },
+              departmentRestrictions: [
+                {
+                  departmentId: '507f1f77bcf86cd799439015',
+                  departmentName: 'Cardiology',
+                  linkedClinics: [
+                    {
+                      clinicId: '507f1f77bcf86cd799439020',
+                      clinicName: 'Cardiology Clinic A',
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Complex not found',
+    schema: {
+      example: {
+        success: false,
+        error: {
+          code: 'COMPLEX_006',
+          message: {
+            ar: 'المجمع غير موجود',
+            en: 'Complex not found',
+          },
+        },
+      },
+    },
+  })
+  async patchComplex(
     @Param('id') id: string,
     @Body() updateComplexDto: UpdateComplexDto,
   ) {
