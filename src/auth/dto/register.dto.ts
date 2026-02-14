@@ -6,6 +6,7 @@ import {
   IsEnum,
   IsOptional,
   Matches,
+  IsMongoId,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { UserRole } from '../../common/enums/user-role.enum';
@@ -159,4 +160,17 @@ export class RegisterDto {
     }),
   })
   gender?: string;
+  @ApiPropertyOptional({
+    description: 'Clinic ID (optional)',
+    example: '507f1f77bcf86cd799439011',
+    type: String,
+  })
+  @IsOptional()
+  @IsMongoId({
+    message: JSON.stringify({
+      ar: 'معرف العيادة غير صالح',
+      en: 'Invalid clinic ID',
+    }),
+  })
+  clinicId?: string;
 }

@@ -34,6 +34,15 @@ export class OrganizationOverviewDto {
   legalName?: string;
 
   @ApiPropertyOptional({
+    description: 'Registration number (CR Number)',
+    example: '1010123456',
+    type: String,
+  })
+  @IsString()
+  @IsOptional()
+  registrationNumber?: string;
+
+  @ApiPropertyOptional({
     description: 'Organization logo URL',
     example: 'https://example.com/logo.png',
     type: String,

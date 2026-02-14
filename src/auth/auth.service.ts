@@ -13,6 +13,7 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import { User } from '../database/schemas/user.schema';
+import { Clinic } from '../database/schemas/clinic.schema';
 import { AuditLog } from '../database/schemas/audit-log.schema';
 import { LoginDto, RegisterDto, AuthResponseDto, UserProfileDto } from './dto';
 import { SubscriptionService } from '../subscription/subscription.service';
@@ -34,6 +35,7 @@ export class AuthService {
 
   constructor(
     @InjectModel(User.name) private userModel: Model<User>,
+    @InjectModel(Clinic.name) private clinicModel: Model<Clinic>,
     @InjectModel(AuditLog.name) private auditLogModel: Model<AuditLog>,
     private jwtService: JwtService,
     private readonly subscriptionService: SubscriptionService,
@@ -138,6 +140,21 @@ export class AuthService {
           },
           code: 'EMAIL_ALREADY_EXISTS',
         });
+      }
+
+
+      // Validate clinicId if provided
+      if (registerDto.clinicId) {
+        const clinic = await this.clinicModel.findById(registerDto.clinicId);
+        if (!clinic) {
+          throw new NotFoundException({
+            message: {
+              ar: 'العيادة غير موجودة',
+              en: 'Clinic not found',
+            },
+            code: 'CLINIC_NOT_FOUND',
+          });
+        }
       }
 
       // Hash password
@@ -248,7 +265,8 @@ export class AuthService {
     } catch (error) {
       if (
         error instanceof ConflictException ||
-        error instanceof ForbiddenException
+        error instanceof ForbiddenException ||
+        error instanceof NotFoundException
       ) {
         throw error;
       }

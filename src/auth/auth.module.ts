@@ -26,6 +26,7 @@ import {
   TokenBlacklist,
   TokenBlacklistSchema,
 } from '../database/schemas/token-blacklist.schema';
+import { Clinic, ClinicSchema } from '../database/schemas/clinic.schema';
 import { Session, SessionSchema } from '../database/schemas/session.schema';
 import { AuditLog, AuditLogSchema } from '../database/schemas/audit-log.schema';
 import {
@@ -47,6 +48,7 @@ import { RateLimitService } from './rate-limit.service';
       { name: Subscription.name, schema: SubscriptionSchema },
       { name: SubscriptionPlan.name, schema: SubscriptionPlanSchema },
       { name: TokenBlacklist.name, schema: TokenBlacklistSchema },
+      { name: Clinic.name, schema: ClinicSchema },
       { name: Session.name, schema: SessionSchema },
       { name: AuditLog.name, schema: AuditLogSchema },
       { name: RateLimitCounter.name, schema: RateLimitCounterSchema },

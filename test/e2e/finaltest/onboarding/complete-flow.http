@@ -1745,6 +1745,24 @@ Content-Type: {{contentType}}
 ### 8.1 Test Duplicate Email (User Creation)
 # @name testDuplicateEmail
 POST {{baseUrl}}/auth/register
+Authorization: Bearer {{ownerAccessToken}}
+Content-Type: {{contentType}}
+
+{
+  "email": "dr.khalid@test-healthcare.com",
+  "password": "Doctor123!",
+  "firstName": "Duplicate",
+  "lastName": "User",
+  "role": "doctor",
+  "phone": "+966501234599",
+  "nationality": "SA",
+  "gender": "male"
+}
+
+### 8.1 Test Duplicate Email (User Creation)
+# @name testDuplicateEmail
+POST {{baseUrl}}/auth/register
+Authorization: Bearer {{ownerAccessToken}}
 Content-Type: {{contentType}}
 
 {
@@ -1765,6 +1783,7 @@ Content-Type: {{contentType}}
 ### 8.2 Test Invalid Email Format
 # @name testInvalidEmail
 POST {{baseUrl}}/auth/register
+Authorization: Bearer {{ownerAccessToken}}
 Content-Type: {{contentType}}
 
 {
@@ -1799,6 +1818,7 @@ Content-Type: {{contentType}}
 ### 8.4 Test Invalid Phone Number Format
 # @name testInvalidPhone
 POST {{baseUrl}}/auth/register
+Authorization: Bearer {{ownerAccessToken}}
 Content-Type: {{contentType}}
 
 {
@@ -1819,6 +1839,7 @@ Content-Type: {{contentType}}
 ### 8.5 Test Weak Password
 # @name testWeakPassword
 POST {{baseUrl}}/auth/register
+Authorization: Bearer {{ownerAccessToken}}
 Content-Type: {{contentType}}
 
 {
@@ -1839,6 +1860,7 @@ Content-Type: {{contentType}}
 ### 8.6 Test Invalid Role
 # @name testInvalidRole
 POST {{baseUrl}}/auth/register
+Authorization: Bearer {{ownerAccessToken}}
 Content-Type: {{contentType}}
 
 {
@@ -1868,6 +1890,7 @@ Content-Type: {{contentType}}
 ### 8.8 Test Invalid Entity ID (Non-existent Clinic)
 # @name testInvalidClinicId
 POST {{baseUrl}}/auth/register
+Authorization: Bearer {{ownerAccessToken}}
 Content-Type: {{contentType}}
 
 {
@@ -1897,6 +1920,23 @@ Content-Type: {{contentType}}
   "legalName": "Duplicate Org LLC",
   "registrationNumber": "9999999999"
 }
+
+### 8.9.1 Test Update Organization Name (Valid Update)
+# @name updateOrgName
+PUT {{baseUrl}}/organizations/{{organizationId}}
+Authorization: Bearer {{ownerAccessToken}}
+Content-Type: {{contentType}}
+
+{
+  "name": "Healthcare Organization",
+  "legalName": "Healthcare Org LLC",
+  "registrationNumber": "9999999999"
+}
+
+# Expected: 200 OK
+# Expected: Organization details updated successfully
+# Expected: Returns updated organization object
+
 
 # Expected: 400 Bad Request
 # Expected: Bilingual error message about duplicate organization name or plan limit

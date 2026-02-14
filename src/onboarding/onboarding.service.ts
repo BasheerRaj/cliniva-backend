@@ -127,7 +127,7 @@ export class OnboardingService {
     private readonly dynamicInfoService: DynamicInfoService,
     private readonly userAccessService: UserAccessService,
     private readonly userService: UserService,
-  ) {}
+  ) { }
 
   /**
    * Complete onboarding process
@@ -753,7 +753,7 @@ export class OnboardingService {
       // Get subscription to determine plan type
       const subscription = await this.subscriptionService.getSubscriptionByUser(userId);
       let planType: 'company' | 'complex' | 'clinic' = 'clinic';
-      
+
       if (subscription) {
         // Check if planId is populated (object) or just an ID
         if (subscription.planId) {
@@ -787,7 +787,7 @@ export class OnboardingService {
 
       // Get completed steps from user's onboardingProgress
       const completedSteps = user.onboardingProgress || [];
-      
+
       // Determine current step based on completed steps and plan type
       let currentStep = 'organization-overview';
       if (planType === 'company') {
@@ -892,36 +892,14 @@ export class OnboardingService {
       );
 
       if (existingOrg) {
-        // Update existing organization with new standardized structure
-        const updateData = {
-          name: dto.name,
-          legalName: dto.legalName,
-          logoUrl: dto.logoUrl,
-          website: dto.website,
-          // Business profile fields (flattened from DTO)
-          yearEstablished: dto.yearEstablished,
-          mission: dto.mission,
-          vision: dto.vision,
-          overview: dto.overview, // Use overview field correctly
-          goals: dto.goals,
-          ceoName: dto.ceoName,
-        };
-
-        const updatedOrg = await this.organizationService.updateOrganization(
-          (existingOrg._id as any).toString(),
-          updateData,
-        );
-
-        // Mark step as complete
-        await this.progressService.markStepComplete(userId, 'organization-overview');
-
-        return {
-          success: true,
-          entityId: (updatedOrg._id as any).toString(),
-          canProceed: true,
-          nextStep: 'organization_contact',
-          data: updateData,
-        };
+        // Strictly enforce plan limit - one organization per company plan user
+        throw new BadRequestException({
+          message: {
+            ar: 'لديك منظمة بالفعل. يمكن لكل مستخدم امتلاك شركة واحدة فقط.',
+            en: 'You already own an organization. Each user can only own one company.',
+          },
+          code: 'ORGANIZATION_ALREADY_EXISTS',
+        });
       } else {
         // Create new organization if it doesn't exist
         // Get user's subscription to link to organization
@@ -944,6 +922,8 @@ export class OnboardingService {
           overview: dto.overview, // Use overview field correctly
           goals: dto.goals,
           ceoName: dto.ceoName,
+          // Map registrationNumber to crNumber if provided
+          crNumber: dto.registrationNumber,
           // Ownership and subscription
           ownerId: userId,
           subscriptionId: (subscription._id as any).toString(),
@@ -966,8 +946,6 @@ export class OnboardingService {
         };
       }
     } catch (error) {
-      console.error('Error saving organization overview:', error);
-
       // More specific error handling
       if (error instanceof BadRequestException) {
         throw error;
@@ -1196,24 +1174,24 @@ export class OnboardingService {
       // Address inheritance with more sophisticated logic
       address:
         entityData.address &&
-        (entityData.address.street ||
-          entityData.address.city ||
-          entityData.address.state ||
-          entityData.address.postalCode)
+          (entityData.address.street ||
+            entityData.address.city ||
+            entityData.address.state ||
+            entityData.address.postalCode)
           ? entityData.address
           : organization.address,
 
       // Emergency contact inheritance
       emergencyContact:
         entityData.emergencyContact &&
-        (entityData.emergencyContact.name || entityData.emergencyContact.phone)
+          (entityData.emergencyContact.name || entityData.emergencyContact.phone)
           ? entityData.emergencyContact
           : organization.emergencyContact,
 
       // Social media links inheritance
       socialMediaLinks:
         entityData.socialMediaLinks &&
-        Object.values(entityData.socialMediaLinks).some((val) => val)
+          Object.values(entityData.socialMediaLinks).some((val) => val)
           ? entityData.socialMediaLinks
           : organization.socialMediaLinks,
 
@@ -2433,7 +2411,7 @@ export class OnboardingService {
         console.log('🔍 Validating clinic hours against complex hours');
         console.log('📋 Clinic schedule to validate:', JSON.stringify(workingHours, null, 2));
         console.log('🏢 Parent complex ID:', (parentComplexId as any).toString());
-        
+
         const validationResult =
           await this.workingHoursValidationService.validateHierarchical(
             workingHours,
