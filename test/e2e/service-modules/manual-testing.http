@@ -1,0 +1,291 @@
+### Manual Testing File for Service, Doctor-Service, and Service-Offer Modules
+### Use this file with REST Client extension in VS Code
+
+@baseUrl = http://localhost:3001/api/v1
+@email = super@admin.in
+@password = SuperAdmin123!
+
+### Variables (Update these after login and getting IDs)
+@accessToken = 
+@serviceId = 
+@clinicId = 
+@complexDepartmentId = 
+@doctorId = 
+@offerId = 
+
+###############################################################################
+# 1. AUTHENTICATION
+###############################################################################
+
+### Login to get access token
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "password": "{{password}}",
+  "rememberMe": false
+}
+
+### Copy the access_token from response and update @accessToken variable above
+
+###############################################################################
+# 2. GET REQUIRED IDs (Run these to get IDs for testing)
+###############################################################################
+
+### Get Complex Departments
+GET {{baseUrl}}/complex-departments
+Authorization: Bearer {{accessToken}}
+
+### Get Clinics
+GET {{baseUrl}}/clinics
+Authorization: Bearer {{accessToken}}
+
+### Get Doctors
+GET {{baseUrl}}/users?role=doctor
+Authorization: Bearer {{accessToken}}
+
+### Get Offers
+GET {{baseUrl}}/offers
+Authorization: Bearer {{accessToken}}
+
+### Update variables above with IDs from responses
+
+###############################################################################
+# 3. SERVICE MODULE - CRUD Operations
+###############################################################################
+
+### 3.1 Create Service
+POST {{baseUrl}}/services
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": "General Consultation",
+  "description": "Standard medical consultation with a general practitioner",
+  "durationMinutes": 30,
+  "price": 150,
+  "complexDepartmentId": "{{complexDepartmentId}}"
+}
+
+### 3.2 Get Service by ID
+GET {{baseUrl}}/services/{{serviceId}}
+Authorization: Bearer {{accessToken}}
+
+### 3.3 Update Service
+PUT {{baseUrl}}/services/{{serviceId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": "Updated General Consultation",
+  "description": "Updated description",
+  "durationMinutes": 45,
+  "price": 200
+}
+
+### 3.4 Validate Service Names
+POST {{baseUrl}}/services/validate-names
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "serviceNames": ["General Consultation", "Blood Test", "X-Ray"],
+  "complexDepartmentId": "{{complexDepartmentId}}"
+}
+
+### 3.5 Get Services by Complex Department
+GET {{baseUrl}}/services/complex-departments/{{complexDepartmentId}}
+Authorization: Bearer {{accessToken}}
+
+### 3.6 Assign Services to Clinic
+POST {{baseUrl}}/services/clinics/{{clinicId}}/assign
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "serviceAssignments": [
+    {
+      "serviceId": "{{serviceId}}",
+      "priceOverride": 160,
+      "isActive": true
+    }
+  ]
+}
+
+### 3.7 Get Services by Clinic
+GET {{baseUrl}}/services/clinics/{{clinicId}}
+Authorization: Bearer {{accessToken}}
+
+### 3.8 Get Services Owned by Clinic
+GET {{baseUrl}}/services/clinics/{{clinicId}}/owned
+Authorization: Bearer {{accessToken}}
+
+### 3.9 Get All Services (with optional filter)
+GET {{baseUrl}}/services?complexDepartmentId={{complexDepartmentId}}
+Authorization: Bearer {{accessToken}}
+
+### 3.10 Get Active Services
+GET {{baseUrl}}/services/active?clinicId={{clinicId}}
+Authorization: Bearer {{accessToken}}
+
+### 3.11 Change Service Status
+PATCH {{baseUrl}}/services/{{serviceId}}/status
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "isActive": false,
+  "reason": "Service temporarily unavailable",
+  "confirmReschedule": true
+}
+
+### 3.12 Get Service Status History
+GET {{baseUrl}}/services/{{serviceId}}/status-history
+Authorization: Bearer {{accessToken}}
+
+### 3.13 Bulk Status Change
+PATCH {{baseUrl}}/services/bulk-status
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "serviceIds": ["{{serviceId}}"],
+  "isActive": false,
+  "reason": "Temporary closure",
+  "confirmReschedule": true
+}
+
+### 3.14 Delete Service (Soft Delete)
+DELETE {{baseUrl}}/services/{{serviceId}}
+Authorization: Bearer {{accessToken}}
+
+###############################################################################
+# 4. DOCTOR-SERVICE MODULE
+###############################################################################
+
+### 4.1 Get Available Doctors for Service
+GET {{baseUrl}}/services/{{serviceId}}/available-doctors?clinicId={{clinicId}}
+Authorization: Bearer {{accessToken}}
+
+### 4.2 Get Doctors Assigned to Service
+GET {{baseUrl}}/services/{{serviceId}}/doctors?clinicId={{clinicId}}&includeStats=true
+Authorization: Bearer {{accessToken}}
+
+### 4.3 Assign Doctor to Service
+POST {{baseUrl}}/services/{{serviceId}}/doctors
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "doctorId": "{{doctorId}}",
+  "clinicId": "{{clinicId}}",
+  "notes": "Specialized in this service"
+}
+
+### 4.4 Update Doctor Assignment Notes
+PATCH {{baseUrl}}/services/{{serviceId}}/doctors/{{doctorId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "clinicId": "{{clinicId}}",
+  "notes": "Updated notes - expert in this field"
+}
+
+### 4.5 Deactivate Doctor from Service
+PATCH {{baseUrl}}/services/{{serviceId}}/doctors/{{doctorId}}/deactivate
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "clinicId": "{{clinicId}}",
+  "reason": "Doctor transferred to another department",
+  "transferAppointmentsTo": "another-doctor-id",
+  "notifyPatients": true
+}
+
+### 4.6 Remove Doctor from Service
+DELETE {{baseUrl}}/services/{{serviceId}}/doctors/{{doctorId}}?clinicId={{clinicId}}
+Authorization: Bearer {{accessToken}}
+
+###############################################################################
+# 5. SERVICE-OFFER MODULE (Discounts)
+###############################################################################
+
+### 5.1 Assign Discount to Service
+POST {{baseUrl}}/services/{{serviceId}}/discounts
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "offerId": "{{offerId}}",
+  "isActive": true
+}
+
+### 5.2 Get Service Discounts
+GET {{baseUrl}}/services/{{serviceId}}/discounts?isActive=true&includeExpired=false
+Authorization: Bearer {{accessToken}}
+
+### 5.3 Calculate Service Price with Discount
+POST {{baseUrl}}/services/{{serviceId}}/calculate-price
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "basePrice": 150,
+  "appointmentDate": "2026-06-15T10:00:00.000Z"
+}
+
+### 5.4 Deactivate Discount
+PATCH {{baseUrl}}/services/{{serviceId}}/discounts/{{offerId}}/deactivate
+Authorization: Bearer {{accessToken}}
+
+### 5.5 Remove Discount from Service
+DELETE {{baseUrl}}/services/{{serviceId}}/discounts/{{offerId}}
+Authorization: Bearer {{accessToken}}
+
+###############################################################################
+# 6. ERROR TESTING SCENARIOS
+###############################################################################
+
+### 6.1 Test without authentication (should return 401)
+GET {{baseUrl}}/services/{{serviceId}}
+
+### 6.2 Test with invalid service ID (should return 404)
+GET {{baseUrl}}/services/invalid-id-123
+Authorization: Bearer {{accessToken}}
+
+### 6.3 Test create service with duplicate name (should return 400)
+POST {{baseUrl}}/services
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": "General Consultation",
+  "complexDepartmentId": "{{complexDepartmentId}}"
+}
+
+### 6.4 Test with invalid data (should return 400)
+POST {{baseUrl}}/services
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": "A",
+  "price": -100
+}
+
+### 6.5 Test delete service with active appointments (should return 400)
+DELETE {{baseUrl}}/services/{{serviceId}}
+Authorization: Bearer {{accessToken}}
+
+###############################################################################
+# NOTES
+###############################################################################
+# 1. Update all variables at the top after login and getting IDs
+# 2. Run requests in order for integration testing
+# 3. Check responses for success/error messages
+# 4. Verify data in database after operations
+# 5. Clean up test data after testing
+
