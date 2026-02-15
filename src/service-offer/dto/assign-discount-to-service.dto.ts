@@ -23,3 +23,4 @@ export class AssignDiscountToServiceDto {
   isActive?: boolean;
 }
 
+

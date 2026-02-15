@@ -24,3 +24,4 @@ export class CalculateServicePriceDto {
   appointmentDate: string;
 }
 
+
