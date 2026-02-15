@@ -1887,6 +1887,72 @@ export class OnboardingService {
         userComplexName: userComplex?.name,
       });
 
+      // Validate complexDepartmentId if provided
+      if (dto.complexDepartmentId && dto.complexDepartmentId.trim() !== '') {
+        try {
+          const department = await this.departmentService.getDepartment(
+            dto.complexDepartmentId,
+          );
+
+          if (!department) {
+            throw new BadRequestException({
+              message: {
+                ar: 'القسم المحدد غير موجود',
+                en: 'The specified department does not exist',
+              },
+              code: 'DEPARTMENT_NOT_FOUND',
+              details: {
+                complexDepartmentId: dto.complexDepartmentId,
+              },
+            });
+          }
+
+          // Validate that the department belongs to the user's complex
+          if (userComplex) {
+            const departmentComplexId = (department as any).complexId?.toString();
+            const userComplexId = userComplex._id?.toString();
+
+            if (departmentComplexId !== userComplexId) {
+              throw new BadRequestException({
+                message: {
+                  ar: 'القسم المحدد لا ينتمي إلى المجمع الطبي الخاص بك',
+                  en: 'The specified department does not belong to your complex',
+                },
+                code: 'INVALID_DEPARTMENT_REFERENCE',
+                details: {
+                  complexDepartmentId: dto.complexDepartmentId,
+                  departmentComplexId,
+                  userComplexId,
+                },
+              });
+            }
+          }
+
+          console.log('✅ Department validation passed:', {
+            departmentId: dto.complexDepartmentId,
+            departmentName: (department as any).name,
+          });
+        } catch (error) {
+          // If it's already a BadRequestException, re-throw it
+          if (error instanceof BadRequestException) {
+            throw error;
+          }
+
+          // Otherwise, throw a generic error
+          throw new BadRequestException({
+            message: {
+              ar: 'فشل التحقق من صحة القسم',
+              en: 'Failed to validate department',
+            },
+            code: 'DEPARTMENT_VALIDATION_FAILED',
+            details: {
+              complexDepartmentId: dto.complexDepartmentId,
+              error: error.message,
+            },
+          });
+        }
+      }
+
       // Prepare clinic data
       let clinicData = {
         name: dto.name,
@@ -2069,7 +2135,20 @@ export class OnboardingService {
       };
     } catch (error) {
       console.error('Error saving clinic overview:', error);
-      throw new InternalServerErrorException('Failed to save clinic overview');
+      
+      // Re-throw BadRequestException as-is to preserve bilingual error messages
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      
+      // For other errors, wrap in InternalServerErrorException
+      throw new InternalServerErrorException({
+        message: {
+          ar: 'فشل حفظ نظرة عامة على العيادة',
+          en: 'Failed to save clinic overview',
+        },
+        details: error.message,
+      });
     }
   }
 

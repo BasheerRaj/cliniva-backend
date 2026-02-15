@@ -2253,28 +2253,20 @@ Save basic clinic information for onboarding process.
     @Request() req,
     @Body() clinicOverviewDto: ClinicOverviewDto,
   ): Promise<StepSaveResponseDto> {
-    try {
-      const userId = req.user.id;
-      const result = await this.onboardingService.saveClinicOverview(
-        userId,
-        clinicOverviewDto,
-      );
+    const userId = req.user.id;
+    const result = await this.onboardingService.saveClinicOverview(
+      userId,
+      clinicOverviewDto,
+    );
 
-      return {
-        success: true,
-        message: 'Clinic overview saved successfully',
-        data: result.data,
-        entityId: result.entityId,
-        nextStep: result.nextStep,
-        canProceed: result.canProceed,
-      };
-    } catch (error) {
-      return {
-        success: false,
-        message: 'Failed to save clinic overview',
-        canProceed: false,
-      };
-    }
+    return {
+      success: true,
+      message: 'Clinic overview saved successfully',
+      data: result.data,
+      entityId: result.entityId,
+      nextStep: result.nextStep,
+      canProceed: result.canProceed,
+    };
   }
 
   @Post('clinic/contact')

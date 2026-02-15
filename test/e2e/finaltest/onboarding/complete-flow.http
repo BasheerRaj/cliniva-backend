@@ -2698,6 +2698,87 @@ Content-Type: {{contentType}}
 # Expected: Bilingual error message about invalid time range
 # Expected: Closing time must be after opening time
 
+### 8.11 Test Not Found - User with Non-existent ID
+# @name testUserNotFound
+GET {{baseUrl}}/users/00000000-0000-0000-0000-000000000000
+Authorization: Bearer {{ownerAccessToken}}
+Content-Type: {{contentType}}
+
+# Expected: 404 Not Found
+# Expected: Bilingual error message about user not found
+# Expected: Error code: USER_NOT_FOUND
+# Expected: Message structure with 'ar' and 'en' fields
+
+### 8.12 Test Not Found - Complex with Non-existent ID
+# @name testComplexNotFound
+GET {{baseUrl}}/complexes/00000000-0000-0000-0000-000000000000
+Authorization: Bearer {{ownerAccessToken}}
+Content-Type: {{contentType}}
+
+# Expected: 404 Not Found
+# Expected: Bilingual error message about complex not found
+# Expected: Error code: COMPLEX_NOT_FOUND or ENTITY_NOT_FOUND
+# Expected: Message structure with 'ar' and 'en' fields
+
+### 8.13 Test Invalid Parent Reference - Complex with Non-existent Organization
+# NOTE: The onboarding API automatically links complexes to organizations owned by the authenticated user.
+# The organizationId is NOT accepted as a request parameter - it's derived from the user's ownership.
+# Therefore, this test validates that a user without an organization cannot create a complex.
+# To properly test this, we would need to:
+# 1. Create a new user with a complex-only subscription plan
+# 2. Attempt to create a complex (which should succeed for complex plan)
+# OR
+# 1. Delete the user's organization
+# 2. Attempt to create a complex (which should fail for company plan)
+# 
+# For now, this test is documented but not executable in the current flow.
+# The API design prevents invalid organization references by using ownership-based linking.
+
+### 8.14 Test Invalid Parent Reference - Clinic with Non-existent Department
+# @name testInvalidDepartmentReference
+POST {{baseUrl}}/onboarding/clinic/overview
+Authorization: Bearer {{ownerAccessToken}}
+Content-Type: {{contentType}}
+
+{
+  "name": "Invalid Clinic",
+  "headDoctorName": "Test Doctor",
+  "specialization": "General",
+  "licenseNumber": "LIC-TEST-001",
+  "pin": "CLN-TEST-001",
+  "complexDepartmentId": "000000000000000000000000",
+  "yearEstablished": 2024,
+  "mission": "Test mission",
+  "vision": "Test vision",
+  "overview": "Test overview",
+  "goals": "Test goals",
+  "ceoName": "Test CEO",
+  "services": []
+}
+
+# Expected: 400 Bad Request
+# Expected: Bilingual error message about department not found
+# Expected: Error code: DEPARTMENT_NOT_FOUND
+# Expected: Message structure with 'ar' and 'en' fields
+# Expected: Error details showing the invalid complexDepartmentId
+#
+# FIXED: The API now validates that the complexDepartmentId exists before creating the clinic.
+# The validation checks:
+# 1. Department exists in the database
+# 2. Department belongs to the user's complex (if user has a complex)
+#
+# Error Response Format:
+# {
+#   "message": {
+#     "ar": "القسم المحدد غير موجود",
+#     "en": "The specified department does not exist"
+#   },
+#   "code": "DEPARTMENT_NOT_FOUND",
+#   "details": {
+#     "complexDepartmentId": "000000000000000000000000"
+#   }
+# }
+
 ###############################################################################
 # SECTION 8 COMPLETE
 ###############################################################################
@@ -2711,7 +2792,25 @@ Content-Type: {{contentType}}
 # ✓ Invalid entity ID validation tested
 # ✓ Duplicate organization name tested
 # ✓ Invalid working hours validation tested
-# ✓ All validation rules enforced with bilingual error messages
+# ✓ Not found error for non-existent user tested
+# ✓ Not found error for non-existent complex tested
+# ✓ Invalid parent reference validation FIXED
+# 
+# FINDINGS:
+# - Complex creation: organizationId is NOT accepted as a parameter. The API 
+#   automatically links complexes to organizations owned by the authenticated user.
+#   This prevents invalid organization references by design.
+# 
+# - Clinic creation: complexDepartmentId validation FIXED. The API now validates:
+#   1. Department exists in the database
+#   2. Department belongs to the user's complex (if user has a complex)
+#   This prevents invalid department references and ensures data integrity.
+# 
+# VALIDATION ADDED:
+# - saveClinicOverview now validates complexDepartmentId before creating clinic
+# - Returns bilingual error message (DEPARTMENT_NOT_FOUND) if department doesn't exist
+# - Returns bilingual error message (INVALID_DEPARTMENT_REFERENCE) if department 
+#   doesn't belong to user's complex
 ###############################################################################
 
 ###############################################################################
