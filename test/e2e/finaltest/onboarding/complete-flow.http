@@ -2602,14 +2602,23 @@ Content-Type: {{contentType}}
 # Expected: Bilingual error message about invalid role
 # Expected: Valid roles: owner, admin, manager, doctor, staff
 
-### 8.7 Test Unauthorized Access (No Token)
-# @name testUnauthorized
+### 8.7 Test Unauthorized Access - User Profile (No Token)
+# @name testUnauthorizedUserProfile
 GET {{baseUrl}}/users/me
 Content-Type: {{contentType}}
 
 # Expected: 401 Unauthorized
 # Expected: Bilingual error message about missing authentication
 # Expected: Error code: UNAUTHORIZED
+
+### 8.7.1 Test Unauthorized Access - List Users (No Token)
+# @name testUnauthorizedListUsers
+GET {{baseUrl}}/users
+Content-Type: {{contentType}}
+
+# Expected: 401 Unauthorized
+# Expected: Bilingual error message about missing authentication
+# Expected: Error code: UNAUTHORIZED or MISSING_TOKEN
 
 ### 8.8 Test Invalid Entity ID (Non-existent Clinic)
 # @name testInvalidClinicId
