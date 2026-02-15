@@ -91,7 +91,24 @@ export class AppointmentService {
     if (serviceId) {
       const service = await this.serviceModel.findById(serviceId);
       if (!service) {
-        throw new NotFoundException('Service not found or inactive');
+        throw new NotFoundException({
+          message: {
+            ar: 'الخدمة غير موجودة',
+            en: 'Service not found',
+          },
+        });
+      }
+
+      if (!service.isActive) {
+        throw new BadRequestException({
+          message: {
+            ar: 'الخدمة غير نشطة حالياً. لا يمكن حجز مواعيد',
+            en: 'Service is currently inactive. Cannot book appointments',
+          },
+          serviceId: service._id,
+          serviceName: service.name,
+          deactivationReason: service.deactivationReason,
+        });
       }
     }
 
@@ -272,6 +289,7 @@ export class AppointmentService {
     await this.validateAppointmentData(createAppointmentDto);
 
     // Get service details for default duration if not provided
+    // Note: Service validation already checked in validateAppointmentData
     let durationMinutes = createAppointmentDto.durationMinutes;
     if (!durationMinutes) {
       const service = await this.serviceModel.findById(

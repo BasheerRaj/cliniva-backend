@@ -6,10 +6,13 @@ import {
   Param,
   Delete,
   Put,
+  Patch,
   ValidationPipe,
   HttpCode,
   HttpStatus,
   Query,
+  Request,
+  UseGuards,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -22,12 +25,16 @@ import {
 } from '@nestjs/swagger';
 import { ServiceService } from './service.service';
 import { CreateServiceDto, AssignServicesDto } from './dto/create-service.dto';
+import { UpdateServiceDto } from './dto/update-service.dto';
+import { ChangeServiceStatusDto } from './dto/change-service-status.dto';
+import { BulkStatusChangeDto } from './dto/bulk-status-change.dto';
 import { Service } from '../database/schemas/service.schema';
 import { ClinicService } from '../database/schemas/clinic-service.schema';
 import { SERVICE_SWAGGER_EXAMPLES } from './constants/swagger-examples';
-
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 @ApiTags('Services')
 @Controller('services')
+@UseGuards(JwtAuthGuard)
 export class ServiceController {
   constructor(private readonly serviceService: ServiceService) {}
 
@@ -118,6 +125,217 @@ export class ServiceController {
   @Get(':id')
   async getServiceById(@Param('id') id: string): Promise<Service> {
     return this.serviceService.getService(id);
+  }
+
+  /**
+   * Update service
+   */
+  @ApiOperation({
+    summary: 'Update service',
+    description:
+      'Updates an existing medical service. If changes affect active appointments (e.g., department/clinic change, duration change), confirmation is required to proceed with rescheduling.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Service updated successfully',
+    schema: {
+      example: SERVICE_SWAGGER_EXAMPLES.UPDATE_SERVICE_SUCCESS,
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description:
+      'Validation error or requires confirmation for appointment rescheduling',
+    schema: {
+      example: {
+        statusCode: 400,
+        message: {
+          ar: 'هذا التعديل سيؤثر على 5 مواعيد نشطة. يرجى التأكيد لإعادة الجدولة',
+          en: 'This change will affect 5 active appointments. Please confirm to reschedule',
+        },
+        requiresConfirmation: true,
+        affectedAppointmentsCount: 5,
+      },
+    },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Service not found',
+    schema: {
+      example: SERVICE_SWAGGER_EXAMPLES.SERVICE_NOT_FOUND,
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - Authentication required',
+    schema: {
+      example: SERVICE_SWAGGER_EXAMPLES.UNAUTHORIZED,
+    },
+  })
+  @ApiBearerAuth()
+  @ApiParam({
+    name: 'id',
+    description: 'Service ID',
+    type: String,
+    example: '507f1f77bcf86cd799439011',
+  })
+  @ApiBody({ type: UpdateServiceDto })
+  @Put(':id')
+  async updateService(
+    @Param('id') id: string,
+    @Body(new ValidationPipe({ transform: true, whitelist: true }))
+    updateServiceDto: UpdateServiceDto,
+  ): Promise<Service> {
+    return this.serviceService.updateService(id, updateServiceDto);
+  }
+
+  /**
+   * Delete service
+   */
+  // @ApiOperation({
+  //   summary: 'Delete service',
+  //   description:
+  //     'Soft deletes a medical service. Cannot delete if service has active appointments (scheduled or confirmed). The service is marked as deleted with a timestamp.',
+  // })
+  // @ApiResponse({
+  //   status: 200,
+  //   description: 'Service deleted successfully',
+  //   schema: {
+  //     example: SERVICE_SWAGGER_EXAMPLES.DELETE_SERVICE_SUCCESS,
+  //   },
+  // })
+  // @ApiResponse({
+  //   status: 400,
+  //   description: 'Cannot delete service with active appointments',
+  //   schema: {
+  //     example: {
+  //       statusCode: 400,
+  //       message: {
+  //         ar: 'لا يمكن حذف الخدمة لأنها تحتوي على 3 مواعيد نشطة',
+  //         en: 'Cannot delete service because it has 3 active appointments',
+  //       },
+  //       activeAppointmentsCount: 3,
+  //     },
+  //   },
+  // })
+  // @ApiResponse({
+  //   status: 404,
+  //   description: 'Service not found',
+  //   schema: {
+  //     example: SERVICE_SWAGGER_EXAMPLES.SERVICE_NOT_FOUND,
+  //   },
+  // })
+  // @ApiResponse({
+  //   status: 401,
+  //   description: 'Unauthorized - Authentication required',
+  //   schema: {
+  //     example: SERVICE_SWAGGER_EXAMPLES.UNAUTHORIZED,
+  //   },
+  // })
+  // @ApiBearerAuth()
+  // @ApiParam({
+  //   name: 'id',
+  //   description: 'Service ID',
+  //   type: String,
+  //   example: '507f1f77bcf86cd799439011',
+  // })
+  // @Delete(':id')
+  // @HttpCode(HttpStatus.OK)
+  // async deleteService(
+  //   @Param('id') id: string,
+  //   @Request() req: any,
+  // ): Promise<{
+  //   success: boolean;
+  //   message: { ar: string; en: string };
+  //   deletedAt: Date;
+  // }> {
+  //   const userId = req.user?.id;
+  //   const userId2 = req.user?.userId;
+  //   ;
+
+  //   console.log('userId__consolecheck', userId);
+  //   console.log('userid2__consolecheck', userId2);
+  //   await this.serviceService.deleteService(id, userId2);
+
+  //   return {
+  //     success: true,
+  //     message: {
+  //       ar: 'تم حذف الخدمة بنجاح',
+  //       en: 'Service deleted successfully',
+  //     },
+  //     deletedAt: new Date(),
+  //   };
+  // }
+
+  /**
+   * Delete a service (soft delete)
+   */
+  @Delete(':id')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Delete a service (soft delete)',
+    description: `
+      Soft deletes a service. Cannot delete if service has active appointments.
+      
+      **Business Rules:**
+      - Cannot delete service with active appointments (scheduled, confirmed, or in_progress)
+      - Uses soft delete (adds deletedAt timestamp)
+      - Tracks who deleted the service
+    `,
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'Service MongoDB ObjectId',
+    example: '507f1f77bcf86cd799439011',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Service deleted successfully',
+    schema: {
+      example: SERVICE_SWAGGER_EXAMPLES.DELETE_SERVICE_SUCCESS,
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Cannot delete service with active appointments',
+    schema: {
+      example: SERVICE_SWAGGER_EXAMPLES.BUSINESS_RULE_VIOLATION,
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized',
+    schema: {
+      example: SERVICE_SWAGGER_EXAMPLES.UNAUTHORIZED,
+    },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Service not found',
+    schema: {
+      example: SERVICE_SWAGGER_EXAMPLES.SERVICE_NOT_FOUND,
+    },
+  })
+  async deleteService(
+    @Param('id') id: string,
+    @Request() req?: any,
+  ): Promise<{
+    success: boolean;
+    message: { ar: string; en: string };
+    deletedAt: Date;
+  }> {
+    const userId = req?.user?.id;
+    await this.serviceService.deleteService(id, userId);
+    return {
+      success: true,
+      message: {
+        ar: 'تم حذف الخدمة بنجاح',
+        en: 'Service deleted successfully',
+      },
+      deletedAt: new Date(),
+    };
   }
 
   /**
@@ -519,5 +737,218 @@ export class ServiceController {
     // If no specific filtering is needed, you could implement a general getAll method
     // For now, returning empty array as base service doesn't have getAll
     return [];
+  }
+
+  /**
+   * Change service status (activate/deactivate)
+   */
+  @ApiOperation({
+    summary: 'Change service status',
+    description:
+      'Changes service active status. If deactivating with active appointments, marks them for rescheduling. Requires confirmation if service has active appointments.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Service status changed successfully',
+    schema: {
+      example: {
+        _id: '507f1f77bcf86cd799439011',
+        name: 'General Consultation',
+        isActive: false,
+        deactivatedAt: '2026-01-31T12:00:00.000Z',
+        deactivatedBy: '507f1f77bcf86cd799439015',
+        deactivationReason: 'Service temporarily unavailable',
+        affectedAppointments: {
+          count: 8,
+          status: 'needs_rescheduling',
+          notificationsSent: true,
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Requires confirmation or missing reason',
+    schema: {
+      example: {
+        statusCode: 400,
+        message: {
+          ar: 'الخدمة لديها 8 مواعيد نشطة. يرجى التأكيد لإعادة الجدولة',
+          en: 'Service has 8 active appointments. Please confirm to reschedule',
+        },
+        requiresConfirmation: true,
+        activeAppointmentsCount: 8,
+      },
+    },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Service not found',
+    schema: {
+      example: SERVICE_SWAGGER_EXAMPLES.SERVICE_NOT_FOUND,
+    },
+  })
+  @ApiBearerAuth()
+  @ApiParam({
+    name: 'id',
+    description: 'Service ID',
+    type: String,
+    example: '507f1f77bcf86cd799439011',
+  })
+  @ApiBody({ type: ChangeServiceStatusDto })
+  @Patch(':id/status')
+  async changeServiceStatus(
+    @Param('id') id: string,
+    @Body(new ValidationPipe({ transform: true, whitelist: true }))
+    dto: ChangeServiceStatusDto,
+    @Request() req: any,
+  ): Promise<any> {
+    const userId = req?.user?.id || req?.user?.userId;
+    return this.serviceService.changeServiceStatus(id, dto, userId);
+  }
+
+  /**
+   * Get service status history
+   */
+  @ApiOperation({
+    summary: 'Get service status history',
+    description:
+      'Returns history of status changes for audit purposes. Note: Full implementation requires a separate StatusHistory schema.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Status history retrieved successfully',
+    schema: {
+      example: [
+        {
+          changedAt: '2026-01-31T12:00:00.000Z',
+          changedBy: {
+            _id: '507f1f77bcf86cd799439015',
+            firstName: 'Admin',
+            lastName: 'User',
+          },
+          previousStatus: true,
+          newStatus: false,
+          reason: 'Service temporarily unavailable',
+          affectedAppointmentsCount: 8,
+        },
+      ],
+    },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Service not found',
+    schema: {
+      example: SERVICE_SWAGGER_EXAMPLES.SERVICE_NOT_FOUND,
+    },
+  })
+  @ApiBearerAuth()
+  @ApiParam({
+    name: 'id',
+    description: 'Service ID',
+    type: String,
+    example: '507f1f77bcf86cd799439011',
+  })
+  @Get(':id/status-history')
+  async getStatusHistory(@Param('id') id: string): Promise<any[]> {
+    return this.serviceService.getStatusHistory(id);
+  }
+
+  /**
+   * Get active services only
+   */
+  @ApiOperation({
+    summary: 'Get active services',
+    description:
+      'Returns only active services. Used for appointment booking dropdowns. Can be filtered by complex department or clinic.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Active services retrieved successfully',
+    schema: {
+      example: [
+        {
+          _id: '507f1f77bcf86cd799439011',
+          name: 'General Consultation',
+          description: 'Standard medical consultation',
+          durationMinutes: 30,
+          price: 150,
+          isActive: true,
+          activeAppointmentsCount: 5,
+          totalAppointmentsCount: 120,
+        },
+      ],
+    },
+  })
+  @ApiBearerAuth()
+  @ApiQuery({
+    name: 'complexDepartmentId',
+    required: false,
+    description: 'Filter by complex department ID',
+    type: String,
+    example: '507f1f77bcf86cd799439020',
+  })
+  @ApiQuery({
+    name: 'clinicId',
+    required: false,
+    description: 'Filter by clinic ID',
+    type: String,
+    example: '507f1f77bcf86cd799439040',
+  })
+  @Get('active')
+  async getActiveServices(
+    @Query('complexDepartmentId') complexDepartmentId?: string,
+    @Query('clinicId') clinicId?: string,
+  ): Promise<Service[]> {
+    return this.serviceService.getActiveServices(
+      complexDepartmentId,
+      clinicId,
+    );
+  }
+
+  /**
+   * Bulk status change for multiple services
+   */
+  @ApiOperation({
+    summary: 'Bulk status change',
+    description:
+      'Changes status for multiple services at once. Useful for temporary closures. Requires confirmation if services have active appointments.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Bulk status change completed',
+    schema: {
+      example: {
+        success: true,
+        updated: 5,
+        failed: 0,
+        totalAffectedAppointments: 23,
+        results: [
+          {
+            serviceId: '507f1f77bcf86cd799439011',
+            success: true,
+            affectedAppointments: 8,
+          },
+        ],
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Validation error',
+    schema: {
+      example: SERVICE_SWAGGER_EXAMPLES.VALIDATION_ERROR,
+    },
+  })
+  @ApiBearerAuth()
+  @ApiBody({ type: BulkStatusChangeDto })
+  @Patch('bulk-status')
+  async bulkStatusChange(
+    @Body(new ValidationPipe({ transform: true, whitelist: true }))
+    dto: BulkStatusChangeDto,
+    @Request() req: any,
+  ): Promise<any> {
+    const userId = req?.user?.id || req?.user?.userId;
+    return this.serviceService.bulkStatusChange(dto, userId);
   }
 }

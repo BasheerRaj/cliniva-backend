@@ -26,6 +26,27 @@ export class Service extends Document {
 
   @Prop({ default: true })
   isActive?: boolean;
+
+  @Prop()
+  deactivatedAt?: Date;
+
+  @Prop({ type: Types.ObjectId, ref: 'User' })
+  deactivatedBy?: Types.ObjectId;
+
+  @Prop()
+  deactivationReason?: string;
+
+  @Prop({ default: 0 })
+  activeAppointmentsCount?: number;
+
+  @Prop({ default: 0 })
+  totalAppointmentsCount?: number;
+
+  @Prop()
+  deletedAt?: Date;
+
+  @Prop({ type: Types.ObjectId, ref: 'User' })
+  deletedBy?: Types.ObjectId;
 }
 
 export const ServiceSchema = SchemaFactory.createForClass(Service);
@@ -35,6 +56,7 @@ ServiceSchema.index({ complexDepartmentId: 1 });
 ServiceSchema.index({ clinicId: 1 });
 ServiceSchema.index({ name: 1 });
 ServiceSchema.index({ isActive: 1 });
+ServiceSchema.index({ deletedAt: 1 });
 // Allow same service names across different clinics and complex departments
 ServiceSchema.index(
   { complexDepartmentId: 1, name: 1 },
