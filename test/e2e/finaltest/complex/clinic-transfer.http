@@ -1,0 +1,332 @@
+### Final Test - Clinic Transfer Between Complexes (Full Onboarding Flow)
+### Description: Verify clinic transfer functionality between complexes (BZR-38)
+### Note: Using 'company' plan to allow creation of multiple complexes for transfer testing.
+### 'Complex' plan typically limits to 1 complex, making transfer impossible within single subscription.
+
+@baseUrl = http://localhost:4001/api/v1
+@contentType = application/json
+
+###############################################################################
+# 1. Admin Login (to have a base, though we will register a new owner)
+###############################################################################
+
+### 1.1 Super Admin Login
+# @name adminLogin
+POST {{baseUrl}}/auth/login
+Content-Type: {{contentType}}
+
+{
+  "email": "superadmin@cliniva.com",
+  "password": "SuperAdmin123!"
+}
+
+###############################################################################
+# 2. Owner Registration & Subscription
+###############################################################################
+
+### 2.1 Register Owner
+# @name registerOwner
+POST {{baseUrl}}/auth/register
+Content-Type: {{contentType}}
+
+{
+  "email": "owner.transfer2@test.com",
+  "password": "OwnerPass123!",
+  "firstName": "Transfer",
+  "lastName": "Owner",
+  "role": "owner",
+  "phone": "+966500000001",
+  "nationality": "SA",
+  "gender": "male"
+}
+###
+@ownerAccessToken = {{registerOwner.response.body.access_token}}
+@ownerId = {{registerOwner.response.body.user.id}}
+
+### 2.2 Get Plans (Simulated, picking a known Company Plan ID or First available)
+# @name getPlans
+GET {{baseUrl}}/subscriptions/plans
+Authorization: Bearer {{ownerAccessToken}}
+
+### Set Plan ID (Assuming first plan is company or similar, or hardcode if known)
+# Ideally capture a 'company' plan id. For this test we assume the first one is valid or we pick one.
+# Valid Plan IDs usually seeded: Company, Complex, Clinic.
+# We'll try to pick the one with planType='company' if possible, or just use a placeholder
+# if the environment is standard.
+@planId = 698fd8acf9d44ef1112ce819 
+
+### 2.3 Create Subscription (Company Plan to allow >1 Complex)
+# @name createSubscription
+POST {{baseUrl}}/subscriptions
+Authorization: Bearer {{ownerAccessToken}}
+Content-Type: {{contentType}}
+
+{
+  "userId": "{{ownerId}}",
+  "subscriptionPlanId": "{{planId}}",
+  "planType": "company",
+  "paymentMethod": "credit_card",
+  "billingCycle": "yearly",
+  "status": "active",
+  "expiresAt": "2030-01-01T00:00:00.000Z"
+}
+###
+@subscriptionId = {{createSubscription.response.body.data._id}}
+
+###############################################################################
+# 3. Onboarding Flow
+###############################################################################
+
+### 3.1 Start Onboarding
+POST {{baseUrl}}/onboarding/start
+Authorization: Bearer {{ownerAccessToken}}
+Content-Type: {{contentType}}
+
+{
+  "planType": "company"
+}
+
+### 3.2 Create Organization Overview
+# @name createOrg
+POST {{baseUrl}}/onboarding/organization/overview
+Authorization: Bearer {{ownerAccessToken}}
+Content-Type: {{contentType}}
+
+{
+  "name": "Transfer Test Org",
+  "legalName": "Transfer Test Org LLC",
+  "yearEstablished": 2024,
+  "ceoName": "Dr. Transfer"
+}
+###
+@organizationId = {{createOrg.response.body.entityId}}
+
+### 3.3 Create Organization Contact
+POST {{baseUrl}}/onboarding/organization/contact
+Authorization: Bearer {{ownerAccessToken}}
+Content-Type: {{contentType}}
+
+{
+  "phoneNumbers": [{ "number": "+966500000001", "type": "primary", "label": "Main" }],
+  "email": "info@transfer-org.com",
+  "address": { "street": "Main St", "city": "Riyadh", "country": "Saudi Arabia" }
+}
+
+### 3.4 Create Organization Legal
+POST {{baseUrl}}/onboarding/organization/legal
+Authorization: Bearer {{ownerAccessToken}}
+Content-Type: {{contentType}}
+
+{
+  "vatNumber": "300000000000003",
+  "crNumber": "1010101010"
+}
+
+### 3.5 Create Complex 1 (Source) Overview
+# @name createComplex1
+POST {{baseUrl}}/onboarding/complex/overview
+Authorization: Bearer {{ownerAccessToken}}
+Content-Type: {{contentType}}
+
+{
+  "name": "Source Complex",
+  "managerName": "Source Manager",
+  "newDepartmentNames": ["Cardiology"]
+}
+###
+@deptId = {{createComplex1.response.body.data.departments[0]._id}}
+
+### 3.5b Get Complex 1 ID (Workaround for missing entityId)
+# @name getComplex1
+GET {{baseUrl}}/complexes?organizationId={{organizationId}}&search=Source
+Authorization: Bearer {{ownerAccessToken}}
+
+###
+@sourceComplexId = {{getComplex1.response.body.data[0]._id}}
+
+### 3.6 Create Complex 1 Contact
+POST {{baseUrl}}/onboarding/complex/contact
+Authorization: Bearer {{ownerAccessToken}}
+Content-Type: {{contentType}}
+
+{
+  "phoneNumbers": [{ "number": "+966500000002", "type": "primary", "label": "Main" }],
+  "email": "source@complex.com",
+  "address": { "street": "Source St", "city": "Riyadh", "country": "Saudi Arabia" }
+}
+
+### 3.7 Create Complex 1 Legal
+POST {{baseUrl}}/onboarding/complex/legal
+Authorization: Bearer {{ownerAccessToken}}
+Content-Type: {{contentType}}
+
+{
+  "vatNumber": "300000000000003",
+  "crNumber": "1010101010"
+}
+
+### 3.8 Create Complex 1 Schedule
+POST {{baseUrl}}/onboarding/complex/schedule
+Authorization: Bearer {{ownerAccessToken}}
+Content-Type: {{contentType}}
+
+[
+  { "dayOfWeek": "sunday", "isWorkingDay": true, "openingTime": "08:00", "closingTime": "17:00" },
+  { "dayOfWeek": "monday", "isWorkingDay": true, "openingTime": "08:00", "closingTime": "17:00" },
+  { "dayOfWeek": "tuesday", "isWorkingDay": true, "openingTime": "08:00", "closingTime": "17:00" },
+  { "dayOfWeek": "wednesday", "isWorkingDay": true, "openingTime": "08:00", "closingTime": "17:00" },
+  { "dayOfWeek": "thursday", "isWorkingDay": true, "openingTime": "08:00", "closingTime": "17:00" },
+  { "dayOfWeek": "friday", "isWorkingDay": false },
+  { "dayOfWeek": "saturday", "isWorkingDay": false }
+]
+
+### 3.9 Create Clinic 1 (To be transferred) Overview
+# @name createClinic1
+POST {{baseUrl}}/onboarding/clinic/overview
+Authorization: Bearer {{ownerAccessToken}}
+Content-Type: {{contentType}}
+
+{
+    "name": "Transferable Clinic",
+    "complexDepartmentId": "{{deptId}}"
+}
+###
+@clinicId = {{createClinic1.response.body.entityId}}
+
+### 3.10 Create Clinic 1 Contact
+POST {{baseUrl}}/onboarding/clinic/contact
+Authorization: Bearer {{ownerAccessToken}}
+Content-Type: {{contentType}}
+
+{
+  "phoneNumbers": [{ "number": "+966500000003", "type": "primary", "label": "Main" }],
+  "email": "flu@clinic.com",
+  "address": { "street": "Source SDt", "city": "Riyadh", "country": "Saudi Arabia" }
+}
+
+### 3.11 Create Clinic 1 Legal
+POST {{baseUrl}}/onboarding/clinic/legal
+Authorization: Bearer {{ownerAccessToken}}
+Content-Type: {{contentType}}
+
+{
+  "vatNumber": "300000000000003",
+  "crNumber": "1010101010"
+}
+
+### 3.12 Create Clinic 1 Schedule
+POST {{baseUrl}}/onboarding/clinic/schedule
+Authorization: Bearer {{ownerAccessToken}}
+Content-Type: {{contentType}}
+
+[
+  { "dayOfWeek": "sunday", "isWorkingDay": true, "openingTime": "08:00", "closingTime": "17:00" },
+  { "dayOfWeek": "monday", "isWorkingDay": true, "openingTime": "08:00", "closingTime": "17:00" },
+  { "dayOfWeek": "tuesday", "isWorkingDay": true, "openingTime": "08:00", "closingTime": "17:00" },
+  { "dayOfWeek": "wednesday", "isWorkingDay": true, "openingTime": "08:00", "closingTime": "17:00" },
+  { "dayOfWeek": "thursday", "isWorkingDay": true, "openingTime": "08:00", "closingTime": "17:00" },
+  { "dayOfWeek": "friday", "isWorkingDay": false },
+  { "dayOfWeek": "saturday", "isWorkingDay": false }
+]
+
+### 3.13 Complete Onboarding
+# NOTE: Onboarding is already complete after step-by-step flow
+# The /onboarding/complete endpoint is for single-request onboarding only
+# POST {{baseUrl}}/onboarding/complete
+# Authorization: Bearer {{ownerAccessToken}}
+# Content-Type: {{contentType}}
+
+###############################################################################
+# 4. Post-Onboarding Setup
+###############################################################################
+
+### 4.1 Create Complex 2 (Target)
+# @name createTargetComplex
+POST {{baseUrl}}/complexes
+Authorization: Bearer {{ownerAccessToken}}
+Content-Type: {{contentType}}
+
+{
+  "name": "Target Complex",
+  "organizationId": "{{organizationId}}",
+  "subscriptionId": "{{subscriptionId}}",
+  "ownerId": "{{ownerId}}",
+  "phone": "+966500000004",
+  "email": "target@complex.com",
+  "mission": "Target Mission",
+  "vision": "Target Vision"
+}
+###
+@targetComplexId = {{createTargetComplex.response.body.data._id}}
+
+### 4.2 Create Doctor (Staff)
+# @name createDoctor
+POST {{baseUrl}}/auth/register
+Authorization: Bearer {{ownerAccessToken}}
+Content-Type: {{contentType}}
+
+{
+  "email": "doctor.transfer@test.com",
+  "password": "DoctorPass123!",
+  "firstName": "Dr. Transfer",
+  "lastName": "Medic",
+  "role": "doctor",
+  "phone": "+966500000005",
+  "nationality": "SA",
+  "gender": "male"
+}
+###
+@doctorId = {{createDoctor.response.body.user.id}}
+
+### 4.3 Assign Doctor to Clinic 1 (Source)
+# Using user-access endpoint to grant clinic-level access
+# @name assignDoctor
+POST {{baseUrl}}/user-access
+Authorization: Bearer {{ownerAccessToken}}
+Content-Type: {{contentType}}
+
+{
+  "userId": "{{doctorId}}",
+  "scopeType": "clinic",
+  "scopeId": "{{clinicId}}",
+  "role": "doctor"
+}
+
+###############################################################################
+# 5. Transfer Execution
+###############################################################################
+
+### 5.1 Verify Clinic 1 Before Transfer
+GET {{baseUrl}}/clinics/{{clinicId}}
+Authorization: Bearer {{ownerAccessToken}}
+
+# Expected: complexId == sourceComplexId
+
+### 5.2 Transfer Clinic to Target Complex
+# @name transferClinic
+POST {{baseUrl}}/complexes/{{sourceComplexId}}/transfer-clinics
+Authorization: Bearer {{ownerAccessToken}}
+Content-Type: {{contentType}}
+
+{
+  "targetComplexId": "{{targetComplexId}}",
+  "clinicIds": ["{{clinicId}}"]
+}
+
+### 5.3 Verify Clinic 1 After Transfer
+GET {{baseUrl}}/clinics/{{clinicId}}
+Authorization: Bearer {{ownerAccessToken}}
+
+# Expected: complexId == targetComplexId
+
+###############################################################################
+# 6. Cleanup (Optional)
+###############################################################################
+
+### 6.1 Delete Source Complex
+DELETE {{baseUrl}}/complexes/{{sourceComplexId}}
+Authorization: Bearer {{ownerAccessToken}}
+
+### 6.2 Delete Target Complex
+DELETE {{baseUrl}}/complexes/{{targetComplexId}}
+Authorization: Bearer {{ownerAccessToken}}

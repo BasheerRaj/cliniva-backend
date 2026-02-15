@@ -1380,11 +1380,14 @@ export class OnboardingService {
               });
             }
             // Link department to complex
-            await this.departmentService.createComplexDepartment(
+            const junction = await this.departmentService.createComplexDepartment(
               complexId,
               (department._id as any)?.toString(),
             );
-            createdDepartments.push(department);
+
+            // Return the junction ID in the results so subsequent steps (like clinic creation)
+            // can correctly reference the department within this specific complex
+            createdDepartments.push(junction);
           }
         }
       }
@@ -1890,7 +1893,7 @@ export class OnboardingService {
       // Validate complexDepartmentId if provided
       if (dto.complexDepartmentId && dto.complexDepartmentId.trim() !== '') {
         try {
-          const department = await this.departmentService.getDepartment(
+          const department = await this.departmentService.getComplexDepartmentById(
             dto.complexDepartmentId,
           );
 
@@ -1930,7 +1933,7 @@ export class OnboardingService {
 
           console.log('✅ Department validation passed:', {
             departmentId: dto.complexDepartmentId,
-            departmentName: (department as any).name,
+            departmentName: (department.departmentId as any)?.name || 'Unknown',
           });
         } catch (error) {
           // If it's already a BadRequestException, re-throw it
@@ -2032,7 +2035,7 @@ export class OnboardingService {
           if (serviceData.name && serviceData.name.trim()) {
             try {
               console.log('🏗️ Creating service:', serviceData.name);
-              
+
               // Check if service already exists for this clinic to prevent duplicates
               const existingServices = await this.serviceService.getServicesOwnedByClinic(
                 clinic._id.toString()
@@ -2049,7 +2052,7 @@ export class OnboardingService {
                 );
                 if (existingService) {
                   createdServiceIds.push((existingService._id as any).toString());
-                  
+
                   // Ensure it's linked via ClinicService
                   try {
                     await this.serviceService.assignServicesToClinic(
@@ -2135,12 +2138,12 @@ export class OnboardingService {
       };
     } catch (error) {
       console.error('Error saving clinic overview:', error);
-      
+
       // Re-throw BadRequestException as-is to preserve bilingual error messages
       if (error instanceof BadRequestException) {
         throw error;
       }
-      
+
       // For other errors, wrap in InternalServerErrorException
       throw new InternalServerErrorException({
         message: {
