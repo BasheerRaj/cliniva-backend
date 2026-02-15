@@ -2114,6 +2114,98 @@ Authorization: Bearer {{ownerAccessToken}}
 ###############################################################################
 
 ###############################################################################
+###############################################################################
+# SECTION 9: CLINIC MANAGEMENT
+###############################################################################
+# Tests: Clinic retrieval, update, status change, capacity
+# Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 6.6
+###############################################################################
+
+### 9.1 Get Clinic 1 Details with Services
+# @name getClinic1
+GET {{baseUrl}}/clinics/{{clinic1Id}}
+Authorization: Bearer {{ownerAccessToken}}
+
+# Expected: 200 OK
+# Expected: Clinic details returned
+# Expected: Services populated (Consultation, ECG, Stress Test)
+# Expected: Complex and department information included
+# Expected: Bilingual success message
+
+### 9.2 Update Clinic 1 Details
+# @name updateClinic1
+PUT {{baseUrl}}/clinics/{{clinic1Id}}
+Authorization: Bearer {{ownerAccessToken}}
+Content-Type: {{contentType}}
+
+{
+  "name": "Advanced Cardiology Clinic",
+  "maxPatients": 75,
+  "vision": "Leading cardiac care center in the region"
+}
+
+# Expected: 200 OK
+# Expected: Name updated to "Advanced Cardiology Clinic"
+# Expected: Max patients updated to 75
+# Expected: Vision updated
+# Expected: Bilingual success message
+
+### 9.3 Verify Clinic 1 Update
+# @name verifyClinic1Update
+GET {{baseUrl}}/clinics/{{clinic1Id}}
+Authorization: Bearer {{ownerAccessToken}}
+
+# Expected: 200 OK
+# Expected: Name is "Advanced Cardiology Clinic"
+# Expected: Max patients is 75
+
+### 9.4 Change Clinic 2 Status to Inactive
+# @name inactivateClinic2
+PATCH {{baseUrl}}/clinics/{{clinic1Id}}/status
+Authorization: Bearer {{ownerAccessToken}}
+Content-Type: {{contentType}}
+
+{
+  "status": "inactive",
+  "reason": "Temporary closure for renovation"
+}
+
+# Expected: 200 OK
+# Expected: Status changed to 'inactive'
+# Expected: Reason recorded
+# Expected: Bilingual success message
+
+### 9.5 Verify Clinic 2 Status
+# @name verifyClinic2Status
+GET {{baseUrl}}/clinics/{{clinic2Id}}
+Authorization: Bearer {{ownerAccessToken}}
+
+# Expected: 200 OK
+# Expected: Status is 'inactive'
+
+### 9.6 Get Clinic 1 Capacity Status
+# @name getClinic1Capacity
+GET {{baseUrl}}/clinics/{{clinic1Id}}/capacity
+Authorization: Bearer {{ownerAccessToken}}
+
+# Expected: 200 OK
+# Expected: Capacity information returned
+# Expected: Current patient count, max patients, available capacity
+# Expected: Doctor count and staff count
+# Expected: Bilingual success message
+
+###############################################################################
+# SECTION 9 COMPLETE
+###############################################################################
+# ✓ Clinic retrieval with services tested
+# ✓ Clinic update tested
+# ✓ Clinic status change tested
+# ✓ Clinic capacity retrieval tested
+###############################################################################
+# ✓ Clinic retrieval with services tested
+###############################################################################
+
+###############################################################################
 # SECTION 12: VALIDATION TESTING
 ###############################################################################
 # Tests: Missing fields, invalid formats, duplicates, unauthorized access
@@ -2360,12 +2452,12 @@ Content-Type: {{contentType}}
 ###############################################################################
 
 ###############################################################################
-# SECTION 9: CLEANUP (OPTIONAL)
+# SECTION 10: CLEANUP (OPTIONAL)
 ###############################################################################
 # Optional cleanup to reset test data
 ###############################################################################
 
-### 9.1 Delete Test Users (Optional)
+### 10.1 Delete Test Users (Optional)
 # Note: Uncomment if you want to clean up test data
 # DELETE {{baseUrl}}/users/{{doctor1Id}}
 # Authorization: Bearer {{ownerAccessToken}}
@@ -2380,7 +2472,7 @@ Content-Type: {{contentType}}
 # Authorization: Bearer {{ownerAccessToken}}
 
 ###############################################################################
-# SECTION 9 COMPLETE
+# SECTION 10 COMPLETE
 ###############################################################################
 # ✓ Cleanup endpoints documented (optional execution)
 ###############################################################################
@@ -2396,18 +2488,22 @@ Content-Type: {{contentType}}
 # - ✅ Complete onboarding flow (organization → complex → clinic)
 # - ✅ Entity verification (organization, complex, clinic, departments, services)
 # - ✅ User management (create, read, update, deactivate/activate)
+# - ✅ Complex management (retrieval, update, PIC assignment, status, capacity)
+# - ✅ Clinic management (retrieval, update, status change, capacity)
 # - ✅ Validation testing (all error scenarios with bilingual messages)
 # - ✅ Working hours hierarchy validation
 # - ✅ Entity relationships verification
 #
 # EXECUTION RESULTS:
-# - Total Sections: 9
-# - Total Requests: 50+
+# - Total Sections: 10
+# - Total Requests: 60+
 # - Onboarding Status: ✅ COMPLETE
 # - All Steps Verified: ✅ 11/11 steps
 # - Entity Creation: ✅ Organization, Complex, Clinic
 # - User Roles Tested: ✅ Owner, Doctor, Admin, Manager, Staff
 # - Validation Coverage: ✅ All major validation rules
+# - Complex Management: ✅ CRUD, PIC, Status, Capacity
+# - Clinic Management: ✅ CRUD, Status, Capacity
 #
 # For questions or issues, refer to:
 # - Requirements: .kiro/specs/e2e-m1-m2-complete-flow/requirements.md

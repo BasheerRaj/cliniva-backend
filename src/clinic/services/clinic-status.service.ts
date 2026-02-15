@@ -10,6 +10,7 @@ import { User } from '../../database/schemas/user.schema';
 import { Appointment } from '../../database/schemas/appointment.schema';
 import { ERROR_CODES } from '../constants/error-codes.constant';
 import { AuditService } from '../../auth/audit.service';
+import { TransactionUtil } from '../../common/utils/transaction.util';
 
 /**
  * Options for changing clinic status
@@ -146,9 +147,10 @@ export class ClinicStatusService {
       }
     }
 
-    // 4. Start transaction for atomic operation
-    const session = await this.connection.startSession();
-    session.startTransaction();
+    // 4. Start transaction for atomic operation (if replica set available)
+    const { session, useTransaction } = await TransactionUtil.startTransaction(
+      this.connection,
+    );
 
     try {
       let doctorsTransferred = 0;
@@ -200,10 +202,12 @@ export class ClinicStatusService {
       } else {
         clinic.isActive = true;
       }
-      await clinic.save({ session });
+      await clinic.save(
+        TransactionUtil.getSessionOptions(session, useTransaction),
+      );
 
-      // 8. Commit transaction
-      await session.commitTransaction();
+      // 8. Commit transaction (if available)
+      await TransactionUtil.commitTransaction(session, useTransaction);
 
       // 9. Log audit event for status change
       await this.auditService.logClinicStatusChange(
@@ -232,10 +236,10 @@ export class ClinicStatusService {
         notificationsSent,
       };
     } catch (error) {
-      await session.abortTransaction();
+      await TransactionUtil.abortTransaction(session, useTransaction);
       throw error;
     } finally {
-      session.endSession();
+      await TransactionUtil.endSession(session);
     }
   }
 
@@ -294,7 +298,7 @@ export class ClinicStatusService {
               : null,
           },
         },
-        { session },
+        session ? { session } : {},
       );
 
       doctorsTransferred = result.modifiedCount;
@@ -317,7 +321,7 @@ export class ClinicStatusService {
               clinicId: new Types.ObjectId(options.targetClinicId),
             },
           },
-          { session },
+          session ? { session } : {},
         );
 
         appointmentsAffected = appointmentResult.modifiedCount;
@@ -348,7 +352,7 @@ export class ClinicStatusService {
               : null,
           },
         },
-        { session },
+        session ? { session } : {},
       );
 
       staffTransferred = result.modifiedCount;
@@ -402,7 +406,7 @@ export class ClinicStatusService {
           markedForReschedulingAt: new Date(),
         },
       },
-      { session },
+      session ? { session } : {},
     );
 
     return result.modifiedCount;
