@@ -81,6 +81,37 @@
 # Tests: Login, token refresh, password management, logout
 # Requirements: 1.1, 1.2, 1.4, 1.5, 1.6
 ###############################################################################
+### 
+# POST {{baseUrl}}/auth/first-login-password-change
+# Authorization: Bearer {{accessToken}}
+# Content-Type: application/json
+
+# {
+#   "currentPassword": "temporary-password",
+#   "newPassword": "NewSecurePassword@123",
+#   "confirmPassword": "NewSecurePassword@123"
+# }
+
+# ### 3.3 Request password reset with invalid email format
+# POST {{baseUrl}}/auth/forgot-password
+# Content-Type: application/json
+
+# {
+#   "email": "superadmin@cliniva.com"
+# }
+
+# ### 4.1 Reset password with valid token
+# POST {{baseUrl}}/auth/reset-password
+# Content-Type: application/json
+
+# {
+#   "token": "e2d5c0e8295c37da8d726d872686d93d765656fd6d387ff5828cb224886d0122",
+#   "newPassword": "SuperAdmin123!",
+#   "confirmPassword": "SuperAdmin123!"
+# }
+
+
+
 
 ### 1.1 Super Admin Login
 # @name login
@@ -91,6 +122,8 @@ Content-Type: {{contentType}}
   "email": "superadmin@cliniva.com",
   "password": "SuperAdmin123!"
 }
+
+
 
 # Expected: 200 OK
 # Expected: Response contains accessToken, refreshToken, and user data
@@ -1970,14 +2003,36 @@ Authorization: Bearer {{ownerAccessToken}}
 # Expected: Bilingual success message
 
 ### 7.5.6 Get Effective Working Hours for Clinic
+@clinic1Id = 699189825d0b6d34f7d3aa22
 # @name getEffectiveClinicWorkingHours
 GET {{baseUrl}}/working-hours/clinic/{{clinic1Id}}
 Authorization: Bearer {{ownerAccessToken}}
 
 # Expected: 200 OK
 # Expected: Returns clinic-level working hours
-# Expected: Monday-Saturday 8AM-8PM (clinic override)
+# Expected: Monday-Wednesday, Friday: 8AM-6PM (working days)
+# Expected: Thursday, Saturday, Sunday: non-working days
 # Expected: Bilingual success message
+# 
+# DEBUG: If this returns empty array, check:
+# 1. Clinic ID is correct: {{clinic1Id}}
+# 2. Working hours were saved in step 5.4
+# 3. Check MongoDB directly: db.working_hours.find({entityType: 'clinic', entityId: ObjectId('{{clinic1Id}}')})
+# 4. Check the response from step 5.4 (createClinic1Schedule) for any errors
+
+### 7.5.6.1 DEBUG - Verify Clinic Exists
+# @name verifyClinicExists
+GET {{baseUrl}}/clinics/{{clinic1Id}}
+Authorization: Bearer {{ownerAccessToken}}
+
+# This should return the clinic details to confirm the clinic ID is valid
+
+### 7.5.6.2 DEBUG - Check All Working Hours for Clinic Entity Type
+# @name getAllClinicWorkingHours
+GET {{baseUrl}}/working-hours/clinic/{{clinic1Id}}?includeInactive=true
+Authorization: Bearer {{ownerAccessToken}}
+
+# This checks if there are any working hours (including inactive ones)
 
 ### 7.5.7 Verify Working Hours Inheritance - Complex Level
 # @name getComplexWorkingHours
@@ -2203,6 +2258,59 @@ Authorization: Bearer {{ownerAccessToken}}
 # ✓ Clinic capacity retrieval tested
 ###############################################################################
 # ✓ Clinic retrieval with services tested
+###############################################################################
+
+###############################################################################
+# SECTION 10: DEPARTMENT MANAGEMENT
+###############################################################################
+# Tests: Department retrieval with clinics, department update
+# Requirements: 7.1, 7.2, 7.3, 7.4
+###############################################################################
+
+### 10.1 Get Department 1 (Cardiology) with Associated Clinics
+@dept1Id = 698fd8acf9d44ef1112ce81d
+# @name getDept1
+GET {{baseUrl}}/departments/{{dept1Id}}
+Authorization: Bearer {{ownerAccessToken}}
+
+# Expected: 200 OK
+# Expected: Department details returned (name: "Cardiology")
+# Expected: Associated clinics populated (Cardiology Clinic should be included)
+# Expected: Complex information included
+# Expected: Bilingual success message
+
+### 10.2 Update Department 1 (Cardiology)
+# @name updateDept1
+PUT {{baseUrl}}/departments/{{dept1Id}}
+Authorization: Bearer {{ownerAccessToken}}
+Content-Type: {{contentType}}
+
+{
+  "name": "Cardiology & Cardiovascular",
+  "description": "Comprehensive heart and cardiovascular care department with advanced diagnostic capabilities"
+}
+
+# Expected: 200 OK
+# Expected: Name updated to "Cardiology & Cardiovascular"
+# Expected: Description updated
+# Expected: Bilingual success message
+
+### 10.3 Verify Department 1 Update
+# @name verifyDept1Update
+GET {{baseUrl}}/departments/{{dept1Id}}
+Authorization: Bearer {{ownerAccessToken}}
+
+# Expected: 200 OK
+# Expected: Name is "Cardiology & Cardiovascular"
+# Expected: Description matches updated value
+# Expected: Associated clinics still populated
+
+###############################################################################
+# SECTION 10 COMPLETE
+###############################################################################
+# ✓ Department retrieval with clinics tested
+# ✓ Department update tested
+# ✓ Department changes verified
 ###############################################################################
 
 ###############################################################################

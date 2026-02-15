@@ -1966,24 +1966,62 @@ export class OnboardingService {
           if (serviceData.name && serviceData.name.trim()) {
             try {
               console.log('🏗️ Creating service:', serviceData.name);
+              
+              // Check if service already exists for this clinic to prevent duplicates
+              const existingServices = await this.serviceService.getServicesOwnedByClinic(
+                clinic._id.toString()
+              );
+              const isDuplicate = existingServices.some(
+                s => s.name.toLowerCase() === serviceData.name.trim().toLowerCase()
+              );
+
+              if (isDuplicate) {
+                console.log('⚠️ Service already exists for this clinic, skipping:', serviceData.name);
+                // Find the existing service and link it if not already linked
+                const existingService = existingServices.find(
+                  s => s.name.toLowerCase() === serviceData.name.trim().toLowerCase()
+                );
+                if (existingService) {
+                  createdServiceIds.push((existingService._id as any).toString());
+                  
+                  // Ensure it's linked via ClinicService
+                  try {
+                    await this.serviceService.assignServicesToClinic(
+                      clinic._id.toString(),
+                      {
+                        serviceAssignments: [
+                          {
+                            serviceId: (existingService._id as any).toString(),
+                            priceOverride: serviceData.price,
+                            isActive: true,
+                          },
+                        ],
+                      },
+                    );
+                    console.log('✅ Existing service re-linked to clinic');
+                  } catch (linkError) {
+                    console.log('ℹ️ Service already linked or link failed:', linkError.message);
+                  }
+                }
+                continue;
+              }
+
               // Create the service in the services collection
-              // Each clinic gets its own separate services, even with duplicate names
+              // Services are clinic-specific (clinicId set, complexDepartmentId NOT set)
               const newService = await this.serviceService.createService({
                 name: serviceData.name.trim(),
                 description: serviceData.description?.trim() || '',
                 durationMinutes: serviceData.durationMinutes || 30,
                 price: serviceData.price || 0,
                 clinicId: clinic._id.toString(), // Link service directly to this clinic
-                complexDepartmentId: clinic.complexDepartmentId
-                  ? clinic.complexDepartmentId.toString()
-                  : undefined,
+                // DO NOT set complexDepartmentId - this makes it a clinic-specific service
               });
 
               console.log('✅ Created service:', newService._id);
               createdServiceIds.push((newService._id as any).toString());
 
-              console.log('🔗 Linking service to clinic...');
-              // Link service to clinic via ClinicService
+              console.log('🔗 Linking service to clinic via ClinicService junction...');
+              // Link service to clinic via ClinicService junction table
               await this.serviceService.assignServicesToClinic(
                 clinic._id.toString(),
                 {
@@ -2360,6 +2398,8 @@ export class OnboardingService {
         userClinic._id,
       );
 
+      console.log('📋 Working hours to save:', JSON.stringify(workingHours, null, 2));
+
       if (planType === 'clinic') {
         // Independent clinic plan - save schedule directly to clinic
         console.log('📅 Saving independent clinic schedule');
@@ -2458,6 +2498,8 @@ export class OnboardingService {
           entityId: (userClinic._id as any).toString(),
           schedule: workingHours as any,
         });
+
+        console.log('✅ Working hours saved successfully for clinic (complex/company plan):', (userClinic._id as any).toString());
 
         const scheduleData = {
           workingHours: workingHours,
