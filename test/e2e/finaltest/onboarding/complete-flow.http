@@ -2314,6 +2314,152 @@ Authorization: Bearer {{ownerAccessToken}}
 ###############################################################################
 
 ###############################################################################
+# SECTION 11: EMPLOYEE MANAGEMENT
+###############################################################################
+# Tests: Employee entity assignments, specialty assignments
+# Requirements: 8.1, 8.2, 8.4
+# 
+# NOTE: In the Cliniva system, employee entity assignments (organization, 
+# complex, clinic) are configured during employee/user creation via the 
+# organizationId, complexId, and clinicId fields in CreateEmployeeDto.
+# 
+# Since users were already created in Section 6, this section demonstrates:
+# 1. Verifying existing employee assignments
+# 2. Assigning specialties to doctors (via doctor-specialties endpoint)
+###############################################################################
+
+### 11.1 Verify Doctor 1 Assignment (should be assigned to organization)
+# @name verifyDoctor1Assignment
+GET {{baseUrl}}/users/{{doctor1Id}}
+Authorization: Bearer {{ownerAccessToken}}
+
+# Expected: 200 OK
+# Expected: User details returned
+# Expected: Role is "doctor"
+# Note: Entity assignments (organizationId, complexId, clinicId) are in user profile
+
+### 11.2 Verify Admin 1 Assignment (should be assigned to organization)
+# @name verifyAdmin1Assignment
+GET {{baseUrl}}/users/{{admin1Id}}
+Authorization: Bearer {{ownerAccessToken}}
+
+# Expected: 200 OK
+# Expected: User details returned
+# Expected: Role is "admin"
+# Note: Entity assignments visible in user profile
+
+###############################################################################
+# SECTION 11 COMPLETE
+###############################################################################
+# ✓ Employee assignments verified (assignments done during user creation)
+# ✓ Ready to proceed with specialty assignments (Section 11.3)
+###############################################################################
+
+### 11.3 Create Cardiology Specialty
+# @name createCardiologySpecialty
+POST {{baseUrl}}/specialties
+Authorization: Bearer {{ownerAccessToken}}
+Content-Type: {{contentType}}
+
+{
+  "name": "Cardiology",
+  "description": "Medical specialty dealing with disorders of the heart"
+}
+
+# Expected: 201 Created
+# Expected: Specialty created successfully
+# Expected: Bilingual success message
+
+### Extract Cardiology Specialty ID
+@cardiologySpecialtyId = {{createCardiologySpecialty.response.body._id}}
+
+### 11.4 Create Pediatrics Specialty
+# @name createPediatricsSpecialty
+POST {{baseUrl}}/specialties
+Authorization: Bearer {{ownerAccessToken}}
+Content-Type: {{contentType}}
+
+{
+  "name": "Pediatrics",
+  "description": "Medical specialty focused on the health and medical care of infants, children, and adolescents"
+}
+
+# Expected: 201 Created
+# Expected: Specialty created successfully
+# Expected: Bilingual success message
+
+### Extract Pediatrics Specialty ID
+@pediatricsSpecialtyId = {{createPediatricsSpecialty.response.body._id}}
+
+### 11.5 Assign Cardiology Specialty to Doctor 1
+# @name assignCardiologyToDoctor1
+POST {{baseUrl}}/doctor-specialties
+Authorization: Bearer {{ownerAccessToken}}
+Content-Type: {{contentType}}
+
+{
+  "doctorId": "{{doctor1Id}}",
+  "specialtyId": "{{cardiologySpecialtyId}}",
+  "yearsOfExperience": 10,
+  "certificationNumber": "CARD-CERT-2014-001"
+}
+
+# Expected: 201 Created
+# Expected: Specialty assigned to doctor successfully
+# Expected: Bilingual success message
+# Expected: Assignment details returned
+
+### 11.6 Assign Pediatrics Specialty to Doctor 2
+# @name assignPediatricsToDoctor2
+POST {{baseUrl}}/doctor-specialties
+Authorization: Bearer {{ownerAccessToken}}
+Content-Type: {{contentType}}
+
+{
+  "doctorId": "{{doctor2Id}}",
+  "specialtyId": "{{pediatricsSpecialtyId}}",
+  "yearsOfExperience": 8,
+  "certificationNumber": "PED-CERT-2016-001"
+}
+
+# Expected: 201 Created
+# Expected: Specialty assigned to doctor successfully
+# Expected: Bilingual success message
+# Expected: Assignment details returned
+
+### 11.7 Verify Doctor 1 Specialties
+# @name verifyDoctor1Specialties
+GET {{baseUrl}}/doctor-specialties/doctor/{{doctor1Id}}
+Authorization: Bearer {{ownerAccessToken}}
+
+# Expected: 200 OK
+# Expected: Array contains Cardiology specialty
+# Expected: Years of experience: 10
+# Expected: Certification number present
+# Expected: Bilingual success message
+
+### 11.8 Verify Doctor 2 Specialties
+# @name verifyDoctor2Specialties
+GET {{baseUrl}}/doctor-specialties/doctor/{{doctor2Id}}
+Authorization: Bearer {{ownerAccessToken}}
+
+# Expected: 200 OK
+# Expected: Array contains Pediatrics specialty
+# Expected: Years of experience: 8
+# Expected: Certification number present
+# Expected: Bilingual success message
+
+###############################################################################
+# SECTION 11 COMPLETE (FINAL)
+###############################################################################
+# ✓ Cardiology specialty created
+# ✓ Pediatrics specialty created
+# ✓ Cardiology specialty assigned to Doctor 1
+# ✓ Pediatrics specialty assigned to Doctor 2
+# ✓ Doctor specialty assignments verified
+###############################################################################
+
+###############################################################################
 # SECTION 12: VALIDATION TESTING
 ###############################################################################
 # Tests: Missing fields, invalid formats, duplicates, unauthorized access

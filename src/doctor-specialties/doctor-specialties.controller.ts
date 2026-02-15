@@ -83,34 +83,42 @@ export class DoctorSpecialtiesController {
         await this.doctorSpecialtiesService.getDoctorSpecialties(doctorId);
 
       const data: DoctorSpecialtyResponseDto[] = specialties.map(
-        (specialty) => ({
-          id: (specialty as any)._id.toString(),
-          doctorId: specialty.doctorId.toString(),
-          specialtyId: specialty.specialtyId.toString(),
-          yearsOfExperience: specialty.yearsOfExperience,
-          certificationNumber: specialty.certificationNumber,
-          createdAt: (specialty as any).createdAt || new Date(),
-          updatedAt: (specialty as any).updatedAt || new Date(),
-          doctor: specialty.doctorId
-            ? {
-                id:
-                  (specialty.doctorId as any)._id?.toString() ||
-                  specialty.doctorId.toString(),
-                firstName: (specialty.doctorId as any).firstName,
-                lastName: (specialty.doctorId as any).lastName,
-                email: (specialty.doctorId as any).email,
-              }
-            : undefined,
-          specialty: specialty.specialtyId
-            ? {
-                id:
-                  (specialty.specialtyId as any)._id?.toString() ||
-                  specialty.specialtyId.toString(),
-                name: (specialty.specialtyId as any).name,
-                description: (specialty.specialtyId as any).description,
-              }
-            : undefined,
-        }),
+        (specialty) => {
+          // Handle populated vs non-populated doctorId
+          const doctorIdStr = (specialty.doctorId as any)._id
+            ? (specialty.doctorId as any)._id.toString()
+            : specialty.doctorId.toString();
+
+          // Handle populated vs non-populated specialtyId
+          const specialtyIdStr = (specialty.specialtyId as any)._id
+            ? (specialty.specialtyId as any)._id.toString()
+            : specialty.specialtyId.toString();
+
+          return {
+            id: (specialty as any)._id.toString(),
+            doctorId: doctorIdStr,
+            specialtyId: specialtyIdStr,
+            yearsOfExperience: specialty.yearsOfExperience,
+            certificationNumber: specialty.certificationNumber,
+            createdAt: (specialty as any).createdAt || new Date(),
+            updatedAt: (specialty as any).updatedAt || new Date(),
+            doctor: specialty.doctorId
+              ? {
+                  id: doctorIdStr,
+                  firstName: (specialty.doctorId as any).firstName,
+                  lastName: (specialty.doctorId as any).lastName,
+                  email: (specialty.doctorId as any).email,
+                }
+              : undefined,
+            specialty: specialty.specialtyId
+              ? {
+                  id: specialtyIdStr,
+                  name: (specialty.specialtyId as any).name,
+                  description: (specialty.specialtyId as any).description,
+                }
+              : undefined,
+          };
+        },
       );
 
       return {
@@ -137,34 +145,42 @@ export class DoctorSpecialtiesController {
       const doctors =
         await this.doctorSpecialtiesService.getDoctorsBySpecialty(specialtyId);
 
-      const data: DoctorSpecialtyResponseDto[] = doctors.map((doctor) => ({
-        id: (doctor as any)._id.toString(),
-        doctorId: doctor.doctorId.toString(),
-        specialtyId: doctor.specialtyId.toString(),
-        yearsOfExperience: doctor.yearsOfExperience,
-        certificationNumber: doctor.certificationNumber,
-        createdAt: (doctor as any).createdAt || new Date(),
-        updatedAt: (doctor as any).updatedAt || new Date(),
-        doctor: doctor.doctorId
-          ? {
-              id:
-                (doctor.doctorId as any)._id?.toString() ||
-                doctor.doctorId.toString(),
-              firstName: (doctor.doctorId as any).firstName,
-              lastName: (doctor.doctorId as any).lastName,
-              email: (doctor.doctorId as any).email,
-            }
-          : undefined,
-        specialty: doctor.specialtyId
-          ? {
-              id:
-                (doctor.specialtyId as any)._id?.toString() ||
-                doctor.specialtyId.toString(),
-              name: (doctor.specialtyId as any).name,
-              description: (doctor.specialtyId as any).description,
-            }
-          : undefined,
-      }));
+      const data: DoctorSpecialtyResponseDto[] = doctors.map((doctor) => {
+        // Handle populated vs non-populated doctorId
+        const doctorIdStr = (doctor.doctorId as any)._id
+          ? (doctor.doctorId as any)._id.toString()
+          : doctor.doctorId.toString();
+
+        // Handle populated vs non-populated specialtyId
+        const specialtyIdStr = (doctor.specialtyId as any)._id
+          ? (doctor.specialtyId as any)._id.toString()
+          : doctor.specialtyId.toString();
+
+        return {
+          id: (doctor as any)._id.toString(),
+          doctorId: doctorIdStr,
+          specialtyId: specialtyIdStr,
+          yearsOfExperience: doctor.yearsOfExperience,
+          certificationNumber: doctor.certificationNumber,
+          createdAt: (doctor as any).createdAt || new Date(),
+          updatedAt: (doctor as any).updatedAt || new Date(),
+          doctor: doctor.doctorId
+            ? {
+                id: doctorIdStr,
+                firstName: (doctor.doctorId as any).firstName,
+                lastName: (doctor.doctorId as any).lastName,
+                email: (doctor.doctorId as any).email,
+              }
+            : undefined,
+          specialty: doctor.specialtyId
+            ? {
+                id: specialtyIdStr,
+                name: (doctor.specialtyId as any).name,
+                description: (doctor.specialtyId as any).description,
+              }
+            : undefined,
+        };
+      });
 
       return {
         success: true,
@@ -192,19 +208,27 @@ export class DoctorSpecialtiesController {
       const assignment =
         await this.doctorSpecialtiesService.getAssignmentById(id);
 
+      // Handle populated vs non-populated doctorId
+      const doctorIdStr = (assignment.doctorId as any)._id
+        ? (assignment.doctorId as any)._id.toString()
+        : assignment.doctorId.toString();
+
+      // Handle populated vs non-populated specialtyId
+      const specialtyIdStr = (assignment.specialtyId as any)._id
+        ? (assignment.specialtyId as any)._id.toString()
+        : assignment.specialtyId.toString();
+
       const response: DoctorSpecialtyResponseDto = {
         id: (assignment as any)._id.toString(),
-        doctorId: assignment.doctorId.toString(),
-        specialtyId: assignment.specialtyId.toString(),
+        doctorId: doctorIdStr,
+        specialtyId: specialtyIdStr,
         yearsOfExperience: assignment.yearsOfExperience,
         certificationNumber: assignment.certificationNumber,
         createdAt: (assignment as any).createdAt || new Date(),
         updatedAt: (assignment as any).updatedAt || new Date(),
         doctor: assignment.doctorId
           ? {
-              id:
-                (assignment.doctorId as any)._id?.toString() ||
-                assignment.doctorId.toString(),
+              id: doctorIdStr,
               firstName: (assignment.doctorId as any).firstName,
               lastName: (assignment.doctorId as any).lastName,
               email: (assignment.doctorId as any).email,
@@ -212,9 +236,7 @@ export class DoctorSpecialtiesController {
           : undefined,
         specialty: assignment.specialtyId
           ? {
-              id:
-                (assignment.specialtyId as any)._id?.toString() ||
-                assignment.specialtyId.toString(),
+              id: specialtyIdStr,
               name: (assignment.specialtyId as any).name,
               description: (assignment.specialtyId as any).description,
             }
@@ -312,19 +334,27 @@ export class DoctorSpecialtiesController {
         updateDoctorSpecialtyDto,
       );
 
+      // Handle populated vs non-populated doctorId
+      const doctorIdStr = (assignment.doctorId as any)._id
+        ? (assignment.doctorId as any)._id.toString()
+        : assignment.doctorId.toString();
+
+      // Handle populated vs non-populated specialtyId
+      const specialtyIdStr = (assignment.specialtyId as any)._id
+        ? (assignment.specialtyId as any)._id.toString()
+        : assignment.specialtyId.toString();
+
       const response: DoctorSpecialtyResponseDto = {
         id: (assignment as any)._id.toString(),
-        doctorId: assignment.doctorId.toString(),
-        specialtyId: assignment.specialtyId.toString(),
+        doctorId: doctorIdStr,
+        specialtyId: specialtyIdStr,
         yearsOfExperience: assignment.yearsOfExperience,
         certificationNumber: assignment.certificationNumber,
         createdAt: (assignment as any).createdAt || new Date(),
         updatedAt: (assignment as any).updatedAt || new Date(),
         doctor: assignment.doctorId
           ? {
-              id:
-                (assignment.doctorId as any)._id?.toString() ||
-                assignment.doctorId.toString(),
+              id: doctorIdStr,
               firstName: (assignment.doctorId as any).firstName,
               lastName: (assignment.doctorId as any).lastName,
               email: (assignment.doctorId as any).email,
@@ -332,9 +362,7 @@ export class DoctorSpecialtiesController {
           : undefined,
         specialty: assignment.specialtyId
           ? {
-              id:
-                (assignment.specialtyId as any)._id?.toString() ||
-                assignment.specialtyId.toString(),
+              id: specialtyIdStr,
               name: (assignment.specialtyId as any).name,
               description: (assignment.specialtyId as any).description,
             }
