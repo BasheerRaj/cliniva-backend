@@ -622,6 +622,90 @@ export const ERROR_MESSAGES = {
     ar: 'تمت العملية بنجاح',
     en: 'Operation completed successfully',
   } as BilingualMessage,
+
+  // ============================================================================
+  // Patient & Appointment M5 Specific Errors
+  // ============================================================================
+
+  PATIENT_DEACTIVATED_APPOINTMENTS_CANCELLED: {
+    ar: 'تم إلغاء تفعيل المريض وإلغاء جميع مواعيده القادمة',
+    en: 'Patient deactivated and all upcoming appointments cancelled',
+  } as BilingualMessage,
+
+  CARD_NUMBER_NOT_EDITABLE: {
+    ar: 'رقم البطاقة غير قابل للتعديل',
+    en: 'Card number is not editable',
+  } as BilingualMessage,
+
+  PATIENT_ALREADY_EXISTS_CARD: {
+    ar: 'يوجد مريض مسجل برقم البطاقة هذا بالفعل',
+    en: 'A patient with this card number already exists',
+  } as BilingualMessage,
+
+  FACILITY_CLOSED_OR_HOLIDAY: {
+    ar: 'المرفق مغلق أو الطبيب غير متاح في هذا التاريخ (عطلة أو يوم غير عمل)',
+    en: 'Facility is closed or doctor is not available on this date (holiday or non-working day)',
+  } as BilingualMessage,
+
+  APPOINTMENT_OUTSIDE_WORKING_HOURS: {
+    ar: 'الموعد يجب أن يكون ضمن ساعات العمل',
+    en: 'Appointment must be within working hours',
+  } as BilingualMessage,
+
+  APPOINTMENT_OVERLAPS_BREAK: {
+    ar: 'الموعد يتعارض مع وقت استراحة الطبيب',
+    en: 'Appointment overlaps with doctor break time',
+  } as BilingualMessage,
+
+  TIME_SLOT_BLOCKED: {
+    ar: 'هذا الوقت محجوز لمهام أخرى أو إجازة خاصة',
+    en: 'This time is blocked for other tasks or special leave',
+  } as BilingualMessage,
+
+  PATIENT_MUST_BE_DEACTIVATED: {
+    ar: 'يجب إلغاء تفعيل المريض قبل الحذف',
+    en: 'Patient must be deactivated before deletion',
+  } as BilingualMessage,
+
+  PATIENT_NOT_FOUND: {
+    ar: 'المريض غير موجود',
+    en: 'Patient not found',
+  } as BilingualMessage,
+
+  INVALID_PATIENT_ID: {
+    ar: 'معرف المريض غير صالح',
+    en: 'Invalid patient ID',
+  } as BilingualMessage,
+
+  DATE_OF_BIRTH_FUTURE: {
+    ar: 'تاريخ الميلاد لا يمكن أن يكون في المستقبل',
+    en: 'Date of birth cannot be in the future',
+  } as BilingualMessage,
+
+  DATE_OF_BIRTH_TOO_OLD: {
+    ar: 'تاريخ الميلاد غير صالح (العمر يتجاوز 150 سنة)',
+    en: 'Date of birth is invalid (age exceeds 150 years)',
+  } as BilingualMessage,
+
+  EMERGENCY_CONTACT_NAME_REQUIRED: {
+    ar: 'اسم جهة الاتصال في حالات الطوارئ مطلوب عند تقديم رقم الهاتف',
+    en: 'Emergency contact name is required when phone is provided',
+  } as BilingualMessage,
+
+  EMERGENCY_CONTACT_PHONE_REQUIRED: {
+    ar: 'رقم هاتف جهة الاتصال في حالات الطوارئ مطلوب عند تقديم الاسم',
+    en: 'Emergency contact phone is required when name is provided',
+  } as BilingualMessage,
+
+  DUPLICATE_EMAIL: {
+    ar: 'البريد الإلكتروني مستخدم بالفعل',
+    en: 'Email is already in use',
+  } as BilingualMessage,
+
+  DUPLICATE_PHONE: {
+    ar: 'رقم الهاتف مستخدم بالفعل',
+    en: 'Phone number is already in use',
+  } as BilingualMessage,
 };
 
 /**

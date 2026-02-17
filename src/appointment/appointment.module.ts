@@ -12,6 +12,9 @@ import { SubscriptionPlanSchema } from '../database/schemas/subscription-plan.sc
 import { SubscriptionModule } from '../subscription/subscription.module';
 import { PatientModule } from '../patient/patient.module';
 import { AuthModule } from '../auth/auth.module';
+import { WorkingHoursModule } from '../working-hours/working-hours.module';
+import { WorkingHoursIntegrationService } from './services/working-hours-integration.service';
+import { ScheduleSchema } from '../database/schemas/schedule.schema';
 
 @Module({
   imports: [
@@ -23,13 +26,15 @@ import { AuthModule } from '../auth/auth.module';
       { name: 'Service', schema: ServiceSchema },
       { name: 'Subscription', schema: SubscriptionSchema },
       { name: 'SubscriptionPlan', schema: SubscriptionPlanSchema },
+      { name: 'Schedule', schema: ScheduleSchema },
     ]),
     SubscriptionModule,
     PatientModule,
     AuthModule,
+    WorkingHoursModule,
   ],
   controllers: [AppointmentController],
-  providers: [AppointmentService],
-  exports: [AppointmentService],
+  providers: [AppointmentService, WorkingHoursIntegrationService],
+  exports: [AppointmentService, WorkingHoursIntegrationService],
 })
 export class AppointmentModule {}

@@ -12,6 +12,10 @@ import { Patient } from '../database/schemas/patient.schema';
 import { User } from '../database/schemas/user.schema';
 import { Clinic } from '../database/schemas/clinic.schema';
 import { Service } from '../database/schemas/service.schema';
+import { WorkingHoursIntegrationService } from './services/working-hours-integration.service';
+import { NotificationService } from '../notification/notification.service';
+import { AuditService } from '../auth/audit.service';
+import { ERROR_MESSAGES } from '../common/utils/error-messages.constant';
 import {
   CreateAppointmentDto,
   UpdateAppointmentDto,
@@ -38,6 +42,9 @@ export class AppointmentService {
     @InjectModel('User') private readonly userModel: Model<User>,
     @InjectModel('Clinic') private readonly clinicModel: Model<Clinic>,
     @InjectModel('Service') private readonly serviceModel: Model<Service>,
+    private readonly workingHoursIntegrationService: WorkingHoursIntegrationService,
+    private readonly notificationService: NotificationService,
+    private readonly auditService: AuditService,
   ) {}
 
   /**
@@ -134,6 +141,55 @@ export class AppointmentService {
           'Cannot schedule appointments more than 1 year in advance',
         );
       }
+
+    // Working Hours and Holiday Validation
+    if (doctorId && clinicId) {
+      const effectiveHours = await this.workingHoursIntegrationService.getEffectiveWorkingHours(
+        doctorId,
+        clinicId.toString(),
+        new Date(appointmentDate)
+      );
+
+      if (!effectiveHours) {
+        throw new BadRequestException({
+          message: ERROR_MESSAGES.FACILITY_CLOSED_OR_HOLIDAY,
+        });
+      }
+
+      const duration = (appointmentDto as any).durationMinutes || 30;
+      const appointmentEndTime = this.addMinutesToTime(appointmentTime, duration);
+
+      // Check if within opening/closing hours
+      if (appointmentTime < effectiveHours.openingTime || appointmentEndTime > effectiveHours.closingTime) {
+        throw new BadRequestException({
+          message: ERROR_MESSAGES.APPOINTMENT_OUTSIDE_WORKING_HOURS,
+          details: { openingTime: effectiveHours.openingTime, closingTime: effectiveHours.closingTime }
+        });
+      }
+
+      // Check for break time overlap
+      if (effectiveHours.breakStartTime && effectiveHours.breakEndTime) {
+        if (appointmentTime < effectiveHours.breakEndTime && appointmentEndTime > effectiveHours.breakStartTime) {
+          throw new BadRequestException({
+            message: ERROR_MESSAGES.APPOINTMENT_OVERLAPS_BREAK,
+          });
+        }
+      }
+
+      // Check for blocked time
+      const isBlocked = await this.workingHoursIntegrationService.isTimeBlocked(
+        doctorId,
+        new Date(appointmentDate),
+        appointmentTime,
+        appointmentEndTime
+      );
+
+      if (isBlocked) {
+        throw new BadRequestException({
+          message: ERROR_MESSAGES.TIME_SLOT_BLOCKED,
+        });
+      }
+    }
 
       // Check for conflicts
       if (patientId && doctorId) {
@@ -319,6 +375,47 @@ export class AppointmentService {
     this.logger.log(
       `Appointment created successfully with ID: ${savedAppointment._id}`,
     );
+
+    // Send notification to patient
+    await this.notificationService.create({
+      recipientId: createAppointmentDto.patientId,
+      title: 'Appointment Booked',
+      message: `Your appointment has been scheduled for ${createAppointmentDto.appointmentDate} at ${createAppointmentDto.appointmentTime}`,
+      notificationType: 'appointment_booked',
+      priority: 'normal',
+      relatedEntityType: 'appointment',
+      relatedEntityId: (savedAppointment as any)._id.toString(),
+      deliveryMethod: 'in_app'
+    });
+
+    // Send notification to doctor
+    await this.notificationService.create({
+      recipientId: createAppointmentDto.doctorId,
+      title: 'New Appointment Booked',
+      message: `A new appointment has been scheduled for ${createAppointmentDto.appointmentDate} at ${createAppointmentDto.appointmentTime}`,
+      notificationType: 'appointment_booked',
+      priority: 'normal',
+      relatedEntityType: 'appointment',
+      relatedEntityId: (savedAppointment as any)._id.toString(),
+      deliveryMethod: 'in_app'
+    });
+
+    if (createdByUserId) {
+      await this.auditService.logSecurityEvent({
+        eventType: 'APPOINTMENT_CREATED',
+        userId: createdByUserId,
+        actorId: createdByUserId,
+        ipAddress: '0.0.0.0',
+        userAgent: 'System',
+        timestamp: new Date(),
+        metadata: {
+          appointmentId: (savedAppointment as any)._id.toString(),
+          patientId: createAppointmentDto.patientId,
+          doctorId: createAppointmentDto.doctorId,
+        },
+      });
+    }
+
     return savedAppointment;
   }
 
@@ -543,6 +640,47 @@ export class AppointmentService {
       .exec();
 
     this.logger.log(`Appointment rescheduled: ${appointmentId}`);
+
+    // Send notification to patient
+    await this.notificationService.create({
+      recipientId: appointment.patientId.toString(),
+      title: 'Appointment Rescheduled',
+      message: `Your appointment has been rescheduled to ${rescheduleDto.newAppointmentDate} at ${rescheduleDto.newAppointmentTime}`,
+      notificationType: 'appointment_rescheduled',
+      priority: 'high',
+      relatedEntityType: 'appointment',
+      relatedEntityId: appointmentId,
+      deliveryMethod: 'in_app'
+    });
+
+    // Send notification to doctor
+    await this.notificationService.create({
+      recipientId: appointment.doctorId.toString(),
+      title: 'Appointment Rescheduled',
+      message: `An appointment has been rescheduled to ${rescheduleDto.newAppointmentDate} at ${rescheduleDto.newAppointmentTime}`,
+      notificationType: 'appointment_rescheduled',
+      priority: 'normal',
+      relatedEntityType: 'appointment',
+      relatedEntityId: appointmentId,
+      deliveryMethod: 'in_app'
+    });
+
+    if (updatedByUserId) {
+      await this.auditService.logSecurityEvent({
+        eventType: 'APPOINTMENT_RESCHEDULED',
+        userId: updatedByUserId,
+        actorId: updatedByUserId,
+        ipAddress: '0.0.0.0',
+        userAgent: 'System',
+        timestamp: new Date(),
+        metadata: {
+          appointmentId,
+          newDate: rescheduleDto.newAppointmentDate,
+          newTime: rescheduleDto.newAppointmentTime,
+        },
+      });
+    }
+
     return updatedAppointment!;
   }
 
@@ -580,6 +718,46 @@ export class AppointmentService {
       .exec();
 
     this.logger.log(`Appointment cancelled: ${appointmentId}`);
+
+    // Send notification to patient
+    await this.notificationService.create({
+      recipientId: appointment.patientId.toString(),
+      title: 'Appointment Cancelled',
+      message: `Your appointment has been cancelled. Reason: ${cancelDto.cancellationReason || 'No reason provided'}`,
+      notificationType: 'appointment_cancelled',
+      priority: 'high',
+      relatedEntityType: 'appointment',
+      relatedEntityId: appointmentId,
+      deliveryMethod: 'in_app'
+    });
+
+    // Send notification to doctor
+    await this.notificationService.create({
+      recipientId: appointment.doctorId.toString(),
+      title: 'Appointment Cancelled',
+      message: `An appointment has been cancelled. Reason: ${cancelDto.cancellationReason || 'No reason provided'}`,
+      notificationType: 'appointment_cancelled',
+      priority: 'normal',
+      relatedEntityType: 'appointment',
+      relatedEntityId: appointmentId,
+      deliveryMethod: 'in_app'
+    });
+
+    if (updatedByUserId) {
+      await this.auditService.logSecurityEvent({
+        eventType: 'APPOINTMENT_CANCELLED',
+        userId: updatedByUserId,
+        actorId: updatedByUserId,
+        ipAddress: '0.0.0.0',
+        userAgent: 'System',
+        timestamp: new Date(),
+        metadata: {
+          appointmentId,
+          reason: cancelDto.cancellationReason,
+        },
+      });
+    }
+
     return updatedAppointment!;
   }
 
@@ -618,6 +796,34 @@ export class AppointmentService {
       .exec();
 
     this.logger.log(`Appointment confirmed: ${appointmentId}`);
+
+    // Send notification to patient
+    await this.notificationService.create({
+      recipientId: appointment.patientId.toString(),
+      title: 'Appointment Confirmed',
+      message: `Your appointment has been confirmed for ${appointment.appointmentDate.toISOString().split('T')[0]} at ${appointment.appointmentTime}. ${confirmDto.confirmationNotes || ''}`,
+      notificationType: 'appointment_confirmed',
+      priority: 'high',
+      relatedEntityType: 'appointment',
+      relatedEntityId: appointmentId,
+      deliveryMethod: 'in_app'
+    });
+
+    if (updatedByUserId) {
+      await this.auditService.logSecurityEvent({
+        eventType: 'APPOINTMENT_CONFIRMED',
+        userId: updatedByUserId,
+        actorId: updatedByUserId,
+        ipAddress: '0.0.0.0',
+        userAgent: 'System',
+        timestamp: new Date(),
+        metadata: {
+          appointmentId,
+          notes: confirmDto.confirmationNotes,
+        },
+      });
+    }
+
     return updatedAppointment!;
   }
 
@@ -665,65 +871,117 @@ export class AppointmentService {
     query: AppointmentAvailabilityQueryDto,
   ): Promise<DayScheduleDto> {
     const { doctorId, date, clinicId, durationMinutes = 30 } = query;
+    const bookingDate = new Date(date);
+
+    // Clinic ID is required for working hours integration
+    if (!clinicId) {
+      return {
+        date,
+        doctorId,
+        clinicId: '',
+        workingHours: { start: '00:00', end: '00:00', breaks: [] },
+        timeSlots: [],
+        totalSlots: 0,
+        availableSlots: 0,
+        bookedSlots: 0,
+      };
+    }
+
+    // Get effective working hours for this day
+    const effectiveHours = await this.workingHoursIntegrationService.getEffectiveWorkingHours(
+      doctorId,
+      clinicId,
+      bookingDate
+    );
+
+    if (!effectiveHours) {
+      return {
+        date,
+        doctorId,
+        clinicId: clinicId || '',
+        workingHours: { start: '00:00', end: '00:00', breaks: [] },
+        timeSlots: [],
+        totalSlots: 0,
+        availableSlots: 0,
+        bookedSlots: 0,
+      };
+    }
 
     // Get existing appointments for the doctor on this date
     const existingAppointments = await this.appointmentModel
       .find({
         doctorId: new Types.ObjectId(doctorId),
-        appointmentDate: new Date(date),
+        appointmentDate: {
+          $gte: new Date(bookingDate.setHours(0, 0, 0, 0)),
+          $lte: new Date(bookingDate.setHours(23, 59, 59, 999))
+        },
         status: { $nin: ['cancelled', 'no_show'] },
         deletedAt: { $exists: false },
       })
       .sort({ appointmentTime: 1 })
       .exec();
 
-    // Basic working hours (this should come from working hours service)
-    // For now, using default 9 AM to 5 PM
-    const workingHours = {
-      start: '09:00',
-      end: '17:00',
-      breaks: [
-        { start: '12:00', end: '13:00' }, // Lunch break
-      ],
-    };
-
-    // Generate time slots
     const timeSlots: TimeSlotDto[] = [];
-    const startHour = 9;
-    const endHour = 17;
-    const slotDuration = 30; // minutes
+    
+    // Parse times
+    const [startHour, startMin] = effectiveHours.openingTime.split(':').map(Number);
+    const [endHour, endMin] = effectiveHours.closingTime.split(':').map(Number);
+    
+    let currentHour = startHour;
+    let currentMin = startMin;
 
-    for (let hour = startHour; hour < endHour; hour++) {
-      for (let minute = 0; minute < 60; minute += slotDuration) {
-        const timeStr = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+    while (currentHour < endHour || (currentHour === endHour && currentMin < endMin)) {
+      const timeStr = `${currentHour.toString().padStart(2, '0')}:${currentMin.toString().padStart(2, '0')}`;
+      const nextTime = this.addMinutesToTime(timeStr, durationMinutes);
+      
+      // Stop if next slot exceeds closing time
+      if (nextTime > effectiveHours.closingTime) break;
 
-        // Skip lunch break
-        if (timeStr >= '12:00' && timeStr < '13:00') {
-          continue;
-        }
+      // Check if slot is in break time
+      const isBreak = !!(effectiveHours.breakStartTime && 
+                     effectiveHours.breakEndTime &&
+                     timeStr >= effectiveHours.breakStartTime && 
+                     timeStr < effectiveHours.breakEndTime);
 
-        // Check if slot is available
-        const isBooked = existingAppointments.some((apt) => {
-          const aptStartTime = apt.appointmentTime;
-          const aptEndTime = this.addMinutesToTime(
-            aptStartTime,
-            apt.durationMinutes,
-          );
-          return timeStr >= aptStartTime && timeStr < aptEndTime;
-        });
+      // Check if slot is blocked
+      const isBlocked = await this.workingHoursIntegrationService.isTimeBlocked(
+        doctorId,
+        bookingDate,
+        timeStr,
+        nextTime
+      );
 
-        const existingAppointment = existingAppointments.find(
-          (apt) => apt.appointmentTime === timeStr,
-        );
+      // Check if slot is already booked
+      const isBooked = existingAppointments.some((apt) => {
+        const aptStartTime = apt.appointmentTime;
+        const aptEndTime = this.addMinutesToTime(aptStartTime, apt.durationMinutes);
+        // Overlap check: (StartA < EndB) and (EndA > StartB)
+        return timeStr < aptEndTime && nextTime > aptStartTime;
+      });
 
-        timeSlots.push({
-          time: timeStr,
-          isAvailable: !isBooked,
-          reason: isBooked ? 'Already booked' : undefined,
-          existingAppointmentId: existingAppointment
-            ? (existingAppointment as any)._id.toString()
-            : undefined,
-        });
+      const existingAppointment = existingAppointments.find(
+        (apt) => apt.appointmentTime === timeStr,
+      );
+
+      let reason: string | undefined = undefined;
+      if (isBreak) reason = 'Break time';
+      else if (isBlocked) reason = 'Time blocked';
+      else if (isBooked) reason = 'Already booked';
+
+      timeSlots.push({
+        time: timeStr,
+        isAvailable: !isBreak && !isBlocked && !isBooked,
+        reason,
+        existingAppointmentId: existingAppointment
+          ? (existingAppointment as any)._id.toString()
+          : undefined,
+      });
+
+      // Increment time
+      currentMin += durationMinutes;
+      while (currentMin >= 60) {
+        currentMin -= 60;
+        currentHour += 1;
       }
     }
 
@@ -735,7 +993,13 @@ export class AppointmentService {
       date,
       doctorId,
       clinicId: clinicId || '',
-      workingHours,
+      workingHours: {
+        start: effectiveHours.openingTime,
+        end: effectiveHours.closingTime,
+        breaks: (effectiveHours.breakStartTime && effectiveHours.breakEndTime) ? [
+          { start: effectiveHours.breakStartTime, end: effectiveHours.breakEndTime }
+        ] : [],
+      },
       timeSlots,
       totalSlots,
       availableSlots,

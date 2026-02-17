@@ -21,6 +21,9 @@ export class Notification extends Document {
   @Prop({
     required: true,
     enum: [
+      'appointment_booked',
+      'appointment_confirmed',
+      'appointment_rescheduled',
       'appointment_reminder',
       'appointment_cancelled',
       'payment_due',
@@ -32,6 +35,9 @@ export class Notification extends Document {
     ],
   })
   notificationType: string;
+
+  @Prop({ type: Map, of: String })
+  data?: Map<string, string>; // Extra context (e.g., deep linking IDs)
 
   @Prop({
     enum: ['low', 'normal', 'high', 'urgent'],

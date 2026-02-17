@@ -12,6 +12,9 @@ export class Patient extends Document {
   @Prop({ required: true, unique: true })
   patientNumber: string;
 
+  @Prop({ required: true, unique: true })
+  cardNumber: string; // From m5.json business rules
+
   @Prop({ required: true })
   firstName: string;
 
@@ -27,6 +30,13 @@ export class Patient extends Document {
   })
   gender: string;
 
+  @Prop({
+    required: true,
+    enum: ['Active', 'Inactive'],
+    default: 'Active',
+  })
+  status: string;
+
   @Prop()
   phone?: string;
 
@@ -37,10 +47,34 @@ export class Patient extends Document {
   address?: string;
 
   @Prop()
+  nationality?: string;
+
+  @Prop({
+    enum: ['Single', 'Married', 'Divorced', 'Widowed', 'Other'],
+  })
+  maritalStatus?: string;
+
+  @Prop()
+  religion?: string;
+
+  @Prop({ default: 'english' })
+  preferredLanguage: string;
+
+  @Prop()
+  profilePicture?: string;
+
+  @Prop([String])
+  documents?: string[];
+
+  // Emergency Contact Information
+  @Prop()
   emergencyContactName?: string;
 
   @Prop()
   emergencyContactPhone?: string;
+
+  @Prop()
+  emergencyContactRelationship?: string;
 
   @Prop()
   bloodType?: string; // A+, B-, O+, etc.
@@ -51,20 +85,42 @@ export class Patient extends Document {
   @Prop()
   medicalHistory?: string; // Brief medical history
 
+  // Insurance Information (Expanded from m5.json)
   @Prop()
-  insuranceProvider?: string;
-
-  @Prop()
-  insurancePolicyNumber?: string;
+  insuranceCompany?: string;
 
   @Prop()
-  nationality?: string;
+  insuranceMemberNumber?: string;
 
-  @Prop({ default: 'english' })
-  preferredLanguage: string;
+  @Prop()
+  insuranceMemberType?: string;
 
-  @Prop({ default: false })
-  isPortalEnabled: boolean; // Future: Enable patient portal access
+  @Prop()
+  insuranceProviderNetwork?: string;
+
+  @Prop()
+  insurancePolicyId?: string;
+
+  @Prop()
+  insuranceClass?: string;
+
+  @Prop()
+  insuranceCoPayment?: number;
+
+  @Prop()
+  insuranceCoverageLimit?: number;
+
+  @Prop()
+  insuranceStartDate?: Date;
+
+  @Prop()
+  insuranceEndDate?: Date;
+
+  @Prop({
+    enum: ['Active', 'Expired', 'Pending', 'None'],
+    default: 'None',
+  })
+  insuranceStatus?: string;
 
   @Prop({ type: Types.ObjectId, ref: 'User' })
   createdBy?: Types.ObjectId;
@@ -80,7 +136,10 @@ export const PatientSchema = SchemaFactory.createForClass(Patient);
 
 // Indexes
 PatientSchema.index({ userId: 1 });
+PatientSchema.index({ cardNumber: 1 }, { unique: true });
+PatientSchema.index({ patientNumber: 1 }, { unique: true });
 PatientSchema.index({ email: 1 });
 PatientSchema.index({ phone: 1 });
 PatientSchema.index({ firstName: 1, lastName: 1 });
+PatientSchema.index({ status: 1 });
 PatientSchema.index({ deletedAt: 1 });

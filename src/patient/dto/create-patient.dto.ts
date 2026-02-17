@@ -10,13 +10,30 @@ import {
   MinLength,
   MaxLength,
   IsIn,
+  IsNumber,
+  IsArray,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
 
+/**
+ * Data Transfer Object for creating a new patient.
+ * 
+ * Required fields: cardNumber, firstName, lastName, dateOfBirth, gender
+ * 
+ * Business Rules:
+ * - cardNumber must be unique (Requirement 1.2)
+ * - cardNumber is immutable after creation (Requirement 4.2)
+ * - patientNumber is auto-generated in format PAT{YEAR}{SEQUENCE} (Requirement 1.3)
+ * - status defaults to "Active" (Requirement 1.1)
+ */
 export class CreatePatientDto {
   @IsString()
   @IsOptional()
-  userId?: string; // Future: Link to user account for patient portal access
+  userId?: string;
+
+  @IsString()
+  @IsNotEmpty()
+  cardNumber: string;
 
   @IsString()
   @IsNotEmpty()
@@ -40,6 +57,12 @@ export class CreatePatientDto {
   @IsNotEmpty()
   gender: string;
 
+  @IsEnum(['Active', 'Inactive'], {
+    message: 'Status must be one of: Active, Inactive',
+  })
+  @IsOptional()
+  status?: string;
+
   @IsString()
   @IsOptional()
   @MinLength(10)
@@ -57,6 +80,34 @@ export class CreatePatientDto {
 
   @IsString()
   @IsOptional()
+  @MaxLength(50)
+  nationality?: string;
+
+  @IsEnum(['Single', 'Married', 'Divorced', 'Widowed', 'Other'])
+  @IsOptional()
+  maritalStatus?: string;
+
+  @IsString()
+  @IsOptional()
+  religion?: string;
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(50)
+  preferredLanguage?: string;
+
+  @IsString()
+  @IsOptional()
+  profilePicture?: string;
+
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  documents?: string[];
+
+  // Emergency Contact Information
+  @IsString()
+  @IsOptional()
   @MinLength(2)
   @MaxLength(100)
   emergencyContactName?: string;
@@ -66,6 +117,11 @@ export class CreatePatientDto {
   @MinLength(10)
   @MaxLength(20)
   emergencyContactPhone?: string;
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(50)
+  emergencyContactRelationship?: string;
 
   @IsString()
   @IsOptional()
@@ -84,118 +140,56 @@ export class CreatePatientDto {
   @MaxLength(1000)
   medicalHistory?: string;
 
+  // Insurance Information
   @IsString()
   @IsOptional()
   @MaxLength(100)
-  insuranceProvider?: string;
+  insuranceCompany?: string;
 
   @IsString()
   @IsOptional()
   @MaxLength(50)
-  insurancePolicyNumber?: string;
+  insuranceMemberNumber?: string;
 
   @IsString()
   @IsOptional()
   @MaxLength(50)
-  nationality?: string;
+  insuranceMemberType?: string;
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(100)
+  insuranceProviderNetwork?: string;
 
   @IsString()
   @IsOptional()
   @MaxLength(50)
-  preferredLanguage?: string;
-
-  @IsBoolean()
-  @IsOptional()
-  @Transform(({ value }) => value === 'true' || value === true)
-  isPortalEnabled?: boolean;
-}
-
-export class UpdatePatientDto {
-  @IsString()
-  @IsOptional()
-  @MinLength(2)
-  @MaxLength(50)
-  firstName?: string;
+  insurancePolicyId?: string;
 
   @IsString()
   @IsOptional()
-  @MinLength(2)
   @MaxLength(50)
-  lastName?: string;
+  insuranceClass?: string;
+
+  @IsNumber()
+  @IsOptional()
+  insuranceCoPayment?: number;
+
+  @IsNumber()
+  @IsOptional()
+  insuranceCoverageLimit?: number;
 
   @IsDateString()
   @IsOptional()
-  dateOfBirth?: string;
+  insuranceStartDate?: string;
 
-  @IsEnum(['male', 'female', 'other'], {
-    message: 'Gender must be one of: male, female, other',
-  })
+  @IsDateString()
   @IsOptional()
-  gender?: string;
+  insuranceEndDate?: string;
 
-  @IsString()
+  @IsEnum(['Active', 'Expired', 'Pending', 'None'])
   @IsOptional()
-  @MinLength(10)
-  @MaxLength(20)
-  phone?: string;
-
-  @IsEmail()
-  @IsOptional()
-  email?: string;
-
-  @IsString()
-  @IsOptional()
-  @MaxLength(200)
-  address?: string;
-
-  @IsString()
-  @IsOptional()
-  @MinLength(2)
-  @MaxLength(100)
-  emergencyContactName?: string;
-
-  @IsString()
-  @IsOptional()
-  @MinLength(10)
-  @MaxLength(20)
-  emergencyContactPhone?: string;
-
-  @IsString()
-  @IsOptional()
-  @IsIn(['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'], {
-    message: 'Blood type must be one of: A+, A-, B+, B-, AB+, AB-, O+, O-',
-  })
-  bloodType?: string;
-
-  @IsString()
-  @IsOptional()
-  @MaxLength(500)
-  allergies?: string;
-
-  @IsString()
-  @IsOptional()
-  @MaxLength(1000)
-  medicalHistory?: string;
-
-  @IsString()
-  @IsOptional()
-  @MaxLength(100)
-  insuranceProvider?: string;
-
-  @IsString()
-  @IsOptional()
-  @MaxLength(50)
-  insurancePolicyNumber?: string;
-
-  @IsString()
-  @IsOptional()
-  @MaxLength(50)
-  nationality?: string;
-
-  @IsString()
-  @IsOptional()
-  @MaxLength(50)
-  preferredLanguage?: string;
+  insuranceStatus?: string;
 
   @IsBoolean()
   @IsOptional()
@@ -203,26 +197,37 @@ export class UpdatePatientDto {
   isPortalEnabled?: boolean;
 }
 
+/**
+ * Data Transfer Object for patient response.
+ * Contains all patient fields returned in API responses.
+ */
 export class PatientResponseDto {
   _id: string;
   userId?: string;
   patientNumber: string;
+  cardNumber: string;
   firstName: string;
   lastName: string;
   dateOfBirth: Date;
   gender: string;
+  status: string;
   phone?: string;
   email?: string;
   address?: string;
+  nationality?: string;
+  maritalStatus?: string;
+  religion?: string;
+  preferredLanguage: string;
+  profilePicture?: string;
+  documents?: string[];
   emergencyContactName?: string;
   emergencyContactPhone?: string;
+  emergencyContactRelationship?: string;
   bloodType?: string;
   allergies?: string;
   medicalHistory?: string;
-  insuranceProvider?: string;
-  insurancePolicyNumber?: string;
-  nationality?: string;
-  preferredLanguage: string;
+  insuranceCompany?: string;
+  insuranceStatus?: string;
   isPortalEnabled: boolean;
   createdBy?: string;
   updatedBy?: string;
@@ -234,7 +239,7 @@ export class PatientResponseDto {
 export class PatientSearchQueryDto {
   @IsString()
   @IsOptional()
-  search?: string; // Search in firstName, lastName, phone, email
+  search?: string;
 
   @IsString()
   @IsOptional()
@@ -258,11 +263,15 @@ export class PatientSearchQueryDto {
 
   @IsString()
   @IsOptional()
+  status?: string;
+
+  @IsString()
+  @IsOptional()
   bloodType?: string;
 
   @IsString()
   @IsOptional()
-  insuranceProvider?: string;
+  insuranceCompany?: string;
 
   @IsString()
   @IsOptional()

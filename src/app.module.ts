@@ -30,6 +30,8 @@ import { DoctorSpecialtiesModule } from './doctor-specialties/doctor-specialties
 import { EmergencyContactsModule } from './emergency-contacts/emergency-contacts.module';
 import { DoctorServiceModule } from './doctor-service/doctor-service.module';
 import { ServiceOfferModule } from './service-offer/service-offer.module';
+import { NotificationModule } from './notification/notification.module';
+import { PatientPortalModule } from './patient-portal/patient-portal.module';
 
 @Module({
   imports: [
@@ -66,6 +68,8 @@ import { ServiceOfferModule } from './service-offer/service-offer.module';
     EmergencyContactsModule,
     DoctorServiceModule,
     ServiceOfferModule,
+    NotificationModule,
+    PatientPortalModule,
   ],
   controllers: [AppController],
   providers: [AppService],

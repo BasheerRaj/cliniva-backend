@@ -4,10 +4,14 @@ import {
   BadRequestException,
   ConflictException,
   Logger,
+  InternalServerErrorException,
 } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose';
+import { InjectModel, InjectConnection } from '@nestjs/mongoose';
+import { Model, Types, Connection, ClientSession } from 'mongoose';
 import { Patient } from '../database/schemas/patient.schema';
+import { Appointment } from '../database/schemas/appointment.schema';
+import { AuditService } from '../auth/audit.service';
+import { ERROR_MESSAGES } from '../common/utils/error-messages.constant';
 import {
   CreatePatientDto,
   UpdatePatientDto,
@@ -24,6 +28,10 @@ export class PatientService {
 
   constructor(
     @InjectModel('Patient') private readonly patientModel: Model<Patient>,
+    @InjectModel('Appointment')
+    private readonly appointmentModel: Model<Appointment>,
+    @InjectConnection() private readonly connection: Connection,
+    private readonly auditService: AuditService,
   ) {}
 
   /**
@@ -59,6 +67,29 @@ export class PatientService {
     isUpdate = false,
     patientId?: string,
   ): Promise<void> {
+    // Check if cardNumber is being updated (not allowed per business rules)
+    if (isUpdate && 'cardNumber' in patientDto) {
+      throw new BadRequestException(ERROR_MESSAGES.CARD_NUMBER_NOT_EDITABLE);
+    }
+
+    // Check for duplicate card number (m5.json business rule)
+    if ('cardNumber' in patientDto && patientDto.cardNumber) {
+      const cardNumberQuery: any = {
+        cardNumber: patientDto.cardNumber,
+        deletedAt: { $exists: false },
+      };
+
+      if (isUpdate && patientId) {
+        cardNumberQuery._id = { $ne: new Types.ObjectId(patientId) };
+      }
+
+      const existingPatientByCard =
+        await this.patientModel.findOne(cardNumberQuery);
+      if (existingPatientByCard) {
+        throw new ConflictException(ERROR_MESSAGES.PATIENT_ALREADY_EXISTS_CARD);
+      }
+    }
+
     // Check for duplicate email
     if (patientDto.email) {
       const emailQuery: any = {
@@ -73,7 +104,7 @@ export class PatientService {
       const existingPatientByEmail =
         await this.patientModel.findOne(emailQuery);
       if (existingPatientByEmail) {
-        throw new ConflictException('Patient with this email already exists');
+        throw new ConflictException(ERROR_MESSAGES.DUPLICATE_EMAIL);
       }
     }
 
@@ -91,9 +122,7 @@ export class PatientService {
       const existingPatientByPhone =
         await this.patientModel.findOne(phoneQuery);
       if (existingPatientByPhone) {
-        throw new ConflictException(
-          'Patient with this phone number already exists',
-        );
+        throw new ConflictException(ERROR_MESSAGES.DUPLICATE_PHONE);
       }
     }
 
@@ -103,29 +132,23 @@ export class PatientService {
       const today = new Date();
 
       if (dob > today) {
-        throw new BadRequestException('Date of birth cannot be in the future');
+        throw new BadRequestException(ERROR_MESSAGES.DATE_OF_BIRTH_FUTURE);
       }
 
       // Check if age is reasonable (not older than 150 years)
       const age = today.getFullYear() - dob.getFullYear();
       if (age > 150) {
-        throw new BadRequestException(
-          'Invalid date of birth: age cannot exceed 150 years',
-        );
+        throw new BadRequestException(ERROR_MESSAGES.DATE_OF_BIRTH_TOO_OLD);
       }
     }
 
     // Validate emergency contact
     if (patientDto.emergencyContactName && !patientDto.emergencyContactPhone) {
-      throw new BadRequestException(
-        'Emergency contact phone is required when emergency contact name is provided',
-      );
+      throw new BadRequestException(ERROR_MESSAGES.EMERGENCY_CONTACT_PHONE_REQUIRED);
     }
 
     if (patientDto.emergencyContactPhone && !patientDto.emergencyContactName) {
-      throw new BadRequestException(
-        'Emergency contact name is required when emergency contact phone is provided',
-      );
+      throw new BadRequestException(ERROR_MESSAGES.EMERGENCY_CONTACT_NAME_REQUIRED);
     }
   }
 
@@ -149,7 +172,13 @@ export class PatientService {
       patientNumber,
       dateOfBirth: new Date(createPatientDto.dateOfBirth),
       preferredLanguage: createPatientDto.preferredLanguage || 'english',
-      isPortalEnabled: createPatientDto.isPortalEnabled || false,
+      status: 'Active',
+      insuranceStartDate: createPatientDto.insuranceStartDate
+        ? new Date(createPatientDto.insuranceStartDate)
+        : undefined,
+      insuranceEndDate: createPatientDto.insuranceEndDate
+        ? new Date(createPatientDto.insuranceEndDate)
+        : undefined,
       createdBy: createdByUserId
         ? new Types.ObjectId(createdByUserId)
         : undefined,
@@ -157,6 +186,18 @@ export class PatientService {
 
     const patient = new this.patientModel(patientData);
     const savedPatient = await patient.save();
+
+    if (createdByUserId) {
+      await this.auditService.logSecurityEvent({
+        eventType: 'PATIENT_CREATED',
+        userId: createdByUserId,
+        actorId: createdByUserId,
+        ipAddress: '0.0.0.0',
+        userAgent: 'System',
+        timestamp: new Date(),
+        metadata: { patientId: (savedPatient as any)._id.toString(), patientNumber },
+      });
+    }
 
     this.logger.log(
       `Patient created successfully with ID: ${savedPatient._id}`,
@@ -180,8 +221,9 @@ export class PatientService {
       phone,
       email,
       gender,
+      status,
       bloodType,
-      insuranceProvider,
+      insuranceCompany,
       nationality,
       isPortalEnabled,
       page = '1',
@@ -203,6 +245,7 @@ export class PatientService {
         { phone: { $regex: search, $options: 'i' } },
         { email: { $regex: search, $options: 'i' } },
         { patientNumber: { $regex: search, $options: 'i' } },
+        { cardNumber: { $regex: search, $options: 'i' } },
       ];
     }
 
@@ -212,16 +255,17 @@ export class PatientService {
     if (phone) filter.phone = { $regex: phone, $options: 'i' };
     if (email) filter.email = { $regex: email, $options: 'i' };
     if (gender) filter.gender = gender;
+    if (status) filter.status = status;
     if (bloodType) filter.bloodType = bloodType;
-    if (insuranceProvider)
-      filter.insuranceProvider = { $regex: insuranceProvider, $options: 'i' };
+    if (insuranceCompany)
+      filter.insuranceCompany = { $regex: insuranceCompany, $options: 'i' };
     if (nationality)
       filter.nationality = { $regex: nationality, $options: 'i' };
     if (isPortalEnabled !== undefined) filter.isPortalEnabled = isPortalEnabled;
 
     // Pagination
     const pageNum = Math.max(1, parseInt(page));
-    const pageSize = Math.max(1, Math.min(100, parseInt(limit))); // Max 100 per page
+    const pageSize = Math.max(1, Math.min(50, parseInt(limit))); // Max 50 per page (Requirement 9.5)
     const skip = (pageNum - 1) * pageSize;
 
     // Sorting
@@ -249,11 +293,27 @@ export class PatientService {
   }
 
   /**
+   * Calculate patient age from date of birth
+   */
+  private calculateAge(dateOfBirth: Date): number {
+    const today = new Date();
+    const birthDate = new Date(dateOfBirth);
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    
+    return age;
+  }
+
+  /**
    * Get patient by ID
    */
   async getPatientById(patientId: string): Promise<Patient> {
     if (!Types.ObjectId.isValid(patientId)) {
-      throw new BadRequestException('Invalid patient ID format');
+      throw new BadRequestException(ERROR_MESSAGES.INVALID_PATIENT_ID);
     }
 
     const patient = await this.patientModel
@@ -264,7 +324,7 @@ export class PatientService {
       .exec();
 
     if (!patient) {
-      throw new NotFoundException('Patient not found');
+      throw new NotFoundException(ERROR_MESSAGES.PATIENT_NOT_FOUND);
     }
 
     return patient;
@@ -282,7 +342,7 @@ export class PatientService {
       .exec();
 
     if (!patient) {
-      throw new NotFoundException('Patient not found');
+      throw new NotFoundException(ERROR_MESSAGES.PATIENT_NOT_FOUND);
     }
 
     return patient;
@@ -297,7 +357,7 @@ export class PatientService {
     updatedByUserId?: string,
   ): Promise<Patient> {
     if (!Types.ObjectId.isValid(patientId)) {
-      throw new BadRequestException('Invalid patient ID format');
+      throw new BadRequestException(ERROR_MESSAGES.INVALID_PATIENT_ID);
     }
 
     this.logger.log(`Updating patient: ${patientId}`);
@@ -311,9 +371,15 @@ export class PatientService {
         : undefined,
     };
 
-    // Convert date string to Date object if provided
+    // Convert date strings to Date objects if provided
     if (updatePatientDto.dateOfBirth) {
       updateData.dateOfBirth = new Date(updatePatientDto.dateOfBirth);
+    }
+    if (updatePatientDto.insuranceStartDate) {
+      updateData.insuranceStartDate = new Date(updatePatientDto.insuranceStartDate);
+    }
+    if (updatePatientDto.insuranceEndDate) {
+      updateData.insuranceEndDate = new Date(updatePatientDto.insuranceEndDate);
     }
 
     const patient = await this.patientModel
@@ -328,10 +394,200 @@ export class PatientService {
       .exec();
 
     if (!patient) {
-      throw new NotFoundException('Patient not found');
+      throw new NotFoundException(ERROR_MESSAGES.PATIENT_NOT_FOUND);
+    }
+
+    if (updatedByUserId) {
+      await this.auditService.logSecurityEvent({
+        eventType: 'PATIENT_UPDATED',
+        userId: patientId,
+        actorId: updatedByUserId,
+        ipAddress: '0.0.0.0',
+        userAgent: 'System',
+        timestamp: new Date(),
+        metadata: { changes: Object.keys(updatePatientDto) },
+      });
     }
 
     this.logger.log(`Patient updated successfully: ${patientId}`);
+    return patient;
+  }
+
+  /**
+   * Deactivate patient and cancel appointments with transaction support
+   */
+  async deactivatePatient(
+    patientId: string,
+    updatedByUserId?: string,
+  ): Promise<Patient> {
+    if (!Types.ObjectId.isValid(patientId)) {
+      throw new BadRequestException(ERROR_MESSAGES.INVALID_PATIENT_ID);
+    }
+
+    this.logger.log(`Deactivating patient and cancelling appointments: ${patientId}`);
+
+    // Check if patient exists first
+    const existingPatient = await this.patientModel
+      .findOne({
+        _id: new Types.ObjectId(patientId),
+        deletedAt: { $exists: false },
+      })
+      .exec();
+
+    if (!existingPatient) {
+      throw new NotFoundException(ERROR_MESSAGES.PATIENT_NOT_FOUND);
+    }
+
+    // Handle idempotent deactivation (Requirement 5.6)
+    if (existingPatient.status === 'Inactive') {
+      this.logger.log(`Patient ${patientId} is already inactive, returning without changes`);
+      return existingPatient;
+    }
+
+    // Start MongoDB session for transaction
+    const session: ClientSession = await this.connection.startSession();
+    session.startTransaction();
+
+    try {
+      // Update patient status to "Inactive"
+      const patient = await this.patientModel
+        .findOneAndUpdate(
+          { _id: new Types.ObjectId(patientId), deletedAt: { $exists: false } },
+          {
+            $set: {
+              status: 'Inactive',
+              updatedBy: updatedByUserId ? new Types.ObjectId(updatedByUserId) : undefined,
+            },
+          },
+          { new: true, session },
+        )
+        .exec();
+
+      if (!patient) {
+        throw new NotFoundException(ERROR_MESSAGES.PATIENT_NOT_FOUND);
+      }
+
+      // Cancel all active appointments (status 'scheduled' or 'confirmed')
+      const result = await this.appointmentModel.updateMany(
+        {
+          patientId: new Types.ObjectId(patientId),
+          status: { $in: ['scheduled', 'confirmed'] },
+          deletedAt: { $exists: false },
+        },
+        {
+          $set: {
+            status: 'cancelled',
+            cancellationReason: 'Patient deactivated',
+            updatedBy: updatedByUserId ? new Types.ObjectId(updatedByUserId) : undefined,
+          },
+        },
+        { session },
+      );
+
+      // Commit transaction
+      await session.commitTransaction();
+
+      // Log deactivation event with cancelled appointment count
+      if (updatedByUserId) {
+        await this.auditService.logSecurityEvent({
+          eventType: 'PATIENT_DEACTIVATED',
+          userId: patientId,
+          actorId: updatedByUserId,
+          ipAddress: '0.0.0.0',
+          userAgent: 'System',
+          timestamp: new Date(),
+          metadata: { cancelledAppointments: result.modifiedCount },
+        });
+      }
+
+      this.logger.log(
+        `Patient ${patientId} deactivated successfully. Cancelled ${result.modifiedCount} appointments.`,
+      );
+
+      return patient;
+    } catch (error) {
+      // Rollback transaction on error
+      await session.abortTransaction();
+      this.logger.error(`Failed to deactivate patient ${patientId}:`, error);
+      
+      if (error instanceof NotFoundException || error instanceof BadRequestException) {
+        throw error;
+      }
+      
+      throw new InternalServerErrorException({
+        message: {
+          ar: 'فشل في تعطيل المريض',
+          en: 'Failed to deactivate patient',
+        },
+      });
+    } finally {
+      // End session
+      session.endSession();
+    }
+  }
+
+  /**
+   * Activate patient
+   */
+  async activatePatient(
+    patientId: string,
+    updatedByUserId?: string,
+  ): Promise<Patient> {
+    if (!Types.ObjectId.isValid(patientId)) {
+      throw new BadRequestException(ERROR_MESSAGES.INVALID_PATIENT_ID);
+    }
+
+    this.logger.log(`Activating patient: ${patientId}`);
+
+    // Check if patient exists first
+    const existingPatient = await this.patientModel
+      .findOne({
+        _id: new Types.ObjectId(patientId),
+        deletedAt: { $exists: false },
+      })
+      .exec();
+
+    if (!existingPatient) {
+      throw new NotFoundException(ERROR_MESSAGES.PATIENT_NOT_FOUND);
+    }
+
+    // Handle idempotent activation (Requirement 6.4)
+    if (existingPatient.status === 'Active') {
+      this.logger.log(`Patient ${patientId} is already active, returning without changes`);
+      return existingPatient;
+    }
+
+    const patient = await this.patientModel
+      .findOneAndUpdate(
+        { _id: new Types.ObjectId(patientId), deletedAt: { $exists: false } },
+        {
+          $set: {
+            status: 'Active',
+            updatedBy: updatedByUserId ? new Types.ObjectId(updatedByUserId) : undefined,
+          },
+        },
+        { new: true },
+      )
+      .exec();
+
+    if (!patient) {
+      throw new NotFoundException(ERROR_MESSAGES.PATIENT_NOT_FOUND);
+    }
+
+    if (updatedByUserId) {
+      await this.auditService.logSecurityEvent({
+        eventType: 'PATIENT_ACTIVATED',
+        userId: patientId,
+        actorId: updatedByUserId,
+        ipAddress: '0.0.0.0',
+        userAgent: 'System',
+        timestamp: new Date(),
+        metadata: { action: 'Patient account activated' },
+      });
+    }
+
+    this.logger.log(`Patient ${patientId} activated successfully`);
+
     return patient;
   }
 
@@ -343,7 +599,13 @@ export class PatientService {
     deletedByUserId?: string,
   ): Promise<void> {
     if (!Types.ObjectId.isValid(patientId)) {
-      throw new BadRequestException('Invalid patient ID format');
+      throw new BadRequestException(ERROR_MESSAGES.INVALID_PATIENT_ID);
+    }
+
+    // Check if patient is deactivated first (m5.json requirement)
+    const patient = await this.getPatientById(patientId);
+    if (patient.status !== 'Inactive') {
+      throw new BadRequestException(ERROR_MESSAGES.PATIENT_MUST_BE_DEACTIVATED);
     }
 
     this.logger.log(`Soft deleting patient: ${patientId}`);
@@ -366,7 +628,19 @@ export class PatientService {
       .exec();
 
     if (!result) {
-      throw new NotFoundException('Patient not found');
+      throw new NotFoundException(ERROR_MESSAGES.PATIENT_NOT_FOUND);
+    }
+
+    if (deletedByUserId) {
+      await this.auditService.logSecurityEvent({
+        eventType: 'PATIENT_DELETED',
+        userId: patientId,
+        actorId: deletedByUserId,
+        ipAddress: '0.0.0.0',
+        userAgent: 'System',
+        timestamp: new Date(),
+        metadata: { action: 'Patient record soft deleted' },
+      });
     }
 
     this.logger.log(`Patient soft deleted successfully: ${patientId}`);
@@ -381,7 +655,7 @@ export class PatientService {
     updatedByUserId?: string,
   ): Promise<Patient> {
     if (!Types.ObjectId.isValid(patientId)) {
-      throw new BadRequestException('Invalid patient ID format');
+      throw new BadRequestException(ERROR_MESSAGES.INVALID_PATIENT_ID);
     }
 
     const updateData: any = {
@@ -403,7 +677,7 @@ export class PatientService {
       .exec();
 
     if (!patient) {
-      throw new NotFoundException('Patient not found');
+      throw new NotFoundException(ERROR_MESSAGES.PATIENT_NOT_FOUND);
     }
 
     return patient;
@@ -411,62 +685,73 @@ export class PatientService {
 
   /**
    * Get patient statistics
+   * Requirements: 10.1, 10.2, 10.3, 10.4, 10.5, 10.6
    */
   async getPatientStats(): Promise<PatientStatsDto> {
     const now = new Date();
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+    // Base filter to exclude soft-deleted patients (Requirement 10.6)
+    const baseFilter = { deletedAt: { $exists: false } };
 
     const [
       totalPatients,
       activePatients,
       malePatients,
       femalePatients,
+      otherGenderPatients,
       patientsWithInsurance,
       patientsWithPortalAccess,
       recentPatients,
       avgAgeResult,
     ] = await Promise.all([
-      // Total patients
-      this.patientModel.countDocuments({ deletedAt: { $exists: false } }),
+      // Total patients (Requirement 10.1)
+      this.patientModel.countDocuments(baseFilter),
 
       // Active patients (not deleted)
-      this.patientModel.countDocuments({ deletedAt: { $exists: false } }),
+      this.patientModel.countDocuments(baseFilter),
 
-      // Male patients
+      // Male patients (Requirement 10.2)
       this.patientModel.countDocuments({
+        ...baseFilter,
         gender: 'male',
-        deletedAt: { $exists: false },
       }),
 
-      // Female patients
+      // Female patients (Requirement 10.2)
       this.patientModel.countDocuments({
+        ...baseFilter,
         gender: 'female',
-        deletedAt: { $exists: false },
       }),
 
-      // Patients with insurance
+      // Other gender patients (Requirement 10.2)
       this.patientModel.countDocuments({
-        insuranceProvider: { $exists: true, $ne: '' },
-        deletedAt: { $exists: false },
+        ...baseFilter,
+        gender: 'other',
+      }),
+
+      // Patients with active insurance (Requirement 10.4)
+      this.patientModel.countDocuments({
+        ...baseFilter,
+        insuranceStatus: 'Active',
       }),
 
       // Patients with portal access
       this.patientModel.countDocuments({
+        ...baseFilter,
         isPortalEnabled: true,
-        deletedAt: { $exists: false },
       }),
 
-      // Recent patients (last 30 days)
+      // Recent patients - registered in last 30 days (Requirement 10.5)
       this.patientModel.countDocuments({
+        ...baseFilter,
         createdAt: { $gte: thirtyDaysAgo },
-        deletedAt: { $exists: false },
       }),
 
-      // Average age
+      // Average age calculation (Requirement 10.3)
       this.patientModel.aggregate([
         {
           $match: {
-            deletedAt: { $exists: false },
+            ...baseFilter,
             dateOfBirth: { $exists: true },
           },
         },
@@ -491,12 +776,20 @@ export class PatientService {
       ]),
     ]);
 
+    // Verify that total equals sum of gender counts (Requirement 10.1, 10.2)
+    const genderSum = malePatients + femalePatients + otherGenderPatients;
+    if (totalPatients !== genderSum) {
+      this.logger.warn(
+        `Statistics mismatch: total (${totalPatients}) != gender sum (${genderSum})`,
+      );
+    }
+
     return {
       totalPatients,
       activePatients,
       malePatients,
       femalePatients,
-      avgAge: avgAgeResult[0]?.avgAge || 0,
+      avgAge: Math.round((avgAgeResult[0]?.avgAge || 0) * 10) / 10, // Round to 1 decimal place
       patientsWithInsurance,
       patientsWithPortalAccess,
       recentPatients,
