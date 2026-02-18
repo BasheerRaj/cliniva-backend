@@ -1,4 +1,13 @@
-import { Controller, Post, Body, Get, UseGuards, Request, HttpStatus, HttpCode } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  Get,
+  UseGuards,
+  Request,
+  HttpStatus,
+  HttpCode,
+} from '@nestjs/common';
 import { PatientPortalService } from '../services/patient-portal.service';
 import { RegisterPatientUserDto, LoginPatientDto } from '../dto/auth.dto';
 import { BookAppointmentDto } from '../dto/appointment.dto';
@@ -30,7 +39,10 @@ export class PatientAuthController {
   @Post('appointments')
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.CREATED)
-  async bookAppointment(@Request() req: any, @Body() bookDto: BookAppointmentDto) {
+  async bookAppointment(
+    @Request() req: any,
+    @Body() bookDto: BookAppointmentDto,
+  ) {
     return this.patientPortalService.bookAppointment(req.user.userId, bookDto);
   }
 

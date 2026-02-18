@@ -35,4 +35,3 @@ export const ServiceOfferSchema = SchemaFactory.createForClass(ServiceOffer);
 ServiceOfferSchema.index({ serviceId: 1, offerId: 1 }, { unique: true });
 ServiceOfferSchema.index({ serviceId: 1, isActive: 1 });
 ServiceOfferSchema.index({ offerId: 1 });
-

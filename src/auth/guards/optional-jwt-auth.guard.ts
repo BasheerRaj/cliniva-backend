@@ -1,8 +1,4 @@
-import {
-  Injectable,
-  ExecutionContext,
-  Logger,
-} from '@nestjs/common';
+import { Injectable, ExecutionContext, Logger } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
@@ -45,7 +41,9 @@ export class OptionalJwtAuthGuard extends AuthGuard('jwt') {
 
     // If no auth header, allow the request to proceed without user
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      this.logger.debug('No auth token provided, proceeding without authentication');
+      this.logger.debug(
+        'No auth token provided, proceeding without authentication',
+      );
       request.user = null;
       return true;
     }
@@ -60,10 +58,13 @@ export class OptionalJwtAuthGuard extends AuthGuard('jwt') {
 
       // Check if token is blacklisted
       const tokenHash = this.tokenService.hashToken(token);
-      const isBlacklisted = await this.sessionService.isTokenBlacklisted(tokenHash);
+      const isBlacklisted =
+        await this.sessionService.isTokenBlacklisted(tokenHash);
 
       if (isBlacklisted) {
-        this.logger.debug('Token is blacklisted, proceeding without authentication');
+        this.logger.debug(
+          'Token is blacklisted, proceeding without authentication',
+        );
         request.user = null;
         return true;
       }
@@ -83,7 +84,9 @@ export class OptionalJwtAuthGuard extends AuthGuard('jwt') {
       return true;
     } catch (error) {
       // If JWT validation fails, allow the request to proceed without user
-      this.logger.debug(`Optional JWT auth failed: ${error.message}, proceeding without authentication`);
+      this.logger.debug(
+        `Optional JWT auth failed: ${error.message}, proceeding without authentication`,
+      );
       request.user = null;
       return true;
     }

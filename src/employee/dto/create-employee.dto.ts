@@ -504,8 +504,8 @@ export class UpdateEmployeeDto {
 // Employee Document DTOs
 export class CreateEmployeeDocumentDto {
   @IsMongoId()
-  @IsNotEmpty()
-  userId: string;
+  @IsOptional()
+  userId?: string;
 
   @IsEnum([
     'contract',
@@ -613,8 +613,8 @@ export class UpdateEmployeeDocumentDto {
 // Employee Shift DTOs
 export class CreateEmployeeShiftDto {
   @IsMongoId()
-  @IsNotEmpty()
-  userId: string;
+  @IsOptional()
+  userId?: string;
 
   @IsEnum(['organization', 'complex', 'clinic'])
   @IsNotEmpty()

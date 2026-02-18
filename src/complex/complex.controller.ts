@@ -45,7 +45,7 @@ import { TransferClinicsDto } from './dto/transfer-clinics.dto';
 @ApiTags('Complex Management')
 @Controller('complexes')
 export class ComplexController {
-  constructor(private readonly complexService: ComplexService) { }
+  constructor(private readonly complexService: ComplexService) {}
 
   /**
    * List complexes with pagination, filters, and optional counts
@@ -468,13 +468,13 @@ export class ComplexController {
         success: true,
         message: complex
           ? {
-            ar: 'تم العثور على المجمع',
-            en: 'Complex found',
-          }
+              ar: 'تم العثور على المجمع',
+              en: 'Complex found',
+            }
           : {
-            ar: 'لم يتم العثور على مجمع لهذا الاشتراك',
-            en: 'No complex found for this subscription',
-          },
+              ar: 'لم يتم العثور على مجمع لهذا الاشتراك',
+              en: 'No complex found for this subscription',
+            },
         data: complex,
       };
     } catch (error) {

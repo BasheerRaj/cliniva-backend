@@ -5,8 +5,14 @@ import { NotificationController } from './notification.controller';
 import { NotificationSchema } from '../database/schemas/notification.schema';
 import { AuthModule } from '../auth/auth.module';
 import { User, UserSchema } from '../database/schemas/user.schema';
-import { Subscription, SubscriptionSchema } from '../database/schemas/subscription.schema';
-import { SubscriptionPlan, SubscriptionPlanSchema } from '../database/schemas/subscription-plan.schema';
+import {
+  Subscription,
+  SubscriptionSchema,
+} from '../database/schemas/subscription.schema';
+import {
+  SubscriptionPlan,
+  SubscriptionPlanSchema,
+} from '../database/schemas/subscription-plan.schema';
 
 @Global() // Make it global so other modules can use NotificationService easily
 @Module({

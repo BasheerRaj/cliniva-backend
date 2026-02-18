@@ -27,7 +27,7 @@ export class TransactionUtil {
     try {
       const session = await connection.startSession();
       session.startTransaction();
-      
+
       // If we haven't verified support yet, let's verify it now
       if (this.transactionsSupported === null) {
         try {
@@ -36,29 +36,31 @@ export class TransactionUtil {
           }
           // Attempt a lightweight command with the session to verify transaction support
           await connection.db.command({ ping: 1 }, { session });
-          
+
           this.transactionsSupported = true;
           this.logger.log('MongoDB transactions are supported (verified)');
         } catch (e) {
           // If checking fails, we assume no support
           await session.abortTransaction();
           await session.endSession();
-          
+
           this.transactionsSupported = false;
-          this.logger.warn(`MongoDB transactions not supported (standalone mode): ${e.message}`);
+          this.logger.warn(
+            `MongoDB transactions not supported (standalone mode): ${e.message}`,
+          );
           return { session: null, useTransaction: false };
         }
       }
-      
+
       return { session, useTransaction: true };
     } catch (error) {
       // Cache that transactions aren't supported
       this.transactionsSupported = false;
-      
+
       this.logger.warn(
         'MongoDB transactions not available (standalone mode). Proceeding without transaction.',
       );
-      
+
       return { session: null, useTransaction: false };
     }
   }
@@ -113,7 +115,10 @@ export class TransactionUtil {
    */
   static async withTransaction<T>(
     connection: Connection,
-    operation: (session: ClientSession | null, useTransaction: boolean) => Promise<T>,
+    operation: (
+      session: ClientSession | null,
+      useTransaction: boolean,
+    ) => Promise<T>,
   ): Promise<T> {
     const { session, useTransaction } = await this.startTransaction(connection);
 

@@ -148,8 +148,12 @@ describe('PatientService - Patient Creation (Task 7)', () => {
         expect(error).toBeInstanceOf(ConflictException);
         expect(error.response).toHaveProperty('ar');
         expect(error.response).toHaveProperty('en');
-        expect(error.response.ar).toBe('يوجد مريض مسجل برقم البطاقة هذا بالفعل');
-        expect(error.response.en).toBe('A patient with this card number already exists');
+        expect(error.response.ar).toBe(
+          'يوجد مريض مسجل برقم البطاقة هذا بالفعل',
+        );
+        expect(error.response.en).toBe(
+          'A patient with this card number already exists',
+        );
       }
     });
 

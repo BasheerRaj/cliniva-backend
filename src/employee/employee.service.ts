@@ -3,11 +3,10 @@ import {
   NotFoundException,
   BadRequestException,
   ConflictException,
-  ForbiddenException,
   Logger,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose';
+import { Model, Types, RootFilterQuery } from 'mongoose';
 import * as bcrypt from 'bcrypt';
 import { User } from '../database/schemas/user.schema';
 import { EmployeeProfile } from '../database/schemas/employee-profile.schema';
@@ -23,12 +22,8 @@ import {
   CreateEmployeeDocumentDto,
   UpdateEmployeeDocumentDto,
   CreateEmployeeShiftDto,
-  UpdateEmployeeShiftDto,
   BulkEmployeeActionDto,
-  EmployeePerformanceDto,
   EmployeeStatsDto,
-  AssignEmployeeDto,
-  EmployeeAttendanceDto,
   TerminateEmployeeDto,
 } from './dto';
 import { ValidationUtil } from '../common/utils/validation.util';
@@ -543,7 +538,7 @@ export class EmployeeService {
       {
         $unwind: {
           path: '$employeeProfile',
-          preserveNullAndEmptyArrays: false,
+          preserveNullAndEmptyArrays: true,
         },
       },
       {
@@ -636,7 +631,7 @@ export class EmployeeService {
       {
         $unwind: {
           path: '$employeeProfile',
-          preserveNullAndEmptyArrays: false,
+          preserveNullAndEmptyArrays: true,
         },
       },
       {
@@ -1022,7 +1017,7 @@ export class EmployeeService {
       {
         $unwind: {
           path: '$employeeProfile',
-          preserveNullAndEmptyArrays: false,
+          preserveNullAndEmptyArrays: true,
         },
       },
       {
@@ -1375,6 +1370,16 @@ export class EmployeeService {
     createDocumentDto: CreateEmployeeDocumentDto,
     uploadedByUserId?: string,
   ): Promise<any> {
+    // Validate userId is provided
+    if (!createDocumentDto.userId) {
+      throw new BadRequestException({
+        message: {
+          ar: 'معرف الموظف مطلوب',
+          en: 'Employee ID is required',
+        },
+      });
+    }
+
     // Validate employee exists
     const employee = await this.getEmployeeById(createDocumentDto.userId);
     if (!employee) {
@@ -1475,6 +1480,16 @@ export class EmployeeService {
   async createEmployeeShift(
     createShiftDto: CreateEmployeeShiftDto,
   ): Promise<any> {
+    // Validate userId is provided
+    if (!createShiftDto.userId) {
+      throw new BadRequestException({
+        message: {
+          ar: 'معرف الموظف مطلوب',
+          en: 'Employee ID is required',
+        },
+      });
+    }
+
     // Validate employee exists
     const employee = await this.getEmployeeById(createShiftDto.userId);
     if (!employee) {
@@ -1651,7 +1666,7 @@ export class EmployeeService {
       {
         $unwind: {
           path: '$employeeProfile',
-          preserveNullAndEmptyArrays: false,
+          preserveNullAndEmptyArrays: true,
         },
       },
       // Filter: Only active users and active employee profiles

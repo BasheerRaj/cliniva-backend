@@ -105,4 +105,4 @@ import { RateLimitService } from './rate-limit.service';
     RateLimitService,
   ],
 })
-export class AuthModule { }
+export class AuthModule {}

@@ -139,8 +139,9 @@ export class OrganizationService {
     }
 
     // Use MongoDB transaction to ensure data consistency (if replica set is available)
-    const { session, useTransaction } =
-      await TransactionUtil.startTransaction(this.connection);
+    const { session, useTransaction } = await TransactionUtil.startTransaction(
+      this.connection,
+    );
 
     try {
       // Prepare organization data with logo normalization

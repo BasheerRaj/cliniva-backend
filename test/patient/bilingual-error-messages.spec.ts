@@ -1,9 +1,9 @@
 /**
  * Bilingual Error Messages Test Suite
- * 
+ *
  * This test suite verifies that all error messages in the patient management module
  * are bilingual (Arabic & English) as required by Requirements 8.1-8.5.
- * 
+ *
  * Requirements Coverage:
  * - 8.1: Duplicate cardNumber error
  * - 8.2: Invalid ID error
@@ -224,7 +224,9 @@ describe('Patient Module - Bilingual Error Messages', () => {
       } catch (error) {
         expect(error).toBeInstanceOf(NotFoundException);
         verifyBilingualMessage(error);
-        expect(error.response.message).toEqual(ERROR_MESSAGES.PATIENT_NOT_FOUND);
+        expect(error.response.message).toEqual(
+          ERROR_MESSAGES.PATIENT_NOT_FOUND,
+        );
         expect(error.response.message.ar).toBe('المريض غير موجود');
         expect(error.response.message.en).toBe('Patient not found');
       }
@@ -245,7 +247,9 @@ describe('Patient Module - Bilingual Error Messages', () => {
       } catch (error) {
         expect(error).toBeInstanceOf(NotFoundException);
         verifyBilingualMessage(error);
-        expect(error.response.message).toEqual(ERROR_MESSAGES.PATIENT_NOT_FOUND);
+        expect(error.response.message).toEqual(
+          ERROR_MESSAGES.PATIENT_NOT_FOUND,
+        );
       }
     });
 
@@ -262,7 +266,9 @@ describe('Patient Module - Bilingual Error Messages', () => {
       } catch (error) {
         expect(error).toBeInstanceOf(NotFoundException);
         verifyBilingualMessage(error);
-        expect(error.response.message).toEqual(ERROR_MESSAGES.PATIENT_NOT_FOUND);
+        expect(error.response.message).toEqual(
+          ERROR_MESSAGES.PATIENT_NOT_FOUND,
+        );
       }
     });
   });
@@ -350,7 +356,9 @@ describe('Patient Module - Bilingual Error Messages', () => {
         expect(error).toBeInstanceOf(ConflictException);
         verifyBilingualMessage(error);
         expect(error.response.message).toEqual(ERROR_MESSAGES.DUPLICATE_EMAIL);
-        expect(error.response.message.ar).toBe('البريد الإلكتروني مستخدم بالفعل');
+        expect(error.response.message.ar).toBe(
+          'البريد الإلكتروني مستخدم بالفعل',
+        );
         expect(error.response.message.en).toBe('Email is already in use');
       }
     });
@@ -382,7 +390,9 @@ describe('Patient Module - Bilingual Error Messages', () => {
         verifyBilingualMessage(error);
         expect(error.response.message).toEqual(ERROR_MESSAGES.DUPLICATE_PHONE);
         expect(error.response.message.ar).toBe('رقم الهاتف مستخدم بالفعل');
-        expect(error.response.message.en).toBe('Phone number is already in use');
+        expect(error.response.message.en).toBe(
+          'Phone number is already in use',
+        );
       }
     });
 

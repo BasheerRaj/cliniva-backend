@@ -17,9 +17,9 @@ import { Transform } from 'class-transformer';
 
 /**
  * Data Transfer Object for creating a new patient.
- * 
+ *
  * Required fields: cardNumber, firstName, lastName, dateOfBirth, gender
- * 
+ *
  * Business Rules:
  * - cardNumber must be unique (Requirement 1.2)
  * - cardNumber is immutable after creation (Requirement 4.2)

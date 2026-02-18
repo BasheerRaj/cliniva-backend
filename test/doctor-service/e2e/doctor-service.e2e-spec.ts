@@ -364,9 +364,7 @@ describe('Doctor-Service Management (e2e)', () => {
       expect(response.body.success).toBe(true);
       expect(Array.isArray(response.body.data)).toBe(true);
       // doctor2 should be available (not assigned)
-      const doctor2 = response.body.data.find(
-        (d: any) => d._id === doctor2Id,
-      );
+      const doctor2 = response.body.data.find((d: any) => d._id === doctor2Id);
       expect(doctor2).toBeDefined();
       expect(doctor2.isAlreadyAssigned).toBe(false);
     });
@@ -377,9 +375,7 @@ describe('Doctor-Service Management (e2e)', () => {
         .set('Authorization', `Bearer ${adminToken}`)
         .expect(200);
 
-      const doctor1 = response.body.data.find(
-        (d: any) => d._id === doctor1Id,
-      );
+      const doctor1 = response.body.data.find((d: any) => d._id === doctor1Id);
       expect(doctor1).toBeDefined();
       expect(doctor1.isAlreadyAssigned).toBe(true);
     });
@@ -411,9 +407,7 @@ describe('Doctor-Service Management (e2e)', () => {
 
     it('should successfully deactivate doctor with no appointments', async () => {
       const response = await request(app.getHttpServer())
-        .patch(
-          `/services/${testServiceId}/doctors/${doctor1Id}/deactivate`,
-        )
+        .patch(`/services/${testServiceId}/doctors/${doctor1Id}/deactivate`)
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
           clinicId: testClinicId,
@@ -458,9 +452,7 @@ describe('Doctor-Service Management (e2e)', () => {
       });
 
       const response = await request(app.getHttpServer())
-        .patch(
-          `/services/${testServiceId}/doctors/${doctor1Id}/deactivate`,
-        )
+        .patch(`/services/${testServiceId}/doctors/${doctor1Id}/deactivate`)
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
           clinicId: testClinicId,
@@ -504,9 +496,7 @@ describe('Doctor-Service Management (e2e)', () => {
       });
 
       const response = await request(app.getHttpServer())
-        .patch(
-          `/services/${testServiceId}/doctors/${doctor1Id}/deactivate`,
-        )
+        .patch(`/services/${testServiceId}/doctors/${doctor1Id}/deactivate`)
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
           clinicId: testClinicId,
@@ -663,7 +653,9 @@ describe('Doctor-Service Management (e2e)', () => {
         .expect(200);
 
       expect(response.body.success).toBe(true);
-      expect(response.body.data.notes).toBe('Updated notes for this assignment');
+      expect(response.body.data.notes).toBe(
+        'Updated notes for this assignment',
+      );
 
       // Verify in database
       const updated = await doctorServiceModel.findOne({
@@ -687,4 +679,3 @@ describe('Doctor-Service Management (e2e)', () => {
     });
   });
 });
-

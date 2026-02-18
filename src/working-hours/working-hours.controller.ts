@@ -1658,7 +1658,10 @@ export class WorkingHoursController {
         message: {
           type: 'object',
           properties: {
-            ar: { type: 'string', example: 'لم يتم تكوين ساعات العمل للمستخدم' },
+            ar: {
+              type: 'string',
+              example: 'لم يتم تكوين ساعات العمل للمستخدم',
+            },
             en: {
               type: 'string',
               example: 'No working hours configured for user',

@@ -376,9 +376,7 @@ describe('Service-Offer Management (e2e)', () => {
 
     it('should successfully deactivate discount', async () => {
       const response = await request(app.getHttpServer())
-        .patch(
-          `/services/${testServiceId}/discounts/${testOfferId}/deactivate`,
-        )
+        .patch(`/services/${testServiceId}/discounts/${testOfferId}/deactivate`)
         .set('Authorization', `Bearer ${adminToken}`)
         .expect(200);
 
@@ -561,4 +559,3 @@ describe('Service-Offer Management (e2e)', () => {
     });
   });
 });
-

@@ -35,4 +35,3 @@ import { AuthModule } from '../auth/auth.module';
   exports: [DoctorServiceService],
 })
 export class DoctorServiceModule {}
-

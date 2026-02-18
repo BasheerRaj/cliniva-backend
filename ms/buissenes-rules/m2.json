@@ -1,0 +1,155 @@
+{
+  "module": "Medical Facilities Management",
+  "subModules": [
+    {
+      "name": "Company and Complexes Management",
+      "userStories": [
+        {
+          "id": "US-6d5c4b3",
+          "name": "Choosing the plan",
+          "businessRules": [
+            {
+              "id": "BZR-p6a2d9c0",
+              "statement": "When creating the company plan and skipping the filling of the complex, the filling of the clinic is also skipped."
+            },
+            {
+              "id": "BZR-y9f4a2c6",
+              "statement": "If plan (1) is selected, only one company can be created in the system, and this company remains the only one allowed under this plan."
+            },
+            {
+              "id": "BZR-d0e9a1c5",
+              "statement": "In the complex plan or clinic plan, clinic details cannot be filled before filling the complex details."
+            },
+            {
+              "id": "BZR-y9f4a2c0",
+              "statement": "If Plan (2) is selected, no more than one complex can be created in the system, and this complex remains the only one allowed under this plan."
+            },
+            {
+              "id": "BZR-e3f7b6d2",
+              "statement": "When creating the plan and setting the working schedule for the clinic, the clinic filling step is automatically populated with the working days and hours of the complex after opening it."
+            },
+            {
+              "id": "BZR-e3f7b6d0",
+              "statement": "If Plan (3) is selected, no more than one clinic can be created in the system, and this clinic remains the only one allowed under this plan."
+            }
+          ]
+        },
+        {
+          "id": "US-68955c52",
+          "name": "View list of complexes",
+          "businessRules": [
+            {
+              "id": "BZR-t5f9a0d4",
+              "statement": "The column Scheduled Appointments Count represents the number of active scheduled appointments in the system related to this complex."
+            },
+            {
+              "id": "BZR-v2a3e4b9",
+              "statement": "The column Clinics Assigned Count represents the number of only active clinics assigned to this complex."
+            },
+            {
+              "id": "BZR-9c0d1e2f",
+              "statement": "When a new facility is created, capacity values for doctors, staff, and patients are entered only at the clinic level. In the facility details page, the total capacity is automatically calculated as the sum of capacities across all associated clinics and cannot be edited at the facility level."
+            }
+          ]
+        },
+        {
+          "id": "US-f5ba411e",
+          "name": "Add a new complex",
+          "businessRules": [
+            {
+              "id": "BZR-s7f3d0a6",
+              "statement": "When creating a new complex, the person in charge (PIC) is assigned from the list of employees designated to work in that complex."
+            }
+          ]
+        },
+        {
+          "id": "US-007c2f48",
+          "name": "View complex details",
+          "businessRules": [
+            {
+              "id": "BZR-1a2b3c4d",
+              "statement": "The capacities of a complex are automatically calculated by summing the respective capacities of all clinics under the complex and are dynamically updated whenever any clinic's capacity is modified."
+            }
+          ]
+        },
+        {
+          "id": "US-4f796e55",
+          "name": "Edit complex details",
+          "businessRules": [
+            {
+              "id": "BZR-w6f0c5d1",
+              "statement": "When editing the complex details, if an attempt is made to delete a department assigned to one of its clinics, the delete action is disabled with a tooltip explaining that the department is linked to a clinic."
+            }
+          ]
+        },
+        {
+          "id": "US-34c9d57a",
+          "name": "Change complex status",
+          "businessRules": [
+            {
+              "id": "BZR-5d6e7f8a",
+              "statement": "If a complex is deactivated, all services under it are automatically deactivated."
+            },
+            {
+              "id": "BZR-x1d3b7e8",
+              "statement": "When changing the status of a complex that contains clinics, all associated clinics with their medical staff and appointments must be transferred to another complex before completing the change. Conflicting active appointments are marked as Needs Rescheduling."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Clinic and Specialties Management",
+      "userStories": [
+        {
+          "id": "US-0df9ba23",
+          "name": "View clinic details",
+          "businessRules": [
+            {
+              "id": "BZR-s3e2b6c1",
+              "statement": "When creating a clinic, its capacity for patients, doctors, and staff must be specified. If the assigned number exceeds the defined capacity, the system highlights the exceeded capacity in red without blocking the assignment."
+            }
+          ]
+        },
+        {
+          "id": "US-ba0f99e4",
+          "name": "Add a new clinic to the system",
+          "businessRules": [
+            {
+              "id": "BZR-v8e3c1b6",
+              "statement": "Appointments are scheduled according to the session duration or slot set for the clinic. The end time is automatically calculated based on the start time with the option to modify."
+            },
+            {
+              "id": "BZR-x2d3b7e9",
+              "statement": "The person in charge (PIC) of the clinic is selected from those previously assigned as PICs for the complex to which the clinic belongs."
+            }
+          ]
+        },
+        {
+          "id": "US-4m5n6o7p",
+          "name": "Edit clinic details",
+          "businessRules": [
+            {
+              "id": "BZR-o9b1e7d4",
+              "statement": "When editing the clinic working hours, the new hours must be within the working hours of the complex; saving changes is not allowed if this range is exceeded."
+            },
+            {
+              "id": "BZR-n5f0c3e6",
+              "statement": "If the clinic’s working hours are modified and there is a conflict with active appointments or assigned doctors and staff, a conflict notification appears and all affected appointments are marked as needing rescheduling only if there is an actual conflict."
+            }
+          ]
+        },
+        {
+          "id": "US-4o5p6q7r",
+          "name": "Change clinic status",
+          "businessRules": [
+            {
+              "id": "BZR-z0e7b5d3",
+              "statement": "When changing the status of a clinic with scheduled appointments and doctors, the system requires choosing whether to keep or transfer the doctors, with the option to transfer staff, selecting a new clinic or department for transfer, showing a warning before execution, and confirming success after the update."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

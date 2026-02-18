@@ -1,0 +1,165 @@
+### Final Test - User Documents and Shifts
+### Description: Verify user creation, document upload, and shift management (UC-7a6b5c4, Employee Document & Shift)
+
+@baseUrl = http://localhost:4001/api/v1
+@contentType = application/json
+
+###############################################################################
+# 1. Super Admin Login
+###############################################################################
+
+### 1.1 Super Admin Login
+# @name adminLogin
+POST {{baseUrl}}/auth/login
+Content-Type: {{contentType}}
+
+{
+  "email": "superadmin@cliniva.com",
+  "password": "SuperAdmin123!"
+}
+
+###
+@adminAccessToken = {{adminLogin.response.body.access_token}}
+
+###############################################################################
+# 2. User Creation (Staff/Doctor)
+###############################################################################
+
+### 2.1 Create a new Staff User
+# @name createStaffUser
+POST {{baseUrl}}/users
+Authorization: Bearer {{adminAccessToken}}
+Content-Type: {{contentType}}
+
+{
+  "email": "employee.test@test.com",
+  "firstName": "Employee",
+  "lastName": "Test",
+  "role": "staff",
+  "phone": "+966500000010",
+  "nationality": "SA",
+  "gender": "female"
+}
+
+###
+@employeeId = {{createStaffUser.response.body.data.id}}
+
+###############################################################################
+# 3. Document Upload and Linking
+###############################################################################
+
+### 3.1 Upload Document to system
+# @name uploadFile
+POST {{baseUrl}}/upload/document
+Authorization: Bearer {{adminAccessToken}}
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
+
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="document"; filename="test-contract.pdf"
+Content-Type: application/pdf
+
+< d:/client.jpg
+------WebKitFormBoundary7MA4YWxkTrZu0gW--
+
+###
+@documentUrl = {{uploadFile.response.body.data.url}}
+
+### 3.2 Link Document to Employee (UC-7a6b5c4 sections: documents)
+# @name linkDocument
+POST {{baseUrl}}/employees/{{employeeId}}/documents
+Authorization: Bearer {{adminAccessToken}}
+Content-Type: {{contentType}}
+
+{
+  "userId": "{{employeeId}}",
+  "documentType": "contract",
+  "documentName": "Employment Contract 2026",
+  "fileUrl": "{{documentUrl}}",
+  "expiryDate": "2027-12-31T00:00:00.000Z",
+  "notes": "Annual contract for testing"
+}
+
+# Expected: 201 Created
+# Expected: data.userId == employeeId
+
+###############################################################################
+# 4. Working Hours Management
+###############################################################################
+
+### 4.1 Create Working Hours for User (UC-first-login, UC-7a6b5c4 sections: working_schedule)
+# @name createWorkingHours
+POST {{baseUrl}}/working-hours
+Authorization: Bearer {{adminAccessToken}}
+Content-Type: {{contentType}}
+
+{
+  "entityType": "user",
+  "entityId": "{{employeeId}}",
+  "schedule": [
+    {
+      "dayOfWeek": "monday",
+      "isWorkingDay": true,
+      "openingTime": "08:00",
+      "closingTime": "17:00",
+      "breakStartTime": "12:00",
+      "breakEndTime": "13:00"
+    },
+    {
+      "dayOfWeek": "tuesday",
+      "isWorkingDay": true,
+      "openingTime": "08:00",
+      "closingTime": "17:00"
+    },
+    {
+      "dayOfWeek": "wednesday",
+      "isWorkingDay": true,
+      "openingTime": "08:00",
+      "closingTime": "17:00"
+    },
+    {
+      "dayOfWeek": "thursday",
+      "isWorkingDay": true,
+      "openingTime": "08:00",
+      "closingTime": "17:00"
+    },
+    {
+      "dayOfWeek": "friday",
+      "isWorkingDay": false
+    },
+    {
+      "dayOfWeek": "saturday",
+      "isWorkingDay": false
+    },
+    {
+      "dayOfWeek": "sunday",
+      "isWorkingDay": false
+    }
+  ]
+}
+
+# Expected: 201 Created
+# Note: Working hours are unique per day. Use 'shifts' for multiple intervals per day.
+
+### 4.2 Verify User Working Hours
+GET {{baseUrl}}/working-hours/user/{{employeeId}}
+Authorization: Bearer {{adminAccessToken}}
+
+# Expected: 200 OK
+# Expected: Returns the full weekly schedule for the user
+
+### 4.3 Verify Employee Profile (Including Documents and Working Hours)
+GET {{baseUrl}}/employees/{{employeeId}}
+Authorization: Bearer {{adminAccessToken}}
+
+# Expected: 200 OK
+# Expected: Response contains user, profile, documents, and shifts/working hours info
+
+###############################################################################
+# 5. Cleanup
+###############################################################################
+
+### 5.1 Delete Employee (Soft Delete)
+DELETE {{baseUrl}}/employees/{{employeeId}}
+Authorization: Bearer {{adminAccessToken}}
+
+# Expected: 200 OK

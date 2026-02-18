@@ -1,0 +1,153 @@
+{
+  "module": "Security & User Management",
+  "subModules": [
+    {
+      "name": "Authentication",
+      "userStories": [
+        {
+          "id": "US-32c52391",
+          "name": "Log in to the system",
+          "businessRules": [
+            {
+              "id": "BZR-a9f3e7c1",
+              "statement": "First Login Alert: Upon first login by a staff member, a notification will prompt the user to update their password for security purposes."
+            },
+            {
+              "id": "BZR-b2d4a8f6",
+              "statement": "When clicking on the Username field, all saved names in the system will be displayed. Upon selection, the password field will be filled in with a request for identity verification."
+            }
+          ]
+        },
+        {
+          "id": "US-8ef5d90b",
+          "name": "Log out from the system",
+          "businessRules": [
+            {
+              "id": "BZR-c1e9f0a4",
+              "statement": "Logout During Editing: If a user logs out while in Fill-in or Edit mode, a confirmation dialog appears asking to save or discard changes."
+            },
+            {
+              "id": "BZR-d5a1b6e3",
+              "statement": "Session Restoration: If a session ends while viewing a specific page, the same page will be restored upon next login."
+            },
+            {
+              "id": "BZR-e8c2d3f9",
+              "statement": "Admin Edits Username: When an Admin modifies a Username, the user is automatically logged out."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "User Management",
+      "userStories": [
+        {
+          "id": "US-570149f3",
+          "name": "Add a new user account",
+          "businessRules": [
+            {
+              "id": "BZR-f0a4b7d2",
+              "statement": "Work Hours Reset Warning: When editing user account data in step 3 and returning to step 1 to change the assigned complex/clinic, the user will be warned that changing the facility will clear work hours."
+            },
+            {
+              "id": "BZR-k3b5f8d1",
+              "statement": "Work Hours Checkbox Logic: In step 3 of user creation, unchecked workdays are disabled. They become active only when the checkbox is selected."
+            },
+            {
+              "id": "BZR-f1c0a9e4",
+              "statement": "Clinic Working Hours Validation: In step 3 of user creation, selected hours must fall within the complex/clinic operating hours. If not, a warning will specify the issue and how to resolve it."
+            },
+            {
+              "id": "BZR-u5a0f7d3",
+              "statement": "Only hours within the clinic’s working hours can be selected. If hours outside the range are selected, a warning will appear explaining the issue and how to resolve it."
+            },
+            {
+              "id": "BZR-h5e4c7a0",
+              "statement": "When adding a new user account (Doctor), the working hours are auto-filled with the clinic’s working hours assigned to them, with the possibility to modify."
+            },
+            {
+              "id": "BZR-r2b4e5c7",
+              "statement": "When adding a new user account (Staff), the working hours are auto-filled with the complex’s working hours assigned to them, with the possibility to modify."
+            },
+            {
+              "id": "BZR-g3e5c9a0",
+              "statement": "When adding a new user account and selecting a complex, only the clinics affiliated with that complex will be suggested in the clinic assignment dropdown."
+            },
+            {
+              "id": "BZR-5e6f7a8b",
+              "statement": "An employee can be assigned to only one medical complex, but can be assigned to one or more clinics within that complex."
+            },
+            {
+              "id": "BZR-h7f1d6b2",
+              "statement": "When adding a new user account and selecting a complex/clinic, only the available working hours within that complex/clinic will be suggested."
+            },
+            {
+              "id": "BZR-i4c3e2f7",
+              "statement": "When adding a new user account and selecting Plan 2, the complex field will be auto-filled and non-editable."
+            },
+            {
+              "id": "BZR-j8a9f0d5",
+              "statement": "When adding a new user account and selecting Plan 3, the complex field will be hidden, and the clinic field will be auto-filled and non-editable."
+            }
+          ]
+        },
+        {
+          "id": "US-91a5d3c7",
+          "name": "View User Details",
+          "businessRules": [
+            {
+              "id": "BZR-j0c9a4e2",
+              "statement": "In the user account details, when clicking on the button to send a new password, a link will be sent to the user’s email where they can enter their new password in case it was forgotten."
+            }
+          ]
+        },
+        {
+          "id": "US-4bdf58de",
+          "name": "Edit a user account",
+          "businessRules": [
+            {
+              "id": "BZR-k2b7d3a6",
+              "statement": "When modifying the user's Username, the user will be logged out and the new Username will be sent to their email."
+            },
+            {
+              "id": "BZR-i7d3f1b6",
+              "statement": "When modifying the user Role, the user will be logged out, and upon re-logging in, they will have the new permissions."
+            },
+            {
+              "id": "BZR-l9e0f1c4",
+              "statement": "When modifying the doctor’s working hours, their appointments (after the modification date and on the modified day only) will be shifted to the new working hours. The appointment status will not be “Reschedule” until the staff confirms the change with the patients."
+            }
+          ]
+        },
+        {
+          "id": "US-02ace2cd",
+          "name": "Change User Status",
+          "businessRules": [
+            {
+              "id": "BZR-n0c4e9f2",
+              "statement": "When deactivating an account currently logged in, the status modification icon will be disabled, with a tooltip explaining the reason."
+            },
+            {
+              "id": "BZR-q4f3e1b8",
+              "statement": "When deactivating a user account, they can no longer be assigned to anything in the system and will not appear in any dropdown list."
+            },
+            {
+              "id": "BZR-q0d8a9f1",
+              "statement": "When deactivating a doctor’s account who has appointments, a dialog will appear asking to assign another doctor to transfer the appointments to. It’s possible to skip the transfer, but the status of those appointments will become (Reschedule)."
+            }
+          ]
+        },
+        {
+          "id": "US-0b8e6ae3",
+          "name": "Delete a user account",
+          "businessRules": [
+            {
+              "id": "BZR-m3d5a8b7",
+              "statement": "When deleting an account currently logged in, the delete icon will be disabled, with a tooltip explaining the reason."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

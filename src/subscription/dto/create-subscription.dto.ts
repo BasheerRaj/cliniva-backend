@@ -27,7 +27,8 @@ export class CreateSubscriptionDto {
   subscriptionPlanId: string;
 
   @ApiPropertyOptional({
-    description: 'Type of subscription plan (optional, will be auto-detected from plan)',
+    description:
+      'Type of subscription plan (optional, will be auto-detected from plan)',
     enum: ['company', 'complex', 'clinic'],
     example: 'complex',
   })

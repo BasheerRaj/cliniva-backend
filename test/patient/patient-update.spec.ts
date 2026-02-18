@@ -1,6 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getModelToken, getConnectionToken } from '@nestjs/mongoose';
-import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 import { Types } from 'mongoose';
 import { PatientService } from '../../src/patient/patient.service';
 import { Patient } from '../../src/database/schemas/patient.schema';
@@ -117,7 +121,11 @@ describe('PatientService - Update Operations', () => {
           }),
         });
 
-        const result = await service.updatePatient(mockPatientId, updateDto, mockUserId);
+        const result = await service.updatePatient(
+          mockPatientId,
+          updateDto,
+          mockUserId,
+        );
 
         expect(result.firstName).toBe('Jane');
         expect(result.lastName).toBe('Smith');
@@ -161,7 +169,11 @@ describe('PatientService - Update Operations', () => {
           }),
         });
 
-        const result = await service.updatePatient(mockPatientId, updateDto, mockUserId);
+        const result = await service.updatePatient(
+          mockPatientId,
+          updateDto,
+          mockUserId,
+        );
 
         expect(result.email).toBe('newemail@example.com');
       });
@@ -179,7 +191,11 @@ describe('PatientService - Update Operations', () => {
           }),
         });
 
-        const result = await service.updatePatient(mockPatientId, updateDto, mockUserId);
+        const result = await service.updatePatient(
+          mockPatientId,
+          updateDto,
+          mockUserId,
+        );
 
         expect(result.email).toBe('john.doe@example.com');
       });
@@ -226,7 +242,11 @@ describe('PatientService - Update Operations', () => {
           }),
         });
 
-        const result = await service.updatePatient(mockPatientId, updateDto, mockUserId);
+        const result = await service.updatePatient(
+          mockPatientId,
+          updateDto,
+          mockUserId,
+        );
 
         expect(result.phone).toBe('+1111111111');
       });
@@ -361,7 +381,11 @@ describe('PatientService - Update Operations', () => {
         }),
       });
 
-      const result = await service.updatePatient(mockPatientId, updateDto, mockUserId);
+      const result = await service.updatePatient(
+        mockPatientId,
+        updateDto,
+        mockUserId,
+      );
 
       expect(result).toBeDefined();
       expect(result.firstName).toBe('Jane');
@@ -459,7 +483,11 @@ describe('PatientService - Update Operations', () => {
           }),
         });
 
-        const result = await service.updatePatient(mockPatientId, updateDto, mockUserId);
+        const result = await service.updatePatient(
+          mockPatientId,
+          updateDto,
+          mockUserId,
+        );
 
         expect(result.emergencyContactName).toBe('Jane Doe');
         expect(result.emergencyContactPhone).toBe('+1234567890');

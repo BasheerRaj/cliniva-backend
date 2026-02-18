@@ -8,10 +8,10 @@ import { Response } from 'express';
 
 /**
  * Custom exception filter to handle validation errors with bilingual messages.
- * 
+ *
  * This filter intercepts BadRequestException thrown by class-validator and
  * parses JSON-stringified bilingual messages from DTO decorators.
- * 
+ *
  * @example
  * // In DTO:
  * @IsEmail({}, {
@@ -20,7 +20,7 @@ import { Response } from 'express';
  *     en: 'Invalid email address'
  *   })
  * })
- * 
+ *
  * // Filter converts to:
  * {
  *   success: false,
@@ -42,10 +42,7 @@ export class ValidationExceptionFilter implements ExceptionFilter {
     const exceptionResponse: any = exception.getResponse();
 
     // Check if this is a validation error from class-validator
-    if (
-      exceptionResponse.message &&
-      Array.isArray(exceptionResponse.message)
-    ) {
+    if (exceptionResponse.message && Array.isArray(exceptionResponse.message)) {
       // Parse bilingual messages from validation errors
       const errors = exceptionResponse.message.map((msg: string) => {
         try {
@@ -85,7 +82,10 @@ export class ValidationExceptionFilter implements ExceptionFilter {
     }
 
     // Check if this is a custom exception with bilingual message
-    if (exceptionResponse.message && typeof exceptionResponse.message === 'object') {
+    if (
+      exceptionResponse.message &&
+      typeof exceptionResponse.message === 'object'
+    ) {
       return response.status(status).json({
         success: false,
         error: {

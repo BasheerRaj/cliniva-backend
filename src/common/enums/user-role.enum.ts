@@ -47,7 +47,12 @@ export const RoleHierarchy: Record<UserRole, UserRole[]> = {
     UserRole.STAFF,
     UserRole.PATIENT,
   ],
-  [UserRole.ADMIN]: [UserRole.MANAGER, UserRole.DOCTOR, UserRole.STAFF, UserRole.PATIENT],
+  [UserRole.ADMIN]: [
+    UserRole.MANAGER,
+    UserRole.DOCTOR,
+    UserRole.STAFF,
+    UserRole.PATIENT,
+  ],
   [UserRole.MANAGER]: [UserRole.DOCTOR, UserRole.STAFF, UserRole.PATIENT],
   [UserRole.DOCTOR]: [UserRole.PATIENT],
   [UserRole.STAFF]: [UserRole.PATIENT],

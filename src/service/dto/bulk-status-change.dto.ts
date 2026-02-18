@@ -70,5 +70,3 @@ export class BulkStatusChangeDto {
   @IsOptional()
   notifyPatients?: boolean;
 }
-
-

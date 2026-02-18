@@ -1,0 +1,145 @@
+### Final Test - User Management (Security & User Management Module M1)
+### Description: Verify user listing, activation, and deactivation functionality (UC-a9b8c7d, UC-f5e6d7c, UC-6b5a4c3)
+
+@baseUrl = http://localhost:4001/api/v1
+@contentType = application/json
+
+###############################################################################
+# 1. Super Admin Login
+###############################################################################
+
+### 1.1 Super Admin Login
+# @name adminLogin
+POST {{baseUrl}}/auth/login
+Content-Type: {{contentType}}
+
+{
+  "email": "superadmin@cliniva.com",
+  "password": "SuperAdmin123!"
+}
+
+###
+@adminAccessToken = {{adminLogin.response.body.access_token}}
+
+###############################################################################
+# 2. User Management Operations
+###############################################################################
+
+### 2.1 Get Users List (Paginated)
+# @name getUsers
+GET {{baseUrl}}/users?page=1&limit=10&sortBy=createdAt&sortOrder=desc
+Authorization: Bearer {{adminAccessToken}}
+
+# Expected: 200 OK
+# Expected: data.users array containing user objects
+# Expected: data.total, data.page, data.limit fields
+
+###
+@targetUserId = {{getUsers.response.body.data.users[0]._id}}
+
+### 2.2 Create a test user to deactivate/activate (UC-7a6b5c4)
+# @name createTestUser
+POST {{baseUrl}}/users
+Authorization: Bearer {{adminAccessToken}}
+Content-Type: {{contentType}}
+
+{
+  "email": "test.user.m1@test.com",
+  "firstName": "M1-Test",
+  "lastName": "User",
+  "role": "staff",
+  "phone": "+966500000009",
+  "nationality": "SA",
+  "gender": "male"
+}
+
+###
+@testUserId = {{createTestUser.response.body.data.id}}
+
+### 2.3 Deactivate User (UC-f5e6d7c)
+# @name deactivateUser
+PATCH {{baseUrl}}/users/{{testUserId}}/status
+Authorization: Bearer {{adminAccessToken}}
+Content-Type: {{contentType}}
+
+{
+  "isActive": false
+}
+
+# Expected: 200 OK
+# Expected: message.en == "User deactivated successfully"
+# Expected: data.isActive == false
+
+### 2.4 Verify User Status is Deactivated
+GET {{baseUrl}}/users/{{testUserId}}
+Authorization: Bearer {{adminAccessToken}}
+
+# Expected: 200 OK
+# Expected: data.isActive == false
+
+### 2.5 Try to login with deactivated user (Should fail)
+POST {{baseUrl}}/auth/login
+Content-Type: {{contentType}}
+
+{
+  "email": "test.user.m1@test.com",
+  "password": "{{createTestUser.response.body.data.temporaryPassword}}"
+}
+
+# Expected: 401 Unauthorized
+# Expected: Error message about account being inactive
+
+### 2.6 Activate User (UC-6b5a4c3)
+# @name activateUser
+PATCH {{baseUrl}}/users/{{testUserId}}/status
+Authorization: Bearer {{adminAccessToken}}
+Content-Type: {{contentType}}
+
+{
+  "isActive": true
+}
+
+# Expected: 200 OK
+# Expected: message.en == "User activated successfully"
+# Expected: data.isActive == true
+
+### 2.7 Verify User Status is Activated
+GET {{baseUrl}}/users/{{testUserId}}
+Authorization: Bearer {{adminAccessToken}}
+
+# Expected: 200 OK
+# Expected: data.isActive == true
+
+### 2.8 Search Users by Name
+GET {{baseUrl}}/users?search=M1-Test
+Authorization: Bearer {{adminAccessToken}}
+
+# Expected: 200 OK
+# Expected: data.users array contains the test user
+
+### 2.9 Filter Users by Role
+GET {{baseUrl}}/users?role=staff
+Authorization: Bearer {{adminAccessToken}}
+
+# Expected: 200 OK
+# Expected: All users in the list have role "staff"
+
+###############################################################################
+# 3. Cleanup (Optional - Delete the test user)
+###############################################################################
+
+### 3.1 Deactivate again before deletion (Rule: User must be deactivated)
+PATCH {{baseUrl}}/users/{{testUserId}}/status
+Authorization: Bearer {{adminAccessToken}}
+Content-Type: {{contentType}}
+
+{
+  "isActive": false
+}
+
+### 3.2 Delete test user (UC-3a2b1c0)
+DELETE {{baseUrl}}/users/{{testUserId}}
+Authorization: Bearer {{adminAccessToken}}
+
+# Expected: 200 OK
+# Expected: message.en == "User deleted successfully"

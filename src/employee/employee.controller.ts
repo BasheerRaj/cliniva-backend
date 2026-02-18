@@ -312,7 +312,7 @@ export class EmployeeController {
   @ApiOperation({
     summary: 'Get current user employee profile',
     description:
-      'Retrieves the authenticated user\'s employee profile including employee number, job title, salary, date of hiring, certifications, and documents.',
+      "Retrieves the authenticated user's employee profile including employee number, job title, salary, date of hiring, certifications, and documents.",
   })
   @ApiResponse({
     status: 200,

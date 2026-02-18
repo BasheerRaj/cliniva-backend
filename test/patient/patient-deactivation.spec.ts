@@ -177,7 +177,9 @@ describe('PatientService - Deactivation with Transactions (Task 3)', () => {
 
       // Mock patient update to succeed
       mockPatientModel.findOneAndUpdate.mockReturnValue({
-        exec: jest.fn().mockResolvedValue({ ...mockPatient, status: 'Inactive' }),
+        exec: jest
+          .fn()
+          .mockResolvedValue({ ...mockPatient, status: 'Inactive' }),
       });
 
       // Mock appointment cancellation to fail
@@ -313,7 +315,9 @@ describe('PatientService - Deactivation with Transactions (Task 3)', () => {
 
       // Mock patient update
       mockPatientModel.findOneAndUpdate.mockReturnValue({
-        exec: jest.fn().mockResolvedValue({ ...mockPatient, status: 'Inactive' }),
+        exec: jest
+          .fn()
+          .mockResolvedValue({ ...mockPatient, status: 'Inactive' }),
       });
 
       // Mock appointment cancellation with 5 appointments
@@ -350,7 +354,9 @@ describe('PatientService - Deactivation with Transactions (Task 3)', () => {
 
       // Mock patient update
       mockPatientModel.findOneAndUpdate.mockReturnValue({
-        exec: jest.fn().mockResolvedValue({ ...mockPatient, status: 'Inactive' }),
+        exec: jest
+          .fn()
+          .mockResolvedValue({ ...mockPatient, status: 'Inactive' }),
       });
 
       // Mock appointment cancellation with 0 appointments

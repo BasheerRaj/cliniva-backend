@@ -224,10 +224,10 @@ export class ValidationUtil {
     // - Followed by 4-14 digits for the phone number
     // - Total length: 8-18 characters (including +)
     const internationalPhoneRegex = /^\+[1-9]\d{1,14}$/;
-    
+
     // Remove spaces and dashes for validation
     const cleanPhone = phone.replace(/[\s-]/g, '');
-    
+
     return internationalPhoneRegex.test(cleanPhone);
   }
 

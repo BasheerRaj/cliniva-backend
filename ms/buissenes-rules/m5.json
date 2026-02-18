@@ -1,0 +1,140 @@
+{
+  "module": "Patients Management",
+  "subModules": [
+    {
+      "name": "Patient Records",
+      "userStories": [
+        {
+          "id": "US-92c2702e",
+          "name": "Add a New Patient",
+          "businessRules": [
+            {
+              "id": "BZR-5c6d7e8f",
+              "statement": ""
+            }
+          ]
+        },
+        {
+          "id": "US-727572cb",
+          "name": "View List of Patients",
+          "businessRules": [
+            {
+              "id": "BZR-9a0b1c2d",
+              "statement": ""
+            }
+          ]
+        },
+        {
+          "id": "US-df4c3465",
+          "name": "View Patient Details",
+          "businessRules": [
+            {
+              "id": "BZR-3e4f5a6b",
+              "statement": ""
+            }
+          ]
+        },
+        {
+          "id": "US-778f115c",
+          "name": "Edit Patient Personal Details",
+          "businessRules": [
+            {
+              "id": "BZR-7c8d9e0f",
+              "statement": ""
+            }
+          ]
+        },
+        {
+          "id": "US-df4c5465",
+          "name": "Delete Patient",
+          "businessRules": [
+            {
+              "id": "BZR-b1c2d3e4",
+              "statement": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Electronic Medical Records (EMR)",
+      "userStories": [
+        {
+          "id": "US-9b3d8a72",
+          "name": "View Patient's Medical Record Details",
+          "businessRules": [
+            {
+              "id": "BZR-f5a6b7c8",
+              "statement": ""
+            }
+          ]
+        },
+        {
+          "id": "US-99b9083f",
+          "name": "Edit Medical Record",
+          "businessRules": [
+            {
+              "id": "BZR-0d1e2f3a",
+              "statement": ""
+            }
+          ]
+        },
+        {
+          "id": "US-47291ad8",
+          "name": "Delete Medical Record",
+          "businessRules": [
+            {
+              "id": "BZR-4c5d6e7f",
+              "statement": ""
+            }
+          ]
+        },
+        {
+          "id": "US-edda676a",
+          "name": "View All Electronic Medical Records (EMRs)",
+          "businessRules": [
+            {
+              "id": "BZR-8a9b0c1d",
+              "statement": ""
+            }
+          ]
+        },
+        {
+          "id": "US-a79c8e38",
+          "name": "Attach Lab Test Results & Imaging",
+          "businessRules": [
+            {
+              "id": "BZR-c4d5e6f7",
+              "statement": ""
+            }
+          ]
+        },
+        {
+          "id": "US-f49da018",
+          "name": "Export Patient Electronic Medical Record (EMR)",
+          "businessRules": [
+            {
+              "id": "BZR-a8b9c0d1",
+              "statement": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Notifications",
+      "userStories": [
+        {
+          "id": "US-405a92af",
+          "name": "Send Reminders for Follow-ups and Tests",
+          "businessRules": [
+            {
+              "id": "BZR-1f2a3b4c",
+              "statement": ""
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

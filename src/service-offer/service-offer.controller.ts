@@ -113,14 +113,14 @@ export class ServiceOfferController {
       (!offer.endsAt || new Date(offer.endsAt) >= now);
 
     const resultObj = result.toObject ? result.toObject() : result;
-    
+
     return {
       _id: result._id,
       serviceId: result.serviceId,
       offerId: result.offerId,
       isActive: result.isActive,
       appliedCount: result.appliedCount,
-      createdAt: (resultObj as any).createdAt,
+      createdAt: resultObj.createdAt,
       offer: {
         _id: offer._id,
         name: offer.name,
@@ -356,4 +356,3 @@ export class ServiceOfferController {
     return this.serviceOfferService.calculateServicePrice(serviceId, dto);
   }
 }
-

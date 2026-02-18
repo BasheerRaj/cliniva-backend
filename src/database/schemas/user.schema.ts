@@ -92,7 +92,11 @@ export class User extends Document {
   @Prop({
     type: {
       language: { type: String, enum: ['ar', 'en'], default: 'en' },
-      theme: { type: String, enum: ['light', 'dark', 'auto'], default: 'light' },
+      theme: {
+        type: String,
+        enum: ['light', 'dark', 'auto'],
+        default: 'light',
+      },
       notifications: {
         email: { type: Boolean, default: true },
         sms: { type: Boolean, default: false },

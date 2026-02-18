@@ -127,7 +127,7 @@ export class OnboardingService {
     private readonly dynamicInfoService: DynamicInfoService,
     private readonly userAccessService: UserAccessService,
     private readonly userService: UserService,
-  ) { }
+  ) {}
 
   /**
    * Complete onboarding process
@@ -478,7 +478,10 @@ export class OnboardingService {
           if (subscription) {
             // Check if planId is populated (object) or just an ID
             if (subscription.planId) {
-              if (typeof subscription.planId === 'object' && 'name' in subscription.planId) {
+              if (
+                typeof subscription.planId === 'object' &&
+                'name' in subscription.planId
+              ) {
                 // planId is populated with SubscriptionPlan document
                 planType = (subscription.planId as any).name || null;
               } else {
@@ -751,13 +754,17 @@ export class OnboardingService {
       }
 
       // Get subscription to determine plan type
-      const subscription = await this.subscriptionService.getSubscriptionByUser(userId);
+      const subscription =
+        await this.subscriptionService.getSubscriptionByUser(userId);
       let planType: 'company' | 'complex' | 'clinic' = 'clinic';
 
       if (subscription) {
         // Check if planId is populated (object) or just an ID
         if (subscription.planId) {
-          if (typeof subscription.planId === 'object' && 'name' in subscription.planId) {
+          if (
+            typeof subscription.planId === 'object' &&
+            'name' in subscription.planId
+          ) {
             // planId is populated with SubscriptionPlan document
             const planName = (subscription.planId as any).name?.toLowerCase();
             if (planName === 'company') planType = 'company';
@@ -780,9 +787,9 @@ export class OnboardingService {
 
       // Determine total steps based on plan type
       const stepCounts = {
-        company: 9,  // org(3) + complex(4) + clinic(2)
-        complex: 6,  // complex(4) + clinic(2)
-        clinic: 3,   // clinic(3)
+        company: 9, // org(3) + complex(4) + clinic(2)
+        complex: 6, // complex(4) + clinic(2)
+        clinic: 3, // clinic(3)
       };
 
       // Get completed steps from user's onboardingProgress
@@ -852,7 +859,8 @@ export class OnboardingService {
         completedSteps,
         totalSteps: stepCounts[planType],
         currentStepNumber: completedSteps.length + 1,
-        canSkipCurrent: planType === 'company' && currentStep === 'complex-overview',
+        canSkipCurrent:
+          planType === 'company' && currentStep === 'complex-overview',
       };
     } catch (error) {
       console.error('Error getting step progress:', error);
@@ -935,7 +943,10 @@ export class OnboardingService {
         );
 
         // Mark step as complete
-        await this.progressService.markStepComplete(userId, 'organization-overview');
+        await this.progressService.markStepComplete(
+          userId,
+          'organization-overview',
+        );
 
         return {
           success: true,
@@ -987,7 +998,10 @@ export class OnboardingService {
       );
 
       // Mark step as complete
-      await this.progressService.markStepComplete(userId, 'organization-contact');
+      await this.progressService.markStepComplete(
+        userId,
+        'organization-contact',
+      );
 
       return {
         success: true,
@@ -1174,24 +1188,24 @@ export class OnboardingService {
       // Address inheritance with more sophisticated logic
       address:
         entityData.address &&
-          (entityData.address.street ||
-            entityData.address.city ||
-            entityData.address.state ||
-            entityData.address.postalCode)
+        (entityData.address.street ||
+          entityData.address.city ||
+          entityData.address.state ||
+          entityData.address.postalCode)
           ? entityData.address
           : organization.address,
 
       // Emergency contact inheritance
       emergencyContact:
         entityData.emergencyContact &&
-          (entityData.emergencyContact.name || entityData.emergencyContact.phone)
+        (entityData.emergencyContact.name || entityData.emergencyContact.phone)
           ? entityData.emergencyContact
           : organization.emergencyContact,
 
       // Social media links inheritance
       socialMediaLinks:
         entityData.socialMediaLinks &&
-          Object.values(entityData.socialMediaLinks).some((val) => val)
+        Object.values(entityData.socialMediaLinks).some((val) => val)
           ? entityData.socialMediaLinks
           : organization.socialMediaLinks,
 
@@ -1380,10 +1394,11 @@ export class OnboardingService {
               });
             }
             // Link department to complex
-            const junction = await this.departmentService.createComplexDepartment(
-              complexId,
-              (department._id as any)?.toString(),
-            );
+            const junction =
+              await this.departmentService.createComplexDepartment(
+                complexId,
+                (department._id as any)?.toString(),
+              );
 
             // Return the junction ID in the results so subsequent steps (like clinic creation)
             // can correctly reference the department within this specific complex
@@ -1893,9 +1908,10 @@ export class OnboardingService {
       // Validate complexDepartmentId if provided
       if (dto.complexDepartmentId && dto.complexDepartmentId.trim() !== '') {
         try {
-          const department = await this.departmentService.getComplexDepartmentById(
-            dto.complexDepartmentId,
-          );
+          const department =
+            await this.departmentService.getComplexDepartmentById(
+              dto.complexDepartmentId,
+            );
 
           if (!department) {
             throw new BadRequestException({
@@ -1912,7 +1928,9 @@ export class OnboardingService {
 
           // Validate that the department belongs to the user's complex
           if (userComplex) {
-            const departmentComplexId = (department as any).complexId?.toString();
+            const departmentComplexId = (
+              department as any
+            ).complexId?.toString();
             const userComplexId = userComplex._id?.toString();
 
             if (departmentComplexId !== userComplexId) {
@@ -2037,21 +2055,31 @@ export class OnboardingService {
               console.log('🏗️ Creating service:', serviceData.name);
 
               // Check if service already exists for this clinic to prevent duplicates
-              const existingServices = await this.serviceService.getServicesOwnedByClinic(
-                clinic._id.toString()
-              );
+              const existingServices =
+                await this.serviceService.getServicesOwnedByClinic(
+                  clinic._id.toString(),
+                );
               const isDuplicate = existingServices.some(
-                s => s.name.toLowerCase() === serviceData.name.trim().toLowerCase()
+                (s) =>
+                  s.name.toLowerCase() ===
+                  serviceData.name.trim().toLowerCase(),
               );
 
               if (isDuplicate) {
-                console.log('⚠️ Service already exists for this clinic, skipping:', serviceData.name);
+                console.log(
+                  '⚠️ Service already exists for this clinic, skipping:',
+                  serviceData.name,
+                );
                 // Find the existing service and link it if not already linked
                 const existingService = existingServices.find(
-                  s => s.name.toLowerCase() === serviceData.name.trim().toLowerCase()
+                  (s) =>
+                    s.name.toLowerCase() ===
+                    serviceData.name.trim().toLowerCase(),
                 );
                 if (existingService) {
-                  createdServiceIds.push((existingService._id as any).toString());
+                  createdServiceIds.push(
+                    (existingService._id as any).toString(),
+                  );
 
                   // Ensure it's linked via ClinicService
                   try {
@@ -2069,7 +2097,10 @@ export class OnboardingService {
                     );
                     console.log('✅ Existing service re-linked to clinic');
                   } catch (linkError) {
-                    console.log('ℹ️ Service already linked or link failed:', linkError.message);
+                    console.log(
+                      'ℹ️ Service already linked or link failed:',
+                      linkError.message,
+                    );
                   }
                 }
                 continue;
@@ -2089,7 +2120,9 @@ export class OnboardingService {
               console.log('✅ Created service:', newService._id);
               createdServiceIds.push((newService._id as any).toString());
 
-              console.log('🔗 Linking service to clinic via ClinicService junction...');
+              console.log(
+                '🔗 Linking service to clinic via ClinicService junction...',
+              );
               // Link service to clinic via ClinicService junction table
               await this.serviceService.assignServicesToClinic(
                 clinic._id.toString(),
@@ -2480,7 +2513,10 @@ export class OnboardingService {
         userClinic._id,
       );
 
-      console.log('📋 Working hours to save:', JSON.stringify(workingHours, null, 2));
+      console.log(
+        '📋 Working hours to save:',
+        JSON.stringify(workingHours, null, 2),
+      );
 
       if (planType === 'clinic') {
         // Independent clinic plan - save schedule directly to clinic
@@ -2543,8 +2579,14 @@ export class OnboardingService {
 
         // Validate clinic working hours against complex working hours
         console.log('🔍 Validating clinic hours against complex hours');
-        console.log('📋 Clinic schedule to validate:', JSON.stringify(workingHours, null, 2));
-        console.log('🏢 Parent complex ID:', (parentComplexId as any).toString());
+        console.log(
+          '📋 Clinic schedule to validate:',
+          JSON.stringify(workingHours, null, 2),
+        );
+        console.log(
+          '🏢 Parent complex ID:',
+          (parentComplexId as any).toString(),
+        );
 
         const validationResult =
           await this.workingHoursValidationService.validateHierarchical(
@@ -2554,7 +2596,10 @@ export class OnboardingService {
             userClinic.name || 'Clinic',
           );
 
-        console.log('✅ Validation result:', JSON.stringify(validationResult, null, 2));
+        console.log(
+          '✅ Validation result:',
+          JSON.stringify(validationResult, null, 2),
+        );
 
         if (!validationResult.isValid) {
           // Format validation errors for response
@@ -2581,7 +2626,10 @@ export class OnboardingService {
           schedule: workingHours as any,
         });
 
-        console.log('✅ Working hours saved successfully for clinic (complex/company plan):', (userClinic._id as any).toString());
+        console.log(
+          '✅ Working hours saved successfully for clinic (complex/company plan):',
+          (userClinic._id as any).toString(),
+        );
 
         const scheduleData = {
           workingHours: workingHours,

@@ -199,9 +199,7 @@ export class ServiceService {
         query.complexDepartmentId = { $exists: false };
       }
 
-      return await this.serviceModel
-        .find(query)
-        .exec();
+      return await this.serviceModel.find(query).exec();
     } catch (error) {
       console.error('Error getting services for clinic:', error);
       return [];
@@ -297,9 +295,8 @@ export class ServiceService {
 
     // If there are critical changes, check for active appointments
     if (criticalChanges.length > 0) {
-      const affectedAppointments = await this.findAffectedAppointments(
-        serviceId,
-      );
+      const affectedAppointments =
+        await this.findAffectedAppointments(serviceId);
 
       if (affectedAppointments.length > 0 && !updateDto.confirmRescheduling) {
         throw new BadRequestException({
@@ -438,7 +435,6 @@ export class ServiceService {
       deletedBy: userId ? new Types.ObjectId(userId) : undefined,
       isActive: false,
     });
-
   }
 
   /**
@@ -452,8 +448,7 @@ export class ServiceService {
 
     if (
       updateDto.complexDepartmentId !== undefined &&
-      updateDto.complexDepartmentId !==
-        service.complexDepartmentId?.toString()
+      updateDto.complexDepartmentId !== service.complexDepartmentId?.toString()
     ) {
       changes.push('complexDepartmentId');
     }
@@ -620,8 +615,12 @@ export class ServiceService {
           for (const notif of notifications) {
             await this.notificationModel.create({
               recipientId: notif.recipientId,
-              title: typeof notif.title === 'string' ? notif.title : notif.title.en,
-              message: typeof notif.message === 'string' ? notif.message : notif.message.en,
+              title:
+                typeof notif.title === 'string' ? notif.title : notif.title.en,
+              message:
+                typeof notif.message === 'string'
+                  ? notif.message
+                  : notif.message.en,
               notificationType: notif.notificationType,
               priority: notif.priority,
               relatedEntityType: notif.relatedEntityType,
@@ -770,7 +769,8 @@ export class ServiceService {
               serviceId,
               success: false,
               affectedAppointments: 0,
-              error: 'Reason is required when deactivating (minimum 10 characters)',
+              error:
+                'Reason is required when deactivating (minimum 10 characters)',
             });
             failed++;
             continue;

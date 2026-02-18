@@ -30,7 +30,7 @@ export class ComplexService {
     @InjectModel('Complex') private readonly complexModel: Model<Complex>,
     @InjectConnection() private readonly connection: Connection,
     private readonly subscriptionService: SubscriptionService,
-  ) { }
+  ) {}
 
   /**
    * List complexes with pagination, filters, and optional counts
@@ -1115,8 +1115,13 @@ export class ComplexService {
     userId?: string,
   ): Promise<StatusChangeResponse> {
     // Start MongoDB transaction if supported (Requirement 6.8)
-    const { session, useTransaction } = await TransactionUtil.startTransaction(this.connection);
-    const sessionOpts = TransactionUtil.getSessionOptions(session, useTransaction);
+    const { session, useTransaction } = await TransactionUtil.startTransaction(
+      this.connection,
+    );
+    const sessionOpts = TransactionUtil.getSessionOptions(
+      session,
+      useTransaction,
+    );
 
     try {
       // Validate complex exists (Requirement 6.1)
@@ -1196,7 +1201,7 @@ export class ComplexService {
               await this.markAppointmentsForRescheduling(
                 clinicIds,
                 dto.deactivationReason ||
-                'Complex deactivated - clinics transferred',
+                  'Complex deactivated - clinics transferred',
                 markedBy,
                 session,
               );
@@ -1718,8 +1723,13 @@ export class ComplexService {
     clinicIds: string[],
   ): Promise<any> {
     // Start MongoDB transaction if supported (Requirement 10.4, 13.1, 13.2)
-    const { session, useTransaction } = await TransactionUtil.startTransaction(this.connection);
-    const sessionOpts = TransactionUtil.getSessionOptions(session, useTransaction);
+    const { session, useTransaction } = await TransactionUtil.startTransaction(
+      this.connection,
+    );
+    const sessionOpts = TransactionUtil.getSessionOptions(
+      session,
+      useTransaction,
+    );
 
     try {
       // Validate source complex exists (throw COMPLEX_006 if not) - Requirement 10.1

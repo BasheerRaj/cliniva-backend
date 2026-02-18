@@ -144,11 +144,15 @@ export class PatientService {
 
     // Validate emergency contact
     if (patientDto.emergencyContactName && !patientDto.emergencyContactPhone) {
-      throw new BadRequestException(ERROR_MESSAGES.EMERGENCY_CONTACT_PHONE_REQUIRED);
+      throw new BadRequestException(
+        ERROR_MESSAGES.EMERGENCY_CONTACT_PHONE_REQUIRED,
+      );
     }
 
     if (patientDto.emergencyContactPhone && !patientDto.emergencyContactName) {
-      throw new BadRequestException(ERROR_MESSAGES.EMERGENCY_CONTACT_NAME_REQUIRED);
+      throw new BadRequestException(
+        ERROR_MESSAGES.EMERGENCY_CONTACT_NAME_REQUIRED,
+      );
     }
   }
 
@@ -195,7 +199,10 @@ export class PatientService {
         ipAddress: '0.0.0.0',
         userAgent: 'System',
         timestamp: new Date(),
-        metadata: { patientId: (savedPatient as any)._id.toString(), patientNumber },
+        metadata: {
+          patientId: (savedPatient as any)._id.toString(),
+          patientNumber,
+        },
       });
     }
 
@@ -300,11 +307,14 @@ export class PatientService {
     const birthDate = new Date(dateOfBirth);
     let age = today.getFullYear() - birthDate.getFullYear();
     const monthDiff = today.getMonth() - birthDate.getMonth();
-    
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+
+    if (
+      monthDiff < 0 ||
+      (monthDiff === 0 && today.getDate() < birthDate.getDate())
+    ) {
       age--;
     }
-    
+
     return age;
   }
 
@@ -376,7 +386,9 @@ export class PatientService {
       updateData.dateOfBirth = new Date(updatePatientDto.dateOfBirth);
     }
     if (updatePatientDto.insuranceStartDate) {
-      updateData.insuranceStartDate = new Date(updatePatientDto.insuranceStartDate);
+      updateData.insuranceStartDate = new Date(
+        updatePatientDto.insuranceStartDate,
+      );
     }
     if (updatePatientDto.insuranceEndDate) {
       updateData.insuranceEndDate = new Date(updatePatientDto.insuranceEndDate);
@@ -424,7 +436,9 @@ export class PatientService {
       throw new BadRequestException(ERROR_MESSAGES.INVALID_PATIENT_ID);
     }
 
-    this.logger.log(`Deactivating patient and cancelling appointments: ${patientId}`);
+    this.logger.log(
+      `Deactivating patient and cancelling appointments: ${patientId}`,
+    );
 
     // Check if patient exists first
     const existingPatient = await this.patientModel
@@ -440,7 +454,9 @@ export class PatientService {
 
     // Handle idempotent deactivation (Requirement 5.6)
     if (existingPatient.status === 'Inactive') {
-      this.logger.log(`Patient ${patientId} is already inactive, returning without changes`);
+      this.logger.log(
+        `Patient ${patientId} is already inactive, returning without changes`,
+      );
       return existingPatient;
     }
 
@@ -456,7 +472,9 @@ export class PatientService {
           {
             $set: {
               status: 'Inactive',
-              updatedBy: updatedByUserId ? new Types.ObjectId(updatedByUserId) : undefined,
+              updatedBy: updatedByUserId
+                ? new Types.ObjectId(updatedByUserId)
+                : undefined,
             },
           },
           { new: true, session },
@@ -478,7 +496,9 @@ export class PatientService {
           $set: {
             status: 'cancelled',
             cancellationReason: 'Patient deactivated',
-            updatedBy: updatedByUserId ? new Types.ObjectId(updatedByUserId) : undefined,
+            updatedBy: updatedByUserId
+              ? new Types.ObjectId(updatedByUserId)
+              : undefined,
           },
         },
         { session },
@@ -509,11 +529,14 @@ export class PatientService {
       // Rollback transaction on error
       await session.abortTransaction();
       this.logger.error(`Failed to deactivate patient ${patientId}:`, error);
-      
-      if (error instanceof NotFoundException || error instanceof BadRequestException) {
+
+      if (
+        error instanceof NotFoundException ||
+        error instanceof BadRequestException
+      ) {
         throw error;
       }
-      
+
       throw new InternalServerErrorException({
         message: {
           ar: 'فشل في تعطيل المريض',
@@ -553,7 +576,9 @@ export class PatientService {
 
     // Handle idempotent activation (Requirement 6.4)
     if (existingPatient.status === 'Active') {
-      this.logger.log(`Patient ${patientId} is already active, returning without changes`);
+      this.logger.log(
+        `Patient ${patientId} is already active, returning without changes`,
+      );
       return existingPatient;
     }
 
@@ -563,7 +588,9 @@ export class PatientService {
         {
           $set: {
             status: 'Active',
-            updatedBy: updatedByUserId ? new Types.ObjectId(updatedByUserId) : undefined,
+            updatedBy: updatedByUserId
+              ? new Types.ObjectId(updatedByUserId)
+              : undefined,
           },
         },
         { new: true },

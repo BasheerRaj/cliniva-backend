@@ -35,9 +35,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 @Controller('services')
 @UseGuards(JwtAuthGuard)
 export class DoctorServiceController {
-  constructor(
-    private readonly doctorServiceService: DoctorServiceService,
-  ) {}
+  constructor(private readonly doctorServiceService: DoctorServiceService) {}
 
   /**
    * Get available doctors for service
@@ -99,10 +97,11 @@ export class DoctorServiceController {
     @Param('serviceId') serviceId: string,
     @Query('clinicId') clinicId?: string,
   ) {
-    const doctors = await this.doctorServiceService.getAvailableDoctorsForService(
-      serviceId,
-      clinicId,
-    );
+    const doctors =
+      await this.doctorServiceService.getAvailableDoctorsForService(
+        serviceId,
+        clinicId,
+      );
     return {
       success: true,
       message: {
@@ -201,7 +200,8 @@ export class DoctorServiceController {
       serviceId,
       {
         clinicId,
-        isActive: isActive === 'true' ? true : isActive === 'false' ? false : undefined,
+        isActive:
+          isActive === 'true' ? true : isActive === 'false' ? false : undefined,
         includeStats: includeStats === 'true',
       },
     );
@@ -577,5 +577,3 @@ export class DoctorServiceController {
     };
   }
 }
-
-

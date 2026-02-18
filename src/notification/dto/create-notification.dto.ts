@@ -1,4 +1,11 @@
-import { IsString, IsNotEmpty, IsOptional, IsEnum, IsMongoId, IsBoolean } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsOptional,
+  IsEnum,
+  IsMongoId,
+  IsBoolean,
+} from 'class-validator';
 
 export class CreateNotificationDto {
   @IsMongoId()

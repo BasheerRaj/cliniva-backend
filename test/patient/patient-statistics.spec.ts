@@ -54,7 +54,7 @@ describe('PatientService - Statistics', () => {
     it('should exclude soft-deleted patients from all counts (Requirement 10.6)', async () => {
       // Arrange
       const baseFilter = { deletedAt: { $exists: false } };
-      
+
       mockPatientModel.countDocuments.mockImplementation((filter) => {
         // Verify all queries include the soft-delete filter
         expect(filter).toHaveProperty('deletedAt');
@@ -174,10 +174,10 @@ describe('PatientService - Statistics', () => {
 
       // Assert
       expect(stats.patientsWithInsurance).toBe(35);
-      
+
       // Verify the correct filter was used
       const insuranceCalls = mockPatientModel.countDocuments.mock.calls.filter(
-        (call) => call[0].insuranceStatus === 'Active'
+        (call) => call[0].insuranceStatus === 'Active',
       );
       expect(insuranceCalls.length).toBeGreaterThan(0);
     });
@@ -235,7 +235,7 @@ describe('PatientService - Statistics', () => {
       // Assert
       expect(mockPatientModel.aggregate).toHaveBeenCalled();
       const aggregateCall = mockPatientModel.aggregate.mock.calls[0][0];
-      
+
       // Verify the pipeline structure
       expect(aggregateCall).toBeInstanceOf(Array);
       expect(aggregateCall[0]).toHaveProperty('$match');

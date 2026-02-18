@@ -1,0 +1,118 @@
+{
+  "module": "Appointments Management",
+  "subModules": [
+    {
+      "name": "Appointment Scheduling",
+      "userStories": [
+        {
+          "id": "US-57f9166a",
+          "name": "View Appointments Calendar",
+          "businessRules": [
+          ]
+        },
+        {
+          "id": "US-501eaee4",
+          "name": "Book a New Appointment",
+          "businessRules": [
+            {
+              "id": "BZR-3c4d5e6f",
+              "statement": "If you filter by clinic before clicking Add Appointment, the related dropdown lists (Department, Clinic, Service, Doctor) will be automatically populated accordingly."
+            }
+          ]
+        },
+        {
+          "id": "US-d4871fb4",
+          "name": "View list of Appointments",
+          "businessRules": [
+          ]
+        },
+        {
+          "id": "US-6w7x8y9z",
+          "name": "View Appointment Details",
+          "businessRules": [
+          ]
+        },
+        {
+          "id": "US-7a8b9c1d",
+          "name": "Edit Appointment",
+          "businessRules": [
+          ]
+        },
+        {
+          "id": "US-9i1j2k3l",
+          "name": "Delete Appointment",
+          "businessRules": [
+          ]
+        },
+        {
+          "id": "US-3k4l5m6n",
+          "name": "Start Appointment",
+          "businessRules": [
+          ]
+        },
+        {
+          "id": "US-bea0718e",
+          "name": "End an Appointment and Update Patient Records",
+          "businessRules": [
+            {
+              "id": "BZR-4e5a6b7c",
+              "statement": "The service is provided by the clinic regardless of the doctor, and the same service can be provided by more than one clinic."
+            },
+            {
+              "id": "BZR-8d9a0b1c",
+              "statement": "When defining a service, it is assigned to a clinic, and the doctors who will provide this service are specified (name, specialty, doctor)."
+            },
+            {
+              "id": "BZR-c6d7e8f9",
+              "statement": "Appointments are scheduled according to the clinic working hours, and the clinic working hours are based on the complex working hours."
+            },
+            {
+              "id": "BZR-1a2f3b4c",
+              "statement": "When creating any facility, there must be the ability to add more than one phone number."
+            },
+            {
+              "id": "BZR-5e6b7d8a",
+              "statement": "Only one image can be selected for a doctor, staff member, and patient."
+            },
+            {
+              "id": "BZR-9f0b1c2d",
+              "statement": "Remove the Job Title from the doctor details."
+            },
+            {
+              "id": "BZR-3a4d5e6f",
+              "statement": "The specialty appears only in the doctor details and does not appear in the clinic details because it has no impact on it."
+            },
+            {
+              "id": "BZR-7e8b9a0c",
+              "statement": "When a user requests to change the password, the admin grants them a link to set the new password."
+            },
+            {
+              "id": "BZR-b5c6d7e8",
+              "statement": "All system permissions must be documented in the Roles sheet."
+            },
+            {
+              "id": "BZR-f9a0b1c2",
+              "statement": "Remove the ID from all facilities and keep only the user ID and patient ID."
+            },
+            {
+              "id": "BZR-0a1b2c3d",
+              "statement": "When creating a new user account, the admin enters the basic information. If important required data is missing, the user is redirected on first login to a complete profile page to fill in the missing details before accessing the system."
+            },
+            {
+              "id": "BZR-4f5a6b7c",
+              "statement": "When adding a clinic, there must be at least one available doctor."
+            },
+            {
+              "id": "BZR-8e9b0c1d",
+              "statement": "A notification is sent when a doctor's certificate is about to expire."
+            },
+            {
+              "id": "BZR-c7d8e9f0",
+              "statement": "Provide a path to allow adding a patient while booking an appointment."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

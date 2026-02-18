@@ -15,10 +15,10 @@ import { Transform } from 'class-transformer';
 
 /**
  * Data Transfer Object for updating patient information.
- * 
+ *
  * IMPORTANT: cardNumber is NOT included in this DTO as it is immutable
  * per business rules (Requirements 4.2, M5 specification).
- * 
+ *
  * All fields are optional to allow partial updates.
  */
 export class UpdatePatientDto {

@@ -26,7 +26,8 @@ export class PatientPortalService {
   constructor(
     @InjectModel('User') private readonly userModel: Model<User>,
     @InjectModel('Patient') private readonly patientModel: Model<Patient>,
-    @InjectModel('Appointment') private readonly appointmentModel: Model<Appointment>,
+    @InjectModel('Appointment')
+    private readonly appointmentModel: Model<Appointment>,
     private readonly jwtService: JwtService,
     private readonly notificationService: NotificationService,
     private readonly appointmentService: AppointmentService,
@@ -37,7 +38,9 @@ export class PatientPortalService {
    */
   async register(registerDto: RegisterPatientUserDto) {
     // 1. Check if user already exists
-    const existingUser = await this.userModel.findOne({ email: registerDto.email });
+    const existingUser = await this.userModel.findOne({
+      email: registerDto.email,
+    });
     if (existingUser) {
       throw new ConflictException('Email already registered');
     }
@@ -55,14 +58,16 @@ export class PatientPortalService {
       phone: registerDto.phone,
       role: UserRole.PATIENT,
       gender: registerDto.gender,
-      dateOfBirth: registerDto.dateOfBirth ? new Date(registerDto.dateOfBirth) : undefined,
+      dateOfBirth: registerDto.dateOfBirth
+        ? new Date(registerDto.dateOfBirth)
+        : undefined,
       isActive: true,
       emailVerified: false, // In a real app, send verification email
     });
     const savedUser = await user.save();
 
     // 4. Check if Patient profile exists (by phone or email) to link, or create new
-    let patient = await this.patientModel.findOne({
+    const patient = await this.patientModel.findOne({
       $or: [{ email: registerDto.email }, { phone: registerDto.phone }],
     });
 
@@ -83,7 +88,9 @@ export class PatientPortalService {
         email: registerDto.email,
         phone: registerDto.phone,
         gender: registerDto.gender,
-        dateOfBirth: registerDto.dateOfBirth ? new Date(registerDto.dateOfBirth) : new Date(),
+        dateOfBirth: registerDto.dateOfBirth
+          ? new Date(registerDto.dateOfBirth)
+          : new Date(),
         patientNumber,
         cardNumber,
         status: 'Active',
@@ -93,7 +100,11 @@ export class PatientPortalService {
     }
 
     // 5. Generate Token
-    const payload = { sub: (savedUser as any)._id, email: savedUser.email, role: savedUser.role };
+    const payload = {
+      sub: (savedUser as any)._id,
+      email: savedUser.email,
+      role: savedUser.role,
+    };
     const accessToken = this.jwtService.sign(payload);
 
     // 6. Send Welcome Notification
@@ -135,7 +146,11 @@ export class PatientPortalService {
       throw new UnauthorizedException('Account is inactive');
     }
 
-    const payload = { sub: (user as any)._id, email: user.email, role: user.role };
+    const payload = {
+      sub: (user as any)._id,
+      email: user.email,
+      role: user.role,
+    };
     return {
       accessToken: this.jwtService.sign(payload),
       user: {
@@ -152,23 +167,26 @@ export class PatientPortalService {
    */
   async getDashboard(userId: string) {
     // Find linked patient profile
-    const patient = await this.patientModel.findOne({ userId: new Types.ObjectId(userId) });
+    const patient = await this.patientModel.findOne({
+      userId: new Types.ObjectId(userId),
+    });
     if (!patient) {
       throw new NotFoundException('Patient profile not found');
     }
 
     const today = new Date();
-    
+
     // Get upcoming appointments
-    const upcomingAppointments = await this.appointmentModel.find({
-      patientId: (patient as any)._id,
-      appointmentDate: { $gte: today },
-      status: { $in: ['scheduled', 'confirmed'] },
-    })
-    .sort({ appointmentDate: 1, appointmentTime: 1 })
-    .limit(5)
-    .populate('doctorId', 'firstName lastName')
-    .populate('clinicId', 'name address');
+    const upcomingAppointments = await this.appointmentModel
+      .find({
+        patientId: (patient as any)._id,
+        appointmentDate: { $gte: today },
+        status: { $in: ['scheduled', 'confirmed'] },
+      })
+      .sort({ appointmentDate: 1, appointmentTime: 1 })
+      .limit(5)
+      .populate('doctorId', 'firstName lastName')
+      .populate('clinicId', 'name address');
 
     // Get recent medical history/reports (placeholder logic until MedicalReport module is fully linked)
     // const recentReports = ...
@@ -182,9 +200,11 @@ export class PatientPortalService {
       },
       upcomingAppointments,
       stats: {
-        totalAppointments: await this.appointmentModel.countDocuments({ patientId: (patient as any)._id }),
+        totalAppointments: await this.appointmentModel.countDocuments({
+          patientId: (patient as any)._id,
+        }),
         upcomingCount: upcomingAppointments.length,
-      }
+      },
     };
   }
 
@@ -193,7 +213,9 @@ export class PatientPortalService {
    */
   async bookAppointment(userId: string, bookDto: BookAppointmentDto) {
     // Get patient profile
-    const patient = await this.patientModel.findOne({ userId: new Types.ObjectId(userId) });
+    const patient = await this.patientModel.findOne({
+      userId: new Types.ObjectId(userId),
+    });
     if (!patient) {
       throw new NotFoundException('Patient profile not found');
     }
@@ -213,7 +235,7 @@ export class PatientPortalService {
       appointmentTime: bookDto.appointmentTime,
       notes: bookDto.notes,
       status: 'scheduled',
-      urgencyLevel: 'medium'
+      urgencyLevel: 'medium',
     };
 
     return this.appointmentService.createAppointment(createDto, userId);
@@ -223,12 +245,16 @@ export class PatientPortalService {
    * Get all appointments for patient
    */
   async getAppointments(userId: string) {
-    const patient = await this.patientModel.findOne({ userId: new Types.ObjectId(userId) });
+    const patient = await this.patientModel.findOne({
+      userId: new Types.ObjectId(userId),
+    });
     if (!patient) {
       throw new NotFoundException('Patient profile not found');
     }
 
-    return this.appointmentService.getPatientAppointments((patient as any)._id.toString());
+    return this.appointmentService.getPatientAppointments(
+      (patient as any)._id.toString(),
+    );
   }
 
   private async generatePatientNumber(): Promise<string> {

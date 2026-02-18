@@ -1,4 +1,10 @@
-import { IsString, IsNotEmpty, IsMongoId, IsBoolean, IsOptional } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsMongoId,
+  IsBoolean,
+  IsOptional,
+} from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class AssignDiscountToServiceDto {
@@ -22,5 +28,3 @@ export class AssignDiscountToServiceDto {
   @IsOptional()
   isActive?: boolean;
 }
-
-

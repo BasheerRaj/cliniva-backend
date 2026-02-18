@@ -10,7 +10,10 @@ import { Offer } from '../database/schemas/offer.schema';
 import { Service } from '../database/schemas/service.schema';
 import { AssignDiscountToServiceDto } from './dto/assign-discount-to-service.dto';
 import { CalculateServicePriceDto } from './dto/calculate-service-price.dto';
-import { PriceCalculation, DiscountApplied } from './interfaces/price-calculation.interface';
+import {
+  PriceCalculation,
+  DiscountApplied,
+} from './interfaces/price-calculation.interface';
 
 @Injectable()
 export class ServiceOfferService {
@@ -76,7 +79,7 @@ export class ServiceOfferService {
     });
 
     const saved = await serviceOffer.save();
-    
+
     // Populate offer for return
     const populated = await this.serviceOfferModel
       .findById(saved._id)
@@ -259,7 +262,8 @@ export class ServiceOfferService {
       if (!offer.isActive) continue;
 
       // Check date range
-      if (offer.startsAt && appointmentDate < new Date(offer.startsAt)) continue;
+      if (offer.startsAt && appointmentDate < new Date(offer.startsAt))
+        continue;
       if (offer.endsAt && appointmentDate > new Date(offer.endsAt)) continue;
 
       // Calculate discount
@@ -306,4 +310,3 @@ export class ServiceOfferService {
     );
   }
 }
-

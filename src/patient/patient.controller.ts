@@ -15,12 +15,12 @@ import {
   ParseIntPipe,
   BadRequestException,
 } from '@nestjs/common';
-import { 
-  ApiTags, 
-  ApiOperation, 
-  ApiResponse, 
-  ApiBearerAuth, 
-  ApiParam, 
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiParam,
   ApiQuery,
   ApiBody,
   ApiExtraModels,
@@ -40,7 +40,12 @@ import * as SwaggerExamples from './examples/swagger-examples';
 
 @ApiTags('Patients')
 @ApiBearerAuth('JWT-auth')
-@ApiExtraModels(CreatePatientDto, UpdatePatientDto, PatientResponseDto, PatientStatsDto)
+@ApiExtraModels(
+  CreatePatientDto,
+  UpdatePatientDto,
+  PatientResponseDto,
+  PatientStatsDto,
+)
 @Controller('patients')
 @UseGuards(JwtAuthGuard)
 export class PatientController {
@@ -51,7 +56,7 @@ export class PatientController {
    * POST /patients
    */
   @Post()
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Create a new patient record',
     description: `Creates a new patient with unique card number validation.
     
@@ -73,25 +78,26 @@ export class PatientController {
 - email: Optional, valid email format, must be unique
 - bloodType: Optional, one of: A+, A-, B+, B-, AB+, AB-, O+, O-`,
   })
-  @ApiBody({ 
+  @ApiBody({
     type: CreatePatientDto,
     examples: {
       complete: {
         summary: 'Complete patient record',
-        description: 'Example with all fields including insurance and emergency contact',
+        description:
+          'Example with all fields including insurance and emergency contact',
         value: SwaggerExamples.CREATE_PATIENT_REQUEST_EXAMPLE,
       },
     },
   })
-  @ApiResponse({ 
-    status: 201, 
+  @ApiResponse({
+    status: 201,
     description: 'Patient created successfully',
     schema: {
       example: SwaggerExamples.CREATE_PATIENT_RESPONSE_EXAMPLE,
     },
   })
-  @ApiResponse({ 
-    status: 400, 
+  @ApiResponse({
+    status: 400,
     description: 'Validation error or invalid data',
     schema: {
       oneOf: [
@@ -101,8 +107,8 @@ export class PatientController {
       ],
     },
   })
-  @ApiResponse({ 
-    status: 409, 
+  @ApiResponse({
+    status: 409,
     description: 'Duplicate card number, email, or phone',
     schema: {
       oneOf: [
@@ -140,7 +146,7 @@ export class PatientController {
    * GET /patients
    */
   @Get()
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Get list of patients with filters',
     description: `Retrieves a paginated list of patients with optional filtering.
     
@@ -161,15 +167,54 @@ export class PatientController {
 - sortBy: Field to sort by (default: createdAt)
 - sortOrder: Sort direction (asc/desc, default: desc)`,
   })
-  @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number', example: 1 })
-  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Items per page', example: 10 })
-  @ApiQuery({ name: 'search', required: false, type: String, description: 'Search term' })
-  @ApiQuery({ name: 'status', required: false, enum: ['Active', 'Inactive'], description: 'Patient status' })
-  @ApiQuery({ name: 'gender', required: false, enum: ['male', 'female', 'other'], description: 'Patient gender' })
-  @ApiQuery({ name: 'sortBy', required: false, type: String, description: 'Sort field', example: 'createdAt' })
-  @ApiQuery({ name: 'sortOrder', required: false, enum: ['asc', 'desc'], description: 'Sort direction', example: 'desc' })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    type: Number,
+    description: 'Page number',
+    example: 1,
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    description: 'Items per page',
+    example: 10,
+  })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    type: String,
+    description: 'Search term',
+  })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    enum: ['Active', 'Inactive'],
+    description: 'Patient status',
+  })
+  @ApiQuery({
+    name: 'gender',
+    required: false,
+    enum: ['male', 'female', 'other'],
+    description: 'Patient gender',
+  })
+  @ApiQuery({
+    name: 'sortBy',
+    required: false,
+    type: String,
+    description: 'Sort field',
+    example: 'createdAt',
+  })
+  @ApiQuery({
+    name: 'sortOrder',
+    required: false,
+    enum: ['asc', 'desc'],
+    description: 'Sort direction',
+    example: 'desc',
+  })
+  @ApiResponse({
+    status: 200,
     description: 'Patients retrieved successfully',
     schema: {
       example: SwaggerExamples.GET_PATIENTS_RESPONSE_EXAMPLE,
@@ -203,7 +248,7 @@ export class PatientController {
    * GET /patients/:id
    */
   @Get(':id')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Get patient by ID',
     description: `Retrieves complete patient details by ID.
     
@@ -215,23 +260,27 @@ export class PatientController {
 **Excludes:**
 - Soft-deleted patients (returns 404)`,
   })
-  @ApiParam({ name: 'id', description: 'Patient ID (MongoDB ObjectId)', example: '507f1f77bcf86cd799439011' })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiParam({
+    name: 'id',
+    description: 'Patient ID (MongoDB ObjectId)',
+    example: '507f1f77bcf86cd799439011',
+  })
+  @ApiResponse({
+    status: 200,
     description: 'Patient retrieved successfully',
     schema: {
       example: SwaggerExamples.GET_PATIENT_RESPONSE_EXAMPLE,
     },
   })
-  @ApiResponse({ 
-    status: 400, 
+  @ApiResponse({
+    status: 400,
     description: 'Invalid patient ID',
     schema: {
       example: SwaggerExamples.ERROR_INVALID_PATIENT_ID_EXAMPLE,
     },
   })
-  @ApiResponse({ 
-    status: 404, 
+  @ApiResponse({
+    status: 404,
     description: 'Patient not found or soft-deleted',
     schema: {
       example: SwaggerExamples.ERROR_PATIENT_NOT_FOUND_EXAMPLE,
@@ -240,23 +289,26 @@ export class PatientController {
   async getPatient(@Param('id') id: string) {
     try {
       const patient = await this.patientService.getPatientById(id);
-      
+
       // Calculate age from dateOfBirth (Requirement 3.4)
       const calculateAge = (dateOfBirth: Date): number => {
         const today = new Date();
         const birthDate = new Date(dateOfBirth);
         let age = today.getFullYear() - birthDate.getFullYear();
         const monthDiff = today.getMonth() - birthDate.getMonth();
-        
-        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+
+        if (
+          monthDiff < 0 ||
+          (monthDiff === 0 && today.getDate() < birthDate.getDate())
+        ) {
           age--;
         }
-        
+
         return age;
       };
-      
+
       const age = calculateAge(patient.dateOfBirth);
-      
+
       return {
         success: true,
         message: 'Patient retrieved successfully',
@@ -279,7 +331,7 @@ export class PatientController {
    * PUT /patients/:id
    */
   @Put(':id')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Update patient record',
     description: `Updates patient information while preventing changes to immutable fields.
     
@@ -295,8 +347,12 @@ export class PatientController {
 - Same validation rules as creation apply when fields are provided
 - cardNumber field is not allowed in update DTO`,
   })
-  @ApiParam({ name: 'id', description: 'Patient ID (MongoDB ObjectId)', example: '507f1f77bcf86cd799439011' })
-  @ApiBody({ 
+  @ApiParam({
+    name: 'id',
+    description: 'Patient ID (MongoDB ObjectId)',
+    example: '507f1f77bcf86cd799439011',
+  })
+  @ApiBody({
     type: UpdatePatientDto,
     examples: {
       partial: {
@@ -306,15 +362,15 @@ export class PatientController {
       },
     },
   })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Patient updated successfully',
     schema: {
       example: SwaggerExamples.UPDATE_PATIENT_RESPONSE_EXAMPLE,
     },
   })
-  @ApiResponse({ 
-    status: 400, 
+  @ApiResponse({
+    status: 400,
     description: 'Invalid patient ID or card number in update',
     schema: {
       oneOf: [
@@ -323,15 +379,15 @@ export class PatientController {
       ],
     },
   })
-  @ApiResponse({ 
-    status: 404, 
+  @ApiResponse({
+    status: 404,
     description: 'Patient not found or soft-deleted',
     schema: {
       example: SwaggerExamples.ERROR_PATIENT_NOT_FOUND_EXAMPLE,
     },
   })
-  @ApiResponse({ 
-    status: 409, 
+  @ApiResponse({
+    status: 409,
     description: 'Duplicate email or phone',
     schema: {
       oneOf: [
@@ -370,7 +426,7 @@ export class PatientController {
    * PUT /patients/:id/deactivate
    */
   @Put(':id/deactivate')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Deactivate patient and cancel upcoming appointments',
     description: `Deactivates a patient and automatically cancels all active appointments.
     
@@ -393,23 +449,27 @@ export class PatientController {
 - Existing appointment slots are released back to availability
 - Patient can be reactivated later if needed`,
   })
-  @ApiParam({ name: 'id', description: 'Patient ID (MongoDB ObjectId)', example: '507f1f77bcf86cd799439011' })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiParam({
+    name: 'id',
+    description: 'Patient ID (MongoDB ObjectId)',
+    example: '507f1f77bcf86cd799439011',
+  })
+  @ApiResponse({
+    status: 200,
     description: 'Patient deactivated and appointments cancelled successfully',
     schema: {
       example: SwaggerExamples.DEACTIVATE_PATIENT_RESPONSE_EXAMPLE,
     },
   })
-  @ApiResponse({ 
-    status: 400, 
+  @ApiResponse({
+    status: 400,
     description: 'Invalid patient ID',
     schema: {
       example: SwaggerExamples.ERROR_INVALID_PATIENT_ID_EXAMPLE,
     },
   })
-  @ApiResponse({ 
-    status: 404, 
+  @ApiResponse({
+    status: 404,
     description: 'Patient not found',
     schema: {
       example: SwaggerExamples.ERROR_PATIENT_NOT_FOUND_EXAMPLE,
@@ -440,7 +500,7 @@ export class PatientController {
    * PUT /patients/:id/activate
    */
   @Put(':id/activate')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Activate patient',
     description: `Activates an inactive patient, allowing them to be scheduled for appointments.
     
@@ -461,23 +521,27 @@ export class PatientController {
 - Patient appears in active patient lists and searches
 - Previous appointment history is preserved`,
   })
-  @ApiParam({ name: 'id', description: 'Patient ID (MongoDB ObjectId)', example: '507f1f77bcf86cd799439011' })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiParam({
+    name: 'id',
+    description: 'Patient ID (MongoDB ObjectId)',
+    example: '507f1f77bcf86cd799439011',
+  })
+  @ApiResponse({
+    status: 200,
     description: 'Patient activated successfully',
     schema: {
       example: SwaggerExamples.ACTIVATE_PATIENT_RESPONSE_EXAMPLE,
     },
   })
-  @ApiResponse({ 
-    status: 400, 
+  @ApiResponse({
+    status: 400,
     description: 'Invalid patient ID',
     schema: {
       example: SwaggerExamples.ERROR_INVALID_PATIENT_ID_EXAMPLE,
     },
   })
-  @ApiResponse({ 
-    status: 404, 
+  @ApiResponse({
+    status: 404,
     description: 'Patient not found',
     schema: {
       example: SwaggerExamples.ERROR_PATIENT_NOT_FOUND_EXAMPLE,
@@ -509,7 +573,7 @@ export class PatientController {
    */
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Soft delete patient',
     description: `Performs a soft delete on a patient record after validation.
     
@@ -535,16 +599,20 @@ export class PatientController {
 - Patient data is preserved for audit and compliance
 - Patient can potentially be restored by database administrator`,
   })
-  @ApiParam({ name: 'id', description: 'Patient ID (MongoDB ObjectId)', example: '507f1f77bcf86cd799439011' })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiParam({
+    name: 'id',
+    description: 'Patient ID (MongoDB ObjectId)',
+    example: '507f1f77bcf86cd799439011',
+  })
+  @ApiResponse({
+    status: 200,
     description: 'Patient deleted successfully',
     schema: {
       example: SwaggerExamples.DELETE_PATIENT_RESPONSE_EXAMPLE,
     },
   })
-  @ApiResponse({ 
-    status: 400, 
+  @ApiResponse({
+    status: 400,
     description: 'Invalid patient ID or patient is still active',
     schema: {
       oneOf: [
@@ -553,8 +621,8 @@ export class PatientController {
       ],
     },
   })
-  @ApiResponse({ 
-    status: 404, 
+  @ApiResponse({
+    status: 404,
     description: 'Patient not found',
     schema: {
       example: SwaggerExamples.ERROR_PATIENT_NOT_FOUND_EXAMPLE,
@@ -581,7 +649,7 @@ export class PatientController {
    * GET /patients/search/query?q=searchTerm
    */
   @Get('search/query')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Search patients by term',
     description: `Searches for patients across multiple fields.
     
@@ -604,16 +672,22 @@ export class PatientController {
 - Empty or whitespace-only terms return empty results`,
   })
   @ApiQuery({ name: 'q', description: 'Search term', example: 'Ahmed' })
-  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Maximum results (default: 20, max: 50)', example: 20 })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    description: 'Maximum results (default: 20, max: 50)',
+    example: 20,
+  })
+  @ApiResponse({
+    status: 200,
     description: 'Search completed successfully',
     schema: {
       example: SwaggerExamples.SEARCH_PATIENTS_RESPONSE_EXAMPLE,
     },
   })
-  @ApiResponse({ 
-    status: 400, 
+  @ApiResponse({
+    status: 400,
     description: 'Search term is required',
   })
   async searchPatients(
@@ -736,7 +810,7 @@ export class PatientController {
    * GET /patients/stats/overview
    */
   @Get('stats/overview')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Get patient statistics',
     description: `Retrieves comprehensive patient statistics.
     
@@ -754,8 +828,8 @@ export class PatientController {
 - Insurance count includes only patients with insuranceStatus = "Active"
 - Recent count includes patients created within last 30 days`,
   })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Patient statistics retrieved successfully',
     schema: {
       example: SwaggerExamples.PATIENT_STATS_RESPONSE_EXAMPLE,
@@ -907,7 +981,8 @@ export class PatientController {
         emergencyContacts.push({
           name: patient.emergencyContactName,
           phone: patient.emergencyContactPhone,
-          relationship: patient.emergencyContactRelationship || 'Emergency Contact',
+          relationship:
+            patient.emergencyContactRelationship || 'Emergency Contact',
           isPrimary: true,
         });
       }
@@ -958,7 +1033,8 @@ export class PatientController {
         data: {
           name: patient.emergencyContactName,
           phone: patient.emergencyContactPhone,
-          relationship: patient.emergencyContactRelationship || 'Emergency Contact',
+          relationship:
+            patient.emergencyContactRelationship || 'Emergency Contact',
         },
       };
     } catch (error) {

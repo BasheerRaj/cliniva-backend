@@ -86,4 +86,3 @@ export class UpdateServiceDto {
   @IsOptional()
   confirmRescheduling?: boolean;
 }
-

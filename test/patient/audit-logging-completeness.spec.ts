@@ -9,10 +9,10 @@ import { AuditLog } from '../../src/database/schemas/audit-log.schema';
 
 /**
  * Test Suite: Audit Logging Completeness
- * 
+ *
  * This test suite verifies that all patient operations log audit events
  * with complete metadata as specified in Requirements 12.1-12.6
- * 
+ *
  * Requirements Coverage:
  * - 12.1: Patient creation logging
  * - 12.2: Patient update logging
@@ -81,7 +81,9 @@ describe('PatientService - Audit Logging Completeness', () => {
     service = module.get<PatientService>(PatientService);
     auditService = module.get<AuditService>(AuditService);
     patientModel = module.get<Model<Patient>>(getModelToken('Patient'));
-    appointmentModel = module.get<Model<Appointment>>(getModelToken('Appointment'));
+    appointmentModel = module.get<Model<Appointment>>(
+      getModelToken('Appointment'),
+    );
     connection = module.get<Connection>('DatabaseConnection');
   });
 
@@ -91,7 +93,7 @@ describe('PatientService - Audit Logging Completeness', () => {
 
   /**
    * Requirement 12.1: Patient Creation Audit Logging
-   * 
+   *
    * Verifies that createPatient logs:
    * - Patient ID
    * - Patient number
@@ -204,7 +206,7 @@ describe('PatientService - Audit Logging Completeness', () => {
 
   /**
    * Requirement 12.2: Patient Update Audit Logging
-   * 
+   *
    * Verifies that updatePatient logs:
    * - Patient ID
    * - Changed fields
@@ -223,7 +225,9 @@ describe('PatientService - Audit Logging Completeness', () => {
         patientNumber: mockPatientNumber,
       };
 
-      jest.spyOn(patientModel, 'findOneAndUpdate').mockResolvedValue(mockUpdatedPatient as any);
+      jest
+        .spyOn(patientModel, 'findOneAndUpdate')
+        .mockResolvedValue(mockUpdatedPatient as any);
 
       await service.updatePatient(mockPatientId, updatePatientDto, mockUserId);
 
@@ -249,7 +253,9 @@ describe('PatientService - Audit Logging Completeness', () => {
         ...updatePatientDto,
       };
 
-      jest.spyOn(patientModel, 'findOneAndUpdate').mockResolvedValue(mockUpdatedPatient as any);
+      jest
+        .spyOn(patientModel, 'findOneAndUpdate')
+        .mockResolvedValue(mockUpdatedPatient as any);
 
       await service.updatePatient(mockPatientId, updatePatientDto, mockUserId);
 
@@ -270,7 +276,9 @@ describe('PatientService - Audit Logging Completeness', () => {
         ...updatePatientDto,
       };
 
-      jest.spyOn(patientModel, 'findOneAndUpdate').mockResolvedValue(mockUpdatedPatient as any);
+      jest
+        .spyOn(patientModel, 'findOneAndUpdate')
+        .mockResolvedValue(mockUpdatedPatient as any);
 
       await service.updatePatient(mockPatientId, updatePatientDto);
 
@@ -280,7 +288,7 @@ describe('PatientService - Audit Logging Completeness', () => {
 
   /**
    * Requirement 12.3: Patient Deactivation Audit Logging
-   * 
+   *
    * Verifies that deactivatePatient logs:
    * - Patient ID
    * - Cancelled appointment count
@@ -309,7 +317,9 @@ describe('PatientService - Audit Logging Completeness', () => {
       jest.spyOn(appointmentModel, 'updateMany').mockResolvedValue({
         modifiedCount: 3,
       } as any);
-      jest.spyOn(connection, 'startSession').mockResolvedValue(mockSession as any);
+      jest
+        .spyOn(connection, 'startSession')
+        .mockResolvedValue(mockSession as any);
 
       await service.deactivatePatient(mockPatientId, mockUserId);
 
@@ -346,7 +356,9 @@ describe('PatientService - Audit Logging Completeness', () => {
       jest.spyOn(appointmentModel, 'updateMany').mockResolvedValue({
         modifiedCount: 0,
       } as any);
-      jest.spyOn(connection, 'startSession').mockResolvedValue(mockSession as any);
+      jest
+        .spyOn(connection, 'startSession')
+        .mockResolvedValue(mockSession as any);
 
       await service.deactivatePatient(mockPatientId, mockUserId);
 
@@ -378,7 +390,9 @@ describe('PatientService - Audit Logging Completeness', () => {
       jest.spyOn(appointmentModel, 'updateMany').mockResolvedValue({
         modifiedCount: 0,
       } as any);
-      jest.spyOn(connection, 'startSession').mockResolvedValue(mockSession as any);
+      jest
+        .spyOn(connection, 'startSession')
+        .mockResolvedValue(mockSession as any);
 
       await service.deactivatePatient(mockPatientId);
 
@@ -401,7 +415,7 @@ describe('PatientService - Audit Logging Completeness', () => {
 
   /**
    * Requirement 12.4: Patient Activation Audit Logging
-   * 
+   *
    * Verifies that activatePatient logs:
    * - Patient ID
    * - Actor user ID
@@ -487,7 +501,7 @@ describe('PatientService - Audit Logging Completeness', () => {
 
   /**
    * Requirement 12.5: Patient Deletion Audit Logging
-   * 
+   *
    * Verifies that deletePatient logs:
    * - Patient ID
    * - Deleter user ID
@@ -500,7 +514,9 @@ describe('PatientService - Audit Logging Completeness', () => {
       };
 
       jest.spyOn(patientModel, 'findOne').mockResolvedValue(mockPatient as any);
-      jest.spyOn(patientModel, 'findOneAndUpdate').mockResolvedValue(mockPatient as any);
+      jest
+        .spyOn(patientModel, 'findOneAndUpdate')
+        .mockResolvedValue(mockPatient as any);
 
       await service.deletePatient(mockPatientId, mockUserId);
 
@@ -523,7 +539,9 @@ describe('PatientService - Audit Logging Completeness', () => {
       };
 
       jest.spyOn(patientModel, 'findOne').mockResolvedValue(mockPatient as any);
-      jest.spyOn(patientModel, 'findOneAndUpdate').mockResolvedValue(mockPatient as any);
+      jest
+        .spyOn(patientModel, 'findOneAndUpdate')
+        .mockResolvedValue(mockPatient as any);
 
       await service.deletePatient(mockPatientId, mockUserId);
 
@@ -541,7 +559,9 @@ describe('PatientService - Audit Logging Completeness', () => {
       };
 
       jest.spyOn(patientModel, 'findOne').mockResolvedValue(mockPatient as any);
-      jest.spyOn(patientModel, 'findOneAndUpdate').mockResolvedValue(mockPatient as any);
+      jest
+        .spyOn(patientModel, 'findOneAndUpdate')
+        .mockResolvedValue(mockPatient as any);
 
       await service.deletePatient(mockPatientId);
 
@@ -551,12 +571,12 @@ describe('PatientService - Audit Logging Completeness', () => {
 
   /**
    * Requirement 12.6: Audit Log Metadata Completeness
-   * 
+   *
    * Verifies that all audit logs include:
    * - Timestamp
    * - IP address
    * - User agent
-   * 
+   *
    * Note: Current implementation uses hardcoded values ('0.0.0.0' and 'System')
    * This is a known limitation that should be addressed in future iterations
    * by passing actual IP address and user agent from the controller layer.
@@ -607,11 +627,14 @@ describe('PatientService - Audit Logging Completeness', () => {
         ...updatePatientDto,
       };
 
-      jest.spyOn(patientModel, 'findOneAndUpdate').mockResolvedValue(mockUpdatedPatient as any);
+      jest
+        .spyOn(patientModel, 'findOneAndUpdate')
+        .mockResolvedValue(mockUpdatedPatient as any);
 
       await service.updatePatient(mockPatientId, updatePatientDto, mockUserId);
 
-      const callArgs = (auditService.logSecurityEvent as jest.Mock).mock.calls[0][0];
+      const callArgs = (auditService.logSecurityEvent as jest.Mock).mock
+        .calls[0][0];
       expect(callArgs.ipAddress).toBeDefined();
       expect(typeof callArgs.ipAddress).toBe('string');
     });
@@ -630,7 +653,8 @@ describe('PatientService - Audit Logging Completeness', () => {
 
       await service.activatePatient(mockPatientId, mockUserId);
 
-      const callArgs = (auditService.logSecurityEvent as jest.Mock).mock.calls[0][0];
+      const callArgs = (auditService.logSecurityEvent as jest.Mock).mock
+        .calls[0][0];
       expect(callArgs.userAgent).toBeDefined();
       expect(typeof callArgs.userAgent).toBe('string');
     });
@@ -638,8 +662,8 @@ describe('PatientService - Audit Logging Completeness', () => {
 
   /**
    * Summary Test: Verify All Operations Log Audit Events
-   * 
-   * This test ensures that all five patient operations (create, update, 
+   *
+   * This test ensures that all five patient operations (create, update,
    * deactivate, activate, delete) properly log audit events when a user ID
    * is provided.
    */
@@ -674,27 +698,38 @@ describe('PatientService - Audit Logging Completeness', () => {
       };
 
       // Setup mocks
-      jest.spyOn(patientModel, 'findOne')
+      jest
+        .spyOn(patientModel, 'findOne')
         .mockResolvedValueOnce(null) // For create
         .mockResolvedValueOnce({ ...mockPatient, status: 'Active' } as any) // For deactivate
         .mockResolvedValueOnce({ ...mockPatient, status: 'Inactive' } as any) // For activate
         .mockResolvedValueOnce({ ...mockPatient, status: 'Inactive' } as any); // For delete
 
       (patientModel as any).mockImplementation(() => mockPatient);
-      jest.spyOn(patientModel, 'findOneAndUpdate').mockResolvedValue(mockPatient as any);
-      jest.spyOn(appointmentModel, 'updateMany').mockResolvedValue({ modifiedCount: 0 } as any);
-      jest.spyOn(connection, 'startSession').mockResolvedValue(mockSession as any);
+      jest
+        .spyOn(patientModel, 'findOneAndUpdate')
+        .mockResolvedValue(mockPatient as any);
+      jest
+        .spyOn(appointmentModel, 'updateMany')
+        .mockResolvedValue({ modifiedCount: 0 } as any);
+      jest
+        .spyOn(connection, 'startSession')
+        .mockResolvedValue(mockSession as any);
 
       // Execute all operations
       await service.createPatient(createPatientDto, mockUserId);
-      await service.updatePatient(mockPatientId, { firstName: 'Jane' }, mockUserId);
+      await service.updatePatient(
+        mockPatientId,
+        { firstName: 'Jane' },
+        mockUserId,
+      );
       await service.deactivatePatient(mockPatientId, mockUserId);
       await service.activatePatient(mockPatientId, mockUserId);
       await service.deletePatient(mockPatientId, mockUserId);
 
       // Verify all operations logged audit events
       expect(auditService.logSecurityEvent).toHaveBeenCalledTimes(5);
-      
+
       // Verify event types
       const calls = (auditService.logSecurityEvent as jest.Mock).mock.calls;
       expect(calls[0][0].eventType).toBe('PATIENT_CREATED');

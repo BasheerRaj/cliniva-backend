@@ -84,7 +84,7 @@ import {
 export class AuthController {
   private readonly logger = new Logger(AuthController.name);
 
-  constructor(private readonly authService: AuthService) { }
+  constructor(private readonly authService: AuthService) {}
 
   /**
    * Register a new user
@@ -172,10 +172,10 @@ export class AuthController {
     // Extract creator user info from JWT if present (populated by OptionalJwtAuthGuard)
     const creatorUser = req.user
       ? {
-        id: req.user.id || req.user.userId || req.user.sub,
-        role: req.user.role,
-        email: req.user.email,
-      }
+          id: req.user.id || req.user.userId || req.user.sub,
+          role: req.user.role,
+          email: req.user.email,
+        }
       : null;
 
     return this.authService.register(registerDto, creatorUser);
@@ -190,7 +190,7 @@ export class AuthController {
    * Requirements: 9.2
    */
   @Post('login')
-  @UseGuards(RateLimitGuard)  // Temporarily disabled for testing
+  @UseGuards(RateLimitGuard) // Temporarily disabled for testing
   @RateLimit(RateLimitType.LOGIN_ATTEMPT, 10, 900) // 10 attempts per 15 minutes (900 seconds)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({

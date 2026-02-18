@@ -142,54 +142,68 @@ export class AppointmentService {
         );
       }
 
-    // Working Hours and Holiday Validation
-    if (doctorId && clinicId) {
-      const effectiveHours = await this.workingHoursIntegrationService.getEffectiveWorkingHours(
-        doctorId,
-        clinicId.toString(),
-        new Date(appointmentDate)
-      );
+      // Working Hours and Holiday Validation
+      if (doctorId && clinicId) {
+        const effectiveHours =
+          await this.workingHoursIntegrationService.getEffectiveWorkingHours(
+            doctorId,
+            clinicId.toString(),
+            new Date(appointmentDate),
+          );
 
-      if (!effectiveHours) {
-        throw new BadRequestException({
-          message: ERROR_MESSAGES.FACILITY_CLOSED_OR_HOLIDAY,
-        });
-      }
-
-      const duration = (appointmentDto as any).durationMinutes || 30;
-      const appointmentEndTime = this.addMinutesToTime(appointmentTime, duration);
-
-      // Check if within opening/closing hours
-      if (appointmentTime < effectiveHours.openingTime || appointmentEndTime > effectiveHours.closingTime) {
-        throw new BadRequestException({
-          message: ERROR_MESSAGES.APPOINTMENT_OUTSIDE_WORKING_HOURS,
-          details: { openingTime: effectiveHours.openingTime, closingTime: effectiveHours.closingTime }
-        });
-      }
-
-      // Check for break time overlap
-      if (effectiveHours.breakStartTime && effectiveHours.breakEndTime) {
-        if (appointmentTime < effectiveHours.breakEndTime && appointmentEndTime > effectiveHours.breakStartTime) {
+        if (!effectiveHours) {
           throw new BadRequestException({
-            message: ERROR_MESSAGES.APPOINTMENT_OVERLAPS_BREAK,
+            message: ERROR_MESSAGES.FACILITY_CLOSED_OR_HOLIDAY,
+          });
+        }
+
+        const duration = (appointmentDto as any).durationMinutes || 30;
+        const appointmentEndTime = this.addMinutesToTime(
+          appointmentTime,
+          duration,
+        );
+
+        // Check if within opening/closing hours
+        if (
+          appointmentTime < effectiveHours.openingTime ||
+          appointmentEndTime > effectiveHours.closingTime
+        ) {
+          throw new BadRequestException({
+            message: ERROR_MESSAGES.APPOINTMENT_OUTSIDE_WORKING_HOURS,
+            details: {
+              openingTime: effectiveHours.openingTime,
+              closingTime: effectiveHours.closingTime,
+            },
+          });
+        }
+
+        // Check for break time overlap
+        if (effectiveHours.breakStartTime && effectiveHours.breakEndTime) {
+          if (
+            appointmentTime < effectiveHours.breakEndTime &&
+            appointmentEndTime > effectiveHours.breakStartTime
+          ) {
+            throw new BadRequestException({
+              message: ERROR_MESSAGES.APPOINTMENT_OVERLAPS_BREAK,
+            });
+          }
+        }
+
+        // Check for blocked time
+        const isBlocked =
+          await this.workingHoursIntegrationService.isTimeBlocked(
+            doctorId,
+            new Date(appointmentDate),
+            appointmentTime,
+            appointmentEndTime,
+          );
+
+        if (isBlocked) {
+          throw new BadRequestException({
+            message: ERROR_MESSAGES.TIME_SLOT_BLOCKED,
           });
         }
       }
-
-      // Check for blocked time
-      const isBlocked = await this.workingHoursIntegrationService.isTimeBlocked(
-        doctorId,
-        new Date(appointmentDate),
-        appointmentTime,
-        appointmentEndTime
-      );
-
-      if (isBlocked) {
-        throw new BadRequestException({
-          message: ERROR_MESSAGES.TIME_SLOT_BLOCKED,
-        });
-      }
-    }
 
       // Check for conflicts
       if (patientId && doctorId) {
@@ -385,7 +399,7 @@ export class AppointmentService {
       priority: 'normal',
       relatedEntityType: 'appointment',
       relatedEntityId: (savedAppointment as any)._id.toString(),
-      deliveryMethod: 'in_app'
+      deliveryMethod: 'in_app',
     });
 
     // Send notification to doctor
@@ -397,7 +411,7 @@ export class AppointmentService {
       priority: 'normal',
       relatedEntityType: 'appointment',
       relatedEntityId: (savedAppointment as any)._id.toString(),
-      deliveryMethod: 'in_app'
+      deliveryMethod: 'in_app',
     });
 
     if (createdByUserId) {
@@ -650,7 +664,7 @@ export class AppointmentService {
       priority: 'high',
       relatedEntityType: 'appointment',
       relatedEntityId: appointmentId,
-      deliveryMethod: 'in_app'
+      deliveryMethod: 'in_app',
     });
 
     // Send notification to doctor
@@ -662,7 +676,7 @@ export class AppointmentService {
       priority: 'normal',
       relatedEntityType: 'appointment',
       relatedEntityId: appointmentId,
-      deliveryMethod: 'in_app'
+      deliveryMethod: 'in_app',
     });
 
     if (updatedByUserId) {
@@ -728,7 +742,7 @@ export class AppointmentService {
       priority: 'high',
       relatedEntityType: 'appointment',
       relatedEntityId: appointmentId,
-      deliveryMethod: 'in_app'
+      deliveryMethod: 'in_app',
     });
 
     // Send notification to doctor
@@ -740,7 +754,7 @@ export class AppointmentService {
       priority: 'normal',
       relatedEntityType: 'appointment',
       relatedEntityId: appointmentId,
-      deliveryMethod: 'in_app'
+      deliveryMethod: 'in_app',
     });
 
     if (updatedByUserId) {
@@ -806,7 +820,7 @@ export class AppointmentService {
       priority: 'high',
       relatedEntityType: 'appointment',
       relatedEntityId: appointmentId,
-      deliveryMethod: 'in_app'
+      deliveryMethod: 'in_app',
     });
 
     if (updatedByUserId) {
@@ -888,11 +902,12 @@ export class AppointmentService {
     }
 
     // Get effective working hours for this day
-    const effectiveHours = await this.workingHoursIntegrationService.getEffectiveWorkingHours(
-      doctorId,
-      clinicId,
-      bookingDate
-    );
+    const effectiveHours =
+      await this.workingHoursIntegrationService.getEffectiveWorkingHours(
+        doctorId,
+        clinicId,
+        bookingDate,
+      );
 
     if (!effectiveHours) {
       return {
@@ -913,7 +928,7 @@ export class AppointmentService {
         doctorId: new Types.ObjectId(doctorId),
         appointmentDate: {
           $gte: new Date(bookingDate.setHours(0, 0, 0, 0)),
-          $lte: new Date(bookingDate.setHours(23, 59, 59, 999))
+          $lte: new Date(bookingDate.setHours(23, 59, 59, 999)),
         },
         status: { $nin: ['cancelled', 'no_show'] },
         deletedAt: { $exists: false },
@@ -922,39 +937,49 @@ export class AppointmentService {
       .exec();
 
     const timeSlots: TimeSlotDto[] = [];
-    
+
     // Parse times
-    const [startHour, startMin] = effectiveHours.openingTime.split(':').map(Number);
+    const [startHour, startMin] = effectiveHours.openingTime
+      .split(':')
+      .map(Number);
     const [endHour, endMin] = effectiveHours.closingTime.split(':').map(Number);
-    
+
     let currentHour = startHour;
     let currentMin = startMin;
 
-    while (currentHour < endHour || (currentHour === endHour && currentMin < endMin)) {
+    while (
+      currentHour < endHour ||
+      (currentHour === endHour && currentMin < endMin)
+    ) {
       const timeStr = `${currentHour.toString().padStart(2, '0')}:${currentMin.toString().padStart(2, '0')}`;
       const nextTime = this.addMinutesToTime(timeStr, durationMinutes);
-      
+
       // Stop if next slot exceeds closing time
       if (nextTime > effectiveHours.closingTime) break;
 
       // Check if slot is in break time
-      const isBreak = !!(effectiveHours.breakStartTime && 
-                     effectiveHours.breakEndTime &&
-                     timeStr >= effectiveHours.breakStartTime && 
-                     timeStr < effectiveHours.breakEndTime);
+      const isBreak = !!(
+        effectiveHours.breakStartTime &&
+        effectiveHours.breakEndTime &&
+        timeStr >= effectiveHours.breakStartTime &&
+        timeStr < effectiveHours.breakEndTime
+      );
 
       // Check if slot is blocked
       const isBlocked = await this.workingHoursIntegrationService.isTimeBlocked(
         doctorId,
         bookingDate,
         timeStr,
-        nextTime
+        nextTime,
       );
 
       // Check if slot is already booked
       const isBooked = existingAppointments.some((apt) => {
         const aptStartTime = apt.appointmentTime;
-        const aptEndTime = this.addMinutesToTime(aptStartTime, apt.durationMinutes);
+        const aptEndTime = this.addMinutesToTime(
+          aptStartTime,
+          apt.durationMinutes,
+        );
         // Overlap check: (StartA < EndB) and (EndA > StartB)
         return timeStr < aptEndTime && nextTime > aptStartTime;
       });
@@ -996,9 +1021,15 @@ export class AppointmentService {
       workingHours: {
         start: effectiveHours.openingTime,
         end: effectiveHours.closingTime,
-        breaks: (effectiveHours.breakStartTime && effectiveHours.breakEndTime) ? [
-          { start: effectiveHours.breakStartTime, end: effectiveHours.breakEndTime }
-        ] : [],
+        breaks:
+          effectiveHours.breakStartTime && effectiveHours.breakEndTime
+            ? [
+                {
+                  start: effectiveHours.breakStartTime,
+                  end: effectiveHours.breakEndTime,
+                },
+              ]
+            : [],
       },
       timeSlots,
       totalSlots,

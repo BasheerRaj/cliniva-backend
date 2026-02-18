@@ -10,12 +10,15 @@ export class LoginDto {
     format: 'email',
   })
   @Transform(({ value }) => value?.toLowerCase().trim())
-  @IsEmail({}, {
-    message: JSON.stringify({
-      ar: 'البريد الإلكتروني غير صالح',
-      en: 'Invalid email address',
-    }),
-  })
+  @IsEmail(
+    {},
+    {
+      message: JSON.stringify({
+        ar: 'البريد الإلكتروني غير صالح',
+        en: 'Invalid email address',
+      }),
+    },
+  )
   @IsNotEmpty({
     message: JSON.stringify({
       ar: 'البريد الإلكتروني مطلوب',

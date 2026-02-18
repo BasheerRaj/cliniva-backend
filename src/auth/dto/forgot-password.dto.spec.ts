@@ -8,18 +8,18 @@ describe('ForgotPasswordDto', () => {
 
     const errors = await validate(dto);
     expect(errors.length).toBeGreaterThan(0);
-    
-    const emailError = errors.find(e => e.property === 'email');
+
+    const emailError = errors.find((e) => e.property === 'email');
     expect(emailError).toBeDefined();
-    
+
     // Check that the error message is bilingual (JSON stringified)
     const constraints = Object.values(emailError!.constraints || {});
     expect(constraints.length).toBeGreaterThan(0);
-    
+
     // Parse the first constraint message
-    const firstMessage = constraints[0] as string;
+    const firstMessage = constraints[0];
     const parsed = JSON.parse(firstMessage);
-    
+
     expect(parsed).toHaveProperty('ar');
     expect(parsed).toHaveProperty('en');
     expect(parsed.ar).toBe('البريد الإلكتروني غير صالح');
@@ -32,8 +32,8 @@ describe('ForgotPasswordDto', () => {
 
     const errors = await validate(dto);
     expect(errors.length).toBeGreaterThan(0);
-    
-    const emailError = errors.find(e => e.property === 'email');
+
+    const emailError = errors.find((e) => e.property === 'email');
     expect(emailError).toBeDefined();
   });
 
@@ -53,7 +53,7 @@ describe('ForgotPasswordDto', () => {
     dto.email = dto.email.toLowerCase().trim();
 
     expect(dto.email).toBe('test@example.com');
-    
+
     const errors = await validate(dto);
     expect(errors.length).toBe(0);
   });

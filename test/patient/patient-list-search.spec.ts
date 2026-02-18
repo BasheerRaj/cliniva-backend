@@ -64,7 +64,12 @@ describe('PatientService - List and Search Operations', () => {
     it('should exclude soft-deleted patients from list', async () => {
       const mockPatients = [
         { _id: '1', firstName: 'John', lastName: 'Doe', deletedAt: undefined },
-        { _id: '2', firstName: 'Jane', lastName: 'Smith', deletedAt: undefined },
+        {
+          _id: '2',
+          firstName: 'Jane',
+          lastName: 'Smith',
+          deletedAt: undefined,
+        },
       ];
 
       const mockQuery = {

@@ -900,10 +900,7 @@ export class ServiceController {
     @Query('complexDepartmentId') complexDepartmentId?: string,
     @Query('clinicId') clinicId?: string,
   ): Promise<Service[]> {
-    return this.serviceService.getActiveServices(
-      complexDepartmentId,
-      clinicId,
-    );
+    return this.serviceService.getActiveServices(complexDepartmentId, clinicId);
   }
 
   /**

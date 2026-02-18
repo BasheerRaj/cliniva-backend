@@ -5,7 +5,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { InjectModel, InjectConnection } from '@nestjs/mongoose';
-import { Model, Types, Connection } from 'mongoose';
+import { Model, Types, Connection, RootFilterQuery } from 'mongoose';
 import { User } from '../database/schemas/user.schema';
 import { Organization } from '../database/schemas/organization.schema';
 import { Complex } from '../database/schemas/complex.schema';
@@ -25,6 +25,9 @@ import { DoctorDeactivationService } from './doctor-deactivation.service';
 import { ValidationUtil } from '../common/utils/validation.util';
 import { ResponseBuilder } from '../common/utils/response-builder.util';
 import { ERROR_MESSAGES } from '../common/utils/error-messages.constant';
+
+import { GetUsersFilterDto } from './dto/get-users-filter.dto';
+import { SortOrder } from '../common/dto/pagination-query.dto';
 
 @Injectable()
 export class UserService {
@@ -48,6 +51,85 @@ export class UserService {
     private readonly userRestrictionService: UserRestrictionService,
     private readonly doctorDeactivationService: DoctorDeactivationService,
   ) {}
+
+  /**
+   * Get paginated list of users with filtering
+   *
+   * Task 1.1: Implement getUsers method for paginated list with filters
+   * Requirements: 4.1, 4.2
+   *
+   * @param filterDto - Filter and pagination options
+   * @returns Paginated users list
+   */
+  async getUsers(filterDto: GetUsersFilterDto) {
+    try {
+      const {
+        page = 1,
+        limit = 10,
+        sortBy = 'createdAt',
+        sortOrder = SortOrder.DESC,
+        search,
+        role,
+        isActive,
+        organizationId,
+        complexId,
+        clinicId,
+      } = filterDto;
+
+      const query: RootFilterQuery<User> = {};
+
+      // Apply filters
+      if (role) query.role = role;
+      if (isActive !== undefined) query.isActive = isActive;
+      if (organizationId)
+        query.organizationId = new Types.ObjectId(organizationId);
+      if (complexId) query.complexId = new Types.ObjectId(complexId);
+      if (clinicId) query.clinicId = new Types.ObjectId(clinicId);
+
+      // Search by name or email
+      if (search) {
+        query.$or = [
+          { firstName: { $regex: search, $options: 'i' } },
+          { lastName: { $regex: search, $options: 'i' } },
+          { email: { $regex: search, $options: 'i' } },
+        ];
+      }
+
+      // Execute query with pagination
+      const skip = (page - 1) * limit;
+      const [users, total] = await Promise.all([
+        this.userModel
+          .find(query)
+          .sort({ [sortBy]: sortOrder === SortOrder.ASC ? 1 : -1 })
+          .skip(skip)
+          .limit(limit)
+          .populate('organizationId', 'name nameAr')
+          .populate('complexId', 'name nameAr')
+          .populate('clinicId', 'name nameAr')
+          .select('-passwordHash -__v')
+          .lean()
+          .exec(),
+        this.userModel.countDocuments(query).exec(),
+      ]);
+
+      return {
+        users,
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      };
+    } catch (error) {
+      this.logger.error('Error fetching users list:', error);
+      throw new BadRequestException({
+        message: {
+          ar: 'حدث خطأ أثناء جلب قائمة المستخدمين',
+          en: 'Error fetching users list',
+        },
+        code: 'USERS_FETCH_ERROR',
+      });
+    }
+  }
 
   async checkUserEntities(userId: string): Promise<UserEntitiesResponseDto> {
     try {
@@ -86,7 +168,7 @@ export class UserService {
       }
 
       const plan = subscription.planId as any; // Populated SubscriptionPlan
-      const planType = plan.name; // clinic, complex, company
+      const planType = plan?.name || 'clinic'; // clinic, complex, company
 
       // Check existing entities
       const [organizationCount, complexCount, clinicCount] = await Promise.all([
@@ -321,6 +403,26 @@ export class UserService {
       // Requirement 8.1, 8.3: Prevent self-deactivation
       if (!updateUserStatusDto.isActive) {
         this.userRestrictionService.canDeactivateUser(currentUserId, userId);
+
+        // Rule: User has no future appointments
+        const futureAppointmentsCount = await this.appointmentModel
+          .countDocuments({
+            doctorId: new Types.ObjectId(userId),
+            status: { $in: ['scheduled', 'confirmed'] },
+            appointmentDate: { $gte: new Date() },
+          })
+          .exec();
+
+        if (futureAppointmentsCount > 0) {
+          throw new BadRequestException({
+            message: {
+              ar: 'لا يمكن إلغاء تفعيل المستخدم لأن لديه مواعيد مستقبلية. يرجى نقل المواعيد أو إلغاؤها أولاً',
+              en: 'Cannot deactivate user because they have future appointments. Please transfer or cancel appointments first',
+            },
+            code: 'USER_HAS_FUTURE_APPOINTMENTS',
+            details: { appointmentCount: futureAppointmentsCount },
+          });
+        }
       }
 
       // Validate user exists
@@ -603,10 +705,15 @@ export class UserService {
     role?: string;
     complexId?: string;
     clinicId?: string;
+    includeDeactivated?: boolean;
   }) {
     try {
-      // Build query - only active users
-      const query: any = { isActive: true };
+      // Build query
+      const query: RootFilterQuery<User> = {};
+
+      if (!filters?.includeDeactivated) {
+        query.isActive = true;
+      }
 
       // Apply optional filters
       if (filters?.role) {
@@ -628,7 +735,7 @@ export class UserService {
         .exec();
 
       this.logger.log(
-        `Retrieved ${users.length} active users for dropdown with filters: ${JSON.stringify(filters || {})}`,
+        `Retrieved ${users.length} users for dropdown with filters: ${JSON.stringify(filters || {})}`,
       );
 
       return ResponseBuilder.success(users);
@@ -883,7 +990,10 @@ export class UserService {
    */
   async getUserPreferences(userId: string) {
     try {
-      const user = await this.userModel.findById(userId).select('preferences preferredLanguage').exec();
+      const user = await this.userModel
+        .findById(userId)
+        .select('preferences preferredLanguage')
+        .exec();
 
       if (!user) {
         throw new NotFoundException({
@@ -893,7 +1003,7 @@ export class UserService {
       }
 
       // Return preferences with defaults
-      const preferences = user.preferences || {};
+      const preferences: any = user.preferences || {};
       return {
         language: preferences.language || user.preferredLanguage || 'en',
         theme: preferences.theme || 'light',
@@ -901,7 +1011,8 @@ export class UserService {
           email: preferences.notifications?.email ?? true,
           sms: preferences.notifications?.sms ?? false,
           push: preferences.notifications?.push ?? true,
-          appointmentReminders: preferences.notifications?.appointmentReminders ?? true,
+          appointmentReminders:
+            preferences.notifications?.appointmentReminders ?? true,
           systemUpdates: preferences.notifications?.systemUpdates ?? false,
         },
       };
@@ -910,7 +1021,10 @@ export class UserService {
         throw error;
       }
 
-      this.logger.error(`Error retrieving preferences for user ${userId}:`, error);
+      this.logger.error(
+        `Error retrieving preferences for user ${userId}:`,
+        error,
+      );
       throw new BadRequestException({
         message: {
           ar: 'حدث خطأ أثناء جلب التفضيلات',
@@ -937,45 +1051,48 @@ export class UserService {
 
       // Initialize preferences if not exists
       if (!user.preferences) {
-        user.preferences = {};
+        user.preferences = {} as any;
       }
+
+      const preferences: any = user.preferences;
 
       // Update language
       if (preferencesDto.language) {
-        user.preferences.language = preferencesDto.language;
+        preferences.language = preferencesDto.language;
         user.preferredLanguage = preferencesDto.language; // Keep in sync
       }
 
       // Update theme
       if (preferencesDto.theme) {
-        user.preferences.theme = preferencesDto.theme;
+        preferences.theme = preferencesDto.theme;
       }
 
       // Update notifications
       if (preferencesDto.notifications) {
-        if (!user.preferences.notifications) {
-          user.preferences.notifications = {};
+        if (!preferences.notifications) {
+          preferences.notifications = {};
         }
-        Object.assign(user.preferences.notifications, preferencesDto.notifications);
+        Object.assign(preferences.notifications, preferencesDto.notifications);
       }
 
+      user.markModified('preferences');
       await user.save();
 
       this.logger.log(`Preferences updated for user ${userId}`);
 
-      return ResponseBuilder.success(
-        user.preferences,
-        {
-          ar: 'تم تحديث التفضيلات بنجاح',
-          en: 'Preferences updated successfully',
-        },
-      );
+      return ResponseBuilder.success(user.preferences, {
+        ar: 'تم تحديث التفضيلات بنجاح',
+        en: 'Preferences updated successfully',
+      });
     } catch (error) {
       if (error instanceof NotFoundException) {
         throw error;
       }
 
-      this.logger.error(`Error updating preferences for user ${userId}:`, error);
+      this.logger.error(
+        `Error updating preferences for user ${userId}:`,
+        error,
+      );
       throw new BadRequestException({
         message: {
           ar: 'حدث خطأ أثناء تحديث التفضيلات',

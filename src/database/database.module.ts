@@ -6,7 +6,10 @@ import { DatabaseController } from './database.controller';
 import { DatabaseSeederService } from './seeders/database-seeder.service';
 import { EntitiesSeederService } from './seeders/entities.seeder';
 import { DatabaseInitializerService } from './database-initializer.service';
-import { ServiceOffer, ServiceOfferSchema } from '../service-offer/schemas/service-offer.schema';
+import {
+  ServiceOffer,
+  ServiceOfferSchema,
+} from '../service-offer/schemas/service-offer.schema';
 
 // Import all schemas
 import {

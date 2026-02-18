@@ -100,4 +100,3 @@ export const testEnvironment = {
   MONGODB_URI:
     process.env.MONGODB_TEST_URI || 'mongodb://localhost:27017/cliniva_test',
 };
-

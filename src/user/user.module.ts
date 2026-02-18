@@ -24,6 +24,10 @@ import {
   Appointment,
   AppointmentSchema,
 } from '../database/schemas/appointment.schema';
+import {
+  EmployeeProfile,
+  EmployeeProfileSchema,
+} from '../database/schemas/employee-profile.schema';
 import { AuthModule } from '../auth/auth.module';
 
 @Module({
@@ -36,6 +40,7 @@ import { AuthModule } from '../auth/auth.module';
       { name: Subscription.name, schema: SubscriptionSchema },
       { name: SubscriptionPlan.name, schema: SubscriptionPlanSchema },
       { name: Appointment.name, schema: AppointmentSchema },
+      { name: EmployeeProfile.name, schema: EmployeeProfileSchema },
     ]),
     forwardRef(() => AuthModule), // Use forwardRef to avoid circular dependency
   ],

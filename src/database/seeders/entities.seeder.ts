@@ -173,8 +173,7 @@ export class EntitiesSeederService {
         yearEstablished: 2010,
         mission:
           'To provide comprehensive healthcare services with excellence and compassion',
-        vision:
-          'To be the leading healthcare provider in the region by 2030',
+        vision: 'To be the leading healthcare provider in the region by 2030',
         overview:
           'A multi-facility healthcare organization serving over 100,000 patients annually',
         goals:
@@ -529,7 +528,11 @@ export class EntitiesSeederService {
         ceoName: 'Dr. Mohammed Al-Zahrani',
         phoneNumbers: [
           { number: '+966-13-789-4560', type: 'primary', label: 'Reception' },
-          { number: '+966-50-987-6543', type: 'mobile', label: 'Doctor Mobile' },
+          {
+            number: '+966-50-987-6543',
+            type: 'mobile',
+            label: 'Doctor Mobile',
+          },
         ],
         email: 'info@familycareclinic.com',
         address: {

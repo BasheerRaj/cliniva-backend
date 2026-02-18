@@ -78,7 +78,7 @@ export class FirstLoginGuard implements CanActivate {
     // User should be populated by JwtAuthGuard
     // JWT strategy returns 'id', not 'userId'
     const userId = user?.id || user?.userId || user?.sub;
-    
+
     if (!user || !userId) {
       this.logger.warn(
         'No user found in request - JwtAuthGuard should run first',

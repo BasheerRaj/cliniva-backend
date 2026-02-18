@@ -21,12 +21,15 @@ export class RegisterDto {
     format: 'email',
   })
   @Transform(({ value }) => value?.toLowerCase().trim())
-  @IsEmail({}, {
-    message: JSON.stringify({
-      ar: 'البريد الإلكتروني غير صالح',
-      en: 'Invalid email address',
-    }),
-  })
+  @IsEmail(
+    {},
+    {
+      message: JSON.stringify({
+        ar: 'البريد الإلكتروني غير صالح',
+        en: 'Invalid email address',
+      }),
+    },
+  )
   @IsNotEmpty({
     message: JSON.stringify({
       ar: 'البريد الإلكتروني مطلوب',
@@ -60,12 +63,15 @@ export class RegisterDto {
       en: 'Password must be at least 8 characters long',
     }),
   })
-  @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]+$/, {
-    message: JSON.stringify({
-      ar: 'كلمة المرور يجب أن تحتوي على حرف كبير وحرف صغير ورقم ورمز خاص',
-      en: 'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character',
-    }),
-  })
+  @Matches(
+    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]+$/,
+    {
+      message: JSON.stringify({
+        ar: 'كلمة المرور يجب أن تحتوي على حرف كبير وحرف صغير ورقم ورمز خاص',
+        en: 'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character',
+      }),
+    },
+  )
   password: string;
 
   @ApiProperty({
@@ -162,7 +168,8 @@ export class RegisterDto {
   gender?: string;
 
   @ApiPropertyOptional({
-    description: 'Complex ID (optional) - Associates user with a specific complex',
+    description:
+      'Complex ID (optional) - Associates user with a specific complex',
     example: '507f1f77bcf86cd799439011',
     type: String,
   })

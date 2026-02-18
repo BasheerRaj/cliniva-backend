@@ -500,5 +500,3 @@ export class DoctorServiceService {
     return await doctorService.save();
   }
 }
-
-

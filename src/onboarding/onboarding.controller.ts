@@ -2772,7 +2772,7 @@ Save working hours schedule for the clinic during onboarding. This is the final 
       if (error instanceof BadRequestException) {
         throw error;
       }
-      
+
       // For other errors, return generic error response
       return {
         success: false,

@@ -43,7 +43,7 @@ export class AuthService {
     private readonly auditService: AuditService,
     private readonly sessionService: SessionService,
     private readonly emailService: EmailService,
-  ) { }
+  ) {}
 
   /**
    * Register a new user
@@ -62,7 +62,7 @@ export class AuthService {
     creatorUser?: { id: string; role: UserRole; email: string } | null,
   ): Promise<AuthResponseDto> {
     try {
-      const targetRole = registerDto.role as UserRole;
+      const targetRole = registerDto.role;
 
       // ==========================================
       // ROLE-BASED AUTHORIZATION CHECKS
@@ -83,7 +83,10 @@ export class AuthService {
       }
 
       // Rule 2: Determine if auth is required based on target role
-      const selfRegisterableRoles: UserRole[] = [UserRole.OWNER, UserRole.PATIENT];
+      const selfRegisterableRoles: UserRole[] = [
+        UserRole.OWNER,
+        UserRole.PATIENT,
+      ];
       const requiresAuth = !selfRegisterableRoles.includes(targetRole);
 
       if (requiresAuth && !creatorUser) {
@@ -101,7 +104,7 @@ export class AuthService {
 
       // Rule 3: If auth is provided, validate the creator has permission to create this role
       if (creatorUser) {
-        const creatorRole = creatorUser.role as UserRole;
+        const creatorRole = creatorUser.role;
         const canCreate = canManageRole(creatorRole, targetRole);
 
         if (!canCreate) {
@@ -142,7 +145,6 @@ export class AuthService {
         });
       }
 
-
       // Validate clinicId if provided
       if (registerDto.clinicId) {
         const clinic = await this.clinicModel.findById(registerDto.clinicId);
@@ -166,7 +168,7 @@ export class AuthService {
       // When a privileged user creates another user, associate the new user
       // with the same organization/complex/clinic scope
       // Explicitly provided complexId/clinicId in the DTO take priority over creator's scope
-      let scopeFields: any = {};
+      const scopeFields: any = {};
       if (creatorUser && requiresAuth) {
         scopeFields.createdBy = creatorUser.id;
         const creator = await this.userModel.findById(creatorUser.id);
@@ -211,7 +213,8 @@ export class AuthService {
 
       const savedUser = await newUser.save();
       this.logger.log(
-        `New user registered: ${savedUser.email} (role: ${savedUser.role})${creatorUser ? ` by ${creatorUser.email}` : ' (self-registration)'
+        `New user registered: ${savedUser.email} (role: ${savedUser.role})${
+          creatorUser ? ` by ${creatorUser.email}` : ' (self-registration)'
         }`,
       );
 
@@ -1080,7 +1083,9 @@ export class AuthService {
 
       // Store pending email change (expires in 24 hours)
       user.emailVerificationToken = hashedToken;
-      user.emailVerificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      user.emailVerificationExpires = new Date(
+        Date.now() + 24 * 60 * 60 * 1000,
+      );
       (user as any).pendingEmail = newEmail.toLowerCase();
       await user.save();
 

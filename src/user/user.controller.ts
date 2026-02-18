@@ -41,14 +41,17 @@ import {
 } from './dto/check-user-entities.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UpdateOwnProfileDto } from './dto/update-own-profile.dto';
-import { UpdatePreferencesDto } from './dto/update-preferences.dto';
 import { UpdateUserStatusDto } from './dto/update-user-status.dto';
 import { DeactivateWithTransferDto } from './dto/deactivate-with-transfer.dto';
 import { TransferAppointmentsDto } from './dto/transfer-appointments.dto';
+import { GetUsersFilterDto } from './dto/get-users-filter.dto';
+import { CreateUserDto } from './dto/create-user.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AdminGuard } from '../auth/guards/admin.guard';
 import { AuthService } from '../auth/auth.service';
 import * as EXAMPLES from './constants/swagger-examples';
+import * as crypto from 'crypto';
+import { User } from '../database/schemas/user.schema';
 
 @ApiTags('Users')
 @Controller('users')
@@ -65,6 +68,195 @@ export class UserController {
     private readonly userDropdownService: UserDropdownService,
     private readonly authService: AuthService,
   ) {}
+
+  @ApiOperation({
+    summary: 'Get paginated list of users',
+    description:
+      'Retrieve a paginated list of users with filtering options. Requires admin, owner, or super_admin role.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Users list retrieved successfully',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Insufficient permissions',
+  })
+  @ApiBearerAuth()
+  @Get()
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  async getUsers(@Query() filterDto: GetUsersFilterDto) {
+    try {
+      const result = await this.userService.getUsers(filterDto);
+      return {
+        success: true,
+        data: result,
+        message: {
+          ar: 'تم جلب قائمة المستخدمين بنجاح',
+          en: 'Users list retrieved successfully',
+        },
+      };
+    } catch (error: any) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      this.logger.error(
+        `Get users list failed: ${error?.message}`,
+        error?.stack,
+      );
+      throw new HttpException(
+        {
+          message: {
+            ar: 'فشل جلب قائمة المستخدمين',
+            en: 'Failed to retrieve users list',
+          },
+          code: 'USERS_LIST_FAILED',
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @ApiOperation({
+    summary: 'Create a new user',
+    description:
+      'Create a new user (admin, doctor, staff, etc.). Admin-initiated creation. Generates a temporary password if not provided. Requires admin, owner, or super_admin role.',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'User created successfully',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad Request - Validation error',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Insufficient permissions',
+  })
+  @ApiResponse({
+    status: 409,
+    description: 'Conflict - Email already exists',
+  })
+  @ApiBearerAuth()
+  @Post()
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @HttpCode(HttpStatus.CREATED)
+  async createUser(@Body() createUserDto: CreateUserDto, @Request() req: any) {
+    try {
+      // Extract currentUserId from JWT payload
+      const currentUserId = req.user?.id || req.user?.userId || req.user?.sub;
+      const currentUserRole = req.user?.role;
+      const currentUserEmail = req.user?.email;
+
+      if (!currentUserId) {
+        throw new HttpException(
+          {
+            message: {
+              ar: 'معرف المستخدم غير موجود',
+              en: 'User ID not found',
+            },
+            code: 'USER_ID_NOT_FOUND',
+          },
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      // Generate temporary password if not provided
+      let isTemporary = false;
+      let password = createUserDto.password;
+      if (!password) {
+        // Generate a secure random password: 12 characters, including upper, lower, digit, special
+        const upper = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+        const lower = 'abcdefghijklmnopqrstuvwxyz';
+        const digits = '0123456789';
+        const special = '@$!%*?&';
+
+        const getRandomChar = (set: string) =>
+          set[crypto.randomInt(0, set.length)];
+
+        // Ensure at least one of each
+        const passwordChars = [
+          getRandomChar(upper),
+          getRandomChar(lower),
+          getRandomChar(digits),
+          getRandomChar(special),
+        ];
+
+        // Fill the rest
+        const all = upper + lower + digits + special;
+        for (let i = 0; i < 8; i++) {
+          passwordChars.push(getRandomChar(all));
+        }
+
+        // Shuffle
+        for (let i = passwordChars.length - 1; i > 0; i--) {
+          const j = crypto.randomInt(0, i + 1);
+          [passwordChars[i], passwordChars[j]] = [
+            passwordChars[j],
+            passwordChars[i],
+          ];
+        }
+
+        password = passwordChars.join('');
+        createUserDto.password = password;
+        isTemporary = true;
+      }
+
+      // Call authService.register with creator info
+      const result = await this.authService.register(createUserDto as any, {
+        id: currentUserId as string,
+        role: currentUserRole,
+        email: currentUserEmail as string,
+      });
+
+      // If password was temporary, mark it in the user record
+      if (isTemporary) {
+        await this.userService.updateUser(
+          result.user.id,
+          { temporaryPassword: true, isFirstLogin: true } as any,
+          currentUserId as string,
+        );
+      }
+
+      return {
+        success: true,
+        data: {
+          ...result.user,
+          temporaryPassword: isTemporary ? password : undefined,
+        },
+        message: {
+          ar: 'تم إنشاء المستخدم بنجاح',
+          en: 'User created successfully',
+        },
+      };
+    } catch (error: any) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      this.logger.error(`Create user failed: ${error?.message}`, error?.stack);
+
+      // Handle ConflictException from AuthService
+      if (error?.status === HttpStatus.CONFLICT) {
+        throw error;
+      }
+
+      throw new HttpException(
+        {
+          message: {
+            ar: 'فشل إنشاء المستخدم',
+            en: 'Failed to create user',
+          },
+          code: 'USER_CREATION_FAILED',
+        },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+  }
 
   @ApiOperation({
     summary: 'Get current user profile',
@@ -161,14 +353,14 @@ export class UserController {
           en: 'User profile retrieved successfully',
         },
       };
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof HttpException) {
         throw error;
       }
 
       this.logger.error(
-        `Get current user failed: ${error.message}`,
-        error.stack,
+        `Get current user failed: ${error?.message}`,
+        error?.stack,
       );
       throw new HttpException(
         {
@@ -280,7 +472,7 @@ export class UserController {
       if (updateData.email) {
         // Initiate email change with verification
         await this.authService.initiateEmailChange(userId, updateData.email);
-        
+
         return {
           success: true,
           data: {
@@ -297,12 +489,15 @@ export class UserController {
       // At this point, validation has already passed via the DTO
       // Only fields defined in UpdateOwnProfileDto can reach here
       const filteredData: Partial<UpdateUserDto> = {};
-      
+
       // Copy validated fields
-      if (updateData.firstName !== undefined) filteredData.firstName = updateData.firstName;
-      if (updateData.lastName !== undefined) filteredData.lastName = updateData.lastName;
+      if (updateData.firstName !== undefined)
+        filteredData.firstName = updateData.firstName;
+      if (updateData.lastName !== undefined)
+        filteredData.lastName = updateData.lastName;
       if (updateData.phone !== undefined) filteredData.phone = updateData.phone;
-      if (updateData.nationality !== undefined) filteredData.nationality = updateData.nationality;
+      if (updateData.nationality !== undefined)
+        filteredData.nationality = updateData.nationality;
 
       // Update user profile
       const updatedUser = await this.userService.updateUser(
@@ -326,14 +521,14 @@ export class UserController {
           en: 'Profile updated successfully',
         },
       };
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof HttpException) {
         throw error;
       }
 
       this.logger.error(
-        `Update profile failed: ${error.message}`,
-        error.stack,
+        `Update profile failed: ${error?.message}`,
+        error?.stack,
       );
       throw new HttpException(
         {
@@ -350,7 +545,8 @@ export class UserController {
 
   @ApiOperation({
     summary: 'Upload profile picture',
-    description: 'Upload a profile picture for the currently authenticated user. Only image files are allowed (JPEG, PNG, GIF, WebP, SVG). Maximum file size: 5MB.',
+    description:
+      'Upload a profile picture for the currently authenticated user. Only image files are allowed (JPEG, PNG, GIF, WebP, SVG). Maximum file size: 5MB.',
   })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
@@ -508,7 +704,7 @@ export class UserController {
           en: 'Profile picture uploaded successfully',
         },
       };
-    } catch (error) {
+    } catch (error: any) {
       // Clean up uploaded file on error
       if (file && file.path && fs.existsSync(file.path)) {
         fs.unlinkSync(file.path);
@@ -519,8 +715,8 @@ export class UserController {
       }
 
       this.logger.error(
-        `Upload profile picture failed: ${error.message}`,
-        error.stack,
+        `Upload profile picture failed: ${error?.message}`,
+        error?.stack,
       );
       throw new HttpException(
         {
@@ -537,7 +733,8 @@ export class UserController {
 
   @ApiOperation({
     summary: 'Delete profile picture',
-    description: 'Delete the profile picture of the currently authenticated user',
+    description:
+      'Delete the profile picture of the currently authenticated user',
   })
   @ApiResponse({
     status: 200,
@@ -600,14 +797,14 @@ export class UserController {
           en: 'Profile picture deleted successfully',
         },
       };
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof HttpException) {
         throw error;
       }
 
       this.logger.error(
-        `Delete profile picture failed: ${error.message}`,
-        error.stack,
+        `Delete profile picture failed: ${error?.message}`,
+        error?.stack,
       );
       throw new HttpException(
         {
@@ -624,7 +821,8 @@ export class UserController {
 
   @ApiOperation({
     summary: 'Get current user login history',
-    description: 'Retrieve login history for the currently authenticated user including successful and failed login attempts',
+    description:
+      'Retrieve login history for the currently authenticated user including successful and failed login attempts',
   })
   @ApiResponse({
     status: 200,
@@ -673,10 +871,7 @@ export class UserController {
   @ApiBearerAuth()
   @Get('me/login-history')
   @UseGuards(JwtAuthGuard)
-  async getLoginHistory(
-    @Request() req: any,
-    @Query('limit') limit?: number,
-  ) {
+  async getLoginHistory(@Request() req: any, @Query('limit') limit?: number) {
     try {
       const userId = req.user?.id || req.user?.userId || req.user?.sub;
 
@@ -717,14 +912,14 @@ export class UserController {
           en: 'Login history retrieved successfully',
         },
       };
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof HttpException) {
         throw error;
       }
 
       this.logger.error(
-        `Get login history failed: ${error.message}`,
-        error.stack,
+        `Get login history failed: ${error?.message}`,
+        error?.stack,
       );
       throw new HttpException(
         {
@@ -741,7 +936,8 @@ export class UserController {
 
   @ApiOperation({
     summary: 'Get current user activity log',
-    description: 'Retrieve activity log for the currently authenticated user including profile updates, password changes, and other important actions',
+    description:
+      'Retrieve activity log for the currently authenticated user including profile updates, password changes, and other important actions',
   })
   @ApiResponse({
     status: 200,
@@ -792,10 +988,7 @@ export class UserController {
   @ApiBearerAuth()
   @Get('me/activity-log')
   @UseGuards(JwtAuthGuard)
-  async getActivityLog(
-    @Request() req: any,
-    @Query('limit') limit?: number,
-  ) {
+  async getActivityLog(@Request() req: any, @Query('limit') limit?: number) {
     try {
       const userId = req.user?.id || req.user?.userId || req.user?.sub;
 
@@ -824,7 +1017,8 @@ export class UserController {
           activities: activityLogs.map((log: any) => ({
             timestamp: log.timestamp,
             eventType: log.eventType,
-            action: log.details?.action || this.getActionDescription(log.eventType),
+            action:
+              log.details?.action || this.getActionDescription(log.eventType),
             ipAddress: log.ipAddress,
             userAgent: log.userAgent,
             details: log.details,
@@ -837,14 +1031,14 @@ export class UserController {
           en: 'Activity log retrieved successfully',
         },
       };
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof HttpException) {
         throw error;
       }
 
       this.logger.error(
-        `Get activity log failed: ${error.message}`,
-        error.stack,
+        `Get activity log failed: ${error?.message}`,
+        error?.stack,
       );
       throw new HttpException(
         {
@@ -882,7 +1076,8 @@ export class UserController {
 
   @ApiOperation({
     summary: 'Get current user preferences',
-    description: 'Retrieve preferences for the currently authenticated user including language, theme, and notification settings',
+    description:
+      'Retrieve preferences for the currently authenticated user including language, theme, and notification settings',
   })
   @ApiResponse({
     status: 200,
@@ -934,12 +1129,15 @@ export class UserController {
         success: true,
         data: preferences,
       };
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof HttpException) {
         throw error;
       }
 
-      this.logger.error(`Get preferences failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `Get preferences failed: ${error?.message}`,
+        error?.stack,
+      );
       throw new HttpException(
         {
           message: {
@@ -1024,13 +1222,19 @@ export class UserController {
         );
       }
 
-      return await this.userService.updateUserPreferences(userId, preferencesDto);
-    } catch (error) {
+      return await this.userService.updateUserPreferences(
+        userId,
+        preferencesDto,
+      );
+    } catch (error: any) {
       if (error instanceof HttpException) {
         throw error;
       }
 
-      this.logger.error(`Update preferences failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `Update preferences failed: ${error?.message}`,
+        error?.stack,
+      );
       throw new HttpException(
         {
           message: {
@@ -1325,13 +1529,16 @@ export class UserController {
           en: 'User retrieved successfully',
         },
       };
-    } catch (error) {
+    } catch (error: any) {
       // Re-throw if already an HTTP exception
       if (error instanceof HttpException) {
         throw error;
       }
 
-      this.logger.error(`Get user by ID failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `Get user by ID failed: ${error?.message}`,
+        error?.stack,
+      );
       throw new HttpException(
         {
           message: {
@@ -1435,15 +1642,15 @@ export class UserController {
         req.ip,
         req.headers['user-agent'],
       );
-    } catch (error) {
+    } catch (error: any) {
       // Re-throw if already an HTTP exception
       if (error instanceof HttpException) {
         throw error;
       }
 
       this.logger.error(
-        `Update user status failed: ${error.message}`,
-        error.stack,
+        `Update user status failed: ${error?.message}`,
+        error?.stack,
       );
       throw new HttpException(
         {
@@ -1555,15 +1762,15 @@ export class UserController {
         req.ip,
         req.headers['user-agent'],
       );
-    } catch (error) {
+    } catch (error: any) {
       // Re-throw if already an HTTP exception
       if (error instanceof HttpException) {
         throw error;
       }
 
       this.logger.error(
-        `Deactivate doctor with transfer failed: ${error.message}`,
-        error.stack,
+        `Deactivate doctor with transfer failed: ${error?.message}`,
+        error?.stack,
       );
       throw new HttpException(
         {
@@ -1722,15 +1929,15 @@ export class UserController {
               : 'Some appointments transferred successfully',
         },
       };
-    } catch (error) {
+    } catch (error: any) {
       // Re-throw if already an HTTP exception
       if (error instanceof HttpException) {
         throw error;
       }
 
       this.logger.error(
-        `Transfer appointments failed: ${error.message}`,
-        error.stack,
+        `Transfer appointments failed: ${error?.message}`,
+        error?.stack,
       );
       throw new HttpException(
         {
@@ -1876,15 +2083,15 @@ export class UserController {
       }
 
       return response;
-    } catch (error) {
+    } catch (error: any) {
       // Re-throw if already an HTTP exception
       if (error instanceof HttpException) {
         throw error;
       }
 
       this.logger.error(
-        `Get users for dropdown failed: ${error.message}`,
-        error.stack,
+        `Get users for dropdown failed: ${error?.message}`,
+        error?.stack,
       );
       throw new HttpException(
         {
@@ -1959,7 +2166,7 @@ export class UserController {
   @HttpCode(HttpStatus.OK)
   async sendPasswordReset(
     @Param('id') userId: string,
-    @Request() req,
+    @Request() req: any,
   ): Promise<{ success: boolean; message: { ar: string; en: string } }> {
     try {
       // Extract adminId from JWT payload (JWT strategy returns 'id')
@@ -1987,15 +2194,15 @@ export class UserController {
 
       // Return SuccessResponse
       return result;
-    } catch (error) {
+    } catch (error: any) {
       // Handle errors with bilingual messages
-      if (error.response?.message) {
+      if (error?.response?.message) {
         throw error;
       }
 
       this.logger.error(
-        `Send password reset failed: ${error.message}`,
-        error.stack,
+        `Send password reset failed: ${error?.message}`,
+        error?.stack,
       );
       throw new HttpException(
         {
@@ -2086,7 +2293,7 @@ export class UserController {
   async updateUser(
     @Param('id') userId: string,
     @Body() updateUserDto: UpdateUserDto,
-    @Request() req,
+    @Request() req: any,
   ): Promise<{
     success: boolean;
     data: any;
@@ -2134,13 +2341,13 @@ export class UserController {
           en: 'User updated successfully',
         },
       };
-    } catch (error) {
+    } catch (error: any) {
       // Handle errors with bilingual messages
-      if (error.response?.message) {
+      if (error?.response?.message) {
         throw error;
       }
 
-      this.logger.error(`Update user failed: ${error.message}`, error.stack);
+      this.logger.error(`Update user failed: ${error?.message}`, error?.stack);
       throw new HttpException(
         {
           message: {
@@ -2266,13 +2473,13 @@ export class UserController {
         req.ip,
         req.headers['user-agent'],
       );
-    } catch (error) {
+    } catch (error: any) {
       // Re-throw if already an HTTP exception
       if (error instanceof HttpException) {
         throw error;
       }
 
-      this.logger.error(`Delete user failed: ${error.message}`, error.stack);
+      this.logger.error(`Delete user failed: ${error?.message}`, error?.stack);
       throw new HttpException(
         {
           message: {

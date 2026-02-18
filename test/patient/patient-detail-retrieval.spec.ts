@@ -107,7 +107,7 @@ describe('PatientService - Detail Retrieval', () => {
       const result = await service.getPatientById(patientId);
 
       expect(result).toBeDefined();
-      
+
       // Verify personal information
       expect(result.firstName).toBe('John');
       expect(result.lastName).toBe('Doe');
@@ -118,22 +118,22 @@ describe('PatientService - Detail Retrieval', () => {
       expect(result.maritalStatus).toBe('Married');
       expect(result.religion).toBe('Christian');
       expect(result.preferredLanguage).toBe('english');
-      
+
       // Verify contact information
       expect(result.phone).toBe('+1234567890');
       expect(result.email).toBe('john.doe@example.com');
       expect(result.address).toBe('123 Main St, City, Country');
-      
+
       // Verify emergency contact information
       expect(result.emergencyContactName).toBe('Jane Doe');
       expect(result.emergencyContactPhone).toBe('+0987654321');
       expect(result.emergencyContactRelationship).toBe('Spouse');
-      
+
       // Verify medical information
       expect(result.bloodType).toBe('O+');
       expect(result.allergies).toBe('Penicillin');
       expect(result.medicalHistory).toBe('No major illnesses');
-      
+
       // Verify insurance information
       expect(result.insuranceCompany).toBe('Health Insurance Co');
       expect(result.insuranceMemberNumber).toBe('INS123456');
@@ -146,14 +146,14 @@ describe('PatientService - Detail Retrieval', () => {
       expect(result.insuranceStartDate).toEqual(new Date('2023-01-01'));
       expect(result.insuranceEndDate).toEqual(new Date('2024-12-31'));
       expect(result.insuranceStatus).toBe('Active');
-      
+
       // Verify identifiers
       expect(result.patientNumber).toBe('PAT2024001');
       expect(result.cardNumber).toBe('CARD123456');
-      
+
       // Verify status is included (Requirement 3.5)
       expect(result.status).toBe('Active');
-      
+
       // Note: Age calculation is done in the controller layer, not service layer
       // The service returns the patient with dateOfBirth, and controller calculates age
     });

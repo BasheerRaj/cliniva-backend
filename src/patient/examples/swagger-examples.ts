@@ -91,7 +91,8 @@ export const UPDATE_PATIENT_REQUEST_EXAMPLE = {
   email: 'ahmed.hassan.updated@example.com',
   address: '456 King Abdullah Road, Riyadh',
   allergies: 'Penicillin, Sulfa drugs',
-  medicalHistory: 'Hypertension, controlled with medication. Recent checkup normal.',
+  medicalHistory:
+    'Hypertension, controlled with medication. Recent checkup normal.',
 };
 
 export const UPDATE_PATIENT_RESPONSE_EXAMPLE = {
@@ -107,7 +108,8 @@ export const UPDATE_PATIENT_RESPONSE_EXAMPLE = {
     email: 'ahmed.hassan.updated@example.com',
     address: '456 King Abdullah Road, Riyadh',
     allergies: 'Penicillin, Sulfa drugs',
-    medicalHistory: 'Hypertension, controlled with medication. Recent checkup normal.',
+    medicalHistory:
+      'Hypertension, controlled with medication. Recent checkup normal.',
     status: 'Active',
     updatedAt: '2024-02-03T11:00:00.000Z',
   },
@@ -401,7 +403,8 @@ export const VALIDATION_RULES = {
   cardNumber: {
     required: true,
     type: 'string',
-    description: 'Unique patient identification card number (immutable after creation)',
+    description:
+      'Unique patient identification card number (immutable after creation)',
     example: 'ID123456789',
   },
   firstName: {
@@ -424,7 +427,8 @@ export const VALIDATION_RULES = {
     required: true,
     type: 'string',
     format: 'ISO 8601 date',
-    description: 'Patient date of birth (cannot be in future, age must be ≤ 150 years)',
+    description:
+      'Patient date of birth (cannot be in future, age must be ≤ 150 years)',
     example: '1990-05-15',
   },
   gender: {
@@ -451,7 +455,8 @@ export const VALIDATION_RULES = {
   },
   emergencyContact: {
     required: false,
-    description: 'Emergency contact information (name and phone must both be provided or both omitted)',
+    description:
+      'Emergency contact information (name and phone must both be provided or both omitted)',
     fields: {
       emergencyContactName: 'Contact person name',
       emergencyContactPhone: 'Contact person phone number',
@@ -468,7 +473,8 @@ export const VALIDATION_RULES = {
   status: {
     type: 'enum',
     values: ['Active', 'Inactive'],
-    description: 'Patient status (Active patients can book appointments, Inactive cannot)',
+    description:
+      'Patient status (Active patients can book appointments, Inactive cannot)',
     default: 'Active',
   },
 };

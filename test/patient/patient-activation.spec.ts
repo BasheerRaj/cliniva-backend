@@ -135,9 +135,7 @@ describe('PatientService - Patient Activation', () => {
         BadRequestException,
       );
 
-      await expect(
-        service.activatePatient(invalidId, userId),
-      ).rejects.toThrow(
+      await expect(service.activatePatient(invalidId, userId)).rejects.toThrow(
         expect.objectContaining({
           response: ERROR_MESSAGES.INVALID_PATIENT_ID,
         }),
@@ -153,9 +151,7 @@ describe('PatientService - Patient Activation', () => {
         NotFoundException,
       );
 
-      await expect(
-        service.activatePatient(patientId, userId),
-      ).rejects.toThrow(
+      await expect(service.activatePatient(patientId, userId)).rejects.toThrow(
         expect.objectContaining({
           response: ERROR_MESSAGES.PATIENT_NOT_FOUND,
         }),

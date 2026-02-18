@@ -1,6 +1,21 @@
-import { Controller, Get, Post, Put, Body, Param, Query, UseGuards, Request, HttpStatus, HttpCode } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+  Request,
+  HttpStatus,
+  HttpCode,
+} from '@nestjs/common';
 import { NotificationService } from './notification.service';
-import { CreateNotificationDto, NotificationQueryDto } from './dto/create-notification.dto';
+import {
+  CreateNotificationDto,
+  NotificationQueryDto,
+} from './dto/create-notification.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @Controller('notifications')
@@ -9,26 +24,35 @@ export class NotificationController {
   constructor(private readonly notificationService: NotificationService) {}
 
   @Get()
-  async getMyNotifications(@Request() req: any, @Query() query: NotificationQueryDto) {
-    const result = await this.notificationService.findAllForUser(req.user.userId, query);
+  async getMyNotifications(
+    @Request() req: any,
+    @Query() query: NotificationQueryDto,
+  ) {
+    const result = await this.notificationService.findAllForUser(
+      req.user.userId,
+      query,
+    );
     return {
       success: true,
       data: result.notifications,
       pagination: {
         total: result.total,
         page: result.page,
-        totalPages: result.totalPages
-      }
+        totalPages: result.totalPages,
+      },
     };
   }
 
   @Put(':id/read')
   async markAsRead(@Param('id') id: string, @Request() req: any) {
-    const notification = await this.notificationService.markAsRead(id, req.user.userId);
+    const notification = await this.notificationService.markAsRead(
+      id,
+      req.user.userId,
+    );
     return {
       success: true,
       message: 'Notification marked as read',
-      data: notification
+      data: notification,
     };
   }
 
@@ -37,7 +61,7 @@ export class NotificationController {
     await this.notificationService.markAllAsRead(req.user.userId);
     return {
       success: true,
-      message: 'All notifications marked as read'
+      message: 'All notifications marked as read',
     };
   }
 
@@ -47,7 +71,7 @@ export class NotificationController {
     const notification = await this.notificationService.create(createDto);
     return {
       success: true,
-      data: notification
+      data: notification,
     };
   }
 }

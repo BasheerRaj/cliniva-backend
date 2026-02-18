@@ -1,0 +1,72 @@
+{
+  "module": "Service Management",
+  "subModules": [
+    {
+      "name": "Services",
+      "userStories": [
+        {
+          "id": "US-598e2e0d",
+          "name": "Add a new Service",
+          "businessRules": [
+            {
+              "id": "BZR-1d2e3f4a",
+              "statement": "Each service must belong to one and only one complex."
+            },
+            {
+              "id": "BZR-5b6c7d8e",
+              "statement": "The service can be linked to one or more clinics within that complex and can also be assigned to one or more doctors who work in those clinics."
+            }
+          ]
+        },
+        {
+          "id": "US-3i4j5k6l",
+          "name": "Edit Service details",
+          "businessRules": [
+            {
+              "id": "BZR-9f0a1b2c",
+              "statement": "If the service is modified by changing the assigned complex, clinics, or doctors, all affected appointments must be rescheduled."
+            },
+            {
+              "id": "BZR-f2a3b4c5",
+              "statement": "Sessions linked to a service cannot be deleted if they contain any active appointments."
+            },
+            {
+              "id": "BZR-c8b3f2d7",
+              "statement": "A discount as a percentage can be applied to the service for a defined period via the discount table in the service details."
+            },
+            {
+              "id": "BZR-t1c9b8e2",
+              "statement": "When a doctor is deactivated from the service, their entry is removed from the assigned doctors table while their historical data remains unchanged and no new appointments can be scheduled with that doctor under the same service."
+            },
+            {
+              "id": "BZR-7c8a9b0d",
+              "statement": "Direct replacement of one doctor with another is not allowed. The current doctor must be deleted or deactivated before adding a new doctor."
+            },
+            {
+              "id": "BZR-b8c9d0e1",
+              "statement": "When adding a new doctor to the service, only doctors with an active status in both M1 and M4 appear in the dropdown and their details are auto-filled upon selection."
+            },
+            {
+              "id": "BZR-1e2f3a4b",
+              "statement": "If the assigned complex or clinics are modified, the system automatically reschedules all related appointments and prompts the user to reassign doctors based on the updated setup."
+            },
+            {
+              "id": "BZR-b2c3d4e5",
+              "statement": "Sessions linked to a service cannot be deleted if they contain any active appointments."
+            }
+          ]
+        },
+        {
+          "id": "US-5c6f0d91",
+          "name": "Change Service Status",
+          "businessRules": [
+            {
+              "id": "BZR-c3d4e5f6",
+              "statement": "If the service status is changed to inactive while active appointments exist, all such appointments must be marked for rescheduling."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

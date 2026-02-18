@@ -120,7 +120,9 @@ describe('PatientService - Deletion', () => {
       (patientModel.findOneAndUpdate as jest.Mock).mockReturnValue({
         exec: jest.fn().mockResolvedValue(mockDeletedPatient),
       });
-      jest.spyOn(auditService, 'logSecurityEvent').mockResolvedValueOnce(undefined);
+      jest
+        .spyOn(auditService, 'logSecurityEvent')
+        .mockResolvedValueOnce(undefined);
 
       await service.deletePatient(mockPatientId, mockUserId);
 
@@ -187,7 +189,9 @@ describe('PatientService - Deletion', () => {
       (patientModel.findOneAndUpdate as jest.Mock).mockReturnValue({
         exec: jest.fn().mockResolvedValue(mockDeletedPatient),
       });
-      jest.spyOn(auditService, 'logSecurityEvent').mockResolvedValueOnce(undefined);
+      jest
+        .spyOn(auditService, 'logSecurityEvent')
+        .mockResolvedValueOnce(undefined);
 
       await service.deletePatient(mockPatientId);
 

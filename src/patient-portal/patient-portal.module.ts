@@ -7,8 +7,14 @@ import { PatientAuthController } from './controllers/patient-auth.controller';
 import { User, UserSchema } from '../database/schemas/user.schema';
 import { PatientSchema } from '../database/schemas/patient.schema';
 import { AppointmentSchema } from '../database/schemas/appointment.schema';
-import { Subscription, SubscriptionSchema } from '../database/schemas/subscription.schema';
-import { SubscriptionPlan, SubscriptionPlanSchema } from '../database/schemas/subscription-plan.schema';
+import {
+  Subscription,
+  SubscriptionSchema,
+} from '../database/schemas/subscription.schema';
+import {
+  SubscriptionPlan,
+  SubscriptionPlanSchema,
+} from '../database/schemas/subscription-plan.schema';
 import { NotificationModule } from '../notification/notification.module';
 import { AuthModule } from '../auth/auth.module';
 import { AppointmentModule } from '../appointment/appointment.module';

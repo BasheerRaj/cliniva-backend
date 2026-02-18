@@ -43,7 +43,9 @@ export class SubscriptionService {
 
     // If planType is provided, validate it matches the plan
     if (createSubscriptionDto.planType) {
-      if (plan.name.toLowerCase() !== createSubscriptionDto.planType.toLowerCase()) {
+      if (
+        plan.name.toLowerCase() !== createSubscriptionDto.planType.toLowerCase()
+      ) {
         throw new BadRequestException({
           message: ERROR_MESSAGES.PLAN_TYPE_MISMATCH,
           code: 'PLAN_TYPE_MISMATCH',

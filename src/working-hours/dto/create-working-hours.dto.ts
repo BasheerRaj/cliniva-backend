@@ -16,7 +16,7 @@ import { Type } from 'class-transformer';
  * Custom validator to check if time format is valid (HH:MM)
  */
 function IsValidTimeFormat(validationOptions?: ValidationOptions) {
-  return function (object: Object, propertyName: string) {
+  return function (object: object, propertyName: string) {
     registerDecorator({
       name: 'isValidTimeFormat',
       target: object.constructor,
@@ -40,7 +40,7 @@ function IsValidTimeFormat(validationOptions?: ValidationOptions) {
  * Custom validator to check working hours logic
  */
 function ValidateWorkingHours(validationOptions?: ValidationOptions) {
-  return function (object: Object, propertyName: string) {
+  return function (object: object, propertyName: string) {
     registerDecorator({
       name: 'validateWorkingHours',
       target: object.constructor,
@@ -205,8 +205,7 @@ export class CreateWorkingHoursDto {
       '{"ar":"معرف الكيان يجب أن يكون نصاً","en":"Entity ID must be a string"}',
   })
   @IsNotEmpty({
-    message:
-      '{"ar":"معرف الكيان مطلوب","en":"Entity ID is required"}',
+    message: '{"ar":"معرف الكيان مطلوب","en":"Entity ID is required"}',
   })
   entityId: string;
 

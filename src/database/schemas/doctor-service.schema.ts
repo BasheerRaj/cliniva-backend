@@ -40,9 +40,10 @@ export class DoctorService extends Document {
 export const DoctorServiceSchema = SchemaFactory.createForClass(DoctorService);
 
 // Indexes
-DoctorServiceSchema.index({ doctorId: 1, serviceId: 1, clinicId: 1 }, { unique: true });
+DoctorServiceSchema.index(
+  { doctorId: 1, serviceId: 1, clinicId: 1 },
+  { unique: true },
+);
 DoctorServiceSchema.index({ serviceId: 1, isActive: 1 });
 DoctorServiceSchema.index({ doctorId: 1, isActive: 1 });
 DoctorServiceSchema.index({ clinicId: 1 });
-
-

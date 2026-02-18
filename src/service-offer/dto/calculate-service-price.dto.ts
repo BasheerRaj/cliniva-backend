@@ -1,9 +1,17 @@
-import { IsString, IsNotEmpty, IsOptional, IsNumber, IsDateString, Min } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsOptional,
+  IsNumber,
+  IsDateString,
+  Min,
+} from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CalculateServicePriceDto {
   @ApiPropertyOptional({
-    description: 'Base price to calculate discount from. If not provided, uses service price',
+    description:
+      'Base price to calculate discount from. If not provided, uses service price',
     example: 150,
     type: Number,
     minimum: 0,
@@ -23,5 +31,3 @@ export class CalculateServicePriceDto {
   @IsDateString()
   appointmentDate: string;
 }
-
-
