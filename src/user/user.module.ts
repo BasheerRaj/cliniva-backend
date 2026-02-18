@@ -29,6 +29,7 @@ import {
   EmployeeProfileSchema,
 } from '../database/schemas/employee-profile.schema';
 import { AuthModule } from '../auth/auth.module';
+import { WorkingHoursModule } from '../working-hours/working-hours.module';
 
 @Module({
   imports: [
@@ -43,6 +44,7 @@ import { AuthModule } from '../auth/auth.module';
       { name: EmployeeProfile.name, schema: EmployeeProfileSchema },
     ]),
     forwardRef(() => AuthModule), // Use forwardRef to avoid circular dependency
+    WorkingHoursModule,
   ],
   controllers: [UserController],
   providers: [

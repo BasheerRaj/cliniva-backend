@@ -1,0 +1,83 @@
+### M1 Module - Gap Verification Flow
+# This file verifies the fixes for the gaps identified in M1 module implementation.
+
+@baseUrl = http://localhost:4001/api/v1
+@contentType = application/json
+
+### 1. Login as Admin to get tokens
+# @name adminLogin
+POST {{baseUrl}}/auth/login
+Content-Type: {{contentType}}
+
+{
+  "email": "admin@cliniva.com",
+  "password": "Password123!"
+}
+
+### Store Tokens
+@adminToken = {{adminLogin.response.body.access_token}}
+@adminId = {{adminLogin.response.body.user.id}}
+
+### 2. Login as Doctor to get tokens and ID
+# @name doctorLogin
+POST {{baseUrl}}/auth/login
+Content-Type: {{contentType}}
+
+{
+  "email": "doctor@cliniva.com",
+  "password": "Password123!"
+}
+
+### Store Doctor Info
+@doctorToken = {{doctorLogin.response.body.access_token}}
+@doctorId = {{doctorLogin.response.body.user.id}}
+
+### 3. Verify Gap Fix: Check User Entities with Appointment Data
+# Requirement: GET /users/:id/check-entities must show hasFutureAppointments
+# @name checkEntities
+GET {{baseUrl}}/users/{{doctorId}}/check-entities
+Authorization: Bearer {{adminToken}}
+
+### 4. Verify Gap Fix: Staff Dashboard with Upcoming Appointments
+# Requirement: Dashboard must include upcoming_appointments and upcoming_count
+# @name staffDashboard
+GET {{baseUrl}}/dashboard/staff
+Authorization: Bearer {{adminToken}}
+
+### 5. Verify Gap Fix: Doctor Dashboard with Real-time Availability
+# Requirement: Dashboard must calculate status (available/busy/unavailable) and next_free_slot
+# @name doctorDashboard
+GET {{baseUrl}}/dashboard/doctor
+Authorization: Bearer {{doctorToken}}
+
+### 6. Verify Gap Fix: User Profile with Working Hours
+# Requirement: GET /users/me and GET /users/:id must include workingHours array
+# @name getMyProfile
+GET {{baseUrl}}/users/me
+Authorization: Bearer {{doctorToken}}
+
+### 7. Verify Gap Fix: Admin View User with Working Hours
+# @name getUserDetails
+GET {{baseUrl}}/users/{{doctorId}}
+Authorization: Bearer {{adminToken}}
+
+### 8. Verify Gap Fix: Employee Update Session Invalidation
+# Change employee email/role should trigger session invalidation
+# Note: This will make the doctorToken invalid if we change doctor's email
+# @name updateEmployee
+PUT {{baseUrl}}/employees/{{doctorId}}
+Authorization: Bearer {{adminToken}}
+Content-Type: {{contentType}}
+
+{
+  "email": "doctor_updated@cliniva.com",
+  "firstName": "Updated",
+  "lastName": "Doctor"
+}
+
+### 9. Verify Session Invalidation (Subsequent Request)
+# This request using the old doctorToken should now FAIL with 401 Unauthorized
+# because the email was changed in step 8.
+# @name verifyInvalidatedSession
+GET {{baseUrl}}/users/me
+Authorization: Bearer {{doctorToken}}

@@ -5,6 +5,7 @@ import {
   Query,
   HttpStatus,
   HttpCode,
+  Request,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -40,20 +41,24 @@ export class DashboardController {
   @Get('staff')
   @Roles(UserRole.STAFF, UserRole.MANAGER, UserRole.ADMIN)
   @ApiOperation({ summary: 'Get Staff Dashboard data' })
-  async getStaffDashboard(@Query('clinicId') clinicId?: string) {
+  async getStaffDashboard(@Request() req: any, @Query('clinicId') clinicId?: string) {
+    // If clinicId not provided, use user's clinicId
+    const effectiveClinicId = clinicId || req.user.clinicId;
     return {
       success: true,
-      data: await this.dashboardService.getStaffDashboard(clinicId),
+      data: await this.dashboardService.getStaffDashboard(effectiveClinicId),
     };
   }
 
   @Get('doctor')
-  @Roles(UserRole.DOCTOR)
+  @Roles(UserRole.DOCTOR, UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Get Doctor Dashboard data' })
-  async getDoctorDashboard(@Query('doctorId') doctorId?: string) {
+  async getDoctorDashboard(@Request() req: any, @Query('doctorId') doctorId?: string) {
+    // If doctorId not provided, use authenticated user's ID
+    const effectiveDoctorId = doctorId || req.user.id;
     return {
       success: true,
-      data: await this.dashboardService.getDoctorDashboard(doctorId),
+      data: await this.dashboardService.getDoctorDashboard(effectiveDoctorId),
     };
   }
 }

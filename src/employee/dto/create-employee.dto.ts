@@ -618,6 +618,24 @@ export class CreateEmployeeDto {
 export class UpdateEmployeeDto {
   // User Information Updates
   @ApiPropertyOptional({
+    description: 'Employee email address',
+    example: 'john.doe@cliniva.com',
+    type: String,
+  })
+  @IsEmail()
+  @IsOptional()
+  email?: string;
+
+  @ApiPropertyOptional({
+    description: 'Employee role',
+    example: 'doctor',
+    enum: ['super_admin', 'owner', 'admin', 'doctor', 'staff', 'patient'],
+  })
+  @IsEnum(['super_admin', 'owner', 'admin', 'doctor', 'staff', 'patient'])
+  @IsOptional()
+  role?: string;
+
+  @ApiPropertyOptional({
     description: 'Employee first name',
     example: 'John',
     type: String,

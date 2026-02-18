@@ -166,6 +166,16 @@ export class User extends Document {
 
   @Prop({ type: Types.ObjectId, ref: 'User' })
   deactivatedBy?: Types.ObjectId;
+
+  // OAuth fields
+  @Prop()
+  authProvider?: string;
+
+  @Prop()
+  authProviderId?: string;
+
+  // Runtime properties (not persisted in this collection)
+  workingHours?: any[];
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

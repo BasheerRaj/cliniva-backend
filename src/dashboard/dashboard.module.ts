@@ -8,6 +8,7 @@ import { Patient, PatientSchema } from '../database/schemas/patient.schema';
 import { Subscription, SubscriptionSchema } from '../database/schemas/subscription.schema';
 import { SubscriptionPlan, SubscriptionPlanSchema } from '../database/schemas/subscription-plan.schema';
 import { AuditLog, AuditLogSchema } from '../database/schemas/audit-log.schema';
+import { WorkingHours, WorkingHoursSchema } from '../database/schemas/working-hours.schema';
 import { AuthModule } from '../auth/auth.module';
 
 @Module({
@@ -19,6 +20,7 @@ import { AuthModule } from '../auth/auth.module';
       { name: Subscription.name, schema: SubscriptionSchema },
       { name: SubscriptionPlan.name, schema: SubscriptionPlanSchema },
       { name: AuditLog.name, schema: AuditLogSchema },
+      { name: WorkingHours.name, schema: WorkingHoursSchema },
     ]),
     AuthModule,
   ],

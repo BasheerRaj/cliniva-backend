@@ -345,6 +345,7 @@ export class UserController {
               }
             : null,
           lastLogin: user.lastLogin,
+          workingHours: (user as any).workingHours,
           createdAt: (user as any).createdAt,
           updatedAt: (user as any).updatedAt,
         },
@@ -1408,6 +1409,25 @@ export class UserController {
     return await this.userService.checkUserEntities(userId);
   }
 
+  @ApiOperation({
+    summary: 'Check user entities by ID (Alias)',
+    description: 'Check what entities and appointments a specific user has. Alias for entities-status.',
+  })
+  @ApiBearerAuth()
+  @ApiParam({
+    name: 'id',
+    description: 'User ID',
+    type: String,
+    example: '507f1f77bcf86cd799439011',
+  })
+  @Get(':id/check-entities')
+  @UseGuards(JwtAuthGuard)
+  async checkUserEntitiesAlias(
+    @Param('id') userId: string,
+  ): Promise<UserEntitiesResponseDto> {
+    return await this.userService.checkUserEntities(userId);
+  }
+
   /**
    * Get user by ID
    *
@@ -1521,6 +1541,7 @@ export class UserController {
               }
             : null,
           lastLogin: user.lastLogin,
+          workingHours: (user as any).workingHours,
           createdAt: (user as any).createdAt,
           updatedAt: (user as any).updatedAt,
         },

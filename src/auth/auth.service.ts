@@ -296,6 +296,125 @@ export class AuthService {
   }
 
   /**
+   * Validate or create a user from OAuth provider data
+   * UC-3d3r2d7 (Google), UC-91a5d3 (Microsoft), UC-0b8e6a (Apple)
+   *
+   * @param providerData - Data received from OAuth provider
+   * @param provider - Name of the provider (google, microsoft, apple)
+   * @returns AuthResponse with tokens and user data
+   */
+  async validateOAuthUser(
+    providerData: {
+      email: string;
+      firstName: string;
+      lastName: string;
+      providerId: string;
+      profilePicture?: string;
+    },
+    provider: string,
+  ): Promise<AuthResponseDto> {
+    try {
+      // Find user by email
+      let user = await this.userModel.findOne({
+        email: providerData.email.toLowerCase(),
+      });
+
+      if (!user) {
+        // Create new user if not found
+        // Default role for OAuth users is 'patient' unless otherwise specified
+        const newUser = new this.userModel({
+          email: providerData.email.toLowerCase(),
+          firstName: providerData.firstName,
+          lastName: providerData.lastName,
+          role: UserRole.PATIENT,
+          isActive: true,
+          emailVerified: true,
+          isFirstLogin: false,
+          passwordChangeRequired: false,
+          profilePictureUrl: providerData.profilePicture,
+          authProvider: provider,
+          authProviderId: providerData.providerId,
+        });
+
+        user = await newUser.save();
+        this.logger.log(`New user created via ${provider}: ${user.email}`);
+      } else {
+        // Update existing user with provider info if not already set
+        if (!user.authProvider) {
+          user.authProvider = provider;
+          user.authProviderId = providerData.providerId;
+          await user.save();
+        }
+
+        // Check if user is active
+        if (!user.isActive) {
+          throw new UnauthorizedException({
+            message: {
+              ar: 'الحساب غير نشط',
+              en: 'Account is inactive',
+            },
+            code: 'ACCOUNT_INACTIVE',
+          });
+        }
+      }
+
+      const userId = (user._id as any).toString();
+
+      // Generate tokens
+      const tokens = await this.generateTokens(user);
+
+      // Create session
+      const accessTokenExpiry = this.parseTimeToSeconds(
+        process.env.JWT_EXPIRES_IN || '24h',
+      );
+      const expiresAt = new Date(Date.now() + accessTokenExpiry * 1000);
+
+      await this.sessionService.createSession(
+        userId,
+        { userAgent: 'oauth', ipAddress: '0.0.0.0' },
+        tokens.access_token,
+        tokens.refresh_token,
+        expiresAt,
+      );
+
+      // Update last login
+      await this.updateLastLogin(userId);
+
+      // Log success
+      await this.auditService.logLoginSuccess(userId, '0.0.0.0', 'oauth');
+
+      return {
+        ...tokens,
+        user: {
+          id: userId,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          role: user.role,
+          isActive: user.isActive,
+          emailVerified: user.emailVerified,
+          isFirstLogin: user.isFirstLogin,
+          passwordChangeRequired: user.passwordChangeRequired,
+          preferredLanguage: user.preferredLanguage,
+          isOwner: user.role === 'owner',
+        },
+      };
+    } catch (error) {
+      if (error instanceof UnauthorizedException) {
+        throw error;
+      }
+      this.logger.error(`${provider} login failed: ${error.message}`, error.stack);
+      throw new UnauthorizedException({
+        message: {
+          ar: 'فشلت المصادقة عبر جهة خارجية',
+          en: `Authentication via ${provider} failed`,
+        },
+        code: 'OAUTH_FAILED',
+      });
+    }
+  }
+
+  /**
    * Login user
    *
    * Requirements: 1.1, 5.1

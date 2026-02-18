@@ -28,6 +28,7 @@ import { ERROR_MESSAGES } from '../common/utils/error-messages.constant';
 
 import { GetUsersFilterDto } from './dto/get-users-filter.dto';
 import { SortOrder } from '../common/dto/pagination-query.dto';
+import { WorkingHoursService } from '../working-hours/working-hours.service';
 
 @Injectable()
 export class UserService {
@@ -50,6 +51,7 @@ export class UserService {
     private readonly auditService: AuditService,
     private readonly userRestrictionService: UserRestrictionService,
     private readonly doctorDeactivationService: DoctorDeactivationService,
+    private readonly workingHoursService: WorkingHoursService,
   ) {}
 
   /**
@@ -170,8 +172,8 @@ export class UserService {
       const plan = subscription.planId as any; // Populated SubscriptionPlan
       const planType = plan?.name || 'clinic'; // clinic, complex, company
 
-      // Check existing entities
-      const [organizationCount, complexCount, clinicCount] = await Promise.all([
+      // Check existing entities and future appointments
+      const [organizationCount, complexCount, clinicCount, futureAppointmentsCount] = await Promise.all([
         this.organizationModel
           .countDocuments({ ownerId: new Types.ObjectId(userId) })
           .exec(),
@@ -181,18 +183,27 @@ export class UserService {
         this.clinicModel
           .countDocuments({ ownerId: new Types.ObjectId(userId) })
           .exec(),
+        this.appointmentModel
+          .countDocuments({
+            doctorId: new Types.ObjectId(userId),
+            status: { $in: ['scheduled', 'confirmed'] },
+            appointmentDate: { $gte: new Date() },
+          })
+          .exec(),
       ]);
 
-      console.log('📊 Entity counts:', {
+      console.log('📊 Entity and appointment counts:', {
         organizationCount,
         complexCount,
         clinicCount,
+        futureAppointmentsCount,
         userId,
       });
 
       const hasOrganization = organizationCount > 0;
       const hasComplex = complexCount > 0;
       const hasClinic = clinicCount > 0;
+      const hasFutureAppointments = futureAppointmentsCount > 0;
 
       // Determine what the user needs based on their plan
       let needsSetup = false;
@@ -241,6 +252,8 @@ export class UserService {
         hasPrimaryEntity,
         needsSetup,
         nextStep,
+        hasFutureAppointments,
+        futureAppointmentsCount,
       };
     } catch (error) {
       this.logger.error(
@@ -940,16 +953,19 @@ export class UserService {
       }
 
       // Query user with population and field exclusion
-      const user = await this.userModel
-        .findById(userId)
-        .select(
-          '-passwordHash -passwordResetToken -emailVerificationToken -__v',
-        )
-        .populate('subscriptionId', 'planType status')
-        .populate('organizationId', 'name nameAr')
-        .populate('complexId', 'name nameAr')
-        .populate('clinicId', 'name nameAr')
-        .exec();
+      const [user, workingHours] = await Promise.all([
+        this.userModel
+          .findById(userId)
+          .select(
+            '-passwordHash -passwordResetToken -emailVerificationToken -__v',
+          )
+          .populate('subscriptionId', 'planType status')
+          .populate('organizationId', 'name nameAr')
+          .populate('complexId', 'name nameAr')
+          .populate('clinicId', 'name nameAr')
+          .exec(),
+        this.workingHoursService.getWorkingHours('user', userId),
+      ]);
 
       // Check if user exists
       if (!user) {
@@ -962,8 +978,12 @@ export class UserService {
         });
       }
 
+      // Attach working hours to the user object (temporarily for the controller to use)
+      const userWithWH = user.toObject();
+      userWithWH.workingHours = workingHours;
+
       this.logger.log(`User ${userId} details retrieved successfully`);
-      return user;
+      return userWithWH as any;
     } catch (error) {
       // Re-throw HTTP exceptions
       if (

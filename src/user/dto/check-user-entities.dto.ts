@@ -61,4 +61,18 @@ export class UserEntitiesResponseDto {
     enum: ['dashboard', 'setup-company', 'setup-complex', 'setup-clinic'],
   })
   nextStep: string;
+
+  @ApiProperty({
+    description: 'Whether user has future appointments (for doctors)',
+    example: false,
+    type: Boolean,
+  })
+  hasFutureAppointments: boolean;
+
+  @ApiProperty({
+    description: 'Count of future scheduled/confirmed appointments',
+    example: 0,
+    type: Number,
+  })
+  futureAppointmentsCount: number;
 }

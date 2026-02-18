@@ -30,6 +30,8 @@ import { ValidationUtil } from '../common/utils/validation.util';
 import { ResponseBuilder } from '../common/utils/response-builder.util';
 import { ERROR_MESSAGES } from '../common/utils/error-messages.constant';
 import { AuditService } from '../auth/audit.service';
+import { SessionService } from '../auth/session.service';
+import { EmailService } from '../auth/email.service';
 
 @Injectable()
 export class EmployeeService {
@@ -48,6 +50,8 @@ export class EmployeeService {
     @InjectModel('Complex') private readonly complexModel: Model<Complex>,
     @InjectModel('Clinic') private readonly clinicModel: Model<Clinic>,
     private readonly auditService: AuditService,
+    private readonly sessionService: SessionService,
+    private readonly emailService: EmailService,
   ) {}
 
   /**
@@ -737,7 +741,16 @@ export class EmployeeService {
     const userUpdates: any = {};
     const profileUpdates: any = {};
 
+    // Track changes for session invalidation
+    const emailChanged =
+      updateEmployeeDto.email && updateEmployeeDto.email !== employee.email;
+    const roleChanged =
+      updateEmployeeDto.role && updateEmployeeDto.role !== employee.role;
+    const oldEmail = employee.email;
+    const oldRole = employee.role;
+
     // User fields
+    if (updateEmployeeDto.email) userUpdates.email = updateEmployeeDto.email;
     if (updateEmployeeDto.firstName)
       userUpdates.firstName = updateEmployeeDto.firstName;
     if (updateEmployeeDto.lastName)
@@ -778,6 +791,41 @@ export class EmployeeService {
         { $set: userUpdates },
         { new: true, runValidators: true },
       );
+
+      // Handle session invalidation for email change
+      if (emailChanged) {
+        await this.sessionService.invalidateUserSessions(
+          employeeId,
+          'email_change',
+          updatedByUserId,
+        );
+
+        const language = employee.preferredLanguage || 'en';
+        await this.emailService.sendUsernameChangedNotification(
+          updateEmployeeDto.email!,
+          oldEmail,
+          employee.firstName,
+          language,
+        );
+      }
+
+      // Handle session invalidation for role change
+      if (roleChanged) {
+        await this.sessionService.invalidateUserSessions(
+          employeeId,
+          'role_change',
+          updatedByUserId,
+        );
+
+        const language = employee.preferredLanguage || 'en';
+        await this.emailService.sendRoleChangedNotification(
+          employee.email,
+          employee.firstName,
+          oldRole,
+          updateEmployeeDto.role!,
+          language,
+        );
+      }
     }
 
     // Update employee profile if there are profile updates

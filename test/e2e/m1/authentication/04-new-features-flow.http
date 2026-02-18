@@ -49,7 +49,7 @@ Authorization: Bearer {{adminToken}}
 Content-Type: {{contentType}}
 
 {
-  "email": "new.staff@cliniva.com",
+  "email": "new.staff1@cliniva.com",
   "password": "TempPassword123!",
   "firstName": "New",
   "lastName": "Staff",
@@ -66,7 +66,7 @@ POST {{baseUrl}}/auth/login
 Content-Type: {{contentType}}
 
 {
-  "email": "new.staff@cliniva.com",
+  "email": "new.staff1@cliniva.com",
   "password": "TempPassword123!"
 }
 
