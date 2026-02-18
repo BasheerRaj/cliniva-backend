@@ -29,8 +29,21 @@ export class CreateEmployeeDto {
     example: 'john.doe@cliniva.com',
     type: String,
   })
-  @IsEmail()
-  @IsNotEmpty()
+  @IsEmail(
+    {},
+    {
+      message: JSON.stringify({
+        ar: 'البريد الإلكتروني غير صالح',
+        en: 'Invalid email address',
+      }),
+    },
+  )
+  @IsNotEmpty({
+    message: JSON.stringify({
+      ar: 'البريد الإلكتروني مطلوب',
+      en: 'Email is required',
+    }),
+  })
   email: string;
 
   @ApiProperty({
@@ -40,10 +53,30 @@ export class CreateEmployeeDto {
     minLength: 8,
     maxLength: 50,
   })
-  @IsString()
-  @IsNotEmpty()
-  @MinLength(8)
-  @MaxLength(50)
+  @IsString({
+    message: JSON.stringify({
+      ar: 'كلمة المرور يجب أن تكون نصاً',
+      en: 'Password must be a string',
+    }),
+  })
+  @IsNotEmpty({
+    message: JSON.stringify({
+      ar: 'كلمة المرور مطلوبة',
+      en: 'Password is required',
+    }),
+  })
+  @MinLength(8, {
+    message: JSON.stringify({
+      ar: 'كلمة المرور يجب أن تكون 8 أحرف على الأقل',
+      en: 'Password must be at least 8 characters long',
+    }),
+  })
+  @MaxLength(50, {
+    message: JSON.stringify({
+      ar: 'كلمة المرور يجب ألا تتجاوز 50 حرفاً',
+      en: 'Password cannot exceed 50 characters',
+    }),
+  })
   password: string;
 
   @ApiProperty({
@@ -53,10 +86,30 @@ export class CreateEmployeeDto {
     minLength: 2,
     maxLength: 50,
   })
-  @IsString()
-  @IsNotEmpty()
-  @MinLength(2)
-  @MaxLength(50)
+  @IsString({
+    message: JSON.stringify({
+      ar: 'الاسم الأول يجب أن يكون نصاً',
+      en: 'First name must be a string',
+    }),
+  })
+  @IsNotEmpty({
+    message: JSON.stringify({
+      ar: 'الاسم الأول مطلوب',
+      en: 'First name is required',
+    }),
+  })
+  @MinLength(2, {
+    message: JSON.stringify({
+      ar: 'الاسم الأول يجب أن يكون حرفين على الأقل',
+      en: 'First name must be at least 2 characters long',
+    }),
+  })
+  @MaxLength(50, {
+    message: JSON.stringify({
+      ar: 'الاسم الأول يجب ألا يتجاوز 50 حرفاً',
+      en: 'First name cannot exceed 50 characters',
+    }),
+  })
   firstName: string;
 
   @ApiProperty({
@@ -66,10 +119,30 @@ export class CreateEmployeeDto {
     minLength: 2,
     maxLength: 50,
   })
-  @IsString()
-  @IsNotEmpty()
-  @MinLength(2)
-  @MaxLength(50)
+  @IsString({
+    message: JSON.stringify({
+      ar: 'اسم العائلة يجب أن يكون نصاً',
+      en: 'Last name must be a string',
+    }),
+  })
+  @IsNotEmpty({
+    message: JSON.stringify({
+      ar: 'اسم العائلة مطلوب',
+      en: 'Last name is required',
+    }),
+  })
+  @MinLength(2, {
+    message: JSON.stringify({
+      ar: 'اسم العائلة يجب أن يكون حرفين على الأقل',
+      en: 'Last name must be at least 2 characters long',
+    }),
+  })
+  @MaxLength(50, {
+    message: JSON.stringify({
+      ar: 'اسم العائلة يجب ألا يتجاوز 50 حرفاً',
+      en: 'Last name cannot exceed 50 characters',
+    }),
+  })
   lastName: string;
 
   @ApiProperty({
@@ -79,10 +152,30 @@ export class CreateEmployeeDto {
     minLength: 10,
     maxLength: 20,
   })
-  @IsString()
-  @IsNotEmpty()
-  @MinLength(10)
-  @MaxLength(20)
+  @IsString({
+    message: JSON.stringify({
+      ar: 'رقم الهاتف يجب أن يكون نصاً',
+      en: 'Phone number must be a string',
+    }),
+  })
+  @IsNotEmpty({
+    message: JSON.stringify({
+      ar: 'رقم الهاتف مطلوب',
+      en: 'Phone number is required',
+    }),
+  })
+  @MinLength(10, {
+    message: JSON.stringify({
+      ar: 'رقم الهاتف يجب أن يكون 10 أرقام على الأقل',
+      en: 'Phone number must be at least 10 characters long',
+    }),
+  })
+  @MaxLength(20, {
+    message: JSON.stringify({
+      ar: 'رقم الهاتف يجب ألا يتجاوز 20 رقماً',
+      en: 'Phone number cannot exceed 20 characters',
+    }),
+  })
   phone: string;
 
   @ApiProperty({
@@ -90,8 +183,18 @@ export class CreateEmployeeDto {
     example: 'doctor',
     enum: ['super_admin', 'owner', 'admin', 'doctor', 'staff', 'patient'],
   })
-  @IsEnum(['super_admin', 'owner', 'admin', 'doctor', 'staff', 'patient'])
-  @IsNotEmpty()
+  @IsEnum(['super_admin', 'owner', 'admin', 'doctor', 'staff', 'patient'], {
+    message: JSON.stringify({
+      ar: 'الدور غير صالح',
+      en: 'Invalid role',
+    }),
+  })
+  @IsNotEmpty({
+    message: JSON.stringify({
+      ar: 'الدور مطلوب',
+      en: 'Role is required',
+    }),
+  })
   role: string;
 
   @ApiPropertyOptional({
@@ -100,9 +203,19 @@ export class CreateEmployeeDto {
     type: String,
     maxLength: 50,
   })
-  @IsString()
+  @IsString({
+    message: JSON.stringify({
+      ar: 'الجنسية يجب أن تكون نصاً',
+      en: 'Nationality must be a string',
+    }),
+  })
   @IsOptional()
-  @MaxLength(50)
+  @MaxLength(50, {
+    message: JSON.stringify({
+      ar: 'الجنسية يجب ألا تتجاوز 50 حرفاً',
+      en: 'Nationality cannot exceed 50 characters',
+    }),
+  })
   nationality?: string;
 
   @ApiProperty({
@@ -110,8 +223,18 @@ export class CreateEmployeeDto {
     example: 'male',
     enum: ['male', 'female', 'other'],
   })
-  @IsEnum(['male', 'female', 'other'])
-  @IsNotEmpty()
+  @IsEnum(['male', 'female', 'other'], {
+    message: JSON.stringify({
+      ar: 'الجنس غير صالح',
+      en: 'Invalid gender',
+    }),
+  })
+  @IsNotEmpty({
+    message: JSON.stringify({
+      ar: 'الجنس مطلوب',
+      en: 'Gender is required',
+    }),
+  })
   gender: string;
 
   @ApiProperty({
@@ -120,8 +243,21 @@ export class CreateEmployeeDto {
     type: String,
     format: 'date',
   })
-  @IsDateString()
-  @IsNotEmpty()
+  @IsDateString(
+    {},
+    {
+      message: JSON.stringify({
+        ar: 'تاريخ الميلاد غير صالح',
+        en: 'Invalid date of birth',
+      }),
+    },
+  )
+  @IsNotEmpty({
+    message: JSON.stringify({
+      ar: 'تاريخ الميلاد مطلوب',
+      en: 'Date of birth is required',
+    }),
+  })
   dateOfBirth: string;
 
   @ApiPropertyOptional({
@@ -130,9 +266,19 @@ export class CreateEmployeeDto {
     type: String,
     maxLength: 200,
   })
-  @IsString()
+  @IsString({
+    message: JSON.stringify({
+      ar: 'العنوان يجب أن يكون نصاً',
+      en: 'Address must be a string',
+    }),
+  })
   @IsOptional()
-  @MaxLength(200)
+  @MaxLength(200, {
+    message: JSON.stringify({
+      ar: 'العنوان يجب ألا يتجاوز 200 حرفاً',
+      en: 'Address cannot exceed 200 characters',
+    }),
+  })
   address?: string;
 
   // Employee Profile Information
@@ -142,9 +288,19 @@ export class CreateEmployeeDto {
     type: String,
     maxLength: 20,
   })
-  @IsString()
+  @IsString({
+    message: JSON.stringify({
+      ar: 'رقم الموظف يجب أن يكون نصاً',
+      en: 'Employee number must be a string',
+    }),
+  })
   @IsOptional()
-  @MaxLength(20)
+  @MaxLength(20, {
+    message: JSON.stringify({
+      ar: 'رقم الموظف يجب ألا يتجاوز 20 حرفاً',
+      en: 'Employee number cannot exceed 20 characters',
+    }),
+  })
   employeeNumber?: string;
 
   @ApiPropertyOptional({
@@ -153,9 +309,19 @@ export class CreateEmployeeDto {
     type: String,
     maxLength: 30,
   })
-  @IsString()
+  @IsString({
+    message: JSON.stringify({
+      ar: 'رقم البطاقة يجب أن يكون نصاً',
+      en: 'Card number must be a string',
+    }),
+  })
   @IsOptional()
-  @MaxLength(30)
+  @MaxLength(30, {
+    message: JSON.stringify({
+      ar: 'رقم البطاقة يجب ألا يتجاوز 30 حرفاً',
+      en: 'Card number cannot exceed 30 characters',
+    }),
+  })
   cardNumber?: string;
 
   @ApiPropertyOptional({
@@ -163,7 +329,12 @@ export class CreateEmployeeDto {
     example: 'married',
     enum: ['single', 'married', 'divorced', 'widowed', 'separated', 'other'],
   })
-  @IsEnum(['single', 'married', 'divorced', 'widowed', 'separated', 'other'])
+  @IsEnum(['single', 'married', 'divorced', 'widowed', 'separated', 'other'], {
+    message: JSON.stringify({
+      ar: 'الحالة الاجتماعية غير صالحة',
+      en: 'Invalid marital status',
+    }),
+  })
   @IsOptional()
   maritalStatus?: string;
 
@@ -174,10 +345,28 @@ export class CreateEmployeeDto {
     minimum: 0,
     maximum: 20,
   })
-  @IsNumber()
+  @IsNumber(
+    {},
+    {
+      message: JSON.stringify({
+        ar: 'عدد الأطفال يجب أن يكون رقماً',
+        en: 'Number of children must be a number',
+      }),
+    }
+  )
   @IsOptional()
-  @Min(0)
-  @Max(20)
+  @Min(0, {
+    message: JSON.stringify({
+      ar: 'عدد الأطفال لا يمكن أن يكون أقل من 0',
+      en: 'Number of children cannot be less than 0',
+    }),
+  })
+  @Max(20, {
+    message: JSON.stringify({
+      ar: 'عدد الأطفال لا يمكن أن يتجاوز 20',
+      en: 'Number of children cannot exceed 20',
+    }),
+  })
   numberOfChildren?: number;
 
   @ApiPropertyOptional({
@@ -185,7 +374,15 @@ export class CreateEmployeeDto {
     example: 'https://example.com/profiles/john-doe.jpg',
     type: String,
   })
-  @IsUrl()
+  @IsUrl(
+    {},
+    {
+      message: JSON.stringify({
+        ar: 'رابط الصورة غير صالح',
+        en: 'Invalid profile picture URL',
+      }),
+    }
+  )
   @IsOptional()
   profilePictureUrl?: string;
 
@@ -196,10 +393,30 @@ export class CreateEmployeeDto {
     minLength: 2,
     maxLength: 100,
   })
-  @IsString()
-  @IsNotEmpty()
-  @MinLength(2)
-  @MaxLength(100)
+  @IsString({
+    message: JSON.stringify({
+      ar: 'المسمى الوظيفي يجب أن يكون نصاً',
+      en: 'Job title must be a string',
+    }),
+  })
+  @IsNotEmpty({
+    message: JSON.stringify({
+      ar: 'المسمى الوظيفي مطلوب',
+      en: 'Job title is required',
+    }),
+  })
+  @MinLength(2, {
+    message: JSON.stringify({
+      ar: 'المسمى الوظيفي يجب أن يكون حرفين على الأقل',
+      en: 'Job title must be at least 2 characters long',
+    }),
+  })
+  @MaxLength(100, {
+    message: JSON.stringify({
+      ar: 'المسمى الوظيفي يجب ألا يتجاوز 100 حرفاً',
+      en: 'Job title cannot exceed 100 characters',
+    }),
+  })
   jobTitle: string;
 
   @ApiProperty({
@@ -208,8 +425,21 @@ export class CreateEmployeeDto {
     type: String,
     format: 'date',
   })
-  @IsDateString()
-  @IsNotEmpty()
+  @IsDateString(
+    {},
+    {
+      message: JSON.stringify({
+        ar: 'تاريخ التوظيف غير صالح',
+        en: 'Invalid date of hiring',
+      }),
+    },
+  )
+  @IsNotEmpty({
+    message: JSON.stringify({
+      ar: 'تاريخ التوظيف مطلوب',
+      en: 'Date of hiring is required',
+    }),
+  })
   dateOfHiring: string;
 
   @ApiPropertyOptional({
@@ -218,9 +448,22 @@ export class CreateEmployeeDto {
     type: Number,
     minimum: 0,
   })
-  @IsNumber()
+  @IsNumber(
+    {},
+    {
+      message: JSON.stringify({
+        ar: 'الراتب يجب أن يكون رقماً',
+        en: 'Salary must be a number',
+      }),
+    }
+  )
   @IsOptional()
-  @Min(0)
+  @Min(0, {
+    message: JSON.stringify({
+      ar: 'الراتب لا يمكن أن يكون أقل من 0',
+      en: 'Salary cannot be less than 0',
+    }),
+  })
   salary?: number;
 
   @ApiPropertyOptional({
@@ -229,9 +472,19 @@ export class CreateEmployeeDto {
     type: String,
     maxLength: 50,
   })
-  @IsString()
+  @IsString({
+    message: JSON.stringify({
+      ar: 'رقم الحساب البنكي يجب أن يكون نصاً',
+      en: 'Bank account must be a string',
+    }),
+  })
   @IsOptional()
-  @MaxLength(50)
+  @MaxLength(50, {
+    message: JSON.stringify({
+      ar: 'رقم الحساب البنكي يجب ألا يتجاوز 50 حرفاً',
+      en: 'Bank account cannot exceed 50 characters',
+    }),
+  })
   bankAccount?: string;
 
   @ApiPropertyOptional({
@@ -240,9 +493,19 @@ export class CreateEmployeeDto {
     type: String,
     maxLength: 30,
   })
-  @IsString()
+  @IsString({
+    message: JSON.stringify({
+      ar: 'رقم التأمينات الاجتماعية يجب أن يكون نصاً',
+      en: 'Social security number must be a string',
+    }),
+  })
   @IsOptional()
-  @MaxLength(30)
+  @MaxLength(30, {
+    message: JSON.stringify({
+      ar: 'رقم التأمينات الاجتماعية يجب ألا يتجاوز 30 حرفاً',
+      en: 'Social security number cannot exceed 30 characters',
+    }),
+  })
   socialSecurityNumber?: string;
 
   @ApiPropertyOptional({
@@ -251,9 +514,19 @@ export class CreateEmployeeDto {
     type: String,
     maxLength: 30,
   })
-  @IsString()
+  @IsString({
+    message: JSON.stringify({
+      ar: 'الرقم الضريبي يجب أن يكون نصاً',
+      en: 'Tax ID must be a string',
+    }),
+  })
   @IsOptional()
-  @MaxLength(30)
+  @MaxLength(30, {
+    message: JSON.stringify({
+      ar: 'الرقم الضريبي يجب ألا يتجاوز 30 حرفاً',
+      en: 'Tax ID cannot exceed 30 characters',
+    }),
+  })
   taxId?: string;
 
   @ApiPropertyOptional({
@@ -262,9 +535,19 @@ export class CreateEmployeeDto {
     type: String,
     maxLength: 500,
   })
-  @IsString()
+  @IsString({
+    message: JSON.stringify({
+      ar: 'الملاحظات يجب أن تكون نصاً',
+      en: 'Notes must be a string',
+    }),
+  })
   @IsOptional()
-  @MaxLength(500)
+  @MaxLength(500, {
+    message: JSON.stringify({
+      ar: 'الملاحظات يجب ألا تتجاوز 500 حرفاً',
+      en: 'Notes cannot exceed 500 characters',
+    }),
+  })
   notes?: string;
 
   // Assignment Information
@@ -273,7 +556,12 @@ export class CreateEmployeeDto {
     example: '507f1f77bcf86cd799439030',
     type: String,
   })
-  @IsMongoId()
+  @IsMongoId({
+    message: JSON.stringify({
+      ar: 'معرف المنظمة غير صالح',
+      en: 'Invalid organization ID',
+    }),
+  })
   @IsOptional()
   organizationId?: string;
 
@@ -282,7 +570,12 @@ export class CreateEmployeeDto {
     example: '507f1f77bcf86cd799439031',
     type: String,
   })
-  @IsMongoId()
+  @IsMongoId({
+    message: JSON.stringify({
+      ar: 'معرف المجمع غير صالح',
+      en: 'Invalid complex ID',
+    }),
+  })
   @IsOptional()
   complexId?: string;
 
@@ -291,7 +584,12 @@ export class CreateEmployeeDto {
     example: '507f1f77bcf86cd799439032',
     type: String,
   })
-  @IsMongoId()
+  @IsMongoId({
+    message: JSON.stringify({
+      ar: 'معرف العيادة غير صالح',
+      en: 'Invalid clinic ID',
+    }),
+  })
   @IsOptional()
   clinicId?: string;
 
@@ -300,8 +598,19 @@ export class CreateEmployeeDto {
     example: ['507f1f77bcf86cd799439040', '507f1f77bcf86cd799439041'],
     type: [String],
   })
-  @IsArray()
-  @IsString({ each: true })
+  @IsArray({
+    message: JSON.stringify({
+      ar: 'التخصصات يجب أن تكون مصفوفة',
+      en: 'Specialties must be an array',
+    }),
+  })
+  @IsString({ 
+    each: true,
+    message: JSON.stringify({
+      ar: 'كل تخصص يجب أن يكون نصاً',
+      en: 'Each specialty must be a string',
+    }),
+  })
   @IsOptional()
   specialties?: string[];
 }

@@ -27,6 +27,8 @@ import {
   RoleDisplayNames,
   getManageableRoles,
 } from '../common/enums/user-role.enum';
+import { WorkingHoursService } from '../working-hours/working-hours.service';
+import { forwardRef, Inject } from '@nestjs/common';
 
 @Injectable()
 export class AuthService {
@@ -43,6 +45,8 @@ export class AuthService {
     private readonly auditService: AuditService,
     private readonly sessionService: SessionService,
     private readonly emailService: EmailService,
+    @Inject(forwardRef(() => WorkingHoursService))
+    private readonly workingHoursService: WorkingHoursService,
   ) {}
 
   /**
@@ -372,12 +376,12 @@ export class AuthService {
       const userId = (user._id as any).toString();
       this.logger.log(`User logged in: ${user.email}`);
 
-      // Generate tokens
-      const tokens = await this.generateTokens(user);
+      // Generate tokens with rememberMe support
+      const tokens = await this.generateTokens(user, loginDto.rememberMe);
 
       // Calculate token expiration
       const accessTokenExpiry = this.parseTimeToSeconds(
-        process.env.JWT_EXPIRES_IN || '24h',
+        loginDto.rememberMe ? '7d' : process.env.JWT_EXPIRES_IN || '24h',
       );
       const expiresAt = new Date(Date.now() + accessTokenExpiry * 1000);
 
@@ -655,7 +659,10 @@ export class AuthService {
   /**
    * Generate JWT tokens
    */
-  private async generateTokens(user: User): Promise<{
+  private async generateTokens(
+    user: User,
+    rememberMe: boolean = false,
+  ): Promise<{
     access_token: string;
     refresh_token: string;
     expires_in: number;
@@ -666,8 +673,13 @@ export class AuthService {
       role: user.role,
     };
 
-    const accessTokenExpiry = process.env.JWT_EXPIRES_IN || '24h';
-    const refreshTokenExpiry = process.env.JWT_REFRESH_EXPIRES_IN || '7d';
+    // If rememberMe is true, extend expiration to 30 days
+    const accessTokenExpiry = rememberMe
+      ? '7d'
+      : process.env.JWT_EXPIRES_IN || '24h';
+    const refreshTokenExpiry = rememberMe
+      ? '30d'
+      : process.env.JWT_REFRESH_EXPIRES_IN || '7d';
 
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(payload, {
@@ -772,6 +784,58 @@ export class AuthService {
           en: `Failed to get user debug info: ${error.message}`,
         },
         code: 'DEBUG_INFO_FAILED',
+      });
+    }
+  }
+
+  /**
+   * First login setup (working hours)
+   *
+   * UC-first-login: Part 1 - Working hours setup
+   */
+  async firstLoginSetup(
+    userId: string,
+    scheduleDto: any,
+  ): Promise<{ success: boolean; message: any }> {
+    try {
+      const user = await this.userModel.findById(userId);
+      if (!user) {
+        throw new NotFoundException({
+          message: {
+            ar: 'المستخدم غير موجود',
+            en: 'User not found',
+          },
+          code: 'USER_NOT_FOUND',
+        });
+      }
+
+      // Create working hours for the user
+      await this.workingHoursService.createWorkingHours({
+        entityType: 'user',
+        entityId: userId,
+        schedule: scheduleDto.schedule,
+      });
+
+      this.logger.log(`First login setup completed for user ${userId}`);
+
+      return {
+        success: true,
+        message: {
+          ar: 'تم حفظ جدول العمل بنجاح',
+          en: 'Working schedule saved successfully',
+        },
+      };
+    } catch (error) {
+      this.logger.error(
+        `First login setup failed for user ${userId}: ${error.message}`,
+        error.stack,
+      );
+      throw new BadRequestException({
+        message: {
+          ar: 'فشل حفظ جدول العمل',
+          en: 'Failed to save working schedule',
+        },
+        code: 'SETUP_FAILED',
       });
     }
   }

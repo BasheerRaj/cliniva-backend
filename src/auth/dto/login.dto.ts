@@ -1,4 +1,11 @@
-import { IsEmail, IsNotEmpty, IsString, MinLength } from 'class-validator';
+import {
+  IsEmail,
+  IsNotEmpty,
+  IsString,
+  MinLength,
+  IsBoolean,
+  IsOptional,
+} from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 
@@ -52,4 +59,19 @@ export class LoginDto {
     }),
   })
   password: string;
+
+  @ApiProperty({
+    description: 'Remember me for 30 days',
+    example: true,
+    required: false,
+    type: Boolean,
+  })
+  @IsOptional()
+  @IsBoolean({
+    message: JSON.stringify({
+      ar: 'يجب أن تكون قيمة تذكرني بولينية',
+      en: 'Remember me must be a boolean value',
+    }),
+  })
+  rememberMe?: boolean;
 }

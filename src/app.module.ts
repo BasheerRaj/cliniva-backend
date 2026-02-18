@@ -32,6 +32,7 @@ import { DoctorServiceModule } from './doctor-service/doctor-service.module';
 import { ServiceOfferModule } from './service-offer/service-offer.module';
 import { NotificationModule } from './notification/notification.module';
 import { PatientPortalModule } from './patient-portal/patient-portal.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 
 @Module({
   imports: [
@@ -70,6 +71,7 @@ import { PatientPortalModule } from './patient-portal/patient-portal.module';
     ServiceOfferModule,
     NotificationModule,
     PatientPortalModule,
+    DashboardModule,
   ],
   controllers: [AppController],
   providers: [AppService],

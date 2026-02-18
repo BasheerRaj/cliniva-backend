@@ -17,6 +17,7 @@ import { SubscriptionPlanSchema } from '../database/schemas/subscription-plan.sc
 import { CommonModule } from '../common/common.module';
 import { AuthModule } from '../auth/auth.module';
 import { SubscriptionModule } from '../subscription/subscription.module';
+import { forwardRef } from '@nestjs/common';
 
 @Module({
   imports: [
@@ -31,7 +32,7 @@ import { SubscriptionModule } from '../subscription/subscription.module';
       { name: 'SubscriptionPlan', schema: SubscriptionPlanSchema },
     ]),
     CommonModule,
-    AuthModule,
+    forwardRef(() => AuthModule),
     SubscriptionModule,
   ],
   controllers: [WorkingHoursController],

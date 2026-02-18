@@ -54,11 +54,14 @@ export class RolesGuard implements CanActivate {
     }
 
     // Check if user has one of the required roles
-    const hasRole = requiredRoles.some((role) => user.role === role);
+    // super_admin is always allowed
+    const hasRole =
+      user.role === UserRole.SUPER_ADMIN ||
+      requiredRoles.some((role) => user.role === role);
 
     if (!hasRole) {
       this.logger.warn(
-        `RolesGuard: User ${user.userId || user.sub} with role ${user.role} attempted to access endpoint requiring roles: ${requiredRoles.join(', ')}`,
+        `RolesGuard: User ${user.id} with role ${user.role} attempted to access endpoint requiring roles: ${requiredRoles.join(', ')}`,
       );
       throw new ForbiddenException({
         message: {
@@ -70,7 +73,7 @@ export class RolesGuard implements CanActivate {
     }
 
     this.logger.log(
-      `RolesGuard: User ${user.userId || user.sub} with role ${user.role} granted access`,
+      `RolesGuard: User ${user.id} with role ${user.role} granted access`,
     );
     return true;
   }

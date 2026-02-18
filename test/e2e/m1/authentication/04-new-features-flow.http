@@ -1,0 +1,140 @@
+### M1 - Authentication: New Features (Remember Me & First Login Setup)
+### Use Case: UC-8e7f6d5, UC-first-login
+### Description: Verify Remember Me functionality and First Login working hours setup
+
+@baseUrl = http://localhost:4001/api/v1
+@contentType = application/json
+
+###############################################################################
+# 1. Remember Me Functionality
+###############################################################################
+
+### 1.1 Login with Remember Me = True
+# @name loginRememberMe
+POST {{baseUrl}}/auth/login
+Content-Type: {{contentType}}
+
+{
+  "email": "superadmin@cliniva.com",
+  "password": "SuperAdmin123!",
+  "rememberMe": true
+}
+
+# Expected Response:
+# - 200 OK
+# - Returns access_token and refresh_token
+# - Documentation check: The refresh_token should now be valid for 30 days (AuthService internal logic)
+
+###############################################################################
+# 2. First Login Setup (Working Hours)
+###############################################################################
+
+### 2.1 Create a temporary user via Admin (to simulate first login)
+# @name adminLogin
+POST {{baseUrl}}/auth/login
+Content-Type: {{contentType}}
+
+{
+  "email": "superadmin@cliniva.com",
+  "password": "SuperAdmin123!"
+}
+
+###
+@adminToken = {{adminLogin.response.body.access_token}}
+
+### 2.2 Register new staff (will have isFirstLogin=true)
+# @name registerNewStaff
+POST {{baseUrl}}/auth/register
+Authorization: Bearer {{adminToken}}
+Content-Type: {{contentType}}
+
+{
+  "email": "new.staff@cliniva.com",
+  "password": "TempPassword123!",
+  "firstName": "New",
+  "lastName": "Staff",
+  "role": "staff",
+  "phone": "+966509998887"
+}
+
+###
+@staffUserId = {{registerNewStaff.response.body.user.id}}
+
+### 2.3 Login as New Staff
+# @name staffLogin
+POST {{baseUrl}}/auth/login
+Content-Type: {{contentType}}
+
+{
+  "email": "new.staff@cliniva.com",
+  "password": "TempPassword123!"
+}
+
+###
+@staffToken = {{staffLogin.response.body.access_token}}
+
+### 2.4 Perform First Login Setup (Working Hours)
+# UC-first-login: Configure working schedule
+POST {{baseUrl}}/auth/first-login-setup
+Authorization: Bearer {{staffToken}}
+Content-Type: {{contentType}}
+
+{
+  "schedule": [
+    {
+      "dayOfWeek": "monday",
+      "isWorkingDay": true,
+      "openingTime": "09:00",
+      "closingTime": "17:00"
+    },
+    {
+      "dayOfWeek": "tuesday",
+      "isWorkingDay": true,
+      "openingTime": "09:00",
+      "closingTime": "17:00"
+    },
+    {
+      "dayOfWeek": "friday",
+      "isWorkingDay": false
+    }
+  ]
+}
+
+# Expected Response:
+# - 200 OK
+# - Message: { ar: "تم حفظ جدول العمل بنجاح", en: "Working schedule saved successfully" }
+
+### 2.5 Change Password (to complete first login flow)
+POST {{baseUrl}}/auth/first-login-password-change
+Authorization: Bearer {{staffToken}}
+Content-Type: {{contentType}}
+
+{
+  "currentPassword": "TempPassword123!",
+  "newPassword": "NewStaffPass123!",
+  "confirmPassword": "NewStaffPass123!"
+}
+
+# Expected Response:
+# - 200 OK
+# - returns new tokens
+# - user.isFirstLogin should now be false
+
+###############################################################################
+# 3. Bilingual Validation Test (CreateEmployeeDto)
+###############################################################################
+
+### 3.1 Attempt to create employee with missing fields (to see bilingual errors)
+POST {{baseUrl}}/employees
+Authorization: Bearer {{adminToken}}
+Content-Type: {{contentType}}
+
+{
+  "email": "invalid-email",
+  "firstName": ""
+}
+
+# Expected Response:
+# - 400 Bad Request
+# - error.message should be a bilingual object (e.g., { ar: "...", en: "..." })
+# - Details should list all validation failures

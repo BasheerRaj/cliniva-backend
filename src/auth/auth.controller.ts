@@ -256,6 +256,81 @@ export class AuthController {
   }
 
   /**
+   * First login setup (working hours)
+   *
+   * UC-first-login: Part 1 - Working hours setup
+   */
+  @Post('first-login-setup')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Setup working hours on first login',
+    description: 'Allows users to configure their working schedule during first login.',
+  })
+  async firstLoginSetup(
+    @Body() scheduleDto: any,
+    @Request() req: any,
+  ): Promise<{ success: boolean; message: any }> {
+    const userId = req.user?.id || req.user?.userId || req.user?.sub;
+    return this.authService.firstLoginSetup(userId, scheduleDto);
+  }
+
+  // ==========================================
+  // THIRD-PARTY OAUTH LOGIN (PLACEHOLDERS)
+  // UC-3d3r2d7 (Google), UC-91a5d3 (Microsoft), UC-0b8e6a (Apple)
+  // ==========================================
+
+  @Get('google')
+  @ApiOperation({
+    summary: 'Google Login',
+    description: 'Redirects to Google OAuth consent page.',
+  })
+  async googleLogin() {
+    return {
+      message: 'Redirecting to Google...',
+      url: 'https://accounts.google.com/o/oauth2/v2/auth?...',
+    };
+  }
+
+  @Post('google/callback')
+  @ApiOperation({
+    summary: 'Google OAuth Callback',
+    description: 'Handles Google OAuth callback and returns tokens.',
+  })
+  async googleCallback(@Body() body: any) {
+    // Placeholder implementation
+    return {
+      success: false,
+      message: 'Google login implementation pending API credentials',
+    };
+  }
+
+  @Get('microsoft')
+  @ApiOperation({
+    summary: 'Microsoft Login',
+    description: 'Redirects to Microsoft OAuth consent page.',
+  })
+  async microsoftLogin() {
+    return {
+      message: 'Redirecting to Microsoft...',
+      url: 'https://login.microsoftonline.com/common/oauth2/v2.0/authorize?...',
+    };
+  }
+
+  @Get('apple')
+  @ApiOperation({
+    summary: 'Apple Login',
+    description: 'Redirects to Apple OAuth consent page.',
+  })
+  async appleLogin() {
+    return {
+      message: 'Redirecting to Apple...',
+      url: 'https://appleid.apple.com/auth/authorize?...',
+    };
+  }
+
+  /**
    * First login password change
    *
    * Task 15.1: Create POST /auth/first-login-password-change endpoint

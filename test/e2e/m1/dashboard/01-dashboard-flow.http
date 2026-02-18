@@ -1,0 +1,90 @@
+### M1 - Dashboard: Dashboard Flow
+### Use Case: UC-a9b8c7d, UC-dhbs47v, UC-s9b8c45
+### Description: Verify dashboard data for different user roles
+
+@baseUrl = http://localhost:4001/api/v1
+@contentType = application/json
+
+###############################################################################
+# 1. Admin Dashboard
+###############################################################################
+
+### 1.1 Login as Super Admin
+# @name adminLogin
+POST {{baseUrl}}/auth/login
+Content-Type: {{contentType}}
+
+{
+  "email": "superadmin@cliniva.com",
+  "password": "SuperAdmin123!"
+}
+
+###
+@adminToken = {{adminLogin.response.body.access_token}}
+
+### 1.2 Get Admin Dashboard Data
+GET {{baseUrl}}/dashboard/admin?period=month
+Authorization: Bearer {{adminToken}}
+
+# Expected Response:
+# - 200 OK
+# - data.counts.users: Role distribution
+# - data.counts.appointments: Status summary
+# - data.growth_charts: User growth over time
+
+###############################################################################
+# 2. Staff Dashboard
+###############################################################################
+
+### 2.1 Get Staff Dashboard Data
+# Assuming the admin also has staff permissions or we use a staff account
+GET {{baseUrl}}/dashboard/staff
+Authorization: Bearer {{adminToken}}
+
+# Expected Response:
+# - 200 OK
+# - data.appointments_overview: Today's appointments
+# - data.medical_summary: Recent patients
+
+###############################################################################
+# 3. Doctor Dashboard
+###############################################################################
+
+### 3.1 Get Doctor Dashboard Data
+# We need a doctorId. Let's assume we have one from a previous test or use a query.
+@doctorId = 6991bd842ac54ad855f13518
+
+GET {{baseUrl}}/dashboard/doctor?doctorId={{doctorId}}
+Authorization: Bearer {{adminToken}}
+
+# Expected Response:
+# - 200 OK
+# - data.today_appointments: List of appointments for today
+# - data.availability: Current status
+# - data.quick_actions: Action buttons list
+
+###############################################################################
+# 4. Role-Based Access Control
+###############################################################################
+
+### 4.1 Regular User attempts to access Admin Dashboard (Should Fail)
+# First login as a non-admin (e.g., a patient or doctor)
+# @name doctorLogin
+POST {{baseUrl}}/auth/login
+Content-Type: {{contentType}}
+
+{
+  "email": "dr.mohammed@cliniva.com",
+  "password": "DoctorPassword@123"
+}
+
+###
+@doctorToken = {{doctorLogin.response.body.access_token}}
+
+### 4.2 Doctor attempts to access Admin Dashboard
+GET {{baseUrl}}/dashboard/admin
+Authorization: Bearer {{doctorToken}}
+
+# Expected Response:
+# - 403 Forbidden
+# - Error: Insufficient permissions

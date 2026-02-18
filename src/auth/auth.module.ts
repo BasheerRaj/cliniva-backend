@@ -39,6 +39,8 @@ import { OptionalJwtAuthGuard } from './guards/optional-jwt-auth.guard';
 import { FirstLoginGuard } from './guards/first-login.guard';
 import { RateLimitGuard } from './guards/rate-limit.guard';
 import { RateLimitService } from './rate-limit.service';
+import { forwardRef } from '@nestjs/common';
+import { WorkingHoursModule } from '../working-hours/working-hours.module';
 
 @Module({
   imports: [
@@ -56,6 +58,9 @@ import { RateLimitService } from './rate-limit.service';
 
     // Import SubscriptionModule for SubscriptionService
     SubscriptionModule,
+
+    // Import WorkingHoursModule
+    forwardRef(() => WorkingHoursModule),
 
     // Import NestJS Schedule Module for cron jobs
     NestScheduleModule.forRoot(),
