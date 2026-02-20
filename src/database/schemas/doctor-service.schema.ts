@@ -47,3 +47,5 @@ DoctorServiceSchema.index(
 DoctorServiceSchema.index({ serviceId: 1, isActive: 1 });
 DoctorServiceSchema.index({ doctorId: 1, isActive: 1 });
 DoctorServiceSchema.index({ clinicId: 1 });
+
+
