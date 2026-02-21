@@ -109,3 +109,5 @@ export class UpdateDoctorServiceNotesDto {
   @MaxLength(500)
   notes?: string;
 }
+
+

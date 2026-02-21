@@ -53,3 +53,5 @@ export class ChangeServiceStatusDto {
   @IsOptional()
   notifyPatients?: boolean;
 }
+
+
