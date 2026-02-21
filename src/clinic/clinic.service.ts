@@ -832,4 +832,90 @@ export class ClinicService {
       return false;
     }
   }
+
+  /**
+   * Delete clinic (soft delete)
+   *
+   * Performs a soft delete by setting the deletedAt timestamp.
+   * This allows data recovery if needed and maintains referential integrity.
+   *
+   * @param id - Clinic ID to delete
+   * @returns Success response with bilingual message
+   * @throws NotFoundException if clinic not found
+   * @throws BadRequestException for unexpected errors
+   *
+   * @example
+   * const result = await service.deleteClinic('507f1f77bcf86cd799439011');
+   * // Returns: { success: true, message: { ar: '...', en: '...' } }
+   */
+  async deleteClinic(id: string): Promise<{
+    success: boolean;
+    message: { ar: string; en: string };
+  }> {
+    try {
+      // Validate ObjectId format
+      if (!Types.ObjectId.isValid(id)) {
+        throw new BadRequestException({
+          message: {
+            ar: 'معرف العيادة غير صالح',
+            en: 'Invalid clinic ID format',
+          },
+          code: 'INVALID_ID',
+        });
+      }
+
+      // Find the clinic
+      const clinic = await this.clinicModel.findById(id);
+
+      if (!clinic) {
+        throw new NotFoundException({
+          message: {
+            ar: 'العيادة غير موجودة',
+            en: 'Clinic not found',
+          },
+          code: 'CLINIC_007',
+        });
+      }
+
+      // Check if already deleted
+      if (clinic.deletedAt) {
+        throw new BadRequestException({
+          message: {
+            ar: 'العيادة محذوفة بالفعل',
+            en: 'Clinic is already deleted',
+          },
+          code: 'CLINIC_ALREADY_DELETED',
+        });
+      }
+
+      // Perform soft delete
+      await this.clinicModel.findByIdAndUpdate(id, {
+        deletedAt: new Date(),
+      });
+
+      return {
+        success: true,
+        message: {
+          ar: 'تم حذف العيادة بنجاح',
+          en: 'Clinic deleted successfully',
+        },
+      };
+    } catch (error) {
+      // Re-throw known exceptions
+      if (
+        error instanceof NotFoundException ||
+        error instanceof BadRequestException
+      ) {
+        throw error;
+      }
+
+      // Handle unexpected errors
+      throw new BadRequestException({
+        message: {
+          ar: 'حدث خطأ أثناء حذف العيادة',
+          en: 'An error occurred while deleting the clinic',
+        },
+      });
+    }
+  }
 }

@@ -19,6 +19,8 @@ import {
   DeleteResult,
   CanDeleteResult,
   LinkedClinicDto,
+  CheckDependenciesResult,
+  DeactivateWithTransferResult,
 } from './dto/delete-response.dto';
 import {
   DEPARTMENT_ERROR_CODES,
@@ -682,6 +684,326 @@ export class DepartmentService {
         message: {
           ar: 'حدث خطأ أثناء التحقق من إمكانية حذف القسم',
           en: 'An error occurred while checking if department can be deleted',
+        },
+      });
+    }
+  }
+
+  /**
+   * Check dependencies for a department
+   *
+   * Checks if a department has active clinics linked to it. This endpoint
+   * provides information about clinics using the department before attempting
+   * deactivation or transfer operations.
+   *
+   * Returns comprehensive information including:
+   * - Whether department has active clinics (hasActiveClinics flag)
+   * - Count of active clinics using this department
+   * - List of clinics with details (clinic name, complex name, IDs)
+   *
+   * @param departmentId - Department ID to check (must be valid MongoDB ObjectId)
+   * @returns CheckDependenciesResult with dependencies information
+   *
+   * @throws NotFoundException if department not found (DEPARTMENT_003)
+   * @throws BadRequestException for unexpected errors
+   *
+   * @example
+   * const result = await service.checkDependencies('507f1f77bcf86cd799439011');
+   * // Returns: { success: true, data: { hasActiveClinics: true, count: 3, clinics: [...] }, message: {...} }
+   */
+  async checkDependencies(
+    departmentId: string,
+  ): Promise<CheckDependenciesResult> {
+    try {
+      // Step 1: Validate department exists
+      await this.validateDepartmentExists(departmentId);
+
+      // Step 2: Get ComplexDepartment IDs
+      const complexDeptIds = await this.getComplexDepartmentIds(departmentId);
+
+      // Step 3: Get linked clinics
+      const linkedClinics = await this.getLinkedClinics(complexDeptIds);
+
+      // Step 4: Format linked clinics
+      const formattedClinics = this.formatLinkedClinics(linkedClinics);
+
+      // Step 5: Build response
+      return {
+        success: true,
+        data: {
+          hasActiveClinics: linkedClinics.length > 0,
+          count: linkedClinics.length,
+          clinics: formattedClinics,
+        },
+        message: {
+          ar: 'تم التحقق من التبعيات بنجاح',
+          en: 'Dependencies checked successfully',
+        },
+      };
+    } catch (error) {
+      // Re-throw known exceptions
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+
+      // Handle unexpected errors
+      this.logger.error(
+        `Unexpected error checking dependencies for department ${departmentId}:`,
+        error.stack,
+      );
+
+      throw new BadRequestException({
+        message: {
+          ar: 'حدث خطأ أثناء التحقق من التبعيات',
+          en: 'An error occurred while checking dependencies',
+        },
+      });
+    }
+  }
+
+  /**
+   * Deactivate department with clinic transfer
+   *
+   * Deactivates a department and transfers all its clinics to a target department.
+   * This operation ensures that clinics are not left without a department assignment
+   * when a department is deactivated.
+   *
+   * Process:
+   * 1. Validate source department exists and is active
+   * 2. Validate target department exists and is active
+   * 3. Get all ComplexDepartment relationships for source department
+   * 4. Get all clinics linked to source department
+   * 5. For each clinic, find the corresponding ComplexDepartment ID in target department
+   * 6. Update clinics to use target department's ComplexDepartment ID
+   * 7. Update source department status to 'inactive'
+   * 8. Log audit trail
+   *
+   * @param departmentId - Source department ID to deactivate
+   * @param targetDepartmentId - Target department ID to transfer clinics to
+   * @returns DeactivateWithTransferResult with success message and transfer count
+   *
+   * @throws NotFoundException if source or target department not found
+   * @throws BadRequestException if source department is already inactive
+   * @throws BadRequestException if target department is inactive
+   * @throws BadRequestException if target department doesn't have matching complex assignments
+   *
+   * @example
+   * const result = await service.deactivateWithTransfer('source-id', 'target-id');
+   * // Returns: { success: true, message: {...}, clinicsTransferred: 3 }
+   */
+  async deactivateWithTransfer(
+    departmentId: string,
+    targetDepartmentId: string,
+  ): Promise<DeactivateWithTransferResult> {
+    try {
+      // Step 1: Validate source department exists
+      const sourceDepartment = await this.validateDepartmentExists(departmentId);
+
+      // Check if source department is already inactive
+      if (sourceDepartment.status === 'inactive') {
+        throw new BadRequestException({
+          message: DEPARTMENT_ERROR_MESSAGES.DEPARTMENT_INACTIVE,
+          code: DEPARTMENT_ERROR_CODES.DEPARTMENT_INACTIVE,
+        });
+      }
+
+      // Step 2: Validate target department exists and is active
+      const targetDepartment = await this.validateDepartmentExists(
+        targetDepartmentId,
+      );
+
+      if (targetDepartment.status === 'inactive') {
+        throw new BadRequestException({
+          message: DEPARTMENT_ERROR_MESSAGES.TARGET_DEPARTMENT_INACTIVE,
+          code: DEPARTMENT_ERROR_CODES.TARGET_DEPARTMENT_INACTIVE,
+        });
+      }
+
+      // Step 3: Get ComplexDepartment IDs for source department
+      const sourceComplexDeptIds =
+        await this.getComplexDepartmentIds(departmentId);
+
+      // Step 4: Get all clinics linked to source department
+      const clinicsToTransfer = await this.getLinkedClinics(sourceComplexDeptIds);
+
+      let clinicsTransferred = 0;
+
+      if (clinicsToTransfer.length > 0) {
+        // Step 5: Transfer clinics to target department
+        // For each clinic, find the ComplexDepartment ID for target department in same complex
+        for (const clinic of clinicsToTransfer) {
+          const complexId = clinic.complexId?._id;
+
+          if (!complexId) {
+            this.logger.warn(
+              `Clinic ${clinic._id} has no complex assigned, skipping transfer`,
+            );
+            continue;
+          }
+
+          // Find the ComplexDepartment for target department in this complex
+          const targetComplexDept = await this.complexDepartmentModel.findOne({
+            complexId: complexId,
+            departmentId: new Types.ObjectId(targetDepartmentId),
+            isActive: true,
+          });
+
+          if (!targetComplexDept) {
+            // If target department is not assigned to this complex, create the assignment
+            const newComplexDept = new this.complexDepartmentModel({
+              complexId: complexId,
+              departmentId: new Types.ObjectId(targetDepartmentId),
+              isActive: true,
+            });
+            await newComplexDept.save();
+
+            // Update clinic to use new ComplexDepartment
+            await this.clinicModel.updateOne(
+              { _id: clinic._id },
+              { complexDepartmentId: newComplexDept._id },
+            );
+
+            this.logger.log(
+              `Created new ComplexDepartment assignment and transferred clinic ${clinic._id} from department ${departmentId} to ${targetDepartmentId}`,
+            );
+          } else {
+            // Update clinic to use target ComplexDepartment
+            await this.clinicModel.updateOne(
+              { _id: clinic._id },
+              { complexDepartmentId: targetComplexDept._id },
+            );
+
+            this.logger.log(
+              `Transferred clinic ${clinic._id} from department ${departmentId} to ${targetDepartmentId}`,
+            );
+          }
+
+          clinicsTransferred++;
+        }
+      }
+
+      // Step 6: Update source department status to 'inactive'
+      await this.departmentModel.findByIdAndUpdate(departmentId, {
+        status: 'inactive',
+      });
+
+      this.logger.log(
+        `Department ${departmentId} deactivated with ${clinicsTransferred} clinics transferred to ${targetDepartmentId}`,
+      );
+
+      // Step 7: Return success response
+      return {
+        success: true,
+        message: DEPARTMENT_SUCCESS_MESSAGES.DEACTIVATED_WITH_TRANSFER,
+        clinicsTransferred,
+      };
+    } catch (error) {
+      // Re-throw known exceptions
+      if (
+        error instanceof NotFoundException ||
+        error instanceof BadRequestException
+      ) {
+        throw error;
+      }
+
+      // Handle unexpected errors
+      this.logger.error(
+        `Unexpected error deactivating department ${departmentId} with transfer to ${targetDepartmentId}:`,
+        error.stack,
+      );
+
+      throw new BadRequestException({
+        message: {
+          ar: 'حدث خطأ أثناء إلغاء تفعيل القسم ونقل العيادات',
+          en: 'An error occurred while deactivating department and transferring clinics',
+        },
+      });
+    }
+  }
+
+  /**
+   * Update department status
+   *
+   * Updates the status of a department to active or inactive.
+   * When deactivating a department that has linked clinics, it will fail
+   * and require using the deactivateWithTransfer method instead.
+   *
+   * @param departmentId - Department ID to update
+   * @param status - New status ('active' or 'inactive')
+   * @returns Updated department document
+   *
+   * @throws NotFoundException if department not found
+   * @throws BadRequestException if trying to deactivate department with linked clinics
+   *
+   * @example
+   * const dept = await service.updateDepartmentStatus('dept-id', 'inactive');
+   */
+  async updateDepartmentStatus(
+    departmentId: string,
+    status: 'active' | 'inactive',
+  ): Promise<Department> {
+    try {
+      // Validate department exists
+      await this.validateDepartmentExists(departmentId);
+
+      // If deactivating, check for linked clinics
+      if (status === 'inactive') {
+        const complexDeptIds = await this.getComplexDepartmentIds(departmentId);
+        const linkedClinics = await this.getLinkedClinics(complexDeptIds);
+
+        if (linkedClinics.length > 0) {
+          const formattedClinics = this.formatLinkedClinics(linkedClinics);
+
+          throw new BadRequestException({
+            message: {
+              ar: 'لا يمكن إلغاء تفعيل القسم لأنه مرتبط بعيادات. استخدم endpoint إلغاء التفعيل مع النقل بدلاً من ذلك',
+              en: 'Cannot deactivate department because it has linked clinics. Use deactivate-with-transfer endpoint instead',
+            },
+            code: DEPARTMENT_ERROR_CODES.LINKED_TO_CLINICS,
+            linkedClinics: formattedClinics,
+            linkedClinicsCount: linkedClinics.length,
+          });
+        }
+      }
+
+      // Update status
+      const updatedDepartment = await this.departmentModel
+        .findByIdAndUpdate(
+          departmentId,
+          { status },
+          { new: true, runValidators: true },
+        )
+        .exec();
+
+      if (!updatedDepartment) {
+        throw new NotFoundException({
+          message: DEPARTMENT_ERROR_MESSAGES.NOT_FOUND,
+          code: DEPARTMENT_ERROR_CODES.NOT_FOUND,
+        });
+      }
+
+      this.logger.log(`Department ${departmentId} status updated to ${status}`);
+
+      return updatedDepartment;
+    } catch (error) {
+      // Re-throw known exceptions
+      if (
+        error instanceof NotFoundException ||
+        error instanceof BadRequestException
+      ) {
+        throw error;
+      }
+
+      // Handle unexpected errors
+      this.logger.error(
+        `Unexpected error updating department ${departmentId} status:`,
+        error.stack,
+      );
+
+      throw new BadRequestException({
+        message: {
+          ar: 'حدث خطأ أثناء تحديث حالة القسم',
+          en: 'An error occurred while updating department status',
         },
       });
     }

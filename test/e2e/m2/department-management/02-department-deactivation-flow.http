@@ -1,0 +1,732 @@
+### M2 - Department Management: Deactivation with Clinic Transfer Flow
+### Description: Test department deactivation feature (GAP-M2-004 implementation)
+### Features Tested:
+###   - GET /departments/:id/check-dependencies
+###   - PATCH /departments/:id/status
+###   - POST /departments/:id/deactivate-with-transfer
+
+@baseUrl = http://localhost:4001/api/v1
+@adminEmail = superadmin@cliniva.com
+@adminPassword = SuperAdmin123!
+
+###############################################################################
+# SETUP: Login and Create Test Data
+###############################################################################
+
+### 1. Login as admin
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{adminEmail}}",
+  "password": "{{adminPassword}}"
+}
+###
+# Copy access token from response
+@accessToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2OTkxODg0YmQ4MzJjNzA1ZWE0M2UwMWIiLCJlbWFpbCI6InN1cGVyYWRtaW5AY2xpbml2YS5jb20iLCJyb2xlIjoic3VwZXJfYWRtaW4iLCJpYXQiOjE3NzE2NjM1MTYsImV4cCI6MTc3MTc0OTkxNn0.9R0ef4e083DWWvIJq6ymGYjsphCw0uJqryc_W0K06iA
+
+###############################################################################
+# STEP 1: Create Test Departments
+###############################################################################
+
+### 2. Create Source Department (Cardiology)
+POST {{baseUrl}}/departments
+Content-Type: application/json
+
+{
+  "name": "Cardiology E2E Test",
+  "description": "Cardiology department for E2E testing"
+}
+###
+# Expected Response:
+# - 201 Created
+# - Department created successfully
+# Save the department ID
+@sourceDepartmentId = 699970d8dea8bde15077fd35
+
+### 3. Create Target Department (Internal Medicine)
+POST {{baseUrl}}/departments
+Content-Type: application/json
+
+{
+  "name": "Internal Medicine E2E Test",
+  "description": "Internal medicine department for E2E testing"
+}
+###
+# Expected Response:
+# - 201 Created
+# - Department created successfully
+# Save the department ID
+@targetDepartmentId = 699970fcdea8bde15077fd38
+
+### 4. Create Third Department (Backup)
+POST {{baseUrl}}/departments
+Content-Type: application/json
+
+{
+  "name": "General Practice E2E Test",
+  "description": "General practice department for E2E testing"
+}
+###
+# Expected Response:
+# - 201 Created
+@backupDepartmentId = 6999710edea8bde15077fd3b
+
+###############################################################################
+# STEP 2: Assign Departments to Complex
+###############################################################################
+
+### 5. Get list of complexes to find one to use
+GET {{baseUrl}}/complexes
+Authorization: Bearer {{accessToken}}
+
+# Copy a complex ID from response
+@complexId = 6995af4a7c8024430545c8cc
+
+### 6. Assign source department to complex
+POST {{baseUrl}}/departments/complexes/{{complexId}}/assign
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "departmentIds": ["{{sourceDepartmentId}}"]
+}
+###
+# Expected Response:
+# - 201 Created
+# - ComplexDepartment assignment created
+# Save the ComplexDepartment ID
+@sourceComplexDeptId = 69997163dea8bde15077fd41
+
+### 7. Assign target department to complex
+POST {{baseUrl}}/departments/complexes/{{complexId}}/assign
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "departmentIds": ["{{targetDepartmentId}}"]
+}
+###
+# Expected Response:
+# - 201 Created
+@targetComplexDeptId = 699972eddea8bde15077fd48
+
+###############################################################################
+# STEP 3: Create Test Clinics Linked to Source Department
+###############################################################################
+
+### 8. Create Clinic 1 using source department
+# Note: You may need to adjust this based on your clinic creation endpoint
+# This is a placeholder - adjust fields as needed
+POST {{baseUrl}}/clinics
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": "Cardiology Clinic A",
+  "complexId": "{{complexId}}",
+  "subscriptionId": "6995af4a7c8024430545c8c9",
+  "ownerId": "6991b0a785139edcd10a0a6d",
+  "complexDepartmentId": "{{sourceComplexDeptId}}"
+}
+###
+# Expected Response:
+# - 201 Created
+@clinic1Id = 699973addea8bde15077fd68
+
+### 9. Create Clinic 2 using source department
+POST {{baseUrl}}/clinics
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": "Cardiology Clinic B",
+  "subscriptionId": "6995af4a7c8024430545c8c9",
+  "ownerId": "6991b0a785139edcd10a0a6d",
+  "complexId": "{{complexId}}",
+  "complexDepartmentId": "{{sourceComplexDeptId}}"
+}
+###
+# Expected Response:
+# - 201 Created
+@clinic2Id = 699973f7dea8bde15077fd74
+
+### 10. Create Clinic 3 using source department
+POST {{baseUrl}}/clinics
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": "Cardiology Clinic C",
+  "subscriptionId": "6995af4a7c8024430545c8c9",
+  "ownerId": "6991b0a785139edcd10a0a6d",
+  "complexId": "{{complexId}}",
+  "complexDepartmentId": "{{sourceComplexDeptId}}"
+}
+###
+# Expected Response:
+# - 201 Created
+@clinic3Id = 6999741ddea8bde15077fd81
+
+###############################################################################
+# TEST SCENARIO 1: Check Dependencies Endpoint
+###############################################################################
+
+### 11. Check dependencies for source department (has clinics)
+GET {{baseUrl}}/departments/{{sourceDepartmentId}}/check-dependencies
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - {
+#     "success": true,
+#     "data": {
+#       "hasActiveClinics": true,
+#       "count": 3,
+#       "clinics": [
+#         {
+#           "clinicId": "...",
+#           "clinicName": "Cardiology Clinic A",
+#           "complexName": "...",
+#           "complexId": "..."
+#         },
+#         {
+#           "clinicId": "...",
+#           "clinicName": "Cardiology Clinic B",
+#           "complexName": "...",
+#           "complexId": "..."
+#         },
+#         {
+#           "clinicId": "...",
+#           "clinicName": "Cardiology Clinic C",
+#           "complexName": "...",
+#           "complexId": "..."
+#         }
+#       ]
+#     },
+#     "message": {
+#       "ar": "تم التحقق من التبعيات بنجاح",
+#       "en": "Dependencies checked successfully"
+#     }
+#   }
+
+### 12. Check dependencies for target department (no clinics)
+GET {{baseUrl}}/departments/{{targetDepartmentId}}/check-dependencies
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - {
+#     "success": true,
+#     "data": {
+#       "hasActiveClinics": false,
+#       "count": 0,
+#       "clinics": []
+#     },
+#     "message": {
+#       "ar": "تم التحقق من التبعيات بنجاح",
+#       "en": "Dependencies checked successfully"
+#     }
+#   }
+
+### 13. Check dependencies for non-existent department (should fail)
+GET {{baseUrl}}/departments/507f1f77bcf86cd799439999/check-dependencies
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 404 Not Found
+# - {
+#     "success": false,
+#     "error": {
+#       "code": "DEPARTMENT_003",
+#       "message": {
+#         "ar": "القسم غير موجود",
+#         "en": "Department not found"
+#       }
+#     }
+#   }
+
+###############################################################################
+# TEST SCENARIO 2: Update Department Status (Without Clinics)
+###############################################################################
+
+### 14. Deactivate target department (no clinics - should succeed)
+PATCH {{baseUrl}}/departments/{{targetDepartmentId}}/status
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "status": "inactive"
+}
+
+# Expected Response:
+# - 200 OK
+# - Department with status: "inactive"
+# - {
+#     "success": true,
+#     "data": {
+#       "_id": "...",
+#       "name": "Internal Medicine E2E Test",
+#       "description": "...",
+#       "status": "inactive",
+#       "createdAt": "...",
+#       "updatedAt": "..."
+#     },
+#     "message": {
+#       "ar": "تم تحديث حالة القسم بنجاح",
+#       "en": "Department status updated successfully"
+#     }
+#   }
+
+### 15. Verify target department is inactive
+GET {{baseUrl}}/departments/{{targetDepartmentId}}
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Department with status: "inactive"
+
+### 16. Reactivate target department
+PATCH {{baseUrl}}/departments/{{targetDepartmentId}}/status
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "status": "active"
+}
+
+# Expected Response:
+# - 200 OK
+# - Department with status: "active"
+# - {
+#     "success": true,
+#     "data": {
+#       "_id": "...",
+#       "status": "active",
+#       ...
+#     },
+#     "message": {
+#       "ar": "تم تحديث حالة القسم بنجاح",
+#       "en": "Department status updated successfully"
+#     }
+#   }
+
+###############################################################################
+# TEST SCENARIO 3: Attempt to Deactivate Department With Clinics (Should Fail)
+###############################################################################
+
+### 17. Try to deactivate source department with clinics (should fail)
+PATCH {{baseUrl}}/departments/{{sourceDepartmentId}}/status
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "status": "inactive"
+}
+
+# Expected Response:
+# - 400 Bad Request
+# - {
+#     "success": false,
+#     "error": {
+#       "code": "DEPARTMENT_001",
+#       "message": {
+#         "ar": "لا يمكن إلغاء تفعيل القسم لأنه مرتبط بعيادات. استخدم endpoint إلغاء التفعيل مع النقل بدلاً من ذلك",
+#         "en": "Cannot deactivate department because it has linked clinics. Use deactivate-with-transfer endpoint instead"
+#       },
+#       "linkedClinics": [
+#         {
+#           "clinicId": "...",
+#           "clinicName": "Cardiology Clinic A",
+#           "complexName": "...",
+#           "complexId": "..."
+#         },
+#         ...
+#       ],
+#       "linkedClinicsCount": 3
+#     }
+#   }
+
+###############################################################################
+# TEST SCENARIO 4: Deactivate Department with Clinic Transfer
+###############################################################################
+
+### 18. Deactivate source department and transfer clinics to target department
+POST {{baseUrl}}/departments/{{sourceDepartmentId}}/deactivate-with-transfer
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "targetDepartmentId": "{{targetDepartmentId}}"
+}
+
+# Expected Response:
+# - 200 OK
+# - {
+#     "success": true,
+#     "message": {
+#       "ar": "تم إلغاء تفعيل القسم ونقل العيادات بنجاح",
+#       "en": "Department deactivated and clinics transferred successfully"
+#     },
+#     "clinicsTransferred": 3
+#   }
+
+### 19. Verify source department is now inactive
+GET {{baseUrl}}/departments/{{sourceDepartmentId}}
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Department with status: "inactive"
+
+### 20. Check dependencies for source department (should have no clinics now)
+GET {{baseUrl}}/departments/{{sourceDepartmentId}}/check-dependencies
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - {
+#     "success": true,
+#     "data": {
+#       "hasActiveClinics": false,
+#       "count": 0,
+#       "clinics": []
+#     },
+#     "message": {
+#       "ar": "تم التحقق من التبعيات بنجاح",
+#       "en": "Dependencies checked successfully"
+#     }
+#   }
+
+### 21. Check dependencies for target department (should now have 3 clinics)
+GET {{baseUrl}}/departments/{{targetDepartmentId}}/check-dependencies
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - {
+#     "success": true,
+#     "data": {
+#       "hasActiveClinics": true,
+#       "count": 3,
+#       "clinics": [
+#         {
+#           "clinicId": "...",
+#           "clinicName": "Cardiology Clinic A",
+#           "complexName": "...",
+#           "complexId": "..."
+#         },
+#         ...
+#       ]
+#     }
+#   }
+
+### 22. Verify clinic 1 is now using target department
+GET {{baseUrl}}/clinics/{{clinic1Id}}
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - Clinic with complexDepartmentId pointing to target department
+
+###############################################################################
+# TEST SCENARIO 5: Error Cases for Deactivate with Transfer
+###############################################################################
+
+### 23. Try to deactivate already inactive department (should fail)
+POST {{baseUrl}}/departments/{{sourceDepartmentId}}/deactivate-with-transfer
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "targetDepartmentId": "{{targetDepartmentId}}"
+}
+
+# Expected Response:
+# - 400 Bad Request
+# - {
+#     "success": false,
+#     "error": {
+#       "code": "DEPARTMENT_005",
+#       "message": {
+#         "ar": "القسم غير نشط",
+#         "en": "Department is inactive"
+#       }
+#     }
+#   }
+
+### 24. Reactivate source department for next test
+PATCH {{baseUrl}}/departments/{{sourceDepartmentId}}/status
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "status": "active"
+}
+
+# Expected Response:
+# - 200 OK
+# - Department reactivated (but still has no clinics)
+
+### 25. Deactivate target department to make it invalid transfer target
+PATCH {{baseUrl}}/departments/{{targetDepartmentId}}/status
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "status": "inactive"
+}
+
+# Expected Response:
+# - 400 Bad Request (because it has clinics)
+# - Or you need to transfer clinics out first
+
+### 26. If target has clinics, transfer them to backup department first
+POST {{baseUrl}}/departments/{{targetDepartmentId}}/deactivate-with-transfer
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "targetDepartmentId": "{{backupDepartmentId}}"
+}
+
+### Expected Response:
+# - 200 OK
+# - Target department now inactive, clinics moved to backup
+
+### 27. Try to transfer to inactive target department (should fail)
+POST {{baseUrl}}/departments/{{sourceDepartmentId}}/deactivate-with-transfer
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "targetDepartmentId": "{{targetDepartmentId}}"
+}
+
+### Expected Response:
+# - 400 Bad Request
+# - {
+#     "success": false,
+#     "error": {
+#       "code": "DEPARTMENT_007",
+#       "message": {
+#         "ar": "القسم المستهدف غير نشط",
+#         "en": "Target department is inactive"
+#       }
+#     }
+#   }
+
+### 28. Try to transfer with non-existent target department (should fail)
+POST {{baseUrl}}/departments/{{sourceDepartmentId}}/deactivate-with-transfer
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "targetDepartmentId": "507f1f77bcf86cd799439999"
+}
+
+# Expected Response:
+# - 404 Not Found
+# - {
+#     "success": false,
+#     "error": {
+#       "code": "DEPARTMENT_003",
+#       "message": {
+#         "ar": "القسم غير موجود",
+#         "en": "Department not found"
+#       }
+#     }
+#   }
+
+### 29. Try to transfer with invalid target department ID format (should fail)
+POST {{baseUrl}}/departments/{{sourceDepartmentId}}/deactivate-with-transfer
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "targetDepartmentId": "invalid-id"
+}
+
+# Expected Response:
+# - 400 Bad Request
+# - Validation error for invalid MongoDB ObjectId
+
+###############################################################################
+# TEST SCENARIO 6: Can Delete Department Endpoint
+###############################################################################
+
+### 30. Check if source department can be deleted (should be yes - no clinics)
+GET {{baseUrl}}/departments/{{sourceDepartmentId}}/can-delete
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - {
+#     "success": true,
+#     "data": {
+#       "canDelete": true
+#     }
+#   }
+
+### 31. Check if backup department can be deleted (should be no - has clinics)
+GET {{baseUrl}}/departments/{{backupDepartmentId}}/can-delete
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - {
+#     "success": true,
+#     "data": {
+#       "canDelete": false,
+#       "reason": {
+#         "ar": "لا يمكن حذف القسم لأنه مرتبط بـ 3 عيادات",
+#         "en": "Cannot delete department because it is linked to 3 clinics"
+#       },
+#       "linkedClinics": [...],
+#       "recommendations": {
+#         "ar": "يرجى إزالة القسم من جميع العيادات المرتبطة قبل الحذف",
+#         "en": "Please remove the department from all linked clinics before deletion"
+#       }
+#     }
+#   }
+
+###############################################################################
+# TEST SCENARIO 7: Delete Department
+###############################################################################
+
+### 32. Delete source department (no clinics - should succeed)
+DELETE {{baseUrl}}/departments/{{sourceDepartmentId}}
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 200 OK
+# - {
+#     "success": true,
+#     "message": {
+#       "ar": "تم حذف القسم بنجاح",
+#       "en": "Department deleted successfully"
+#     }
+#   }
+
+### 33. Verify source department is deleted
+GET {{baseUrl}}/departments/{{sourceDepartmentId}}
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 404 Not Found
+# - Department not found
+
+### 34. Try to delete backup department (has clinics - should fail)
+DELETE {{baseUrl}}/departments/{{backupDepartmentId}}
+Authorization: Bearer {{accessToken}}
+
+# Expected Response:
+# - 400 Bad Request
+# - {
+#     "success": false,
+#     "error": {
+#       "code": "DEPARTMENT_001",
+#       "message": {
+#         "ar": "لا يمكن حذف القسم لأنه مرتبط بعيادة",
+#         "en": "Cannot delete department because it is linked to a clinic"
+#       },
+#       "linkedClinics": [...],
+#       "linkedClinicsCount": 3
+#     }
+#   }
+
+###############################################################################
+# CLEANUP: Clean up test data
+###############################################################################
+
+### 35. Transfer clinics from backup to target department (reactivate target first)
+PATCH {{baseUrl}}/departments/{{targetDepartmentId}}/status
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "status": "active"
+}
+
+### 36. Transfer clinics from backup to target
+POST {{baseUrl}}/departments/{{backupDepartmentId}}/deactivate-with-transfer
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "targetDepartmentId": "{{targetDepartmentId}}"
+}
+
+### 37. Delete backup department
+DELETE {{baseUrl}}/departments/{{backupDepartmentId}}
+Authorization: Bearer {{accessToken}}
+
+### 38. Delete all test clinics
+DELETE {{baseUrl}}/clinics/{{clinic1Id}}
+Authorization: Bearer {{accessToken}}
+
+###
+DELETE {{baseUrl}}/clinics/{{clinic2Id}}
+Authorization: Bearer {{accessToken}}
+
+###
+DELETE {{baseUrl}}/clinics/{{clinic3Id}}
+Authorization: Bearer {{accessToken}}
+
+### 39. Delete target department (after deleting clinics)
+DELETE {{baseUrl}}/departments/{{targetDepartmentId}}
+Authorization: Bearer {{accessToken}}
+
+###############################################################################
+# VALIDATION TESTS
+###############################################################################
+
+### 40. Test invalid status value
+PATCH {{baseUrl}}/departments/{{targetDepartmentId}}/status
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "status": "deleted"
+}
+
+# Expected Response:
+# - 400 Bad Request
+# - Validation error: status must be either active or inactive
+
+### 41. Test missing required field
+PATCH {{baseUrl}}/departments/{{targetDepartmentId}}/status
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+}
+
+# Expected Response:
+# - 400 Bad Request
+# - Validation error: status is required
+
+### 42. Test missing targetDepartmentId
+POST {{baseUrl}}/departments/{{sourceDepartmentId}}/deactivate-with-transfer
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+}
+
+# Expected Response:
+# - 400 Bad Request
+# - Validation error: targetDepartmentId is required
+
+###############################################################################
+# TEST COMPLETE
+###############################################################################
+# All tests for GAP-M2-004 implementation completed!
+#
+# Features tested:
+# ✅ GET /departments/:id/check-dependencies
+# ✅ PATCH /departments/:id/status
+# ✅ POST /departments/:id/deactivate-with-transfer
+# ✅ Error handling and validation
+# ✅ Business rules enforcement
+###############################################################################

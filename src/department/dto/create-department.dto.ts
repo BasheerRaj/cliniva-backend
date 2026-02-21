@@ -1,4 +1,11 @@
-import { IsString, IsNotEmpty, IsOptional, IsArray } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsOptional,
+  IsArray,
+  IsEnum,
+  IsMongoId,
+} from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateDepartmentDto {
@@ -60,4 +67,48 @@ export class AssignDepartmentsDto {
   @IsArray()
   @IsString({ each: true })
   departmentIds: string[];
+}
+
+export class UpdateDepartmentStatusDto {
+  @ApiProperty({
+    description: 'Department status',
+    example: 'active',
+    enum: ['active', 'inactive'],
+    type: String,
+  })
+  @IsEnum(['active', 'inactive'], {
+    message: JSON.stringify({
+      ar: 'حالة القسم يجب أن تكون active أو inactive',
+      en: 'Department status must be either active or inactive',
+    }),
+  })
+  @IsNotEmpty({
+    message: JSON.stringify({
+      ar: 'حالة القسم مطلوبة',
+      en: 'Department status is required',
+    }),
+  })
+  status: 'active' | 'inactive';
+}
+
+export class DeactivateWithTransferDto {
+  @ApiProperty({
+    description:
+      'Target department ID to transfer clinics to (must be active)',
+    example: '507f1f77bcf86cd799439012',
+    type: String,
+  })
+  @IsMongoId({
+    message: JSON.stringify({
+      ar: 'معرف القسم المستهدف غير صالح',
+      en: 'Invalid target department ID',
+    }),
+  })
+  @IsNotEmpty({
+    message: JSON.stringify({
+      ar: 'معرف القسم المستهدف مطلوب',
+      en: 'Target department ID is required',
+    }),
+  })
+  targetDepartmentId: string;
 }

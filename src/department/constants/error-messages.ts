@@ -45,6 +45,26 @@ export const DEPARTMENT_ERROR_CODES = {
    * Error code when department name already exists.
    */
   NAME_EXISTS: 'DEPARTMENT_004',
+
+  /**
+   * Error code when attempting operation on inactive department.
+   */
+  DEPARTMENT_INACTIVE: 'DEPARTMENT_005',
+
+  /**
+   * Error code when target department for transfer is invalid.
+   */
+  INVALID_TARGET_DEPARTMENT: 'DEPARTMENT_006',
+
+  /**
+   * Error code when target department is inactive.
+   */
+  TARGET_DEPARTMENT_INACTIVE: 'DEPARTMENT_007',
+
+  /**
+   * Error code when invalid status value is provided.
+   */
+  INVALID_STATUS: 'DEPARTMENT_008',
 } as const;
 
 /**
@@ -103,6 +123,38 @@ export const DEPARTMENT_ERROR_MESSAGES = {
     ar: 'اسم القسم موجود بالفعل',
     en: 'Department name already exists',
   } as BilingualMessage,
+
+  /**
+   * Error when attempting operation on inactive department.
+   */
+  DEPARTMENT_INACTIVE: {
+    ar: 'القسم غير نشط',
+    en: 'Department is inactive',
+  } as BilingualMessage,
+
+  /**
+   * Error when target department for transfer is invalid.
+   */
+  INVALID_TARGET_DEPARTMENT: {
+    ar: 'القسم المستهدف غير صالح',
+    en: 'Invalid target department',
+  } as BilingualMessage,
+
+  /**
+   * Error when target department is inactive.
+   */
+  TARGET_DEPARTMENT_INACTIVE: {
+    ar: 'القسم المستهدف غير نشط',
+    en: 'Target department is inactive',
+  } as BilingualMessage,
+
+  /**
+   * Error when invalid status value is provided.
+   */
+  INVALID_STATUS: {
+    ar: 'حالة القسم غير صالحة',
+    en: 'Invalid department status',
+  } as BilingualMessage,
 } as const;
 
 /**
@@ -159,6 +211,38 @@ export const DEPARTMENT_SUCCESS_MESSAGES = {
   LIST_RETRIEVED: {
     ar: 'تم استرجاع قائمة الأقسام بنجاح',
     en: 'Departments list retrieved successfully',
+  } as BilingualMessage,
+
+  /**
+   * Success message when department status is updated.
+   */
+  STATUS_UPDATED: {
+    ar: 'تم تحديث حالة القسم بنجاح',
+    en: 'Department status updated successfully',
+  } as BilingualMessage,
+
+  /**
+   * Success message when department is deactivated.
+   */
+  DEACTIVATED: {
+    ar: 'تم إلغاء تفعيل القسم بنجاح',
+    en: 'Department deactivated successfully',
+  } as BilingualMessage,
+
+  /**
+   * Success message when department is deactivated with clinic transfer.
+   */
+  DEACTIVATED_WITH_TRANSFER: {
+    ar: 'تم إلغاء تفعيل القسم ونقل العيادات بنجاح',
+    en: 'Department deactivated and clinics transferred successfully',
+  } as BilingualMessage,
+
+  /**
+   * Success message when department is reactivated.
+   */
+  REACTIVATED: {
+    ar: 'تم إعادة تفعيل القسم بنجاح',
+    en: 'Department reactivated successfully',
   } as BilingualMessage,
 } as const;
 

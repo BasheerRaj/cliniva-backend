@@ -165,3 +165,78 @@ export class DeleteErrorResponse {
   })
   error: DeleteErrorDetails;
 }
+
+/**
+ * Data structure for check-dependencies endpoint
+ */
+export class CheckDependenciesData {
+  @ApiProperty({
+    description: 'Whether department has active clinics',
+    example: true,
+  })
+  hasActiveClinics: boolean;
+
+  @ApiProperty({
+    description: 'Number of active clinics using this department',
+    example: 3,
+  })
+  count: number;
+
+  @ApiProperty({
+    description: 'Array of clinics using this department',
+    type: [LinkedClinicDto],
+  })
+  clinics: LinkedClinicDto[];
+}
+
+/**
+ * Response for check-dependencies endpoint
+ */
+export class CheckDependenciesResult {
+  @ApiProperty({
+    description: 'Operation success status',
+    example: true,
+  })
+  success: boolean;
+
+  @ApiProperty({
+    description: 'Dependencies data',
+    type: CheckDependenciesData,
+  })
+  data: CheckDependenciesData;
+
+  @ApiProperty({
+    description: 'Bilingual success message',
+    example: {
+      ar: 'تم التحقق من التبعيات بنجاح',
+      en: 'Dependencies checked successfully',
+    },
+  })
+  message: BilingualMessage;
+}
+
+/**
+ * Response for deactivate-with-transfer endpoint
+ */
+export class DeactivateWithTransferResult {
+  @ApiProperty({
+    description: 'Operation success status',
+    example: true,
+  })
+  success: boolean;
+
+  @ApiProperty({
+    description: 'Bilingual success message',
+    example: {
+      ar: 'تم إلغاء تفعيل القسم ونقل العيادات بنجاح',
+      en: 'Department deactivated and clinics transferred successfully',
+    },
+  })
+  message: BilingualMessage;
+
+  @ApiProperty({
+    description: 'Number of clinics transferred',
+    example: 3,
+  })
+  clinicsTransferred: number;
+}

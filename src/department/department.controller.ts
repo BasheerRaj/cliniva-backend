@@ -6,6 +6,7 @@ import {
   Param,
   Delete,
   Put,
+  Patch,
   ValidationPipe,
   HttpCode,
   HttpStatus,
@@ -24,10 +25,17 @@ import {
   CreateDepartmentDto,
   AssignDepartmentsDto,
   UpdateDepartmentDto,
+  UpdateDepartmentStatusDto,
+  DeactivateWithTransferDto,
 } from './dto/create-department.dto';
 import { Department } from '../database/schemas/department.schema';
 import { ComplexDepartment } from '../database/schemas/complex-department.schema';
-import { DeleteResult, CanDeleteResult } from './dto/delete-response.dto';
+import {
+  DeleteResult,
+  CanDeleteResult,
+  CheckDependenciesResult,
+  DeactivateWithTransferResult,
+} from './dto/delete-response.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AdminGuard } from '../auth/guards/admin.guard';
 
@@ -709,6 +717,276 @@ export class DepartmentController {
   }
 
   /**
+   * Update department status
+   */
+  @Patch(':id/status')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Update department status',
+    description: `
+      Update the status of a department to active or inactive.
+
+      **Use Cases:**
+      - Reactivate a previously deactivated department
+      - Deactivate a department that has no linked clinics
+
+      **Important:**
+      - Cannot deactivate a department that has linked clinics
+      - Use deactivate-with-transfer endpoint to deactivate department with clinics
+
+      **Business Rules:**
+      - Requires authentication and Admin/Owner role
+      - Department must exist in the system
+      - If deactivating, department must have no linked clinics
+      - Valid status values: 'active', 'inactive'
+
+      **Response:**
+      - Returns updated department with new status
+      - Returns 200 status code on success
+    `,
+  })
+  @ApiParam({
+    name: 'id',
+    type: String,
+    description: 'Department unique identifier (MongoDB ObjectId)',
+    example: '507f1f77bcf86cd799439011',
+    required: true,
+  })
+  @ApiBody({
+    type: UpdateDepartmentStatusDto,
+    description: 'Department status update data',
+    examples: {
+      activate: {
+        summary: 'Activate Department',
+        description: 'Set department status to active',
+        value: {
+          status: 'active',
+        },
+      },
+      deactivate: {
+        summary: 'Deactivate Department (No Clinics)',
+        description: 'Set department status to inactive (only if no linked clinics)',
+        value: {
+          status: 'inactive',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Department status updated successfully',
+    schema: {
+      example: {
+        success: true,
+        data: {
+          _id: '507f1f77bcf86cd799439011',
+          name: 'Cardiology',
+          description: 'Heart and cardiovascular system department',
+          status: 'inactive',
+          createdAt: '2026-02-07T10:00:00.000Z',
+          updatedAt: '2026-02-21T14:30:00.000Z',
+        },
+        message: {
+          ar: 'تم تحديث حالة القسم بنجاح',
+          en: 'Department status updated successfully',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Cannot deactivate department with linked clinics',
+    schema: {
+      example: {
+        success: false,
+        error: {
+          code: 'DEPARTMENT_001',
+          message: {
+            ar: 'لا يمكن إلغاء تفعيل القسم لأنه مرتبط بعيادات. استخدم endpoint إلغاء التفعيل مع النقل بدلاً من ذلك',
+            en: 'Cannot deactivate department because it has linked clinics. Use deactivate-with-transfer endpoint instead',
+          },
+          linkedClinics: [
+            {
+              clinicId: '507f1f77bcf86cd799439011',
+              clinicName: 'Cardiology Clinic A',
+              complexName: 'Medical Complex 1',
+              complexId: '507f1f77bcf86cd799439012',
+            },
+          ],
+          linkedClinicsCount: 3,
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Department not found',
+  })
+  @ApiResponse({
+    status: HttpStatus.UNAUTHORIZED,
+    description: 'User not authenticated',
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'User does not have permission (requires Admin or Owner role)',
+  })
+  async updateDepartmentStatus(
+    @Param('id') id: string,
+    @Body(new ValidationPipe({ transform: true, whitelist: true }))
+    updateStatusDto: UpdateDepartmentStatusDto,
+  ): Promise<Department> {
+    return this.departmentService.updateDepartmentStatus(
+      id,
+      updateStatusDto.status,
+    );
+  }
+
+  /**
+   * Deactivate department with clinic transfer
+   */
+  @Post(':id/deactivate-with-transfer')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Deactivate department with clinic transfer',
+    description: `
+      Deactivate a department and transfer all its clinics to another active department.
+      This ensures that clinics are not left without a department assignment.
+
+      **Use Cases:**
+      - Deactivate a department that has linked clinics
+      - Reorganize clinic assignments by consolidating departments
+      - Retire obsolete departments while preserving clinic operations
+
+      **Process:**
+      1. Validates source department exists and is active
+      2. Validates target department exists and is active
+      3. Finds all clinics linked to source department
+      4. Transfers each clinic to target department (same complex)
+      5. Updates source department status to 'inactive'
+      6. Returns count of clinics transferred
+
+      **Business Rules:**
+      - Requires authentication and Admin/Owner role
+      - Source department must be active
+      - Target department must be active
+      - Target department will be assigned to complexes as needed
+      - All clinics in a complex will use target department's ComplexDepartment ID
+
+      **Important Notes:**
+      - This operation cannot be undone automatically
+      - Clinics remain in their original complexes
+      - Only the department assignment changes
+      - If target department is not assigned to a complex, it will be assigned automatically
+    `,
+  })
+  @ApiParam({
+    name: 'id',
+    type: String,
+    description: 'Source department ID to deactivate (MongoDB ObjectId)',
+    example: '507f1f77bcf86cd799439011',
+    required: true,
+  })
+  @ApiBody({
+    type: DeactivateWithTransferDto,
+    description: 'Target department information',
+    examples: {
+      transfer: {
+        summary: 'Transfer Clinics to Another Department',
+        description: 'Deactivate department and transfer all clinics to target department',
+        value: {
+          targetDepartmentId: '507f1f77bcf86cd799439012',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Department deactivated and clinics transferred successfully',
+    schema: {
+      example: {
+        success: true,
+        message: {
+          ar: 'تم إلغاء تفعيل القسم ونقل العيادات بنجاح',
+          en: 'Department deactivated and clinics transferred successfully',
+        },
+        clinicsTransferred: 3,
+      },
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Source department is already inactive or target department is invalid',
+    schema: {
+      oneOf: [
+        {
+          title: 'Source Department Inactive',
+          example: {
+            success: false,
+            error: {
+              code: 'DEPARTMENT_005',
+              message: {
+                ar: 'القسم غير نشط',
+                en: 'Department is inactive',
+              },
+            },
+          },
+        },
+        {
+          title: 'Target Department Inactive',
+          example: {
+            success: false,
+            error: {
+              code: 'DEPARTMENT_007',
+              message: {
+                ar: 'القسم المستهدف غير نشط',
+                en: 'Target department is inactive',
+              },
+            },
+          },
+        },
+      ],
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Source or target department not found',
+    schema: {
+      example: {
+        success: false,
+        error: {
+          code: 'DEPARTMENT_003',
+          message: {
+            ar: 'القسم غير موجود',
+            en: 'Department not found',
+          },
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.UNAUTHORIZED,
+    description: 'User not authenticated',
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'User does not have permission (requires Admin or Owner role)',
+  })
+  async deactivateWithTransfer(
+    @Param('id') id: string,
+    @Body(new ValidationPipe({ transform: true, whitelist: true }))
+    deactivateDto: DeactivateWithTransferDto,
+  ): Promise<DeactivateWithTransferResult> {
+    return this.departmentService.deactivateWithTransfer(
+      id,
+      deactivateDto.targetDepartmentId,
+    );
+  }
+
+  /**
    * Delete department with validation
    * Prevents deletion if department is linked to clinics or has services
    */
@@ -802,6 +1080,107 @@ export class DepartmentController {
   })
   async deleteDepartment(@Param('id') id: string): Promise<DeleteResult> {
     return this.departmentService.deleteDepartment(id);
+  }
+
+  /**
+   * Check department dependencies
+   * Returns information about clinics using this department
+   */
+  @Get(':id/check-dependencies')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Check department dependencies',
+    description: `
+      Check if a department has active clinics linked to it. This endpoint
+      provides information about clinics using the department before attempting
+      deactivation or transfer operations.
+
+      **Use Cases:**
+      - Before deactivating a department, check if it has active clinics
+      - Display list of clinics that will need reassignment
+      - UI can show warnings about affected clinics
+
+      **Returns:**
+      - hasActiveClinics: boolean indicating if department has active clinics
+      - count: number of active clinics using this department
+      - clinics: array of clinic details with complex information
+
+      **Business Rules:**
+      - Requires authentication and Admin/Owner role
+      - Department must exist in the system
+      - Only checks active clinics (excludes deleted/inactive)
+
+      **Note:** This is a read-only operation for informational purposes.
+    `,
+  })
+  @ApiParam({
+    name: 'id',
+    type: String,
+    description: 'Department unique identifier (MongoDB ObjectId)',
+    example: '507f1f77bcf86cd799439011',
+    required: true,
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Dependencies check completed successfully',
+    schema: {
+      example: {
+        success: true,
+        data: {
+          hasActiveClinics: true,
+          count: 3,
+          clinics: [
+            {
+              clinicId: '507f1f77bcf86cd799439011',
+              clinicName: 'Cardiology Clinic A',
+              complexName: 'Medical Complex 1',
+              complexId: '507f1f77bcf86cd799439012',
+            },
+            {
+              clinicId: '507f1f77bcf86cd799439013',
+              clinicName: 'Cardiology Clinic B',
+              complexName: 'Medical Complex 1',
+              complexId: '507f1f77bcf86cd799439012',
+            },
+          ],
+        },
+        message: {
+          ar: 'تم التحقق من التبعيات بنجاح',
+          en: 'Dependencies checked successfully',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Department not found',
+    schema: {
+      example: {
+        success: false,
+        error: {
+          code: 'DEPARTMENT_003',
+          message: {
+            ar: 'القسم غير موجود',
+            en: 'Department not found',
+          },
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.UNAUTHORIZED,
+    description: 'User not authenticated',
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'User does not have permission (requires Admin or Owner role)',
+  })
+  async checkDependencies(
+    @Param('id') id: string,
+  ): Promise<CheckDependenciesResult> {
+    return this.departmentService.checkDependencies(id);
   }
 
   /**

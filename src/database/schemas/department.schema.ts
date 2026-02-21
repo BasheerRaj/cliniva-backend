@@ -11,6 +11,13 @@ export class Department extends Document {
 
   @Prop()
   description?: string;
+
+  @Prop({
+    type: String,
+    enum: ['active', 'inactive'],
+    default: 'active',
+  })
+  status: string;
 }
 
 export const DepartmentSchema = SchemaFactory.createForClass(Department);

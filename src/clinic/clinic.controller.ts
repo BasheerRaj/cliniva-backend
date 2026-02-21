@@ -2126,4 +2126,124 @@ export class ClinicController {
       };
     }
   }
+
+  /**
+   * Delete clinic (soft delete)
+   *
+   * Performs a soft delete by setting the deletedAt timestamp.
+   * This allows data recovery if needed and maintains referential integrity.
+   *
+   * **Use Cases:**
+   * - Remove test clinics after testing
+   * - Deactivate clinics that are no longer operational
+   * - Clean up clinic data while preserving historical records
+   *
+   * **Important:**
+   * - This is a soft delete (sets deletedAt timestamp)
+   * - Clinic data is preserved for audit and recovery purposes
+   * - Deleted clinics will not appear in regular queries
+   *
+   * **Business Rules:**
+   * - Requires authentication and Admin/Owner role
+   * - Clinic must exist in the system
+   * - Cannot delete already deleted clinics
+   *
+   * @param id - Clinic ID to delete
+   * @returns Success response with bilingual message
+   */
+  @Delete(':id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Delete clinic (soft delete)',
+    description:
+      'Soft delete a clinic by setting deletedAt timestamp. Requires Admin or Owner role. Deleted clinics are hidden from queries but data is preserved.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Clinic deleted successfully',
+    schema: {
+      example: {
+        success: true,
+        message: {
+          ar: 'تم حذف العيادة بنجاح',
+          en: 'Clinic deleted successfully',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid clinic ID or clinic already deleted',
+    schema: {
+      oneOf: [
+        {
+          title: 'Invalid ID',
+          example: {
+            success: false,
+            error: {
+              code: 'INVALID_ID',
+              message: {
+                ar: 'معرف العيادة غير صالح',
+                en: 'Invalid clinic ID format',
+              },
+            },
+          },
+        },
+        {
+          title: 'Already Deleted',
+          example: {
+            success: false,
+            error: {
+              code: 'CLINIC_ALREADY_DELETED',
+              message: {
+                ar: 'العيادة محذوفة بالفعل',
+                en: 'Clinic is already deleted',
+              },
+            },
+          },
+        },
+      ],
+    },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Clinic not found',
+    schema: {
+      example: {
+        success: false,
+        error: {
+          code: 'CLINIC_NOT_FOUND',
+          message: {
+            ar: 'العيادة غير موجودة',
+            en: 'Clinic not found',
+          },
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - JWT token required',
+  })
+  @HttpCode(HttpStatus.OK)
+  async deleteClinic(@Param('id') id: string) {
+    try {
+      return await this.clinicService.deleteClinic(id);
+    } catch (error) {
+      this.logger.error(`Delete clinic failed for ${id}: ${error.message}`);
+      throw new HttpException(
+        error.response || {
+          success: false,
+          error: {
+            message: {
+              ar: 'حدث خطأ أثناء حذف العيادة',
+              en: 'Failed to delete clinic',
+            },
+          },
+        },
+        error.status || HttpStatus.BAD_REQUEST,
+      );
+    }
+  }
 }
