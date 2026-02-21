@@ -12,3 +12,5 @@ export interface PriceCalculation {
   finalPrice: number;
   currency: string;
 }
+
+

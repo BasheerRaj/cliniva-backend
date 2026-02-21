@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
+import { Document, Types } from 'mongoose';
 
 @Schema({
   timestamps: true,
@@ -11,8 +11,26 @@ export class Specialty extends Document {
 
   @Prop()
   description?: string;
+
+  @Prop({ default: true })
+  isActive: boolean;
+
+  @Prop({ type: Types.ObjectId, ref: 'Complex' })
+  complexId?: Types.ObjectId;
+
+  @Prop()
+  deactivatedAt?: Date;
+
+  @Prop({ type: Types.ObjectId, ref: 'User' })
+  deactivatedBy?: Types.ObjectId;
+
+  @Prop()
+  deactivationReason?: string;
 }
 
 export const SpecialtySchema = SchemaFactory.createForClass(Specialty);
 
-// Indexes are automatically created for unique fields
+// Indexes
+SpecialtySchema.index({ isActive: 1 });
+SpecialtySchema.index({ complexId: 1 });
+SpecialtySchema.index({ name: 'text', description: 'text' });
