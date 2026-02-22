@@ -29,6 +29,11 @@ import {
   DayScheduleDto,
   AppointmentConflictDto,
   ConfirmAppointmentDto,
+  ChangeStatusDto,
+  StartAppointmentDto,
+  EndAppointmentDto,
+  ConcludeAppointmentDto,
+  CalendarQueryDto,
 } from './dto';
 
 @Injectable()
@@ -45,7 +50,7 @@ export class AppointmentService {
     private readonly workingHoursIntegrationService: WorkingHoursIntegrationService,
     private readonly notificationService: NotificationService,
     private readonly auditService: AuditService,
-  ) {}
+  ) { }
 
   /**
    * Validate appointment data and check for conflicts
@@ -1024,11 +1029,11 @@ export class AppointmentService {
         breaks:
           effectiveHours.breakStartTime && effectiveHours.breakEndTime
             ? [
-                {
-                  start: effectiveHours.breakStartTime,
-                  end: effectiveHours.breakEndTime,
-                },
-              ]
+              {
+                start: effectiveHours.breakStartTime,
+                end: effectiveHours.breakEndTime,
+              },
+            ]
             : [],
       },
       timeSlots,
@@ -1296,5 +1301,442 @@ export class AppointmentService {
       .sort({ appointmentDate: 1, appointmentTime: 1 })
       .limit(limit)
       .exec();
+  }
+
+  // =========================================================================
+  // M6 – Change Appointment Status (UC-6b5a4c3)
+  // =========================================================================
+  /**
+   * Change appointment status with business-rule validation.
+   * Final states: completed, cancelled (cannot be changed).
+   */
+  async changeAppointmentStatus(
+    appointmentId: string,
+    statusDto: { status: string; notes?: string; reason?: string; newDate?: string; newTime?: string },
+    userId?: string,
+  ): Promise<Appointment> {
+    if (!Types.ObjectId.isValid(appointmentId)) {
+      throw new BadRequestException('Invalid appointment ID format');
+    }
+
+    const appointment = await this.getAppointmentById(appointmentId);
+    const current = appointment.status;
+    const next = statusDto.status;
+
+    // Final-state guard
+    if (['completed', 'cancelled'].includes(current)) {
+      throw new BadRequestException({
+        message: {
+          ar: 'لا يمكن تغيير حالة الموعد بعد اكتماله أو إلغائه',
+          en: `Cannot change status of a ${current} appointment`,
+        },
+        code: 'INVALID_STATUS_TRANSITION',
+      });
+    }
+
+    // Business rule: completed requires notes
+    if (next === 'completed' && !statusDto.notes) {
+      throw new BadRequestException({
+        message: {
+          ar: 'الملاحظات مطلوبة عند إكمال الموعد',
+          en: 'Notes are required when marking an appointment as completed',
+        },
+        code: 'NOTES_REQUIRED_FOR_COMPLETION',
+      });
+    }
+
+    // Business rule: cancelled requires reason
+    if (next === 'cancelled' && !statusDto.reason) {
+      throw new BadRequestException({
+        message: {
+          ar: 'سبب الإلغاء مطلوب',
+          en: 'Cancellation reason is required',
+        },
+        code: 'REASON_REQUIRED_FOR_CANCELLATION',
+      });
+    }
+
+    // Business rule: rescheduled requires new date/time
+    if (next === 'rescheduled' && (!statusDto.newDate || !statusDto.newTime)) {
+      throw new BadRequestException({
+        message: {
+          ar: 'التاريخ والوقت الجديدان مطلوبان عند إعادة الجدولة',
+          en: 'New date and time are required when rescheduling',
+        },
+        code: 'DATETIME_REQUIRED_FOR_RESCHEDULING',
+      });
+    }
+
+    const historyEntry = {
+      status: next,
+      changedAt: new Date(),
+      changedBy: userId ? new Types.ObjectId(userId) : undefined,
+      reason: statusDto.reason || statusDto.notes,
+    };
+
+    const updateData: any = {
+      status: next,
+      $push: { statusHistory: historyEntry },
+    };
+
+    if (statusDto.notes) updateData.notes = statusDto.notes;
+    if (next === 'cancelled') {
+      updateData.cancellationReason = statusDto.reason;
+      updateData.cancelledAt = new Date();
+      if (userId) updateData.cancelledBy = new Types.ObjectId(userId);
+    }
+    if (next === 'rescheduled' && statusDto.newDate && statusDto.newTime) {
+      updateData.appointmentDate = new Date(statusDto.newDate);
+      updateData.appointmentTime = statusDto.newTime;
+    }
+    if (userId) updateData.updatedBy = new Types.ObjectId(userId);
+
+    const updated = await this.appointmentModel
+      .findByIdAndUpdate(appointmentId, updateData, { new: true })
+      .exec();
+
+    this.logger.log(`Appointment ${appointmentId} status changed: ${current} → ${next}`);
+    return updated!;
+  }
+
+  // =========================================================================
+  // M6 – Start Appointment (UC-9a8c7b6)
+  // =========================================================================
+  /**
+   * Mark appointment as in_progress and record actual start time.
+   * Precondition: status must be 'scheduled' or 'confirmed'.
+   */
+  async startAppointment(
+    appointmentId: string,
+    userId?: string,
+  ): Promise<{ appointment: Appointment; redirectTo: string }> {
+    if (!Types.ObjectId.isValid(appointmentId)) {
+      throw new BadRequestException('Invalid appointment ID format');
+    }
+
+    const appointment = await this.getAppointmentById(appointmentId);
+
+    if (!['scheduled', 'confirmed'].includes(appointment.status)) {
+      throw new BadRequestException({
+        message: {
+          ar: 'يمكن بدء المواعيد المجدولة أو المؤكدة فقط',
+          en: 'Can only start scheduled or confirmed appointments',
+        },
+        code: 'INVALID_STATUS_FOR_START',
+        currentStatus: appointment.status,
+      });
+    }
+
+    const now = new Date();
+    const historyEntry = {
+      status: 'in_progress',
+      changedAt: now,
+      changedBy: userId ? new Types.ObjectId(userId) : undefined,
+    };
+
+    const updated = await this.appointmentModel
+      .findByIdAndUpdate(
+        appointmentId,
+        {
+          status: 'in_progress',
+          actualStartTime: now,
+          startedBy: userId ? new Types.ObjectId(userId) : undefined,
+          updatedBy: userId ? new Types.ObjectId(userId) : undefined,
+          $push: { statusHistory: historyEntry },
+        },
+        { new: true },
+      )
+      .exec();
+
+    this.logger.log(`Appointment ${appointmentId} started at ${now.toISOString()}`);
+
+    // Audit log
+    if (userId) {
+      await this.auditService.logSecurityEvent({
+        eventType: 'APPOINTMENT_STARTED',
+        userId,
+        actorId: userId,
+        ipAddress: '0.0.0.0',
+        userAgent: 'System',
+        timestamp: now,
+        metadata: { appointmentId, startedAt: now },
+      });
+    }
+
+    return {
+      appointment: updated!,
+      redirectTo: `/medical-entry/${appointmentId}`,
+    };
+  }
+
+  // =========================================================================
+  // M6 – End Appointment (UC-b4c3a2d)
+  // =========================================================================
+  /**
+   * Complete an in-progress appointment and save medical entry data.
+   * Precondition: status must be 'in_progress'.
+   */
+  async endAppointment(
+    appointmentId: string,
+    medicalEntryData: {
+      sessionNotes?: { diagnosis?: string; symptoms?: string; findings?: string; procedures?: string };
+      prescriptions?: Array<{ medication?: string; dosage?: string; frequency?: string; duration?: string }>;
+      treatmentPlan?: { steps?: string; tests?: string; lifestyle?: string };
+      followUp?: { required?: boolean; recommendedDuration?: string; doctorNotes?: string };
+    },
+    userId?: string,
+  ): Promise<Appointment> {
+    if (!Types.ObjectId.isValid(appointmentId)) {
+      throw new BadRequestException('Invalid appointment ID format');
+    }
+
+    const appointment = await this.getAppointmentById(appointmentId);
+
+    if (appointment.status !== 'in_progress') {
+      throw new BadRequestException({
+        message: {
+          ar: 'يمكن إنهاء المواعيد قيد التقدم فقط',
+          en: 'Can only end appointments that are in progress',
+        },
+        code: 'APPOINTMENT_NOT_IN_PROGRESS',
+        currentStatus: appointment.status,
+      });
+    }
+
+    const now = new Date();
+    const historyEntry = {
+      status: 'completed',
+      changedAt: now,
+      changedBy: userId ? new Types.ObjectId(userId) : undefined,
+    };
+
+    // Store medical entry data inline (M7 will extract to separate collection)
+    const internalNotes = medicalEntryData
+      ? JSON.stringify(medicalEntryData)
+      : undefined;
+
+    const updated = await this.appointmentModel
+      .findByIdAndUpdate(
+        appointmentId,
+        {
+          status: 'completed',
+          actualEndTime: now,
+          completedBy: userId ? new Types.ObjectId(userId) : undefined,
+          updatedBy: userId ? new Types.ObjectId(userId) : undefined,
+          ...(internalNotes && { notes: internalNotes }),
+          $push: { statusHistory: historyEntry },
+        },
+        { new: true },
+      )
+      .exec();
+
+    this.logger.log(`Appointment ${appointmentId} ended at ${now.toISOString()}`);
+
+    if (userId) {
+      await this.auditService.logSecurityEvent({
+        eventType: 'APPOINTMENT_COMPLETED',
+        userId,
+        actorId: userId,
+        ipAddress: '0.0.0.0',
+        userAgent: 'System',
+        timestamp: now,
+        metadata: {
+          appointmentId,
+          completedAt: now,
+          hasFollowUp: medicalEntryData?.followUp?.required,
+        },
+      });
+    }
+
+    return updated!;
+  }
+
+  // =========================================================================
+  // M6 – Conclude Appointment (UC-f1d3e2c)
+  // =========================================================================
+  /**
+   * Comprehensive appointment conclusion. Requires doctorNotes (BR-f1d3e2c).
+   * Precondition: status must be 'in_progress'.
+   */
+  async concludeAppointment(
+    appointmentId: string,
+    conclusionData: {
+      doctorNotes: string;
+      sessionNotes?: { diagnosis?: string; symptoms?: string; findings?: string; procedures?: string };
+      prescriptions?: Array<{ medication?: string; dosage?: string; frequency?: string; duration?: string }>;
+      treatmentPlan?: { steps?: string; tests?: string; lifestyle?: string };
+      followUp?: { required?: boolean; recommendedDuration?: string; doctorNotes?: string };
+    },
+    userId?: string,
+  ): Promise<Appointment> {
+    if (!Types.ObjectId.isValid(appointmentId)) {
+      throw new BadRequestException('Invalid appointment ID format');
+    }
+
+    // Business rule: doctorNotes required (BR-f1d3e2c)
+    if (!conclusionData.doctorNotes || conclusionData.doctorNotes.trim().length < 10) {
+      throw new BadRequestException({
+        message: {
+          ar: 'ملاحظات الطبيب مطلوبة لإتمام الموعد (BR-f1d3e2c)',
+          en: 'Doctor notes are required to conclude an appointment (BR-f1d3e2c)',
+        },
+        code: 'DOCTOR_NOTES_REQUIRED',
+      });
+    }
+
+    const appointment = await this.getAppointmentById(appointmentId);
+
+    if (appointment.status !== 'in_progress') {
+      throw new BadRequestException({
+        message: {
+          ar: 'يمكن إتمام المواعيد قيد التقدم فقط',
+          en: 'Can only conclude appointments that are in progress',
+        },
+        code: 'APPOINTMENT_NOT_IN_PROGRESS',
+        currentStatus: appointment.status,
+      });
+    }
+
+    const now = new Date();
+    const historyEntry = {
+      status: 'completed',
+      changedAt: now,
+      changedBy: userId ? new Types.ObjectId(userId) : undefined,
+      reason: 'Appointment concluded with doctor notes',
+    };
+
+    const conclusionPayload = {
+      ...conclusionData,
+      concludedAt: now,
+    };
+
+    const updated = await this.appointmentModel
+      .findByIdAndUpdate(
+        appointmentId,
+        {
+          status: 'completed',
+          actualEndTime: now,
+          completedBy: userId ? new Types.ObjectId(userId) : undefined,
+          updatedBy: userId ? new Types.ObjectId(userId) : undefined,
+          notes: JSON.stringify(conclusionPayload),
+          $push: { statusHistory: historyEntry },
+        },
+        { new: true },
+      )
+      .exec();
+
+    this.logger.log(`Appointment ${appointmentId} concluded at ${now.toISOString()}`);
+
+    // Schedule follow-up reminder if needed
+    if (conclusionData.followUp?.required) {
+      await this.notificationService.create({
+        recipientId: appointment.doctorId.toString(),
+        title: 'Follow-up Required',
+        message: `Follow-up needed for appointment ${appointmentId}. Recommended duration: ${conclusionData.followUp.recommendedDuration || 'Not specified'}`,
+        notificationType: 'follow_up_reminder',
+        priority: 'normal',
+        relatedEntityType: 'appointment',
+        relatedEntityId: appointmentId,
+        deliveryMethod: 'in_app',
+      });
+    }
+
+    if (userId) {
+      await this.auditService.logSecurityEvent({
+        eventType: 'APPOINTMENT_CONCLUDED',
+        userId,
+        actorId: userId,
+        ipAddress: '0.0.0.0',
+        userAgent: 'System',
+        timestamp: now,
+        metadata: {
+          appointmentId,
+          concludedAt: now,
+          hasFollowUp: conclusionData.followUp?.required,
+        },
+      });
+    }
+
+    return updated!;
+  }
+
+  // =========================================================================
+  // M6 – Get Appointments Calendar (UC-d2e3f4c)
+  // =========================================================================
+  /**
+   * Return appointments grouped for calendar views (day / week / month).
+   */
+  async getAppointmentsCalendar(query: {
+    view?: 'day' | 'week' | 'month';
+    date?: string;
+    clinicId?: string;
+    doctorId?: string;
+    status?: string;
+  }): Promise<{
+    view: string;
+    startDate: string;
+    endDate: string;
+    appointments: Appointment[];
+    groupedByDate: Record<string, Appointment[]>;
+  }> {
+    const view = query.view || 'week';
+    const anchor = query.date ? new Date(query.date) : new Date();
+
+    // Calculate date range based on view
+    let startDate: Date;
+    let endDate: Date;
+
+    if (view === 'day') {
+      startDate = new Date(anchor);
+      startDate.setHours(0, 0, 0, 0);
+      endDate = new Date(anchor);
+      endDate.setHours(23, 59, 59, 999);
+    } else if (view === 'week') {
+      const day = anchor.getDay(); // 0=Sun
+      startDate = new Date(anchor);
+      startDate.setDate(anchor.getDate() - day);
+      startDate.setHours(0, 0, 0, 0);
+      endDate = new Date(startDate);
+      endDate.setDate(startDate.getDate() + 6);
+      endDate.setHours(23, 59, 59, 999);
+    } else {
+      // month
+      startDate = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
+      endDate = new Date(anchor.getFullYear(), anchor.getMonth() + 1, 0, 23, 59, 59, 999);
+    }
+
+    const filter: any = {
+      appointmentDate: { $gte: startDate, $lte: endDate },
+      deletedAt: { $exists: false },
+    };
+
+    if (query.clinicId) filter.clinicId = new Types.ObjectId(query.clinicId);
+    if (query.doctorId) filter.doctorId = new Types.ObjectId(query.doctorId);
+    if (query.status) filter.status = query.status;
+
+    const appointments = await this.appointmentModel
+      .find(filter)
+      .populate('patientId', 'firstName lastName phone')
+      .populate('doctorId', 'firstName lastName')
+      .populate('clinicId', 'name')
+      .populate('serviceId', 'name durationMinutes')
+      .sort({ appointmentDate: 1, appointmentTime: 1 })
+      .exec();
+
+    // Group by date string (YYYY-MM-DD)
+    const groupedByDate: Record<string, Appointment[]> = {};
+    for (const appt of appointments) {
+      const dateKey = appt.appointmentDate.toISOString().split('T')[0];
+      if (!groupedByDate[dateKey]) groupedByDate[dateKey] = [];
+      groupedByDate[dateKey].push(appt);
+    }
+
+    return {
+      view,
+      startDate: startDate.toISOString().split('T')[0],
+      endDate: endDate.toISOString().split('T')[0],
+      appointments,
+      groupedByDate,
+    };
   }
 }

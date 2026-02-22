@@ -52,6 +52,58 @@ export class Appointment extends Document {
   @Prop()
   cancellationReason?: string;
 
+  @Prop()
+  cancelledAt?: Date;
+
+  @Prop({ type: Types.ObjectId, ref: 'User' })
+  cancelledBy?: Types.ObjectId;
+
+  @Prop({ default: false })
+  rescheduleOption?: boolean;
+
+  // Start / End tracking fields (M6)
+  @Prop()
+  actualStartTime?: Date;
+
+  @Prop()
+  actualEndTime?: Date;
+
+  @Prop({ type: Types.ObjectId, ref: 'User' })
+  startedBy?: Types.ObjectId;
+
+  @Prop({ type: Types.ObjectId, ref: 'User' })
+  completedBy?: Types.ObjectId;
+
+  // Booking metadata
+  @Prop()
+  bookingChannel?: string; // 'staff' | 'portal' | 'walk-in'
+
+  @Prop({ type: Types.ObjectId, ref: 'User' })
+  bookedBy?: Types.ObjectId;
+
+  // Medical record placeholder (M7 integration)
+  @Prop({ type: Types.ObjectId })
+  medicalRecordId?: Types.ObjectId;
+
+  // Status audit trail
+  @Prop({
+    type: [
+      {
+        status: String,
+        changedAt: Date,
+        changedBy: { type: Types.ObjectId, ref: 'User' },
+        reason: String,
+      },
+    ],
+    default: [],
+  })
+  statusHistory?: Array<{
+    status: string;
+    changedAt: Date;
+    changedBy: Types.ObjectId;
+    reason?: string;
+  }>;
+
   // Appointment transfer tracking fields (Requirements 7.3, 7.4)
   @Prop({ type: Types.ObjectId, ref: 'User' })
   transferredFrom?: Types.ObjectId; // Original doctor ID before transfer

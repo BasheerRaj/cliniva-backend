@@ -4,6 +4,7 @@ import {
   Get,
   Body,
   Param,
+  Patch,
   Put,
   Delete,
   Query,
@@ -36,11 +37,17 @@ import {
   AppointmentAvailabilityQueryDto,
   ConfirmAppointmentDto,
   AppointmentStatsDto,
+  ChangeStatusDto,
+  StartAppointmentDto,
+  EndAppointmentDto,
+  ConcludeAppointmentDto,
+  CalendarQueryDto,
 } from './dto';
 import { SWAGGER_EXAMPLES } from './constants/swagger-examples';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { UserRole } from '../common/enums/user-role.enum';
+
 
 @ApiTags('Appointments')
 @Controller('appointments')
@@ -324,6 +331,43 @@ export class AppointmentController {
       };
     }
   }
+
+  // =========================================================================
+  // M6 – GET /appointments/calendar  (UC-d2e3f4c)
+  // Must be declared BEFORE ':id' routes
+  // =========================================================================
+  @ApiOperation({
+    summary: 'Get appointments calendar',
+    description:
+      'Returns appointments grouped by date for calendar views. Supports day, week, and month views with optional filtering by clinic, doctor, and status.',
+  })
+  @ApiQuery({ name: 'view', required: false, enum: ['day', 'week', 'month'], description: 'Calendar view mode (default: week)' })
+  @ApiQuery({ name: 'date', required: false, type: String, description: 'Anchor date YYYY-MM-DD (default: today)' })
+  @ApiQuery({ name: 'clinicId', required: false, type: String })
+  @ApiQuery({ name: 'doctorId', required: false, type: String })
+  @ApiQuery({ name: 'status', required: false, enum: ['scheduled', 'confirmed', 'in_progress', 'completed', 'cancelled', 'no_show'] })
+  @ApiResponse({ status: 200, description: 'Calendar data retrieved successfully' })
+  @Get('calendar')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.MANAGER, UserRole.DOCTOR, UserRole.STAFF)
+  async getAppointmentsCalendar(
+    @Query(new ValidationPipe({ transform: true })) query: CalendarQueryDto,
+  ) {
+    try {
+      const result = await this.appointmentService.getAppointmentsCalendar(query);
+      return {
+        success: true,
+        message: 'Calendar retrieved successfully',
+        data: result,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: 'Failed to retrieve calendar',
+        error: error.message,
+      };
+    }
+  }
+
 
   /**
    * Update appointment information
@@ -686,6 +730,155 @@ export class AppointmentController {
       };
     }
   }
+
+  // =========================================================================
+  // M6 – PATCH /appointments/:id/status  (UC-6b5a4c3)
+  // =========================================================================
+  @ApiOperation({
+    summary: 'Change appointment status',
+    description:
+      'Changes the appointment status with business-rule validation. Completed and cancelled are final states. Cancelled requires reason, completed requires notes, rescheduled requires new date/time.',
+  })
+  @ApiParam({ name: 'id', type: String, description: 'Appointment ID', example: '507f1f77bcf86cd799439011' })
+  @ApiBody({ type: ChangeStatusDto })
+  @ApiResponse({ status: 200, description: 'Status changed successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid transition or missing required fields' })
+  @ApiResponse({ status: 404, description: 'Appointment not found' })
+  @Patch(':id/status')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.MANAGER, UserRole.DOCTOR, UserRole.STAFF)
+  async changeAppointmentStatus(
+    @Param('id') id: string,
+    @Body(new ValidationPipe()) changeStatusDto: ChangeStatusDto,
+    @Request() req: any,
+  ) {
+    try {
+      const appointment = await this.appointmentService.changeAppointmentStatus(
+        id,
+        changeStatusDto,
+        req.user?.userId,
+      );
+      return {
+        success: true,
+        message: 'Appointment status updated successfully',
+        data: appointment,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: 'Failed to update appointment status',
+        error: error.message,
+      };
+    }
+  }
+
+  // =========================================================================
+  // M6 – POST /appointments/:id/start  (UC-9a8c7b6)
+  // =========================================================================
+  @ApiOperation({
+    summary: 'Start appointment',
+    description:
+      'Marks a scheduled/confirmed appointment as in progress. Records the actual start time and the user who started it. Returns a redirect URL to the medical entry form.',
+  })
+  @ApiParam({ name: 'id', type: String, description: 'Appointment ID', example: '507f1f77bcf86cd799439011' })
+  @ApiBody({ type: StartAppointmentDto, required: false })
+  @ApiResponse({ status: 200, description: 'Appointment started – returns appointment + redirectTo URL' })
+  @ApiResponse({ status: 400, description: 'Appointment is not in scheduled/confirmed status' })
+  @ApiResponse({ status: 404, description: 'Appointment not found' })
+  @Post(':id/start')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.MANAGER, UserRole.DOCTOR, UserRole.STAFF)
+  async startAppointment(
+    @Param('id') id: string,
+    @Request() req: any,
+  ) {
+    try {
+      const result = await this.appointmentService.startAppointment(id, req.user?.userId);
+      return {
+        success: true,
+        message: 'Appointment started successfully',
+        data: result.appointment,
+        redirectTo: result.redirectTo,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: 'Failed to start appointment',
+        error: error.message,
+      };
+    }
+  }
+
+  // =========================================================================
+  // M6 – POST /appointments/:id/end  (UC-b4c3a2d)
+  // =========================================================================
+  @ApiOperation({
+    summary: 'End appointment',
+    description:
+      'Completes an in-progress appointment and saves medical entry data (session notes, prescriptions, treatment plan, follow-up). Records actual end time.',
+  })
+  @ApiParam({ name: 'id', type: String, description: 'Appointment ID', example: '507f1f77bcf86cd799439011' })
+  @ApiBody({ type: EndAppointmentDto })
+  @ApiResponse({ status: 200, description: 'Appointment ended – status set to completed' })
+  @ApiResponse({ status: 400, description: 'Appointment is not in_progress' })
+  @ApiResponse({ status: 404, description: 'Appointment not found' })
+  @Post(':id/end')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.MANAGER, UserRole.DOCTOR)
+  async endAppointment(
+    @Param('id') id: string,
+    @Body(new ValidationPipe()) endDto: EndAppointmentDto,
+    @Request() req: any,
+  ) {
+    try {
+      const appointment = await this.appointmentService.endAppointment(id, endDto, req.user?.userId);
+      return {
+        success: true,
+        message: 'Appointment ended successfully',
+        data: appointment,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: 'Failed to end appointment',
+        error: error.message,
+      };
+    }
+  }
+
+  // =========================================================================
+  // M6 – POST /appointments/:id/conclude  (UC-f1d3e2c)
+  // =========================================================================
+  @ApiOperation({
+    summary: 'Conclude appointment',
+    description:
+      'Comprehensively concludes an in-progress appointment. Requires doctorNotes (BR-f1d3e2c). Saves diagnosis, prescriptions, treatment plan, and schedules follow-up reminders if needed.',
+  })
+  @ApiParam({ name: 'id', type: String, description: 'Appointment ID', example: '507f1f77bcf86cd799439011' })
+  @ApiBody({ type: ConcludeAppointmentDto })
+  @ApiResponse({ status: 200, description: 'Appointment concluded – status set to completed' })
+  @ApiResponse({ status: 400, description: 'doctorNotes missing or appointment not in_progress' })
+  @ApiResponse({ status: 404, description: 'Appointment not found' })
+  @Post(':id/conclude')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.MANAGER, UserRole.DOCTOR)
+  async concludeAppointment(
+    @Param('id') id: string,
+    @Body(new ValidationPipe()) concludeDto: ConcludeAppointmentDto,
+    @Request() req: any,
+  ) {
+    try {
+      const appointment = await this.appointmentService.concludeAppointment(id, concludeDto, req.user?.userId);
+      return {
+        success: true,
+        message: 'Appointment concluded successfully',
+        data: appointment,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: 'Failed to conclude appointment',
+        error: error.message,
+      };
+    }
+  }
+
 
   /**
    * Get doctor availability for a specific date

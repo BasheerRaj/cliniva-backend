@@ -802,3 +802,250 @@ export class ConfirmAppointmentDto {
   @Transform(({ value }) => value === 'true' || value === true)
   sendReminderSms?: boolean;
 }
+
+// ---------------------------------------------------------------------------
+// M6 – Change Appointment Status
+// ---------------------------------------------------------------------------
+export class ChangeStatusDto {
+  @ApiProperty({
+    description: 'New appointment status',
+    example: 'in_progress',
+    enum: ['scheduled', 'confirmed', 'in_progress', 'completed', 'cancelled', 'no_show', 'rescheduled'],
+  })
+  @IsEnum(['scheduled', 'confirmed', 'in_progress', 'completed', 'cancelled', 'no_show', 'rescheduled'], {
+    message: 'Status must be one of: scheduled, confirmed, in_progress, completed, cancelled, no_show, rescheduled',
+  })
+  @IsNotEmpty()
+  status: string;
+
+  @ApiPropertyOptional({
+    description: 'Notes (required when status = completed)',
+    example: 'Session went well. Patient is recovering.',
+    type: String,
+    maxLength: 500,
+  })
+  @IsString()
+  @IsOptional()
+  @Length(0, 500)
+  notes?: string;
+
+  @ApiPropertyOptional({
+    description: 'Reason (required when status = cancelled)',
+    example: 'Patient requested cancellation',
+    type: String,
+    minLength: 5,
+    maxLength: 200,
+  })
+  @IsString()
+  @IsOptional()
+  @Length(5, 200)
+  reason?: string;
+
+  @ApiPropertyOptional({
+    description: 'New date (required when status = rescheduled, YYYY-MM-DD)',
+    example: '2026-03-01',
+    type: String,
+  })
+  @IsDateString()
+  @IsOptional()
+  newDate?: string;
+
+  @ApiPropertyOptional({
+    description: 'New time (required when status = rescheduled, HH:mm)',
+    example: '10:30',
+    type: String,
+  })
+  @IsString()
+  @IsOptional()
+  @Matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, {
+    message: 'Time must be in HH:mm format',
+  })
+  newTime?: string;
+}
+
+// ---------------------------------------------------------------------------
+// M6 – Start Appointment (body optional, kept for extensibility)
+// ---------------------------------------------------------------------------
+export class StartAppointmentDto {
+  @ApiPropertyOptional({
+    description: 'Any notes at the start of the appointment',
+    example: 'Patient arrived on time',
+    type: String,
+    maxLength: 200,
+  })
+  @IsString()
+  @IsOptional()
+  @Length(0, 200)
+  startNotes?: string;
+}
+
+// ---------------------------------------------------------------------------
+// M6 – Session Notes sub-DTO (shared by End & Conclude)
+// ---------------------------------------------------------------------------
+export class SessionNotesDto {
+  @ApiPropertyOptional({ type: String, example: 'Type 2 Diabetes' })
+  @IsString()
+  @IsOptional()
+  diagnosis?: string;
+
+  @ApiPropertyOptional({ type: String, example: 'Fatigue, thirst, frequent urination' })
+  @IsString()
+  @IsOptional()
+  symptoms?: string;
+
+  @ApiPropertyOptional({ type: String, example: 'Blood glucose elevated' })
+  @IsString()
+  @IsOptional()
+  findings?: string;
+
+  @ApiPropertyOptional({ type: String, example: 'HbA1c test conducted' })
+  @IsString()
+  @IsOptional()
+  procedures?: string;
+}
+
+export class PrescriptionItemDto {
+  @ApiPropertyOptional({ type: String, example: 'Metformin' })
+  @IsString()
+  @IsOptional()
+  medication?: string;
+
+  @ApiPropertyOptional({ type: String, example: '500mg' })
+  @IsString()
+  @IsOptional()
+  dosage?: string;
+
+  @ApiPropertyOptional({ type: String, example: 'Twice daily' })
+  @IsString()
+  @IsOptional()
+  frequency?: string;
+
+  @ApiPropertyOptional({ type: String, example: '3 months' })
+  @IsString()
+  @IsOptional()
+  duration?: string;
+}
+
+export class TreatmentPlanDto {
+  @ApiPropertyOptional({ type: String, example: 'Gradual lifestyle change' })
+  @IsString()
+  @IsOptional()
+  steps?: string;
+
+  @ApiPropertyOptional({ type: String, example: 'HbA1c every 3 months' })
+  @IsString()
+  @IsOptional()
+  tests?: string;
+
+  @ApiPropertyOptional({ type: String, example: 'Low-carb diet, 30 min walk daily' })
+  @IsString()
+  @IsOptional()
+  lifestyle?: string;
+}
+
+export class FollowUpDto {
+  @ApiPropertyOptional({ type: Boolean, example: true })
+  @IsBoolean()
+  @IsOptional()
+  @Transform(({ value }) => value === 'true' || value === true)
+  required?: boolean;
+
+  @ApiPropertyOptional({ type: String, example: '3 months' })
+  @IsString()
+  @IsOptional()
+  recommendedDuration?: string;
+
+  @ApiPropertyOptional({ type: String, example: 'Monitor blood pressure weekly' })
+  @IsString()
+  @IsOptional()
+  doctorNotes?: string;
+}
+
+// ---------------------------------------------------------------------------
+// M6 – End Appointment
+// ---------------------------------------------------------------------------
+export class EndAppointmentDto {
+  @ApiPropertyOptional({ type: () => SessionNotesDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => SessionNotesDto)
+  sessionNotes?: SessionNotesDto;
+
+  @ApiPropertyOptional({ type: [PrescriptionItemDto] })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => PrescriptionItemDto)
+  prescriptions?: PrescriptionItemDto[];
+
+  @ApiPropertyOptional({ type: () => TreatmentPlanDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => TreatmentPlanDto)
+  treatmentPlan?: TreatmentPlanDto;
+
+  @ApiPropertyOptional({ type: () => FollowUpDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => FollowUpDto)
+  followUp?: FollowUpDto;
+}
+
+// ---------------------------------------------------------------------------
+// M6 – Conclude Appointment (extends End but requires doctorNotes)
+// ---------------------------------------------------------------------------
+export class ConcludeAppointmentDto extends EndAppointmentDto {
+  @ApiProperty({
+    description: 'Doctor notes – REQUIRED for appointment conclusion (BR-f1d3e2c)',
+    example: 'Patient responded well to treatment. Continue current medication.',
+    type: String,
+    minLength: 10,
+    maxLength: 2000,
+  })
+  @IsString()
+  @IsNotEmpty({ message: 'Doctor notes are required to conclude an appointment' })
+  @Length(10, 2000)
+  doctorNotes: string;
+}
+
+// ---------------------------------------------------------------------------
+// M6 – Calendar View
+// ---------------------------------------------------------------------------
+export class CalendarQueryDto {
+  @ApiPropertyOptional({
+    description: 'Calendar view mode',
+    enum: ['day', 'week', 'month'],
+    default: 'week',
+    example: 'week',
+  })
+  @IsEnum(['day', 'week', 'month'], { message: 'View must be one of: day, week, month' })
+  @IsOptional()
+  view?: 'day' | 'week' | 'month';
+
+  @ApiPropertyOptional({
+    description: 'Anchor date for the view (YYYY-MM-DD). Defaults to today.',
+    example: '2026-02-22',
+    type: String,
+  })
+  @IsDateString()
+  @IsOptional()
+  date?: string;
+
+  @ApiPropertyOptional({ description: 'Filter by clinic ID', example: '507f1f77bcf86cd799439014', type: String })
+  @IsMongoId()
+  @IsOptional()
+  clinicId?: string;
+
+  @ApiPropertyOptional({ description: 'Filter by doctor ID', example: '507f1f77bcf86cd799439013', type: String })
+  @IsMongoId()
+  @IsOptional()
+  doctorId?: string;
+
+  @ApiPropertyOptional({
+    description: 'Filter by status',
+    enum: ['scheduled', 'confirmed', 'in_progress', 'completed', 'cancelled', 'no_show'],
+  })
+  @IsEnum(['scheduled', 'confirmed', 'in_progress', 'completed', 'cancelled', 'no_show'])
+  @IsOptional()
+  status?: string;
+}
