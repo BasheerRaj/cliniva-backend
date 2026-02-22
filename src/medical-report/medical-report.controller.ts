@@ -26,17 +26,23 @@ import {
   GenerateMedicalReportPdfDto,
   MedicalReportFilterDto,
 } from './dto';
+import { RolesGuard } from '../common/guards/roles.guard';
+import { Roles } from '../common/decorators/roles.decorator';
+import { UserRole } from '../common/enums/user-role.enum';
+import { ApiBearerAuth } from '@nestjs/swagger';
 
 @Controller('medical-reports')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
+@ApiBearerAuth()
 export class MedicalReportController {
-  constructor(private readonly medicalReportService: MedicalReportService) {}
+  constructor(private readonly medicalReportService: MedicalReportService) { }
 
   /**
    * Create a new medical report
    * POST /medical-reports
    */
   @Post()
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.DOCTOR)
   async createMedicalReport(
     @Body(new ValidationPipe()) createMedicalReportDto: CreateMedicalReportDto,
     @Request() req: any,
@@ -65,6 +71,7 @@ export class MedicalReportController {
    * GET /medical-reports
    */
   @Get()
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.DOCTOR, UserRole.STAFF)
   async getMedicalReports(
     @Query(new ValidationPipe()) query: MedicalReportSearchQueryDto,
   ) {
@@ -117,6 +124,7 @@ export class MedicalReportController {
    * PUT /medical-reports/:id
    */
   @Put(':id')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.DOCTOR)
   async updateMedicalReport(
     @Param('id') id: string,
     @Body(new ValidationPipe()) updateMedicalReportDto: UpdateMedicalReportDto,
@@ -147,6 +155,7 @@ export class MedicalReportController {
    * DELETE /medical-reports/:id
    */
   @Delete(':id')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.DOCTOR)
   @HttpCode(HttpStatus.OK)
   async deleteMedicalReport(@Param('id') id: string, @Request() req: any) {
     try {
@@ -169,6 +178,7 @@ export class MedicalReportController {
    * POST /medical-reports/:id/share
    */
   @Post(':id/share')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.DOCTOR)
   async shareMedicalReport(
     @Param('id') id: string,
     @Body(new ValidationPipe()) shareDto: ShareMedicalReportDto,
@@ -231,6 +241,7 @@ export class MedicalReportController {
    * GET /medical-reports/patient/:patientId
    */
   @Get('patient/:patientId')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.DOCTOR)
   async getPatientMedicalHistory(@Param('patientId') patientId: string) {
     try {
       const history =
@@ -254,6 +265,7 @@ export class MedicalReportController {
    * GET /medical-reports/doctor/:doctorId/stats
    */
   @Get('doctor/:doctorId/stats')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN)
   async getDoctorReportStats(@Param('doctorId') doctorId: string) {
     try {
       const stats =
@@ -277,6 +289,7 @@ export class MedicalReportController {
    * GET /medical-reports/stats/overview
    */
   @Get('stats/overview')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN)
   async getMedicalReportStats() {
     try {
       const stats = await this.medicalReportService.getMedicalReportStats();
@@ -299,6 +312,7 @@ export class MedicalReportController {
    * GET /medical-reports/follow-up/pending
    */
   @Get('follow-up/pending')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.DOCTOR)
   async getPendingFollowUpReports() {
     try {
       const reports =
@@ -323,6 +337,7 @@ export class MedicalReportController {
    * GET /medical-reports/search/query?q=searchTerm
    */
   @Get('search/query')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.DOCTOR, UserRole.STAFF)
   async searchMedicalReports(
     @Query('q') searchTerm: string,
     @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
@@ -615,6 +630,7 @@ export class MedicalReportController {
    * GET /medical-reports/analytics/diagnoses
    */
   @Get('analytics/diagnoses')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN)
   async getDiagnosisAnalytics(
     @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
   ) {

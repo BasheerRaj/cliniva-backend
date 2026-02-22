@@ -9,6 +9,9 @@ import {
   HttpCode,
   BadRequestException,
   ValidationPipe,
+  UseGuards,
+  Request,
+  ForbiddenException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -18,6 +21,10 @@ import {
   ApiBody,
   ApiBearerAuth,
 } from '@nestjs/swagger';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../common/guards/roles.guard';
+import { Roles } from '../common/decorators/roles.decorator';
+import { UserRole } from '../common/enums/user-role.enum';
 import { SubscriptionService } from './subscription.service';
 import {
   CreateSubscriptionDto,
@@ -27,8 +34,10 @@ import { SUBSCRIPTION_SWAGGER_EXAMPLES } from './constants/swagger-examples';
 
 @ApiTags('Subscriptions')
 @Controller('subscriptions')
+@UseGuards(JwtAuthGuard)
+@ApiBearerAuth()
 export class SubscriptionController {
-  constructor(private readonly subscriptionService: SubscriptionService) {}
+  constructor(private readonly subscriptionService: SubscriptionService) { }
 
   @ApiOperation({
     summary: 'Create new subscription',
@@ -181,6 +190,8 @@ export class SubscriptionController {
   })
   @ApiBody({ type: UpdateSubscriptionStatusDto })
   @Put(':id/status')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN)
   @HttpCode(HttpStatus.OK)
   async updateSubscriptionStatus(
     @Param('id') id: string,

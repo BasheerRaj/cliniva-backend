@@ -36,6 +36,9 @@ import {
   RateLimit,
   RateLimitType,
 } from '../common/decorators/rate-limit.decorator';
+import { RolesGuard } from '../common/guards/roles.guard';
+import { Roles } from '../common/decorators/roles.decorator';
+import { UserRole } from '../common/enums/user-role.enum';
 import {
   LoginDto,
   RegisterDto,
@@ -84,7 +87,7 @@ import {
 export class AuthController {
   private readonly logger = new Logger(AuthController.name);
 
-  constructor(private readonly authService: AuthService) {}
+  constructor(private readonly authService: AuthService) { }
 
   /**
    * Register a new user
@@ -172,10 +175,10 @@ export class AuthController {
     // Extract creator user info from JWT if present (populated by OptionalJwtAuthGuard)
     const creatorUser = req.user
       ? {
-          id: req.user.id || req.user.userId || req.user.sub,
-          role: req.user.role,
-          email: req.user.email,
-        }
+        id: req.user.id || req.user.userId || req.user.sub,
+        role: req.user.role,
+        email: req.user.email,
+      }
       : null;
 
     return this.authService.register(registerDto, creatorUser);
@@ -912,9 +915,12 @@ export class AuthController {
   }
 
   @Get('debug/user/:userId')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN)
+  @ApiBearerAuth()
   @ApiOperation({
-    summary: 'Debug user information',
-    description: 'Get detailed user information for debugging purposes',
+    summary: 'Debug user information (super_admin only)',
+    description: 'Get detailed user information for debugging purposes. Restricted to super_admin.',
   })
   @ApiParam({
     name: 'userId',

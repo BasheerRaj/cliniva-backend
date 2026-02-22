@@ -47,7 +47,7 @@ export class AuthService {
     private readonly emailService: EmailService,
     @Inject(forwardRef(() => WorkingHoursService))
     private readonly workingHoursService: WorkingHoursService,
-  ) {}
+  ) { }
 
   /**
    * Register a new user
@@ -217,8 +217,7 @@ export class AuthService {
 
       const savedUser = await newUser.save();
       this.logger.log(
-        `New user registered: ${savedUser.email} (role: ${savedUser.role})${
-          creatorUser ? ` by ${creatorUser.email}` : ' (self-registration)'
+        `New user registered: ${savedUser.email} (role: ${savedUser.role})${creatorUser ? ` by ${creatorUser.email}` : ' (self-registration)'
         }`,
       );
 
@@ -788,8 +787,14 @@ export class AuthService {
   }> {
     const payload = {
       sub: (user._id as any).toString(),
+      id: (user._id as any).toString(),
       email: user.email,
       role: user.role,
+      // Include scope for tenant isolation
+      organizationId: user.organizationId?.toString(),
+      subscriptionId: user.subscriptionId?.toString(),
+      complexId: user.complexId?.toString(),
+      clinicId: user.clinicId?.toString(),
     };
 
     // If rememberMe is true, extend expiration to 30 days

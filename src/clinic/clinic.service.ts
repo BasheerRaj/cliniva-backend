@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -30,7 +31,7 @@ export class ClinicService {
     @InjectModel('Appointment')
     private readonly appointmentModel: Model<any>,
     private readonly subscriptionService: SubscriptionService,
-  ) {}
+  ) { }
 
   async findClinicBySubscription(
     subscriptionId: string,
@@ -62,19 +63,23 @@ export class ClinicService {
    * - Exceeded capacity flags
    *
    * @param options - Query options including filters, pagination, and includeCounts flag
+   * @param requestingUser - The authenticated user making the request
    * @returns Paginated list of clinics with optional capacity information
    */
-  async getClinics(options: {
-    subscriptionId?: string;
-    complexId?: string;
-    status?: string;
-    search?: string;
-    includeCounts?: boolean;
-    page?: number;
-    limit?: number;
-    sortBy?: string;
-    sortOrder?: 'asc' | 'desc';
-  }): Promise<{
+  async getClinics(
+    options: {
+      subscriptionId?: string;
+      complexId?: string;
+      status?: string;
+      search?: string;
+      includeCounts?: boolean;
+      page?: number;
+      limit?: number;
+      sortBy?: string;
+      sortOrder?: 'asc' | 'desc';
+    },
+    requestingUser?: any,
+  ): Promise<{
     data: any[];
     meta: { page: number; limit: number; total: number; totalPages: number };
   }> {
@@ -90,15 +95,30 @@ export class ClinicService {
       sortOrder = 'asc',
     } = options;
 
+    let targetSubscriptionId = subscriptionId;
+    let targetComplexId = complexId;
+
+    // TENANT ISOLATION: Enforce scope based on user role (ISSUE-010)
+    if (requestingUser && requestingUser.role !== 'super_admin') {
+      if (requestingUser.subscriptionId) {
+        targetSubscriptionId = requestingUser.subscriptionId;
+      }
+
+      // If user is restricted to a complex, enforce that too
+      if (requestingUser.complexId) {
+        targetComplexId = requestingUser.complexId;
+      }
+    }
+
     // Build query
     const query: any = {};
 
-    if (subscriptionId) {
-      query.subscriptionId = new Types.ObjectId(subscriptionId);
+    if (targetSubscriptionId) {
+      query.subscriptionId = new Types.ObjectId(targetSubscriptionId);
     }
 
-    if (complexId) {
-      query.complexId = new Types.ObjectId(complexId);
+    if (targetComplexId) {
+      query.complexId = new Types.ObjectId(targetComplexId);
     }
 
     if (status) {
@@ -369,10 +389,11 @@ export class ClinicService {
    * - Recommendations when capacity is exceeded
    *
    * @param clinicId - The clinic ID
+   * @param requestingUser - The authenticated user making the request
    * @returns Complete clinic details with capacity information
    * @throws NotFoundException if clinic not found
    */
-  async getClinicWithDetails(clinicId: string): Promise<any> {
+  async getClinicWithDetails(clinicId: string, requestingUser?: any): Promise<any> {
     // 1. Get clinic with populated relationships
     const clinic = await this.clinicModel
       .findById(clinicId)
@@ -388,6 +409,20 @@ export class ClinicService {
         },
         code: 'CLINIC_007',
       });
+    }
+
+    // TENANT ISOLATION: Verify clinic belongs to user's subscription (ISSUE-010)
+    if (requestingUser && requestingUser.role !== 'super_admin') {
+      if (requestingUser.subscriptionId &&
+        clinic.subscriptionId.toString() !== requestingUser.subscriptionId) {
+        throw new ForbiddenException({
+          message: {
+            ar: 'ليس لديك صلاحية للوصول إلى هذه العيادة',
+            en: 'You do not have permission to access this clinic',
+          },
+          code: 'INSUFFICIENT_PERMISSIONS',
+        });
+      }
     }
 
     // 2. Calculate doctors capacity with personnel list

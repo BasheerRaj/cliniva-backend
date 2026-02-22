@@ -38,13 +38,16 @@ import {
   AppointmentStatsDto,
 } from './dto';
 import { SWAGGER_EXAMPLES } from './constants/swagger-examples';
+import { RolesGuard } from '../common/guards/roles.guard';
+import { Roles } from '../common/decorators/roles.decorator';
+import { UserRole } from '../common/enums/user-role.enum';
 
 @ApiTags('Appointments')
 @Controller('appointments')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 @ApiBearerAuth()
 export class AppointmentController {
-  constructor(private readonly appointmentService: AppointmentService) {}
+  constructor(private readonly appointmentService: AppointmentService) { }
 
   /**
    * Create a new appointment
@@ -93,6 +96,7 @@ export class AppointmentController {
   })
   @ApiBody({ type: CreateAppointmentDto })
   @Post()
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.MANAGER, UserRole.DOCTOR, UserRole.STAFF)
   async createAppointment(
     @Body(new ValidationPipe()) createAppointmentDto: CreateAppointmentDto,
     @Request() req: any,
@@ -374,6 +378,7 @@ export class AppointmentController {
   })
   @ApiBody({ type: UpdateAppointmentDto })
   @Put(':id')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   async updateAppointment(
     @Param('id') id: string,
     @Body(new ValidationPipe()) updateAppointmentDto: UpdateAppointmentDto,
@@ -443,6 +448,7 @@ export class AppointmentController {
     example: '507f1f77bcf86cd799439011',
   })
   @Delete(':id')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN)
   @HttpCode(HttpStatus.OK)
   async deleteAppointment(@Param('id') id: string, @Request() req: any) {
     try {
@@ -513,6 +519,7 @@ export class AppointmentController {
   })
   @ApiBody({ type: RescheduleAppointmentDto })
   @Post(':id/reschedule')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.MANAGER, UserRole.DOCTOR, UserRole.STAFF)
   async rescheduleAppointment(
     @Param('id') id: string,
     @Body(new ValidationPipe()) rescheduleDto: RescheduleAppointmentDto,
@@ -583,6 +590,7 @@ export class AppointmentController {
   })
   @ApiBody({ type: CancelAppointmentDto })
   @Post(':id/cancel')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.MANAGER, UserRole.DOCTOR, UserRole.STAFF)
   async cancelAppointment(
     @Param('id') id: string,
     @Body(new ValidationPipe()) cancelDto: CancelAppointmentDto,
@@ -653,6 +661,7 @@ export class AppointmentController {
   })
   @ApiBody({ type: ConfirmAppointmentDto })
   @Post(':id/confirm')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   async confirmAppointment(
     @Param('id') id: string,
     @Body(new ValidationPipe()) confirmDto: ConfirmAppointmentDto,
@@ -936,6 +945,7 @@ export class AppointmentController {
     },
   })
   @Get('stats/overview')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN)
   async getAppointmentStats() {
     try {
       const stats = await this.appointmentService.getAppointmentStats();

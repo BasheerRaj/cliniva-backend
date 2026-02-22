@@ -3,6 +3,7 @@ import {
   NotFoundException,
   Logger,
   BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { InjectModel, InjectConnection } from '@nestjs/mongoose';
 import { Model, Types, Connection, RootFilterQuery } from 'mongoose';
@@ -52,7 +53,7 @@ export class UserService {
     private readonly userRestrictionService: UserRestrictionService,
     private readonly doctorDeactivationService: DoctorDeactivationService,
     private readonly workingHoursService: WorkingHoursService,
-  ) {}
+  ) { }
 
   /**
    * Get paginated list of users with filtering
@@ -61,9 +62,10 @@ export class UserService {
    * Requirements: 4.1, 4.2
    *
    * @param filterDto - Filter and pagination options
+   * @param requestingUser - The user making the request
    * @returns Paginated users list
    */
-  async getUsers(filterDto: GetUsersFilterDto) {
+  async getUsers(filterDto: GetUsersFilterDto, requestingUser?: any) {
     try {
       const {
         page = 1,
@@ -78,15 +80,32 @@ export class UserService {
         clinicId,
       } = filterDto;
 
+      let targetSubscriptionId = organizationId; // organizationId here seems to refer to subscription/org scope
+      let targetComplexId = complexId;
+      let targetClinicId = clinicId;
+
+      // TENANT ISOLATION (ISSUE-011)
+      if (requestingUser && requestingUser.role !== 'super_admin') {
+        if (requestingUser.subscriptionId) {
+          targetSubscriptionId = requestingUser.subscriptionId;
+        }
+        if (requestingUser.complexId) {
+          targetComplexId = requestingUser.complexId;
+        }
+        if (requestingUser.clinicId) {
+          targetClinicId = requestingUser.clinicId;
+        }
+      }
+
       const query: RootFilterQuery<User> = {};
 
       // Apply filters
       if (role) query.role = role;
       if (isActive !== undefined) query.isActive = isActive;
-      if (organizationId)
-        query.organizationId = new Types.ObjectId(organizationId);
-      if (complexId) query.complexId = new Types.ObjectId(complexId);
-      if (clinicId) query.clinicId = new Types.ObjectId(clinicId);
+      if (targetSubscriptionId)
+        query.subscriptionId = new Types.ObjectId(targetSubscriptionId);
+      if (targetComplexId) query.complexId = new Types.ObjectId(targetComplexId);
+      if (targetClinicId) query.clinicId = new Types.ObjectId(targetClinicId);
 
       // Search by name or email
       if (search) {
@@ -133,7 +152,7 @@ export class UserService {
     }
   }
 
-  async checkUserEntities(userId: string): Promise<UserEntitiesResponseDto> {
+  async checkUserEntities(userId: string, requestingUser?: any): Promise<UserEntitiesResponseDto> {
     try {
       // Validate userId can be converted to ObjectId
       if (!Types.ObjectId.isValid(userId)) {
@@ -155,6 +174,19 @@ export class UserService {
           message: ERROR_MESSAGES.USER_NOT_FOUND,
           code: 'USER_NOT_FOUND',
         });
+      }
+
+      // TENANT ISOLATION (ISSUE-012)
+      if (requestingUser && requestingUser.role !== 'super_admin') {
+        if (requestingUser.subscriptionId && user.subscriptionId?.toString() !== requestingUser.subscriptionId) {
+          throw new ForbiddenException({
+            message: {
+              ar: 'ليس لديك صلاحية للوصول إلى هذا المستخدم',
+              en: 'You do not have permission to access this user',
+            },
+            code: 'INSUFFICIENT_PERMISSIONS',
+          });
+        }
       }
 
       // Get subscription details
@@ -934,12 +966,10 @@ export class UserService {
    * Design: Section 3.2
    *
    * @param userId - User ID (MongoDB ObjectId)
+   * @param requestingUser - The user making the request
    * @returns User document with populated entities
-   * @throws {BadRequestException} Invalid user ID format
-   * @throws {NotFoundException} User not found
-   * @throws {InternalServerErrorException} Database or system error
    */
-  async getUserDetailById(userId: string): Promise<User> {
+  async getUserDetailById(userId: string, requestingUser?: any): Promise<User> {
     try {
       // Validate ObjectId format
       if (!Types.ObjectId.isValid(userId)) {
@@ -976,6 +1006,19 @@ export class UserService {
           },
           code: 'USER_NOT_FOUND',
         });
+      }
+
+      // TENANT ISOLATION (ISSUE-012)
+      if (requestingUser && requestingUser.role !== 'super_admin') {
+        if (requestingUser.subscriptionId && user.subscriptionId?.toString() !== requestingUser.subscriptionId) {
+          throw new ForbiddenException({
+            message: {
+              ar: 'ليس لديك صلاحية للوصول إلى هذا المستخدم',
+              en: 'You do not have permission to access this user',
+            },
+            code: 'INSUFFICIENT_PERMISSIONS',
+          });
+        }
       }
 
       // Attach working hours to the user object (temporarily for the controller to use)

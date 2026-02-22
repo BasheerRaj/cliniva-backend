@@ -27,6 +27,9 @@ import {
 } from '@nestjs/swagger';
 import { PatientService } from './patient.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../common/guards/roles.guard';
+import { Roles } from '../common/decorators/roles.decorator';
+import { UserRole } from '../common/enums/user-role.enum';
 import {
   CreatePatientDto,
   UpdatePatientDto,
@@ -49,7 +52,7 @@ import * as SwaggerExamples from './examples/swagger-examples';
 @Controller('patients')
 @UseGuards(JwtAuthGuard)
 export class PatientController {
-  constructor(private readonly patientService: PatientService) {}
+  constructor(private readonly patientService: PatientService) { }
 
   /**
    * Create a new patient
@@ -118,6 +121,8 @@ export class PatientController {
       ],
     },
   })
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.MANAGER, UserRole.DOCTOR, UserRole.STAFF)
   async createPatient(
     @Body(new ValidationPipe()) createPatientDto: CreatePatientDto,
     @Request() req: any,
@@ -220,6 +225,8 @@ export class PatientController {
       example: SwaggerExamples.GET_PATIENTS_RESPONSE_EXAMPLE,
     },
   })
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.MANAGER, UserRole.DOCTOR, UserRole.STAFF)
   async getPatients(@Query(new ValidationPipe()) query: PatientSearchQueryDto) {
     try {
       const result = await this.patientService.getPatients(query);
@@ -628,6 +635,8 @@ export class PatientController {
       example: SwaggerExamples.ERROR_PATIENT_NOT_FOUND_EXAMPLE,
     },
   })
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN)
   async deletePatient(@Param('id') id: string, @Request() req: any) {
     try {
       await this.patientService.deletePatient(id, req.user?.userId);
@@ -746,6 +755,8 @@ export class PatientController {
    * PUT /patients/:id/medical-history
    */
   @Put(':id/medical-history')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.DOCTOR)
   async updateMedicalHistory(
     @Param('id') id: string,
     @Body(new ValidationPipe())

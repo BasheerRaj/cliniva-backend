@@ -77,6 +77,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
     // Return user object that will be attached to request
     return {
+      userId: (user._id as any).toString(),
       id: (user._id as any).toString(),
       email: user.email,
       firstName: user.firstName,
@@ -84,6 +85,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       role: user.role,
       isActive: user.isActive,
       emailVerified: user.emailVerified,
+      organizationId: (user.organizationId as any)?.toString() || null,
+      subscriptionId: (user.subscriptionId as any)?.toString() || null,
+      complexId: (user.complexId as any)?.toString() || null,
+      clinicId: (user.clinicId as any)?.toString() || null,
       permissions: [], // Will be populated by permissions system if needed
     };
   }

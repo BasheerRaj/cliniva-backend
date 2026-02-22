@@ -40,6 +40,8 @@ import { ClinicStatusService } from './services/clinic-status.service';
 
 @ApiTags('Clinics')
 @Controller('clinics')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@ApiBearerAuth()
 export class ClinicController {
   private readonly logger = new Logger(ClinicController.name);
 
@@ -48,7 +50,7 @@ export class ClinicController {
     private readonly capacityService: ClinicCapacityService,
     private readonly workingHoursService: ClinicWorkingHoursService,
     private readonly statusService: ClinicStatusService,
-  ) {}
+  ) { }
 
   /**
    * Get all clinics with optional capacity calculation
@@ -66,8 +68,6 @@ export class ClinicController {
    * @returns List of clinics with optional capacity information
    */
   @Get()
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
   @ApiOperation({
     summary: 'Get all clinics',
     description:
@@ -139,6 +139,7 @@ export class ClinicController {
   })
   @HttpCode(HttpStatus.OK)
   async getClinics(
+    @Request() req: any,
     @Query('subscriptionId') subscriptionId?: string,
     @Query('complexId') complexId?: string,
     @Query('status') status?: string,
@@ -164,7 +165,7 @@ export class ClinicController {
         limit: limitNumber,
         sortBy,
         sortOrder: sortOrder as 'asc' | 'desc',
-      });
+      }, req.user);
 
       return {
         success: true,
@@ -210,8 +211,7 @@ export class ClinicController {
    * @returns Created clinic object
    */
   @Post()
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN)
   @ApiOperation({
     summary: 'Create a new clinic',
     description:
@@ -330,8 +330,6 @@ export class ClinicController {
    * @returns Complete clinic details with capacity information
    */
   @Get(':id')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
   @ApiOperation({
     summary: 'Get clinic details',
     description:
@@ -417,9 +415,9 @@ export class ClinicController {
     description: 'Unauthorized - JWT token required',
   })
   @HttpCode(HttpStatus.OK)
-  async getClinic(@Param('id') id: string) {
+  async getClinic(@Param('id') id: string, @Request() req: any) {
     try {
-      const clinic = await this.clinicService.getClinicWithDetails(id);
+      const clinic = await this.clinicService.getClinicWithDetails(id, req.user);
       return {
         success: true,
         message: {

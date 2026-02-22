@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { InjectModel, InjectConnection } from '@nestjs/mongoose';
 import { Model, Types, Connection } from 'mongoose';
@@ -30,33 +31,48 @@ export class ComplexService {
     @InjectModel('Complex') private readonly complexModel: Model<Complex>,
     @InjectConnection() private readonly connection: Connection,
     private readonly subscriptionService: SubscriptionService,
-  ) {}
+  ) { }
 
   /**
    * List complexes with pagination, filters, and optional counts
    *
    * @param query - Query parameters for filtering, sorting, and pagination
+   * @param requestingUser - The user making the request
    * @returns Promise<PaginatedResponse<Complex>> - Paginated list of complexes
    *
    * Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 1.10
    */
   async listComplexes(
     query: ListComplexesQueryDto,
+    requestingUser?: any,
   ): Promise<PaginatedResponse<any>> {
     // Build query filters
     const filter: any = {};
+
+    let targetSubscriptionId = query.subscriptionId;
+    let targetOrganizationId = query.organizationId;
+
+    // TENANT ISOLATION (ISSUE-009)
+    if (requestingUser && requestingUser.role !== 'super_admin') {
+      if (requestingUser.subscriptionId) {
+        targetSubscriptionId = requestingUser.subscriptionId;
+      }
+      if (requestingUser.organizationId) {
+        targetOrganizationId = requestingUser.organizationId;
+      }
+    }
 
     // Exclude soft-deleted complexes
     filter.deletedAt = null;
 
     // Filter by organizationId
-    if (query.organizationId) {
-      filter.organizationId = new Types.ObjectId(query.organizationId);
+    if (targetOrganizationId) {
+      filter.organizationId = new Types.ObjectId(targetOrganizationId);
     }
 
     // Filter by subscriptionId
-    if (query.subscriptionId) {
-      filter.subscriptionId = new Types.ObjectId(query.subscriptionId);
+    if (targetSubscriptionId) {
+      filter.subscriptionId = new Types.ObjectId(targetSubscriptionId);
     }
 
     // Filter by status
@@ -206,7 +222,20 @@ export class ComplexService {
     };
   }
 
-  async createComplex(createComplexDto: CreateComplexDto): Promise<Complex> {
+  async createComplex(createComplexDto: CreateComplexDto, requestingUser?: any): Promise<Complex> {
+    // TENANT ISOLATION (ISSUE-009)
+    if (requestingUser && requestingUser.role !== 'super_admin') {
+      if (requestingUser.subscriptionId && createComplexDto.subscriptionId !== requestingUser.subscriptionId) {
+        throw new ForbiddenException({
+          message: {
+            ar: 'ليس لديك صلاحية لإنشاء مجمع لهذا الاشتراك',
+            en: 'You do not have permission to create complex for this subscription',
+          },
+          code: 'INSUFFICIENT_PERMISSIONS',
+        });
+      }
+    }
+
     // Validate subscription is active
     const isActive = await this.subscriptionService.isSubscriptionActive(
       createComplexDto.subscriptionId,
@@ -339,11 +368,12 @@ export class ComplexService {
    * Get complete complex details with all relationships and calculated metrics
    *
    * @param complexId - The complex ID
+   * @param requestingUser - The user making the request
    * @returns Promise<ComplexDetailsResponse> - Complete complex details
    *
    * Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8
    */
-  async getComplexDetails(complexId: string): Promise<any> {
+  async getComplexDetails(complexId: string, requestingUser?: any): Promise<any> {
     // Query complex by ID with all relationships populated
     const complex = await this.complexModel
       .findById(complexId)
@@ -359,6 +389,19 @@ export class ComplexService {
         code: ERROR_CODES.COMPLEX_006.code,
         message: ERROR_CODES.COMPLEX_006.message,
       });
+    }
+
+    // TENANT ISOLATION (ISSUE-009)
+    if (requestingUser && requestingUser.role !== 'super_admin') {
+      if (requestingUser.subscriptionId && complex.subscriptionId?.toString() !== requestingUser.subscriptionId) {
+        throw new ForbiddenException({
+          message: {
+            ar: 'ليس لديك صلاحية للوصول إلى هذا المجمع',
+            en: 'You do not have permission to access this complex',
+          },
+          code: 'INSUFFICIENT_PERMISSIONS',
+        });
+      }
     }
 
     // Calculate scheduled appointments count
@@ -418,15 +461,44 @@ export class ComplexService {
     return complex;
   }
 
-  async getComplexesByOrganization(organizationId: string): Promise<Complex[]> {
+  async getComplexesByOrganization(organizationId: string, requestingUser?: any): Promise<Complex[]> {
+    let targetOrganizationId = organizationId;
+
+    // TENANT ISOLATION
+    if (requestingUser && requestingUser.role !== 'super_admin') {
+      if (requestingUser.organizationId && organizationId !== requestingUser.organizationId) {
+        throw new ForbiddenException({
+          message: {
+            ar: 'ليس لديك صلاحية للوصول إلى مجمعات هذه المنظمة',
+            en: 'You do not have permission to access complexes for this organization',
+          },
+          code: 'INSUFFICIENT_PERMISSIONS',
+        });
+      }
+    }
+
     return await this.complexModel
-      .find({ organizationId: new Types.ObjectId(organizationId) })
+      .find({ organizationId: new Types.ObjectId(targetOrganizationId) })
       .exec();
   }
 
   async getComplexBySubscription(
     subscriptionId: string,
+    requestingUser?: any,
   ): Promise<Complex | null> {
+    // TENANT ISOLATION
+    if (requestingUser && requestingUser.role !== 'super_admin') {
+      if (requestingUser.subscriptionId && subscriptionId !== requestingUser.subscriptionId) {
+        throw new ForbiddenException({
+          message: {
+            ar: 'ليس لديك صلاحية للوصول إلى مجمع هذا الاشتراك',
+            en: 'You do not have permission to access complex for this subscription',
+          },
+          code: 'INSUFFICIENT_PERMISSIONS',
+        });
+      }
+    }
+
     return await this.complexModel
       .findOne({ subscriptionId: new Types.ObjectId(subscriptionId) })
       .exec();
@@ -437,6 +509,7 @@ export class ComplexService {
    *
    * @param complexId - The complex ID
    * @param updateComplexDto - Update data
+   * @param requestingUser - The user making the request
    * @returns Promise<UpdateComplexResponse> - Updated complex with restrictions if any
    *
    * Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 4.8
@@ -444,6 +517,7 @@ export class ComplexService {
   async updateComplex(
     complexId: string,
     updateComplexDto: UpdateComplexDto,
+    requestingUser?: any,
   ): Promise<any> {
     // Validate complex exists (Requirement 4.1)
     const complex = await this.complexModel.findById(complexId).exec();
@@ -453,6 +527,9 @@ export class ComplexService {
         message: ERROR_CODES.COMPLEX_006.message,
       });
     }
+
+    // TENANT ISOLATION (ISSUE-009)
+    await this.verifyComplexOwnership(complex, requestingUser);
 
     // Check department restrictions if departmentIds are being updated (Requirements 4.2, 4.3, 4.4)
     let departmentRestrictions: DepartmentRestriction[] | undefined;
@@ -1058,11 +1135,12 @@ export class ComplexService {
    * Prevents deletion if complex has active clinics
    *
    * @param complexId - The complex ID to soft delete
+   * @param requestingUser - The user making the request
    * @returns Promise<SuccessResponse> - Success response with bilingual message
    *
    * Requirements: 5.1, 5.2, 5.3, 5.4, 5.5
    */
-  async softDeleteComplex(complexId: string): Promise<any> {
+  async softDeleteComplex(complexId: string, requestingUser?: any): Promise<any> {
     // Validate complex exists (Requirement 5.1)
     const complex = await this.complexModel.findById(complexId).exec();
     if (!complex) {
@@ -1071,6 +1149,9 @@ export class ComplexService {
         message: ERROR_CODES.COMPLEX_006.message,
       });
     }
+
+    // TENANT ISOLATION (ISSUE-009)
+    await this.verifyComplexOwnership(complex, requestingUser);
 
     // Check for active clinics (Requirement 5.2)
     const activeClinicsCount = await this.calculateClinicsAssigned(complexId);
@@ -1113,7 +1194,20 @@ export class ComplexService {
     complexId: string,
     dto: UpdateComplexStatusDto,
     userId?: string,
+    requestingUser?: any,
   ): Promise<StatusChangeResponse> {
+    // Validate complex exists (Requirement 6.1)
+    const complex = await this.complexModel.findById(complexId).exec();
+    if (!complex) {
+      throw new NotFoundException({
+        code: 'COMPLEX_006',
+        message: ERROR_CODES.COMPLEX_006.message,
+      });
+    }
+
+    // TENANT ISOLATION (ISSUE-009)
+    await this.verifyComplexOwnership(complex, requestingUser);
+
     // Start MongoDB transaction if supported (Requirement 6.8)
     const { session, useTransaction } = await TransactionUtil.startTransaction(
       this.connection,
@@ -1201,7 +1295,7 @@ export class ComplexService {
               await this.markAppointmentsForRescheduling(
                 clinicIds,
                 dto.deactivationReason ||
-                  'Complex deactivated - clinics transferred',
+                'Complex deactivated - clinics transferred',
                 markedBy,
                 session,
               );
@@ -1408,11 +1502,12 @@ export class ComplexService {
    * Public endpoint for capacity calculation
    *
    * @param complexId - The complex ID
+   * @param requestingUser - The user making the request
    * @returns Promise<CapacityResponse> - Capacity breakdown with bilingual message
    *
    * Requirements: 7.1, 7.2, 7.3, 7.4, 7.5
    */
-  async getComplexCapacity(complexId: string): Promise<any> {
+  async getComplexCapacity(complexId: string, requestingUser?: any): Promise<any> {
     // Validate complex exists (throw COMPLEX_006 if not)
     const complex = await this.complexModel.findById(complexId).exec();
     if (!complex) {
@@ -1421,6 +1516,9 @@ export class ComplexService {
         message: ERROR_CODES.COMPLEX_006.message,
       });
     }
+
+    // TENANT ISOLATION (ISSUE-009)
+    await this.verifyComplexOwnership(complex, requestingUser);
 
     // Call calculateCapacity() helper
     const capacity = await this.calculateCapacity(complexId);
@@ -1444,11 +1542,16 @@ export class ComplexService {
    *
    * @param complexId - The complex ID
    * @param userId - The user ID to assign as PIC
+   * @param requestingUser - The user making the request
    * @returns Promise<Complex> - Complex with populated personInCharge
    *
    * Requirements: 8.1, 8.2, 8.3, 8.4, 8.5
    */
-  async assignPersonInCharge(complexId: string, userId: string): Promise<any> {
+  async assignPersonInCharge(
+    complexId: string,
+    userId: string,
+    requestingUser?: any,
+  ): Promise<any> {
     // Validate complex exists (throw COMPLEX_006 if not) - Requirement 8.1
     const complex = await this.complexModel.findById(complexId).exec();
     if (!complex) {
@@ -1457,6 +1560,9 @@ export class ComplexService {
         message: ERROR_CODES.COMPLEX_006.message,
       });
     }
+
+    // TENANT ISOLATION (ISSUE-009)
+    await this.verifyComplexOwnership(complex, requestingUser);
 
     // Validate user exists (throw COMPLEX_002 if not) - Requirement 8.1
     const user = await this.complexModel.db.collection('users').findOne({
@@ -1508,11 +1614,12 @@ export class ComplexService {
    * Sets personInChargeId to null
    *
    * @param complexId - The complex ID
+   * @param requestingUser - The user making the request
    * @returns Promise<SuccessResponse> - Success response with bilingual message
    *
    * Requirements: 9.1, 9.2, 9.3
    */
-  async removePersonInCharge(complexId: string): Promise<any> {
+  async removePersonInCharge(complexId: string, requestingUser?: any): Promise<any> {
     // Validate complex exists (throw COMPLEX_006 if not) - Requirement 9.1
     const complex = await this.complexModel.findById(complexId).exec();
     if (!complex) {
@@ -1521,6 +1628,9 @@ export class ComplexService {
         message: ERROR_CODES.COMPLEX_006.message,
       });
     }
+
+    // TENANT ISOLATION (ISSUE-009)
+    await this.verifyComplexOwnership(complex, requestingUser);
 
     // Set personInChargeId to null - Requirement 9.2
     complex.personInChargeId = undefined;
@@ -1713,6 +1823,7 @@ export class ComplexService {
    * @param sourceComplexId - The source complex ID
    * @param targetComplexId - The target complex ID
    * @param clinicIds - Array of clinic IDs to transfer
+   * @param requestingUser - The user making the request
    * @returns Promise<TransferResponse> - Transfer result with counts and conflicts
    *
    * Requirements: 10.1, 10.2, 10.3, 10.4, 10.5, 10.6, 10.7, 10.9
@@ -1721,7 +1832,26 @@ export class ComplexService {
     sourceComplexId: string,
     targetComplexId: string,
     clinicIds: string[],
+    requestingUser?: any,
   ): Promise<any> {
+    // Validate both complexes exist
+    const [sourceComplex, targetComplex] = await Promise.all([
+      this.complexModel.findById(sourceComplexId).exec(),
+      this.complexModel.findById(targetComplexId).exec(),
+    ]);
+
+    if (!sourceComplex || !targetComplex) {
+      throw new NotFoundException({
+        code: 'COMPLEX_006',
+        message: ERROR_CODES.COMPLEX_006.message,
+      });
+    }
+
+    // TENANT ISOLATION (ISSUE-009)
+    await Promise.all([
+      this.verifyComplexOwnership(sourceComplex, requestingUser),
+      this.verifyComplexOwnership(targetComplex, requestingUser),
+    ]);
     // Start MongoDB transaction if supported (Requirement 10.4, 13.1, 13.2)
     const { session, useTransaction } = await TransactionUtil.startTransaction(
       this.connection,
@@ -1851,6 +1981,25 @@ export class ComplexService {
       throw error;
     } finally {
       await TransactionUtil.endSession(session);
+    }
+  }
+
+  /**
+   * Verified that the requesting user has access to the complex
+   */
+  private async verifyComplexOwnership(complex: any, requestingUser: any) {
+    if (!requestingUser || requestingUser.role === 'super_admin') {
+      return;
+    }
+
+    if (requestingUser.subscriptionId && complex.subscriptionId?.toString() !== requestingUser.subscriptionId) {
+      throw new ForbiddenException({
+        message: {
+          ar: 'ليس لديك صلاحية للوصول إلى هذا المجمع',
+          en: 'You do not have permission to access this complex',
+        },
+        code: 'INSUFFICIENT_PERMISSIONS',
+      });
     }
   }
 }

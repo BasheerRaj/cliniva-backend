@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, Global, forwardRef } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { MongooseModule } from '@nestjs/mongoose';
@@ -39,9 +39,9 @@ import { OptionalJwtAuthGuard } from './guards/optional-jwt-auth.guard';
 import { FirstLoginGuard } from './guards/first-login.guard';
 import { RateLimitGuard } from './guards/rate-limit.guard';
 import { RateLimitService } from './rate-limit.service';
-import { forwardRef } from '@nestjs/common';
 import { WorkingHoursModule } from '../working-hours/working-hours.module';
 
+@Global()
 @Module({
   imports: [
     // Import required schemas for JwtAuthGuard
@@ -110,4 +110,4 @@ import { WorkingHoursModule } from '../working-hours/working-hours.module';
     RateLimitService,
   ],
 })
-export class AuthModule {}
+export class AuthModule { }

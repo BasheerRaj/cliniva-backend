@@ -55,6 +55,8 @@ import { User } from '../database/schemas/user.schema';
 
 @ApiTags('Users')
 @Controller('users')
+@UseGuards(JwtAuthGuard)
+@ApiBearerAuth()
 export class UserController {
   private readonly logger = new Logger(UserController.name);
 
@@ -67,7 +69,7 @@ export class UserController {
     private readonly userService: UserService,
     private readonly userDropdownService: UserDropdownService,
     private readonly authService: AuthService,
-  ) {}
+  ) { }
 
   @ApiOperation({
     summary: 'Get paginated list of users',
@@ -88,10 +90,10 @@ export class UserController {
   })
   @ApiBearerAuth()
   @Get()
-  @UseGuards(JwtAuthGuard, AdminGuard)
-  async getUsers(@Query() filterDto: GetUsersFilterDto) {
+  @UseGuards(AdminGuard)
+  async getUsers(@Query() filterDto: GetUsersFilterDto, @Request() req: any) {
     try {
-      const result = await this.userService.getUsers(filterDto);
+      const result = await this.userService.getUsers(filterDto, req.user);
       return {
         success: true,
         data: result,
@@ -319,30 +321,30 @@ export class UserController {
           preferences: user.preferences,
           subscription: user.subscriptionId
             ? {
-                id: (user.subscriptionId as any)._id.toString(),
-                planType: (user.subscriptionId as any).planType,
-              }
+              id: (user.subscriptionId as any)._id.toString(),
+              planType: (user.subscriptionId as any).planType,
+            }
             : null,
           organization: user.organizationId
             ? {
-                id: (user.organizationId as any)._id.toString(),
-                name: (user.organizationId as any).name,
-                nameAr: (user.organizationId as any).nameAr,
-              }
+              id: (user.organizationId as any)._id.toString(),
+              name: (user.organizationId as any).name,
+              nameAr: (user.organizationId as any).nameAr,
+            }
             : null,
           complex: user.complexId
             ? {
-                id: (user.complexId as any)._id.toString(),
-                name: (user.complexId as any).name,
-                nameAr: (user.complexId as any).nameAr,
-              }
+              id: (user.complexId as any)._id.toString(),
+              name: (user.complexId as any).name,
+              nameAr: (user.complexId as any).nameAr,
+            }
             : null,
           clinic: user.clinicId
             ? {
-                id: (user.clinicId as any)._id.toString(),
-                name: (user.clinicId as any).name,
-                nameAr: (user.clinicId as any).nameAr,
-              }
+              id: (user.clinicId as any)._id.toString(),
+              name: (user.clinicId as any).name,
+              nameAr: (user.clinicId as any).nameAr,
+            }
             : null,
           lastLogin: user.lastLogin,
           workingHours: (user as any).workingHours,
@@ -1402,11 +1404,12 @@ export class UserController {
     example: '507f1f77bcf86cd799439011',
   })
   @Get(':id/entities-status')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(AdminGuard)
   async getUserEntitiesStatus(
     @Param('id') userId: string,
+    @Request() req: any,
   ): Promise<UserEntitiesResponseDto> {
-    return await this.userService.checkUserEntities(userId);
+    return await this.userService.checkUserEntities(userId, req.user);
   }
 
   @ApiOperation({
@@ -1421,11 +1424,12 @@ export class UserController {
     example: '507f1f77bcf86cd799439011',
   })
   @Get(':id/check-entities')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(AdminGuard)
   async checkUserEntitiesAlias(
     @Param('id') userId: string,
+    @Request() req: any,
   ): Promise<UserEntitiesResponseDto> {
-    return await this.userService.checkUserEntities(userId);
+    return await this.userService.checkUserEntities(userId, req.user);
   }
 
   /**
@@ -1491,12 +1495,12 @@ export class UserController {
     example: '507f1f77bcf86cd799439011',
   })
   @Get(':id')
-  @UseGuards(JwtAuthGuard, AdminGuard)
+  @UseGuards(AdminGuard)
   @HttpCode(HttpStatus.OK)
-  async getUserById(@Param('id') userId: string) {
+  async getUserById(@Param('id') userId: string, @Request() req: any) {
     try {
       // Get user details with populated entities
-      const user = await this.userService.getUserDetailById(userId);
+      const user = await this.userService.getUserDetailById(userId, req.user);
 
       // Transform and return response
       return {
@@ -1515,30 +1519,30 @@ export class UserController {
           preferredLanguage: user.preferredLanguage,
           subscription: user.subscriptionId
             ? {
-                id: (user.subscriptionId as any)._id.toString(),
-                planType: (user.subscriptionId as any).planType,
-              }
+              id: (user.subscriptionId as any)._id.toString(),
+              planType: (user.subscriptionId as any).planType,
+            }
             : null,
           organization: user.organizationId
             ? {
-                id: (user.organizationId as any)._id.toString(),
-                name: (user.organizationId as any).name,
-                nameAr: (user.organizationId as any).nameAr,
-              }
+              id: (user.organizationId as any)._id.toString(),
+              name: (user.organizationId as any).name,
+              nameAr: (user.organizationId as any).nameAr,
+            }
             : null,
           complex: user.complexId
             ? {
-                id: (user.complexId as any)._id.toString(),
-                name: (user.complexId as any).name,
-                nameAr: (user.complexId as any).nameAr,
-              }
+              id: (user.complexId as any)._id.toString(),
+              name: (user.complexId as any).name,
+              nameAr: (user.complexId as any).nameAr,
+            }
             : null,
           clinic: user.clinicId
             ? {
-                id: (user.clinicId as any)._id.toString(),
-                name: (user.clinicId as any).name,
-                nameAr: (user.clinicId as any).nameAr,
-              }
+              id: (user.clinicId as any)._id.toString(),
+              name: (user.clinicId as any).name,
+              nameAr: (user.clinicId as any).nameAr,
+            }
             : null,
           lastLogin: user.lastLogin,
           workingHours: (user as any).workingHours,
@@ -1932,11 +1936,11 @@ export class UserController {
           errors: result.errors,
           targetDoctor: targetDoctor
             ? {
-                id: targetDoctor._id,
-                firstName: targetDoctor.firstName,
-                lastName: targetDoctor.lastName,
-                email: targetDoctor.email,
-              }
+              id: targetDoctor._id,
+              firstName: targetDoctor.firstName,
+              lastName: targetDoctor.lastName,
+              email: targetDoctor.email,
+            }
             : null,
         },
         message: {

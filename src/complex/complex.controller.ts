@@ -11,6 +11,8 @@ import {
   NotFoundException,
   BadRequestException,
   HttpStatus,
+  UseGuards,
+  Request,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -19,7 +21,10 @@ import {
   ApiParam,
   ApiQuery,
   ApiBody,
+  ApiBearerAuth,
 } from '@nestjs/swagger';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { AdminGuard } from '../auth/guards/admin.guard';
 import { ComplexService } from './complex.service';
 import { CreateComplexDto, UpdateComplexDto } from './dto/create-complex.dto';
 import { ListComplexesQueryDto } from './dto/list-complexes-query.dto';
@@ -44,8 +49,10 @@ import { TransferClinicsDto } from './dto/transfer-clinics.dto';
  */
 @ApiTags('Complex Management')
 @Controller('complexes')
+@UseGuards(JwtAuthGuard, AdminGuard)
+@ApiBearerAuth()
 export class ComplexController {
-  constructor(private readonly complexService: ComplexService) {}
+  constructor(private readonly complexService: ComplexService) { }
 
   /**
    * List complexes with pagination, filters, and optional counts
@@ -203,9 +210,9 @@ export class ComplexController {
       },
     },
   })
-  async listComplexes(@Query() query: ListComplexesQueryDto) {
+  async listComplexes(@Query() query: ListComplexesQueryDto, @Request() req: any) {
     try {
-      return await this.complexService.listComplexes(query);
+      return await this.complexService.listComplexes(query, req.user);
     } catch (error) {
       // Handle specific error types
       if (
@@ -398,9 +405,9 @@ export class ComplexController {
       },
     },
   })
-  async createComplex(@Body() createComplexDto: CreateComplexDto) {
+  async createComplex(@Body() createComplexDto: CreateComplexDto, @Request() req: any) {
     try {
-      const complex = await this.complexService.createComplex(createComplexDto);
+      const complex = await this.complexService.createComplex(createComplexDto, req.user);
       return {
         success: true,
         data: complex,
@@ -460,21 +467,22 @@ export class ComplexController {
   @Get('subscription/:subscriptionId')
   async getComplexBySubscription(
     @Param('subscriptionId') subscriptionId: string,
+    @Request() req: any,
   ) {
     try {
       const complex =
-        await this.complexService.getComplexBySubscription(subscriptionId);
+        await this.complexService.getComplexBySubscription(subscriptionId, req.user);
       return {
         success: true,
         message: complex
           ? {
-              ar: 'تم العثور على المجمع',
-              en: 'Complex found',
-            }
+            ar: 'تم العثور على المجمع',
+            en: 'Complex found',
+          }
           : {
-              ar: 'لم يتم العثور على مجمع لهذا الاشتراك',
-              en: 'No complex found for this subscription',
-            },
+            ar: 'لم يتم العثور على مجمع لهذا الاشتراك',
+            en: 'No complex found for this subscription',
+          },
         data: complex,
       };
     } catch (error) {
@@ -515,10 +523,11 @@ export class ComplexController {
   @Get('organization/:organizationId')
   async getComplexesByOrganization(
     @Param('organizationId') organizationId: string,
+    @Request() req: any,
   ) {
     try {
       const complexes =
-        await this.complexService.getComplexesByOrganization(organizationId);
+        await this.complexService.getComplexesByOrganization(organizationId, req.user);
       return {
         success: true,
         message: {
@@ -694,9 +703,9 @@ export class ComplexController {
       },
     },
   })
-  async getComplex(@Param('id') id: string) {
+  async getComplex(@Param('id') id: string, @Request() req: any) {
     try {
-      return await this.complexService.getComplexDetails(id);
+      return await this.complexService.getComplexDetails(id, req.user);
     } catch (error) {
       // Handle NotFoundException with bilingual error
       if (error instanceof NotFoundException) {
@@ -885,11 +894,13 @@ export class ComplexController {
   async updateComplex(
     @Param('id') id: string,
     @Body() updateComplexDto: UpdateComplexDto,
+    @Request() req: any,
   ) {
     try {
       const result = await this.complexService.updateComplex(
         id,
         updateComplexDto,
+        req.user,
       );
 
       // Return the result which includes departmentRestrictions if any
@@ -1067,11 +1078,13 @@ export class ComplexController {
   async patchComplex(
     @Param('id') id: string,
     @Body() updateComplexDto: UpdateComplexDto,
+    @Request() req: any,
   ) {
     try {
       const result = await this.complexService.updateComplex(
         id,
         updateComplexDto,
+        req.user,
       );
 
       // Return the result which includes departmentRestrictions if any
@@ -1203,9 +1216,9 @@ export class ComplexController {
       },
     },
   })
-  async softDeleteComplex(@Param('id') id: string) {
+  async softDeleteComplex(@Param('id') id: string, @Request() req: any) {
     try {
-      return await this.complexService.softDeleteComplex(id);
+      return await this.complexService.softDeleteComplex(id, req.user);
     } catch (error) {
       // Handle NotFoundException with bilingual error
       if (error instanceof NotFoundException) {
@@ -1395,14 +1408,14 @@ export class ComplexController {
   async updateComplexStatus(
     @Param('id') id: string,
     @Body() updateComplexStatusDto: UpdateComplexStatusDto,
+    @Request() req: any,
   ) {
     try {
-      // TODO: Extract userId from authenticated user context when auth is implemented
-      // For now, we pass undefined and the service will use the complex owner
       return await this.complexService.updateComplexStatus(
         id,
         updateComplexStatusDto,
-        undefined,
+        req.user.id,
+        req.user,
       );
     } catch (error) {
       // Handle NotFoundException with bilingual error
@@ -1555,9 +1568,9 @@ export class ComplexController {
       },
     },
   })
-  async getComplexCapacity(@Param('id') id: string) {
+  async getComplexCapacity(@Param('id') id: string, @Request() req: any) {
     try {
-      return await this.complexService.getComplexCapacity(id);
+      return await this.complexService.getComplexCapacity(id, req.user);
     } catch (error) {
       // Handle NotFoundException with bilingual error
       if (error instanceof NotFoundException) {
@@ -1710,11 +1723,13 @@ export class ComplexController {
   async assignPersonInCharge(
     @Param('id') id: string,
     @Body() assignPICDto: AssignPICDto,
+    @Request() req: any,
   ) {
     try {
       return await this.complexService.assignPersonInCharge(
         id,
         assignPICDto.userId,
+        req.user,
       );
     } catch (error) {
       // Handle NotFoundException with bilingual error
@@ -1824,9 +1839,9 @@ export class ComplexController {
       },
     },
   })
-  async removePersonInCharge(@Param('id') id: string) {
+  async removePersonInCharge(@Param('id') id: string, @Request() req: any) {
     try {
-      return await this.complexService.removePersonInCharge(id);
+      return await this.complexService.removePersonInCharge(id, req.user);
     } catch (error) {
       // Handle NotFoundException with bilingual error
       if (error instanceof NotFoundException) {
@@ -2017,12 +2032,14 @@ export class ComplexController {
   async transferClinics(
     @Param('id') sourceComplexId: string,
     @Body() transferClinicsDto: TransferClinicsDto,
+    @Request() req: any,
   ) {
     try {
       return await this.complexService.transferClinics(
         sourceComplexId,
         transferClinicsDto.targetComplexId,
         transferClinicsDto.clinicIds,
+        req.user,
       );
     } catch (error) {
       // Handle NotFoundException with bilingual error

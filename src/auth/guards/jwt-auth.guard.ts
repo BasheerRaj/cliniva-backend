@@ -5,12 +5,6 @@ import {
   Logger,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { Observable } from 'rxjs';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
-import { User } from '../../database/schemas/user.schema';
-import { Subscription } from '../../database/schemas/subscription.schema';
-import { SubscriptionPlan } from '../../database/schemas/subscription-plan.schema';
 import { SessionService } from '../session.service';
 import { TokenService } from '../token.service';
 import { AuthErrorCode } from '../../common/enums/auth-error-code.enum';
@@ -21,11 +15,6 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
   private readonly logger = new Logger(JwtAuthGuard.name);
 
   constructor(
-    @InjectModel(User.name) private readonly userModel: Model<User>,
-    @InjectModel(Subscription.name)
-    private readonly subscriptionModel: Model<Subscription>,
-    @InjectModel(SubscriptionPlan.name)
-    private readonly subscriptionPlanModel: Model<SubscriptionPlan>,
     private readonly sessionService: SessionService,
     private readonly tokenService: TokenService,
   ) {
