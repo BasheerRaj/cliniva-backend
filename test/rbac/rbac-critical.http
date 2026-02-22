@@ -1,0 +1,905 @@
+### ─────────────────────────────────────────────────────────────────────────
+###  CLINIVA RBAC CRITICAL TEST SCENARIOS
+###  Base URL: http://localhost:3001/api/v1
+###  Format: VS Code REST Client (.http)
+###
+###  Run each "Flow N" section top-to-bottom.
+###  Comments show expected HTTP status for each request.
+###  Token variables must be manually copied after login steps
+###  (REST Client @name captures work per-file execution).
+###
+###  Source: test/rbac/rbac-critical.e2e-spec.ts
+###  Audit:  docs/audit/rbac-audit.md
+###  Date:   2026-02-22
+### ─────────────────────────────────────────────────────────────────────────
+
+@baseUrl = http://localhost:4001/api/v1
+
+# ── Credential Variables ──────────────────────────────────────────────────────
+# These mirror the fixture users created in the e2e spec's beforeAll block.
+# For roles that use signToken() (admin, doctor, staff, super_admin),
+# you must obtain a valid JWT from your running server's JWT_SECRET before
+# running those flows. The owner and patient tokens come from the login flow.
+
+@superAdminEmail    = superadmin@cliniva.com
+@superAdminPassword = SuperAdmin123!
+
+@ownerAEmail        = owner-a@test.cliniva.com
+@ownerAPassword     = Test1234@
+
+@ownerBEmail        = owner-b@test.cliniva.com
+@ownerBPassword     = Test1234@
+
+@patientAEmail      = patient-a@test.cliniva.com
+@patientAPassword   = Test1234@
+
+# Admin / Doctor / Staff use JWT tokens signed directly from the test setup.
+# Replace the placeholder below with the actual JWT once the server is running.
+# Payload for adminA:   { sub, id: "admin-a-test-id", role: "admin", organizationId: "org-a-test-id", clinicId: "clinic-a-test-id" }
+# Payload for adminB:   { sub, id: "admin-b-test-id", role: "admin", organizationId: "org-b-test-id", clinicId: "clinic-b-test-id" }
+# Payload for complexAdminA: { sub, id: "complex-admin-a-test-id", role: "admin", organizationId: "org-a-test-id", complexId: "complex-a-test-id" }
+# Payload for doctorA:  { sub, id: "doctor-a-test-id",  role: "doctor", clinicId: "clinic-a-test-id", organizationId: "org-a-test-id" }
+# Payload for doctorA2: { sub, id: "doctor-a2-test-id", role: "doctor", clinicId: "clinic-a-test-id", organizationId: "org-a-test-id" }
+# Payload for staffA:   { sub, id: "staff-a-test-id",   role: "staff",  clinicId: "clinic-a-test-id", organizationId: "org-a-test-id" }
+# Payload for superAdmin: { sub, id: "super-admin-test-id", role: "super_admin" }
+@adminAToken        = REPLACE_WITH_SIGNED_JWT_FOR_ADMIN_A
+@adminBToken        = REPLACE_WITH_SIGNED_JWT_FOR_ADMIN_B
+@complexAdminAToken = REPLACE_WITH_SIGNED_JWT_FOR_COMPLEX_ADMIN_A
+@doctorAToken       = REPLACE_WITH_SIGNED_JWT_FOR_DOCTOR_A
+@doctorA2Token      = REPLACE_WITH_SIGNED_JWT_FOR_DOCTOR_A2
+@staffAToken        = REPLACE_WITH_SIGNED_JWT_FOR_STAFF_A
+@superAdminToken    = REPLACE_WITH_SIGNED_JWT_FOR_SUPER_ADMIN
+
+# ── Entity ID Variables ───────────────────────────────────────────────────────
+# All IDs use valid 24-hex MongoDB ObjectId format to prevent CastError 500.
+#
+# IMPORTANT — two behaviours to expect depending on whether DB is seeded:
+#
+#   • Flow 1 (no auth): ID format doesn't matter — 401 is returned before any
+#     DB call. These placeholder IDs are fine as-is.
+#
+#   • Flows 3-6 (cross-tenant 403): For a request to return 403 rather than 404,
+#     the document must actually exist in the database AND belong to the other
+#     tenant. Replace these placeholder IDs with real IDs from `npm run db:seed`
+#     output. Using placeholder IDs will give 404 (document not found) — that is
+#     still a valid test outcome: no unauthorized data was returned.
+#
+# Tenant A resource IDs (prefix aaa…)
+@tenantA_clinic_id          = aaa000000000000000000001
+@tenantA_complex_id         = aaa000000000000000000002
+@orgA_id                    = aaa000000000000000000003
+@subA_id                    = aaa000000000000000000004
+@adminA_id                  = aaa000000000000000000005
+@doctorA_id                 = aaa000000000000000000006
+@doctorA2_id                = aaa000000000000000000007
+@staffA_id                  = aaa000000000000000000008
+@some_complex_id            = aaa000000000000000000009
+
+# Tenant B resource IDs (prefix bbb…)
+@tenantB_clinic_id          = bbb000000000000000000001
+@tenantB_complex_id         = bbb000000000000000000002
+@orgB_id                    = bbb000000000000000000003
+@subB_id                    = bbb000000000000000000004
+@adminB_id                  = bbb000000000000000000005
+@ownerB_subscription_id     = bbb000000000000000000009
+
+# Generic placeholder IDs (prefix ccc/ddd/eee/fff…)
+@some_patient_id            = ccc000000000000000000001
+@some_other_patient_id      = ccc000000000000000000002
+@unrelated_patient_id       = ccc000000000000000000003
+@some_appointment_id        = ddd000000000000000000001
+@some_user_id               = eee000000000000000000001
+@some_sub_id                = fff000000000000000000001
+
+
+### ═══════════════════════════════════════════════════════════════
+### PRELIMINARY — Register test users (owner and patient roles)
+### These must be run once to create the ownerA, ownerB, patientA
+### accounts used in Flows 2, 3, and 10.
+### After registration, copy the access_token values to the token
+### variables in each flow section below.
+### ═══════════════════════════════════════════════════════════════
+
+### Register Owner A (Tenant A)
+# Purpose: Create the ownerA fixture account used in Flows 3 and 10.
+# Expected: 201 Created
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "email": "owner-a@test.cliniva.com",
+  "password": "Test1234@",
+  "firstName": "Owner",
+  "lastName": "TenantA",
+  "role": "owner"
+}
+
+###
+
+### Register Owner B (Tenant B)
+# Purpose: Create the ownerB fixture account — represents a separate tenant.
+# Expected: 201 Created
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "email": "owner-b@test.cliniva.com",
+  "password": "Test1234@",
+  "firstName": "Owner",
+  "lastName": "TenantB",
+  "role": "owner"
+}
+
+###
+
+### Register Patient A
+# Purpose: Create the patientA fixture account used in Flows 2, 8, and 9.
+# Expected: 201 Created
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "email": "patient-a@test.cliniva.com",
+  "password": "Test1234@",
+  "firstName": "Patient",
+  "lastName": "Alpha",
+  "role": "patient"
+}
+
+
+### ═══════════════════════════════════════════════════════════════
+### FLOW 1 — SEC-1: Unauthenticated Requests
+### All requests below must return 401 — no Authorization header sent.
+### Source: ISSUE-001, ISSUE-002, ISSUE-003 in rbac-audit.md
+### ═══════════════════════════════════════════════════════════════
+
+### 1-01  GET /users — no token
+# Expected: 401
+GET {{baseUrl}}/users
+
+###
+
+### 1-02  GET /users/me — no token
+# Expected: 401
+GET {{baseUrl}}/users/me
+
+###
+
+### 1-03  GET /auth/profile — no token
+# Expected: 401
+GET {{baseUrl}}/auth/profile
+
+###
+
+### 1-04  POST /auth/logout — no token
+# Expected: 401
+POST {{baseUrl}}/auth/logout
+Content-Type: application/json
+
+{}
+
+###
+
+### 1-05  POST /auth/change-password — no token
+# Expected: 401
+POST {{baseUrl}}/auth/change-password
+Content-Type: application/json
+
+{
+  "currentPassword": "Test1234@",
+  "newPassword": "NewPass5678@",
+  "confirmPassword": "NewPass5678@"
+}
+
+###
+
+### 1-06  GET /clinics — no token
+# Expected: 401
+GET {{baseUrl}}/clinics
+
+###
+
+### 1-07  POST /clinics — no token
+# Expected: 401
+POST {{baseUrl}}/clinics
+Content-Type: application/json
+
+{
+  "name": "Test Clinic"
+}
+
+###
+
+### 1-08  GET /appointments — no token
+# Expected: 401
+GET {{baseUrl}}/appointments
+
+###
+
+### 1-09  POST /appointments — no token
+# Expected: 401
+POST {{baseUrl}}/appointments
+Content-Type: application/json
+
+{
+  "patientId": "{{some_patient_id}}",
+  "doctorId": "{{doctorA_id}}",
+  "clinicId": "{{tenantA_clinic_id}}",
+  "appointmentDate": "2026-03-01",
+  "appointmentTime": "10:00"
+}
+
+###
+
+### 1-10  GET /patients — no token
+# Expected: 401
+GET {{baseUrl}}/patients
+
+###
+
+### 1-11  POST /patients — no token
+# Expected: 401
+POST {{baseUrl}}/patients
+Content-Type: application/json
+
+{
+  "firstName": "Test",
+  "lastName": "Patient",
+  "cardNumber": "TEST001",
+  "dateOfBirth": "1990-01-01",
+  "gender": "male"
+}
+
+###
+
+### 1-12  GET /medical-reports — no token
+# Expected: 401
+GET {{baseUrl}}/medical-reports
+
+###
+
+### 1-13  POST /medical-reports — no token
+# Expected: 401
+POST {{baseUrl}}/medical-reports
+Content-Type: application/json
+
+{
+  "patientId": "{{some_patient_id}}",
+  "diagnosis": "Test diagnosis"
+}
+
+###
+
+### 1-14  POST /onboarding/start — no token
+# Expected: 401
+POST {{baseUrl}}/onboarding/start
+Content-Type: application/json
+
+{}
+
+###
+
+### 1-15  GET /auth/debug/user/:userId — no token (ISSUE-001 regression)
+# Purpose: Verify debug endpoint requires authentication — was fully unprotected.
+# NOTE: Fixed in current codebase — now uses JwtAuthGuard + Roles(SUPER_ADMIN).
+# Expected: 401
+GET {{baseUrl}}/auth/debug/user/{{some_user_id}}
+
+###
+
+### 1-16  POST /subscriptions — no token (ISSUE-002 regression)
+# Purpose: Verify subscription creation requires authentication.
+# NOTE: Fixed — controller now has @UseGuards(JwtAuthGuard) at class level.
+# Expected: 401
+POST {{baseUrl}}/subscriptions
+Content-Type: application/json
+
+{
+  "userId": "eee000000000000000000001",
+  "planId": "any-plan"
+}
+
+###
+
+### 1-17  PUT /subscriptions/:id/status — no token (ISSUE-002 regression)
+# Purpose: Verify subscription status update requires authentication.
+# Expected: 401
+PUT {{baseUrl}}/subscriptions/{{some_sub_id}}/status
+Content-Type: application/json
+
+{
+  "status": "cancelled"
+}
+
+###
+
+### 1-18  GET /complexes — no token (ISSUE-003 regression)
+# Purpose: Verify complex listing requires authentication.
+# NOTE: Fixed — controller now has @UseGuards(JwtAuthGuard, AdminGuard).
+# Expected: 401
+GET {{baseUrl}}/complexes
+
+###
+
+### 1-19  POST /complexes — no token (ISSUE-003 regression)
+# Purpose: Verify complex creation requires authentication.
+# Expected: 401
+POST {{baseUrl}}/complexes
+Content-Type: application/json
+
+{
+  "name": "Test Complex"
+}
+
+###
+
+### 1-20  DELETE /complexes/:id — no token (ISSUE-003 regression)
+# Purpose: Verify complex deletion requires authentication.
+# Expected: 401
+DELETE {{baseUrl}}/complexes/{{some_complex_id}}
+
+
+### ═══════════════════════════════════════════════════════════════
+### FLOW 2 — SEC-2: Patient Role Blocked from Management Endpoints
+### Patient can only VIEW their own appointments — no management access.
+### Source: ISSUE-004, ISSUE-005, ISSUE-006 in rbac-audit.md
+### ═══════════════════════════════════════════════════════════════
+
+### 2-01  Login as Patient A
+# Purpose: Obtain patientA token for use in subsequent Flow 2 requests.
+# Expected: 200 OK — copy access_token into @patientAToken below
+# @name loginPatient
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{patientAEmail}}",
+  "password": "{{patientAPassword}}"
+}
+
+###
+
+# After running the request above, set the token:
+@patientAToken = {{loginPatient.response.body.access_token}}
+
+### 2-02  GET /users — patient cannot access user management
+# Purpose: Patients must not access the admin user list (admin/owner/super_admin only).
+# Expected: 403 Forbidden
+GET {{baseUrl}}/users
+Authorization: Bearer {{patientAToken}}
+
+###
+
+### 2-03  POST /patients — patient cannot create another patient
+# Purpose: Patient role has no write access to patient records (ISSUE-004).
+# Expected: 403 Forbidden
+POST {{baseUrl}}/patients
+Authorization: Bearer {{patientAToken}}
+Content-Type: application/json
+
+{
+  "firstName": "Fake",
+  "lastName": "Patient",
+  "cardNumber": "FAKE001",
+  "dateOfBirth": "1990-01-01",
+  "gender": "male"
+}
+
+###
+
+### 2-04  DELETE /patients/:id — patient cannot delete patient records
+# Purpose: Only admin/owner may delete patient records (ISSUE-004).
+# Expected: 403 Forbidden
+DELETE {{baseUrl}}/patients/{{some_patient_id}}
+Authorization: Bearer {{patientAToken}}
+
+###
+
+### 2-05  GET /patients — patient cannot list ALL patients system-wide
+# Purpose: Patients may only access their own record, not the full list (ISSUE-004).
+# Expected: 403 Forbidden
+GET {{baseUrl}}/patients
+Authorization: Bearer {{patientAToken}}
+
+###
+
+### 2-06  POST /appointments — patient cannot create appointments
+# Purpose: Patients can only VIEW own appointments — not create (ISSUE-006).
+# Expected: 403 Forbidden
+POST {{baseUrl}}/appointments
+Authorization: Bearer {{patientAToken}}
+Content-Type: application/json
+
+{
+  "patientId": "{{some_patient_id}}",
+  "doctorId": "{{doctorA_id}}",
+  "clinicId": "{{tenantA_clinic_id}}",
+  "appointmentDate": "2026-03-01",
+  "appointmentTime": "10:00"
+}
+
+###
+
+### 2-07  GET /medical-reports — patient cannot read all medical reports
+# Purpose: Patients have no access to the full medical-reports list (ISSUE-005).
+# Expected: 403 Forbidden
+GET {{baseUrl}}/medical-reports
+Authorization: Bearer {{patientAToken}}
+
+###
+
+### 2-08  POST /medical-reports — patient cannot create medical reports
+# Purpose: Medical report creation is restricted to doctor/owner/admin/super_admin (ISSUE-005).
+# Expected: 403 Forbidden
+POST {{baseUrl}}/medical-reports
+Authorization: Bearer {{patientAToken}}
+Content-Type: application/json
+
+{
+  "patientId": "{{some_patient_id}}",
+  "diagnosis": "Test diagnosis"
+}
+
+###
+
+### 2-09  GET /complexes — patient cannot access complex management
+# Purpose: Complex management is admin-level only (ISSUE-003).
+# Expected: 403 Forbidden
+GET {{baseUrl}}/complexes
+Authorization: Bearer {{patientAToken}}
+
+###
+
+### 2-10  PUT /subscriptions/:id/status — patient cannot update subscription status
+# Purpose: Subscription status management is super_admin only (ISSUE-002).
+# Expected: 403 Forbidden
+PUT {{baseUrl}}/subscriptions/{{some_sub_id}}/status
+Authorization: Bearer {{patientAToken}}
+Content-Type: application/json
+
+{
+  "status": "cancelled"
+}
+
+
+### ═══════════════════════════════════════════════════════════════
+### FLOW 3 — SEC-3: Cross-Tenant Isolation — Owner A vs Tenant B
+### Owner A must never be able to read or modify Tenant B resources.
+### Source: ISSUE-007, ISSUE-010 in rbac-audit.md
+### ═══════════════════════════════════════════════════════════════
+
+### 3-01  Login as Owner A
+# Purpose: Obtain ownerA token. This user belongs to Tenant A (org-a-test-id).
+# Expected: 200 OK — copy access_token into @ownerAToken below
+# @name loginOwnerA
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{ownerAEmail}}",
+  "password": "{{ownerAPassword}}"
+}
+
+###
+
+# After running the request above, set the token:
+@ownerAToken = {{loginOwnerA.response.body.access_token}}
+
+### 3-02  GET /clinics/:id — Owner A reads Tenant B clinic by ID
+# Cross-tenant: Owner A must not read a clinic belonging to Tenant B.
+# Expected: 403 Forbidden
+GET {{baseUrl}}/clinics/{{tenantB_clinic_id}}
+Authorization: Bearer {{ownerAToken}}
+
+###
+
+### 3-03  PUT /clinics/:id — Owner A attempts to update Tenant B clinic
+# Cross-tenant: Ownership check must block the write attempt.
+# Expected: 403 Forbidden
+PUT {{baseUrl}}/clinics/{{tenantB_clinic_id}}
+Authorization: Bearer {{ownerAToken}}
+Content-Type: application/json
+
+{
+  "name": "Hijacked Clinic"
+}
+
+###
+
+### 3-04  GET /complexes/:id — Owner A reads Tenant B complex
+# Cross-tenant: Owner A must not retrieve a complex outside their organization.
+# Expected: 403 Forbidden
+GET {{baseUrl}}/complexes/{{tenantB_complex_id}}
+Authorization: Bearer {{ownerAToken}}
+
+###
+
+### 3-05  DELETE /complexes/:id — Owner A attempts to delete Tenant B complex
+# Cross-tenant: Deletion of another tenant's complex must be blocked (ISSUE-003, ISSUE-011).
+# Expected: 403 Forbidden
+DELETE {{baseUrl}}/complexes/{{tenantB_complex_id}}
+Authorization: Bearer {{ownerAToken}}
+
+###
+
+### 3-06  PUT /subscriptions/:id/status — Owner A cancels Owner B's subscription
+# Cross-tenant: Only super_admin may update subscription status.
+# Owner A guessing Owner B's subscription ID must not succeed.
+# Expected: 403 Forbidden
+PUT {{baseUrl}}/subscriptions/{{ownerB_subscription_id}}/status
+Authorization: Bearer {{ownerAToken}}
+Content-Type: application/json
+
+{
+  "status": "cancelled"
+}
+
+###
+
+### 3-07  GET /users?organizationId=org-b-test-id — Owner A queries Tenant B users
+# Cross-tenant: User list must never return users from a different tenant (ISSUE-007).
+# Acceptable outcomes:
+#   - 403 Forbidden (preferred), OR
+#   - 200 OK with zero Tenant B users in the response body
+# Expected: 403 OR 200 with no org-b users leaked
+GET {{baseUrl}}/users?organizationId={{orgB_id}}
+Authorization: Bearer {{ownerAToken}}
+
+
+### ═══════════════════════════════════════════════════════════════
+### FLOW 4 — SEC-4: Admin Scope Violations
+### Admins are scoped to their own organization/clinic.
+### Platform-level actions and cross-org access must be blocked.
+### Source: ISSUE-007, ISSUE-012, ISSUE-014 in rbac-audit.md
+### ═══════════════════════════════════════════════════════════════
+
+### 4-01  GET /clinics/:id — Admin A reads Tenant B clinic
+# Cross-tenant: Admin A is scoped to org-a-test-id / clinic-a-test-id.
+# Tenant B's clinic must be inaccessible.
+# Expected: 403 Forbidden
+GET {{baseUrl}}/clinics/{{tenantB_clinic_id}}
+Authorization: Bearer {{adminAToken}}
+
+###
+
+### 4-02  GET /clinics/:id — Complex Admin A reads clinic outside their complex
+# Scope violation: Complex Admin A only covers complex-a-test-id.
+# Tenant B's clinic belongs to a different complex/organization.
+# Expected: 403 Forbidden
+GET {{baseUrl}}/clinics/{{tenantB_clinic_id}}
+Authorization: Bearer {{complexAdminAToken}}
+
+###
+
+### 4-03  PATCH /users/:id/status — Admin A deactivates a user from Tenant B
+# Cross-tenant: adminB is in org-b-test-id; adminA must not modify them (ISSUE-012).
+# Expected: 403 Forbidden
+PATCH {{baseUrl}}/users/{{adminB_id}}/status
+Authorization: Bearer {{adminAToken}}
+Content-Type: application/json
+
+{
+  "isActive": false
+}
+
+###
+
+### 4-04  PUT /subscriptions/:id/status — Admin tries to manage subscription plans
+# Platform-level action: Only super_admin may update subscription status.
+# Expected: 403 Forbidden
+PUT {{baseUrl}}/subscriptions/{{some_sub_id}}/status
+Authorization: Bearer {{adminAToken}}
+Content-Type: application/json
+
+{
+  "status": "cancelled"
+}
+
+###
+
+### 4-05  POST /users — Admin cannot create another admin (owner/super_admin only)
+# Role escalation: admins can create doctor/staff, never another admin (ISSUE-014).
+# Expected: 403 Forbidden
+POST {{baseUrl}}/users
+Authorization: Bearer {{adminAToken}}
+Content-Type: application/json
+
+{
+  "email": "new-admin-fixture@test.cliniva.com",
+  "password": "Test1234@",
+  "firstName": "New",
+  "lastName": "Admin",
+  "role": "admin"
+}
+
+
+### ═══════════════════════════════════════════════════════════════
+### FLOW 5 — SEC-5: Doctor Accessing Another Doctor's Patient Records
+### Doctors must only access records within their own clinic scope.
+### Source: ISSUE-005, ISSUE-018 in rbac-audit.md
+### ═══════════════════════════════════════════════════════════════
+
+### 5-01  GET /medical-reports — Doctor A reads ALL medical reports system-wide
+# Doctor A's clinic is clinic-a-test-id.
+# If 200, response must contain ONLY reports from clinic-a-test-id.
+# If 403, the role guard is enforcing correctly.
+# Expected: 403 (preferred) OR 200 scoped to doctorA's clinic only
+GET {{baseUrl}}/medical-reports
+Authorization: Bearer {{doctorAToken}}
+
+###
+
+### 5-02  GET /medical-reports/patient/:patientId — Doctor A2 reads another patient's records
+# Doctor A2 is not assigned to "some-other-patient-id".
+# The endpoint must validate clinic/doctor ownership before returning records.
+# Expected: 403 OR 404 (never 200 with cross-doctor data)
+GET {{baseUrl}}/medical-reports/patient/{{some_other_patient_id}}
+Authorization: Bearer {{doctorA2Token}}
+
+###
+
+### 5-03  PUT /patients/:id/medical-history — Doctor A updates unrelated patient
+# Doctor A must not update medical history for a patient outside their assignment.
+# Expected: 403 Forbidden
+PUT {{baseUrl}}/patients/{{unrelated_patient_id}}/medical-history
+Authorization: Bearer {{doctorAToken}}
+Content-Type: application/json
+
+{
+  "allergies": ["penicillin"]
+}
+
+
+### ═══════════════════════════════════════════════════════════════
+### FLOW 6 — SEC-6: Staff Role Restrictions on Medical Data
+### Staff can manage scheduling/admin tasks but never clinical records.
+### Source: ISSUE-004, ISSUE-005, ISSUE-007 in rbac-audit.md
+### ═══════════════════════════════════════════════════════════════
+
+### 6-01  POST /medical-reports — Staff cannot create medical reports
+# Clinical data creation is restricted to doctor/owner/admin/super_admin (ISSUE-005).
+# Expected: 403 Forbidden
+POST {{baseUrl}}/medical-reports
+Authorization: Bearer {{staffAToken}}
+Content-Type: application/json
+
+{
+  "patientId": "{{some_patient_id}}",
+  "diagnosis": "Test diagnosis"
+}
+
+###
+
+### 6-02  PUT /patients/:id/medical-history — Staff cannot update medical history
+# Medical history updates are doctor/admin level only (ISSUE-004).
+# Expected: 403 Forbidden
+PUT {{baseUrl}}/patients/{{some_patient_id}}/medical-history
+Authorization: Bearer {{staffAToken}}
+Content-Type: application/json
+
+{
+  "allergies": ["aspirin"]
+}
+
+###
+
+### 6-03  DELETE /patients/:id — Staff cannot delete patients
+# Patient deletion requires admin/owner role (ISSUE-004).
+# Expected: 403 Forbidden
+DELETE {{baseUrl}}/patients/{{some_patient_id}}
+Authorization: Bearer {{staffAToken}}
+
+###
+
+### 6-04  GET /users — Staff cannot access user management
+# User management list is admin/owner/super_admin only (ISSUE-007).
+# Expected: 403 Forbidden
+GET {{baseUrl}}/users
+Authorization: Bearer {{staffAToken}}
+
+
+### ═══════════════════════════════════════════════════════════════
+### FLOW 7 — SEC-7: Super-Admin Cross-Tenant Access (expect 200)
+### Super-admin must be able to read any resource across all tenants.
+### Source: ISSUE-020 in rbac-audit.md (RolesGuard super_admin bypass is intentional).
+### ═══════════════════════════════════════════════════════════════
+
+### 7-01  Login as Super-Admin
+# Purpose: Obtain superAdmin token for cross-tenant verification.
+# NOTE: In the e2e spec, super_admin token is signed directly via jwtService.sign().
+#       For manual testing, use the @superAdminToken variable above or login if seeded.
+# Expected: 200 OK
+# @name loginSuperAdmin
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{superAdminEmail}}",
+  "password": "{{superAdminPassword}}"
+}
+
+###
+
+# After running the request above, set the token (or use pre-signed token above):
+@superAdminToken = {{loginSuperAdmin.response.body.access_token}}
+
+### 7-02  GET /users — Super-admin lists all users
+# Super-admin must see users across all tenants.
+# Expected: 200 OK
+GET {{baseUrl}}/users
+Authorization: Bearer {{superAdminToken}}
+
+###
+
+### 7-03  GET /clinics — Super-admin accesses Tenant A clinics
+# Expected: 200 OK
+GET {{baseUrl}}/clinics
+Authorization: Bearer {{superAdminToken}}
+
+###
+
+### 7-04  GET /clinics?subscriptionId=sub-b-test-id — Super-admin accesses Tenant B clinics
+# Cross-tenant read: super_admin only — must succeed.
+# Expected: 200 OK
+GET {{baseUrl}}/clinics?subscriptionId={{subB_id}}
+Authorization: Bearer {{superAdminToken}}
+
+###
+
+### 7-05  GET /medical-reports — Super-admin reads all medical reports
+# Expected: 200 OK
+GET {{baseUrl}}/medical-reports
+Authorization: Bearer {{superAdminToken}}
+
+###
+
+### 7-06  GET /appointments — Super-admin reads all appointments
+# Expected: 200 OK
+GET {{baseUrl}}/appointments
+Authorization: Bearer {{superAdminToken}}
+
+###
+
+### 7-07  GET /users/:id — Super-admin retrieves Owner B by ID
+# Cross-tenant user lookup — must succeed for super_admin.
+# Replace {{ownerB_id}} below with the actual ID returned from Owner B's registration.
+# Expected: 200 OK
+@ownerB_id = REPLACE_WITH_OWNER_B_USER_ID
+GET {{baseUrl}}/users/{{ownerB_id}}
+Authorization: Bearer {{superAdminToken}}
+
+
+### ═══════════════════════════════════════════════════════════════
+### FLOW 8 — SEC-8: Appointment Ownership Boundaries
+### Patients may only view their OWN appointments.
+### Source: ISSUE-006, ISSUE-015, ISSUE-016 in rbac-audit.md
+### ═══════════════════════════════════════════════════════════════
+
+### 8-01  Login as Patient A (reuse if already logged in from Flow 2)
+# Purpose: Confirm patientA token is active for appointment ownership checks.
+# Expected: 200 OK
+# @name loginPatientFlow8
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{patientAEmail}}",
+  "password": "{{patientAPassword}}"
+}
+
+###
+
+# After running the request above, set the token:
+@patientATokenFlow8 = {{loginPatientFlow8.response.body.access_token}}
+
+### 8-02  GET /appointments/patient/:patientId — Patient A views another patient's appointments
+# Ownership violation: patientA is requesting appointments for a different patientId.
+# Expected: 403 Forbidden
+GET {{baseUrl}}/appointments/patient/{{some_other_patient_id}}
+Authorization: Bearer {{patientATokenFlow8}}
+
+###
+
+### 8-03  GET /appointments/schedule/upcoming — Staff sees upcoming appointments
+# Scope check: If 200, response must contain ONLY clinic-a-test-id appointments.
+# Must never return appointments from all clinics system-wide (ISSUE-016).
+# Expected: 200 scoped to staffA's clinic OR 403
+GET {{baseUrl}}/appointments/schedule/upcoming
+Authorization: Bearer {{staffAToken}}
+
+
+### ═══════════════════════════════════════════════════════════════
+### FLOW 9 — SEC-9: Debug Endpoint Security Regression (ISSUE-001)
+### GET /auth/debug/user/:id was fully unprotected before the fix.
+### Now requires JwtAuthGuard + Roles(SUPER_ADMIN).
+### ═══════════════════════════════════════════════════════════════
+
+### 9-01  GET /auth/debug/user/:id — no token (anonymous access)
+# ISSUE-001 regression: endpoint was completely unprotected.
+# Expected: 401 Unauthorized
+GET {{baseUrl}}/auth/debug/user/{{some_user_id}}
+
+###
+
+### 9-02  GET /auth/debug/user/:id — authenticated as patient role
+# Patient role must not access admin/debug functionality.
+# Expected: 403 Forbidden OR 404 Not Found
+GET {{baseUrl}}/auth/debug/user/{{some_user_id}}
+Authorization: Bearer {{patientAToken}}
+
+###
+
+### 9-03  GET /auth/debug/user/:id — authenticated as staff role
+# Staff role must not access debug endpoint.
+# Expected: 403 Forbidden OR 404 Not Found
+GET {{baseUrl}}/auth/debug/user/{{some_user_id}}
+Authorization: Bearer {{staffAToken}}
+
+###
+
+### 9-04  GET /auth/debug/user/:id — authenticated as super_admin
+# Super-admin is the only role authorised for this debug endpoint.
+# Replace {{ownerA_id}} with the actual ownerA user ID from registration.
+# Expected: 200 OK OR 404 (if user not found in test DB — both are acceptable)
+@ownerA_id = REPLACE_WITH_OWNER_A_USER_ID
+GET {{baseUrl}}/auth/debug/user/{{ownerA_id}}
+Authorization: Bearer {{superAdminToken}}
+
+
+### ═══════════════════════════════════════════════════════════════
+### FLOW 10 — SEC-10: Owner Cannot Manage Platform Plans
+### Subscription plan management is a super_admin-only platform action.
+### Source: ISSUE-002 in rbac-audit.md; Appendix B (missing /plans endpoint).
+### ═══════════════════════════════════════════════════════════════
+
+### 10-01  Login as Owner A (reuse if already logged in from Flow 3)
+# Expected: 200 OK
+# @name loginOwnerAFlow10
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{ownerAEmail}}",
+  "password": "{{ownerAPassword}}"
+}
+
+###
+
+# After running the request above, set the token:
+@ownerATokenFlow10 = {{loginOwnerAFlow10.response.body.access_token}}
+
+### 10-02  POST /plans — Owner A attempts to create a new subscription plan
+# Platform-level: Only super_admin should create plans.
+# NOTE (Appendix B): The /plans endpoint does not exist yet in the codebase.
+# This request verifies the endpoint is either absent (404) or forbidden (403).
+# Expected: 403 Forbidden OR 404 Not Found (never 201 Created)
+POST {{baseUrl}}/plans
+Authorization: Bearer {{ownerATokenFlow10}}
+Content-Type: application/json
+
+{
+  "name": "custom-plan",
+  "price": 0
+}
+
+###
+
+### 10-03  GET /subscriptions/plans — Owner A views available subscription plans
+# Plan listing is a marketing / informational action — readable by owners.
+# Expected: 200 OK OR 401 (both are acceptable per spec)
+GET {{baseUrl}}/subscriptions/plans
+Authorization: Bearer {{ownerATokenFlow10}}
+
+###
+
+### 10-04  PUT /subscriptions/:id/status — Owner A cancels Owner B's subscription
+# Cross-tenant + role violation: Only super_admin may change subscription status.
+# Owner A must not be able to cancel another owner's subscription by guessing the ID.
+# Expected: 403 Forbidden OR 404 Not Found
+PUT {{baseUrl}}/subscriptions/{{ownerB_subscription_id}}/status
+Authorization: Bearer {{ownerATokenFlow10}}
+Content-Type: application/json
+
+{
+  "status": "cancelled"
+}

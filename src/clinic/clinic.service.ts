@@ -394,6 +394,17 @@ export class ClinicService {
    * @throws NotFoundException if clinic not found
    */
   async getClinicWithDetails(clinicId: string, requestingUser?: any): Promise<any> {
+    // Guard: reject malformed IDs before hitting Mongoose to avoid CastError 500
+    if (!Types.ObjectId.isValid(clinicId)) {
+      throw new NotFoundException({
+        message: {
+          ar: 'العيادة غير موجودة',
+          en: 'Clinic not found',
+        },
+        code: 'CLINIC_007',
+      });
+    }
+
     // 1. Get clinic with populated relationships
     const clinic = await this.clinicModel
       .findById(clinicId)
