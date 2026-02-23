@@ -53,7 +53,7 @@ export class ResetPasswordDto {
       en: 'New password must be at least 8 characters long',
     }),
   })
-  @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/, {
+  @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])/, {
     message: JSON.stringify({
       ar: 'كلمة المرور الجديدة يجب أن تحتوي على حرف كبير وحرف صغير ورقم ورمز خاص',
       en: 'New password must contain at least one uppercase letter, one lowercase letter, one number, and one special character',
