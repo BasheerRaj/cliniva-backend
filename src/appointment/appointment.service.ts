@@ -13,6 +13,9 @@ import { User } from '../database/schemas/user.schema';
 import { Clinic } from '../database/schemas/clinic.schema';
 import { Service } from '../database/schemas/service.schema';
 import { WorkingHoursIntegrationService } from './services/working-hours-integration.service';
+import { AppointmentValidationService } from './services/appointment-validation.service';
+import { AppointmentStatusService } from './services/appointment-status.service';
+import { AppointmentCalendarService } from './services/appointment-calendar.service';
 import { NotificationService } from '../notification/notification.service';
 import { AuditService } from '../auth/audit.service';
 import { ERROR_MESSAGES } from '../common/utils/error-messages.constant';
@@ -35,6 +38,9 @@ import {
   ConcludeAppointmentDto,
   CalendarQueryDto,
 } from './dto';
+import { CreateAppointmentWithSessionDto } from './dto/create-appointment-with-session.dto';
+import { AppointmentSessionService } from './services/appointment-session.service';
+import { SESSION_ERROR_MESSAGES } from './constants/session-error-messages.constant';
 
 @Injectable()
 export class AppointmentService {
@@ -48,8 +54,12 @@ export class AppointmentService {
     @InjectModel('Clinic') private readonly clinicModel: Model<Clinic>,
     @InjectModel('Service') private readonly serviceModel: Model<Service>,
     private readonly workingHoursIntegrationService: WorkingHoursIntegrationService,
+    private readonly appointmentValidationService: AppointmentValidationService,
+    private readonly appointmentStatusService: AppointmentStatusService,
+    private readonly appointmentCalendarService: AppointmentCalendarService,
     private readonly notificationService: NotificationService,
     private readonly auditService: AuditService,
+    private readonly appointmentSessionService: AppointmentSessionService,
   ) { }
 
   /**
@@ -215,10 +225,12 @@ export class AppointmentService {
         const conflicts = await this.checkAppointmentConflicts(
           patientId,
           doctorId,
-          appointmentDate,
+          appointmentDate instanceof Date ? appointmentDate.toISOString().split('T')[0] : String(appointmentDate),
           appointmentTime,
           (appointmentDto as any).durationMinutes || 30,
           excludeAppointmentId,
+          (appointmentDto as any).serviceId,
+          (appointmentDto as any).sessionId,
         );
 
         if (conflicts.length > 0) {
@@ -231,7 +243,11 @@ export class AppointmentService {
   }
 
   /**
-   * Check for appointment conflicts
+   * Check for appointment conflicts.
+   *
+   * When both serviceId and sessionId are provided the method resolves the
+   * session-specific duration from the service document and uses that for
+   * the time-range calculation (Requirements: 8.1-8.4).
    */
   async checkAppointmentConflicts(
     patientId: string,
@@ -240,7 +256,21 @@ export class AppointmentService {
     appointmentTime: string,
     durationMinutes: number = 30,
     excludeAppointmentId?: string,
+    serviceId?: string,
+    sessionId?: string,
   ): Promise<AppointmentConflictDto[]> {
+    // Resolve session-specific duration when both serviceId and sessionId are known
+    if (serviceId && sessionId) {
+      const svc = await this.serviceModel.findById(serviceId);
+      if (svc) {
+        const sess = svc.sessions?.find((s) => (s as any)._id === sessionId);
+        if (sess) {
+          durationMinutes =
+            (sess as any).duration ?? svc.durationMinutes ?? durationMinutes;
+        }
+      }
+    }
+
     const conflicts: AppointmentConflictDto[] = [];
 
     const appointmentStart = new Date(
@@ -351,41 +381,110 @@ export class AppointmentService {
   }
 
   /**
-   * Create a new appointment
+   * Task 3.1: Create a new appointment
+   * Requirements: 1.1-1.12
+   * 
+   * Validates all required entities exist (Patient, Doctor, Service, Clinic)
+   * Validates optional entities (Department) if provided
+   * Verifies service is provided by clinic
+   * Verifies doctor is authorized for service
+   * Gets service duration and sets appointment duration
+   * Sets initial status to "scheduled"
+   * Rejects past dates with bilingual error
+   * Records createdBy user and timestamp
+   * Returns complete appointment with populated relationships
    */
   async createAppointment(
-    createAppointmentDto: CreateAppointmentDto,
-    createdByUserId?: string,
+    createAppointmentDto: CreateAppointmentWithSessionDto,
+    createdByUserId: string,
   ): Promise<Appointment> {
     this.logger.log(
       `Creating appointment for patient ${createAppointmentDto.patientId}`,
     );
 
-    await this.validateAppointmentData(createAppointmentDto);
-
-    // Get service details for default duration if not provided
-    // Note: Service validation already checked in validateAppointmentData
-    let durationMinutes = createAppointmentDto.durationMinutes;
-    if (!durationMinutes) {
-      const service = await this.serviceModel.findById(
+    // Task 6.8: Validate all entities and relationships (Requirements 1.1-1.7)
+    const { service, clinic } =
+      await this.appointmentValidationService.validateAllEntitiesAndRelationships(
+        createAppointmentDto.patientId,
+        createAppointmentDto.doctorId,
         createAppointmentDto.serviceId,
+        createAppointmentDto.clinicId,
+        createAppointmentDto.departmentId,
       );
-      durationMinutes = service?.durationMinutes || 30;
+
+    const { sessionId } = createAppointmentDto;
+
+    // Enforce sessionId when service has sessions (Requirement 3.1)
+    if (service.sessions && service.sessions.length > 0 && !sessionId) {
+      throw new BadRequestException({
+        message: SESSION_ERROR_MESSAGES.SESSION_ID_REQUIRED,
+        code: 'SESSION_ID_REQUIRED',
+      });
     }
 
+    // Session-specific validations (Requirements 3.4, 4.1-4.4, 5.1-5.4)
+    if (sessionId) {
+      await this.appointmentSessionService.validateSessionReference(
+        createAppointmentDto.serviceId,
+        sessionId,
+      );
+      await this.appointmentSessionService.checkDuplicateSessionBooking(
+        createAppointmentDto.patientId,
+        createAppointmentDto.serviceId,
+        sessionId,
+      );
+      await this.appointmentSessionService.checkCompletedSessionRebooking(
+        createAppointmentDto.patientId,
+        createAppointmentDto.serviceId,
+        sessionId,
+      );
+    }
+
+    // 8. Get session-specific or service duration (Requirements 2.1, 2.2)
+    const session = sessionId
+      ? service.sessions?.find((s) => (s as any)._id === sessionId)
+      : undefined;
+    const duration = session
+      ? this.appointmentSessionService.getSessionDuration(
+          session as any,
+          service.durationMinutes || 30,
+        )
+      : service.durationMinutes || 30;
+
+    // 9. Reject past dates (Requirement 1.10)
+    const appointmentDateTime = new Date(
+      `${createAppointmentDto.appointmentDate.toISOString().split('T')[0]}T${createAppointmentDto.appointmentTime}:00`,
+    );
+    const now = new Date();
+    if (appointmentDateTime < now) {
+      throw new BadRequestException({
+        message: {
+          ar: 'لا يمكن حجز مواعيد في الماضي',
+          en: 'Cannot schedule appointments in the past',
+        },
+      });
+    }
+
+    // 10. Create appointment with initial status "scheduled" (Requirement 1.9)
     const appointmentData = {
-      ...createAppointmentDto,
       patientId: new Types.ObjectId(createAppointmentDto.patientId),
       doctorId: new Types.ObjectId(createAppointmentDto.doctorId),
       clinicId: new Types.ObjectId(createAppointmentDto.clinicId),
       serviceId: new Types.ObjectId(createAppointmentDto.serviceId),
-      appointmentDate: new Date(createAppointmentDto.appointmentDate),
-      durationMinutes,
-      status: createAppointmentDto.status || 'scheduled',
-      urgencyLevel: createAppointmentDto.urgencyLevel || 'medium',
-      createdBy: createdByUserId
-        ? new Types.ObjectId(createdByUserId)
+      departmentId: createAppointmentDto.departmentId
+        ? new Types.ObjectId(createAppointmentDto.departmentId)
         : undefined,
+      sessionId: sessionId || undefined,
+      appointmentDate: new Date(createAppointmentDto.appointmentDate),
+      appointmentTime: createAppointmentDto.appointmentTime,
+      durationMinutes: duration,
+      status: 'scheduled', // Requirement 1.9
+      urgency: createAppointmentDto.urgency || 'medium',
+      notes: createAppointmentDto.notes,
+      internalNotes: createAppointmentDto.internalNotes,
+      bookingChannel: createAppointmentDto.bookingChannel || 'web',
+      reason: createAppointmentDto.reason,
+      createdBy: new Types.ObjectId(createdByUserId), // Requirement 1.12
     };
 
     const appointment = new this.appointmentModel(appointmentData);
@@ -395,7 +494,17 @@ export class AppointmentService {
       `Appointment created successfully with ID: ${savedAppointment._id}`,
     );
 
-    // Send notification to patient
+    // 11. Return complete appointment with populated relationships (Requirement 1.11)
+    const populatedAppointment = await this.appointmentModel
+      .findById(savedAppointment._id)
+      .populate('patientId', 'firstName lastName phone email')
+      .populate('doctorId', 'firstName lastName email')
+      .populate('clinicId', 'name address')
+      .populate('serviceId', 'name durationMinutes price')
+      .populate('departmentId', 'name')
+      .exec();
+
+    // Send notifications
     await this.notificationService.create({
       recipientId: createAppointmentDto.patientId,
       title: 'Appointment Booked',
@@ -403,11 +512,10 @@ export class AppointmentService {
       notificationType: 'appointment_booked',
       priority: 'normal',
       relatedEntityType: 'appointment',
-      relatedEntityId: (savedAppointment as any)._id.toString(),
+      relatedEntityId: (savedAppointment._id as any).toString(),
       deliveryMethod: 'in_app',
     });
 
-    // Send notification to doctor
     await this.notificationService.create({
       recipientId: createAppointmentDto.doctorId,
       title: 'New Appointment Booked',
@@ -415,27 +523,26 @@ export class AppointmentService {
       notificationType: 'appointment_booked',
       priority: 'normal',
       relatedEntityType: 'appointment',
-      relatedEntityId: (savedAppointment as any)._id.toString(),
+      relatedEntityId: (savedAppointment._id as any).toString(),
       deliveryMethod: 'in_app',
     });
 
-    if (createdByUserId) {
-      await this.auditService.logSecurityEvent({
-        eventType: 'APPOINTMENT_CREATED',
-        userId: createdByUserId,
-        actorId: createdByUserId,
-        ipAddress: '0.0.0.0',
-        userAgent: 'System',
-        timestamp: new Date(),
-        metadata: {
-          appointmentId: (savedAppointment as any)._id.toString(),
-          patientId: createAppointmentDto.patientId,
-          doctorId: createAppointmentDto.doctorId,
-        },
-      });
-    }
+    // Audit log
+    await this.auditService.logSecurityEvent({
+      eventType: 'APPOINTMENT_CREATED',
+      userId: createdByUserId,
+      actorId: createdByUserId,
+      ipAddress: '0.0.0.0',
+      userAgent: 'System',
+      timestamp: new Date(),
+      metadata: {
+        appointmentId: (savedAppointment._id as any).toString(),
+        patientId: createAppointmentDto.patientId,
+        doctorId: createAppointmentDto.doctorId,
+      },
+    });
 
-    return savedAppointment;
+    return populatedAppointment!;
   }
 
   /**
@@ -487,8 +594,8 @@ export class AppointmentService {
     }
 
     // Pagination
-    const pageNum = Math.max(1, parseInt(page));
-    const pageSize = Math.max(1, Math.min(100, parseInt(limit)));
+    const pageNum = Math.max(1, parseInt(String(page)));
+    const pageSize = Math.max(1, Math.min(100, parseInt(String(limit))));
     const skip = (pageNum - 1) * pageSize;
 
     // Sorting
@@ -547,6 +654,7 @@ export class AppointmentService {
 
   /**
    * Update appointment
+   * Task 6.9: Re-validate when doctor or service changes (Requirement 9.3)
    */
   async updateAppointment(
     appointmentId: string,
@@ -558,6 +666,59 @@ export class AppointmentService {
     }
 
     this.logger.log(`Updating appointment: ${appointmentId}`);
+
+    // Get existing appointment to check what's changing
+    const existingAppointment = await this.appointmentModel.findOne({
+      _id: new Types.ObjectId(appointmentId),
+      deletedAt: { $exists: false },
+    });
+
+    if (!existingAppointment) {
+      throw new NotFoundException('Appointment not found');
+    }
+
+    // Task 6.9: Re-validate entities and relationships when they change
+    const doctorChanged =
+      updateAppointmentDto.doctorId &&
+      updateAppointmentDto.doctorId !== existingAppointment.doctorId.toString();
+    const serviceChanged =
+      updateAppointmentDto.serviceId &&
+      updateAppointmentDto.serviceId !==
+        existingAppointment.serviceId.toString();
+    const clinicChanged =
+      updateAppointmentDto.clinicId &&
+      updateAppointmentDto.clinicId !== existingAppointment.clinicId.toString();
+    const patientChanged =
+      updateAppointmentDto.patientId &&
+      updateAppointmentDto.patientId !==
+        existingAppointment.patientId.toString();
+
+    // If any critical entity changes, re-validate all relationships
+    if (doctorChanged || serviceChanged || clinicChanged || patientChanged) {
+      const patientId =
+        updateAppointmentDto.patientId ||
+        existingAppointment.patientId.toString();
+      const doctorId =
+        updateAppointmentDto.doctorId ||
+        existingAppointment.doctorId.toString();
+      const serviceId =
+        updateAppointmentDto.serviceId ||
+        existingAppointment.serviceId.toString();
+      const clinicId =
+        updateAppointmentDto.clinicId ||
+        existingAppointment.clinicId.toString();
+      const departmentId =
+        updateAppointmentDto.departmentId ||
+        existingAppointment.departmentId?.toString();
+
+      await this.appointmentValidationService.validateAllEntitiesAndRelationships(
+        patientId,
+        doctorId,
+        serviceId,
+        clinicId,
+        departmentId,
+      );
+    }
 
     await this.validateAppointmentData(updateAppointmentDto, appointmentId);
 
@@ -646,8 +807,8 @@ export class AppointmentService {
     const updateData: any = {
       appointmentDate: new Date(rescheduleDto.newAppointmentDate),
       appointmentTime: rescheduleDto.newAppointmentTime,
-      notes: rescheduleDto.rescheduleReason
-        ? `${appointment.notes || ''}\nRescheduled: ${rescheduleDto.rescheduleReason}`.trim()
+      notes: rescheduleDto.reason
+        ? `${appointment.notes || ''}\nRescheduled: ${rescheduleDto.reason}`.trim()
         : appointment.notes,
       updatedBy: updatedByUserId
         ? new Types.ObjectId(updatedByUserId)
@@ -884,12 +1045,75 @@ export class AppointmentService {
   }
 
   /**
+   * Restore deleted appointment
+   * Task 13.6 - Requirements: 13.6, 13.7
+   */
+  async restoreAppointment(appointmentId: string): Promise<Appointment> {
+    if (!Types.ObjectId.isValid(appointmentId)) {
+      throw new BadRequestException({
+        message: {
+          ar: 'معرف الموعد غير صالح',
+          en: 'Invalid appointment ID format',
+        },
+      });
+    }
+
+    this.logger.log(`Restoring appointment: ${appointmentId}`);
+
+    const restoredAppointment = await this.appointmentModel
+      .findOneAndUpdate(
+        {
+          _id: new Types.ObjectId(appointmentId),
+          deletedAt: { $exists: true },
+        },
+        {
+          $unset: {
+            deletedAt: '',
+          },
+        },
+        { new: true },
+      )
+      .populate('patientId', 'firstName lastName phone email')
+      .populate('doctorId', 'firstName lastName email')
+      .populate('clinicId', 'name address')
+      .populate('serviceId', 'name durationMinutes price')
+      .populate('departmentId', 'name')
+      .exec();
+
+    if (!restoredAppointment) {
+      throw new NotFoundException({
+        message: {
+          ar: 'الموعد المحذوف غير موجود',
+          en: 'Deleted appointment not found',
+        },
+      });
+    }
+
+    this.logger.log(`Appointment restored successfully: ${appointmentId}`);
+
+    return restoredAppointment;
+  }
+
+  /**
    * Get doctor availability for a specific date
    */
   async getDoctorAvailability(
     query: AppointmentAvailabilityQueryDto,
   ): Promise<DayScheduleDto> {
-    const { doctorId, date, clinicId, durationMinutes = 30 } = query;
+    const { doctorId, date, clinicId } = query as any;
+    // Resolve session-specific duration when sessionId is provided (Requirement 9.1-9.4)
+    let durationMinutes: number = (query as any).durationMinutes ?? (query as any).duration ?? 30;
+    const { sessionId, serviceId } = query as any;
+    if (sessionId && serviceId) {
+      const svc = await this.serviceModel.findById(serviceId);
+      if (svc) {
+        const sess = svc.sessions?.find((s) => (s as any)._id === sessionId);
+        if (sess) {
+          durationMinutes =
+            (sess as any).duration ?? svc.durationMinutes ?? durationMinutes;
+        }
+      }
+    }
     const bookingDate = new Date(date);
 
     // Clinic ID is required for working hours integration
@@ -1000,7 +1224,7 @@ export class AppointmentService {
 
       timeSlots.push({
         time: timeStr,
-        isAvailable: !isBreak && !isBlocked && !isBooked,
+        available: !isBreak && !isBlocked && !isBooked,
         reason,
         existingAppointmentId: existingAppointment
           ? (existingAppointment as any)._id.toString()
@@ -1016,7 +1240,7 @@ export class AppointmentService {
     }
 
     const totalSlots = timeSlots.length;
-    const availableSlots = timeSlots.filter((slot) => slot.isAvailable).length;
+    const availableSlots = timeSlots.filter((slot) => slot.available).length;
     const bookedSlots = totalSlots - availableSlots;
 
     return {
@@ -1310,6 +1534,11 @@ export class AppointmentService {
    * Change appointment status with business-rule validation.
    * Final states: completed, cancelled (cannot be changed).
    */
+  /**
+   * Change appointment status with proper validation
+   * Uses AppointmentStatusService for status transition validation
+   * Requirements: 6.1-6.12
+   */
   async changeAppointmentStatus(
     appointmentId: string,
     statusDto: { status: string; notes?: string; reason?: string; newDate?: string; newTime?: string },
@@ -1319,84 +1548,49 @@ export class AppointmentService {
       throw new BadRequestException('Invalid appointment ID format');
     }
 
-    const appointment = await this.getAppointmentById(appointmentId);
-    const current = appointment.status;
-    const next = statusDto.status;
-
-    // Final-state guard
-    if (['completed', 'cancelled'].includes(current)) {
+    if (!userId) {
       throw new BadRequestException({
         message: {
-          ar: 'لا يمكن تغيير حالة الموعد بعد اكتماله أو إلغائه',
-          en: `Cannot change status of a ${current} appointment`,
+          ar: 'معرف المستخدم مطلوب',
+          en: 'User ID is required',
         },
-        code: 'INVALID_STATUS_TRANSITION',
+        code: 'USER_ID_REQUIRED',
       });
     }
 
-    // Business rule: completed requires notes
-    if (next === 'completed' && !statusDto.notes) {
-      throw new BadRequestException({
-        message: {
-          ar: 'الملاحظات مطلوبة عند إكمال الموعد',
-          en: 'Notes are required when marking an appointment as completed',
-        },
-        code: 'NOTES_REQUIRED_FOR_COMPLETION',
-      });
+    // Use the new AppointmentStatusService for proper status transition validation
+    const updatedAppointment = await this.appointmentStatusService.changeStatus(
+      appointmentId,
+      statusDto.status as any,
+      userId,
+      {
+        completionNotes: statusDto.notes,
+        cancellationReason: statusDto.reason,
+        notes: statusDto.notes,
+        reason: statusDto.reason,
+      },
+    );
+
+    // Handle rescheduling if new date/time provided
+    if (statusDto.status === 'rescheduled' && statusDto.newDate && statusDto.newTime) {
+      const rescheduledAppointment = await this.appointmentModel
+        .findByIdAndUpdate(
+          appointmentId,
+          {
+            appointmentDate: new Date(statusDto.newDate),
+            appointmentTime: statusDto.newTime,
+          },
+          { new: true },
+        )
+        .exec();
+      
+      if (rescheduledAppointment) {
+        return rescheduledAppointment;
+      }
     }
 
-    // Business rule: cancelled requires reason
-    if (next === 'cancelled' && !statusDto.reason) {
-      throw new BadRequestException({
-        message: {
-          ar: 'سبب الإلغاء مطلوب',
-          en: 'Cancellation reason is required',
-        },
-        code: 'REASON_REQUIRED_FOR_CANCELLATION',
-      });
-    }
-
-    // Business rule: rescheduled requires new date/time
-    if (next === 'rescheduled' && (!statusDto.newDate || !statusDto.newTime)) {
-      throw new BadRequestException({
-        message: {
-          ar: 'التاريخ والوقت الجديدان مطلوبان عند إعادة الجدولة',
-          en: 'New date and time are required when rescheduling',
-        },
-        code: 'DATETIME_REQUIRED_FOR_RESCHEDULING',
-      });
-    }
-
-    const historyEntry = {
-      status: next,
-      changedAt: new Date(),
-      changedBy: userId ? new Types.ObjectId(userId) : undefined,
-      reason: statusDto.reason || statusDto.notes,
-    };
-
-    const updateData: any = {
-      status: next,
-      $push: { statusHistory: historyEntry },
-    };
-
-    if (statusDto.notes) updateData.notes = statusDto.notes;
-    if (next === 'cancelled') {
-      updateData.cancellationReason = statusDto.reason;
-      updateData.cancelledAt = new Date();
-      if (userId) updateData.cancelledBy = new Types.ObjectId(userId);
-    }
-    if (next === 'rescheduled' && statusDto.newDate && statusDto.newTime) {
-      updateData.appointmentDate = new Date(statusDto.newDate);
-      updateData.appointmentTime = statusDto.newTime;
-    }
-    if (userId) updateData.updatedBy = new Types.ObjectId(userId);
-
-    const updated = await this.appointmentModel
-      .findByIdAndUpdate(appointmentId, updateData, { new: true })
-      .exec();
-
-    this.logger.log(`Appointment ${appointmentId} status changed: ${current} → ${next}`);
-    return updated!;
+    this.logger.log(`Appointment ${appointmentId} status changed to ${statusDto.status}`);
+    return updatedAppointment;
   }
 
   // =========================================================================
@@ -1662,81 +1856,46 @@ export class AppointmentService {
 
   // =========================================================================
   // M6 – Get Appointments Calendar (UC-d2e3f4c)
+  // Tasks: 9.1, 9.2, 9.3, 9.4
   // =========================================================================
   /**
    * Return appointments grouped for calendar views (day / week / month).
+   * 
+   * This method delegates to AppointmentCalendarService which implements:
+   * - Task 9.1: getDayView - Day view showing all appointments for a specific date
+   * - Task 9.2: getWeekView - Week view showing appointments grouped by day for 7-day period
+   * - Task 9.3: getMonthView - Month view showing appointment counts per day for calendar month
+   * - Task 9.4: getCalendarView - Dispatcher method routing to appropriate view
+   * 
+   * Requirements: 5.1-5.8
    */
-  async getAppointmentsCalendar(query: {
-    view?: 'day' | 'week' | 'month';
-    date?: string;
-    clinicId?: string;
-    doctorId?: string;
-    status?: string;
-  }): Promise<{
+  async getAppointmentsCalendar(query: CalendarQueryDto): Promise<{
     view: string;
     startDate: string;
     endDate: string;
     appointments: Appointment[];
     groupedByDate: Record<string, Appointment[]>;
   }> {
-    const view = query.view || 'week';
-    const anchor = query.date ? new Date(query.date) : new Date();
+    this.logger.log('Getting appointments calendar view');
 
-    // Calculate date range based on view
-    let startDate: Date;
-    let endDate: Date;
+    // Delegate to calendar service (Tasks 9.1-9.4)
+    const calendarData = await this.appointmentCalendarService.getCalendarView(query);
 
-    if (view === 'day') {
-      startDate = new Date(anchor);
-      startDate.setHours(0, 0, 0, 0);
-      endDate = new Date(anchor);
-      endDate.setHours(23, 59, 59, 999);
-    } else if (view === 'week') {
-      const day = anchor.getDay(); // 0=Sun
-      startDate = new Date(anchor);
-      startDate.setDate(anchor.getDate() - day);
-      startDate.setHours(0, 0, 0, 0);
-      endDate = new Date(startDate);
-      endDate.setDate(startDate.getDate() + 6);
-      endDate.setHours(23, 59, 59, 999);
-    } else {
-      // month
-      startDate = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
-      endDate = new Date(anchor.getFullYear(), anchor.getMonth() + 1, 0, 23, 59, 59, 999);
-    }
-
-    const filter: any = {
-      appointmentDate: { $gte: startDate, $lte: endDate },
-      deletedAt: { $exists: false },
-    };
-
-    if (query.clinicId) filter.clinicId = new Types.ObjectId(query.clinicId);
-    if (query.doctorId) filter.doctorId = new Types.ObjectId(query.doctorId);
-    if (query.status) filter.status = query.status;
-
-    const appointments = await this.appointmentModel
-      .find(filter)
-      .populate('patientId', 'firstName lastName phone')
-      .populate('doctorId', 'firstName lastName')
-      .populate('clinicId', 'name')
-      .populate('serviceId', 'name durationMinutes')
-      .sort({ appointmentDate: 1, appointmentTime: 1 })
-      .exec();
-
-    // Group by date string (YYYY-MM-DD)
-    const groupedByDate: Record<string, Appointment[]> = {};
-    for (const appt of appointments) {
-      const dateKey = appt.appointmentDate.toISOString().split('T')[0];
-      if (!groupedByDate[dateKey]) groupedByDate[dateKey] = [];
-      groupedByDate[dateKey].push(appt);
+    // Transform to legacy format for backward compatibility
+    const appointments: Appointment[] = [];
+    for (const dateKey in calendarData.appointments) {
+      for (const appt of calendarData.appointments[dateKey]) {
+        // Convert AppointmentDataDto back to Appointment for legacy response
+        appointments.push(appt as any);
+      }
     }
 
     return {
-      view,
-      startDate: startDate.toISOString().split('T')[0],
-      endDate: endDate.toISOString().split('T')[0],
+      view: calendarData.view,
+      startDate: calendarData.dateRange.start.toISOString().split('T')[0],
+      endDate: calendarData.dateRange.end.toISOString().split('T')[0],
       appointments,
-      groupedByDate,
+      groupedByDate: calendarData.appointments as any,
     };
   }
 }

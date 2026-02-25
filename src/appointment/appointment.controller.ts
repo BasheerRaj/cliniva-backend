@@ -26,6 +26,7 @@ import {
   ApiQuery,
 } from '@nestjs/swagger';
 import { AppointmentService } from './appointment.service';
+import { AppointmentSessionService } from './services/appointment-session.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import {
   CreateAppointmentDto,
@@ -43,6 +44,8 @@ import {
   ConcludeAppointmentDto,
   CalendarQueryDto,
 } from './dto';
+import { CreateAppointmentWithSessionDto } from './dto/create-appointment-with-session.dto';
+import { BatchBookSessionsDto } from './dto/batch-book-sessions.dto';
 import { SWAGGER_EXAMPLES } from './constants/swagger-examples';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -54,7 +57,10 @@ import { UserRole } from '../common/enums/user-role.enum';
 @UseGuards(JwtAuthGuard, RolesGuard)
 @ApiBearerAuth()
 export class AppointmentController {
-  constructor(private readonly appointmentService: AppointmentService) { }
+  constructor(
+    private readonly appointmentService: AppointmentService,
+    private readonly appointmentSessionService: AppointmentSessionService,
+  ) { }
 
   /**
    * Create a new appointment
@@ -101,11 +107,11 @@ export class AppointmentController {
       example: SWAGGER_EXAMPLES.CONFLICT_ERROR,
     },
   })
-  @ApiBody({ type: CreateAppointmentDto })
+  @ApiBody({ type: CreateAppointmentWithSessionDto })
   @Post()
   @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.MANAGER, UserRole.DOCTOR, UserRole.STAFF)
   async createAppointment(
-    @Body(new ValidationPipe()) createAppointmentDto: CreateAppointmentDto,
+    @Body(new ValidationPipe()) createAppointmentDto: CreateAppointmentWithSessionDto,
     @Request() req: any,
   ) {
     try {
@@ -113,15 +119,153 @@ export class AppointmentController {
         createAppointmentDto,
         req.user?.userId,
       );
+      const enriched = await this.appointmentSessionService.enrichAppointmentWithSession(appointment);
       return {
         success: true,
-        message: 'Appointment created successfully',
-        data: appointment,
+        message: {
+          ar: 'تم إنشاء الموعد بنجاح',
+          en: 'Appointment created successfully',
+        },
+        data: enriched,
       };
     } catch (error) {
       return {
         success: false,
-        message: 'Failed to create appointment',
+        message: {
+          ar: 'فشل إنشاء الموعد',
+          en: 'Failed to create appointment',
+        },
+        error: error.message,
+      };
+    }
+  }
+
+  /**
+   * Batch book multiple sessions for a patient
+   * POST /appointments/batch-book-sessions
+   * Requirements: 7.1–7.6
+   */
+  @ApiOperation({
+    summary: 'Batch book multiple sessions',
+    description:
+      'Atomically books multiple sessions for a patient in a single request. All session bookings must pass validation (reference, duplicate, completed checks). If any validation fails, the entire batch is rejected. Uses MongoDB transactions for atomicity.',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'All sessions booked successfully',
+    schema: {
+      example: {
+        success: true,
+        message: { ar: 'تم حجز الجلسات بنجاح', en: 'Sessions booked successfully' },
+        data: { totalRequested: 2, successCount: 2, failureCount: 0, appointments: [] },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Batch booking failed — per-session error details returned',
+    schema: {
+      example: {
+        success: false,
+        message: { ar: 'فشل حجز بعض الجلسات', en: 'Batch booking failed' },
+        error: 'BATCH_BOOKING_FAILED',
+      },
+    },
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiBody({ type: BatchBookSessionsDto })
+  @Post('batch-book-sessions')
+  @HttpCode(HttpStatus.CREATED)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.MANAGER, UserRole.DOCTOR, UserRole.STAFF)
+  async batchBookSessions(
+    @Body(new ValidationPipe({ transform: true, whitelist: true })) dto: BatchBookSessionsDto,
+    @Request() req: any,
+  ) {
+    try {
+      const result = await this.appointmentSessionService.batchBookSessions(
+        dto,
+        req.user?.userId,
+      );
+      return {
+        success: true,
+        message: {
+          ar: 'تم حجز الجلسات بنجاح',
+          en: 'Sessions booked successfully',
+        },
+        data: result,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: {
+          ar: 'فشل حجز الجلسات',
+          en: 'Failed to book sessions',
+        },
+        error: error.message,
+      };
+    }
+  }
+
+  /**
+   * Get session progress for a patient within a service
+   * GET /appointments/session-progress/:patientId/:serviceId
+   * Requirements: 10.1–10.4
+   */
+  @ApiOperation({
+    summary: 'Get patient session progress',
+    description:
+      "Returns a patient's progress through all sessions of a multi-step service. Each session is listed with its status (not_booked, scheduled, confirmed, in_progress, completed, cancelled, no_show). Includes completion percentage.",
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Session progress retrieved successfully',
+    schema: {
+      example: {
+        success: true,
+        message: { ar: 'تم استرجاع تقدم الجلسات بنجاح', en: 'Session progress retrieved successfully' },
+        data: {
+          patientId: '507f1f77bcf86cd799439011',
+          serviceId: '507f1f77bcf86cd799439013',
+          serviceName: 'Multi-Step Treatment',
+          totalSessions: 4,
+          completedSessions: 2,
+          completionPercentage: 50,
+          sessions: [],
+        },
+      },
+    },
+  })
+  @ApiResponse({ status: 400, description: 'Service has no sessions defined' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 404, description: 'Service not found' })
+  @ApiParam({ name: 'patientId', type: String, description: 'Patient ID (MongoDB ObjectId)', example: '507f1f77bcf86cd799439011' })
+  @ApiParam({ name: 'serviceId', type: String, description: 'Service ID (MongoDB ObjectId)', example: '507f1f77bcf86cd799439013' })
+  @Get('session-progress/:patientId/:serviceId')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.MANAGER, UserRole.DOCTOR, UserRole.STAFF)
+  async getSessionProgress(
+    @Param('patientId') patientId: string,
+    @Param('serviceId') serviceId: string,
+  ) {
+    try {
+      const progress = await this.appointmentSessionService.getSessionProgress(
+        patientId,
+        serviceId,
+      );
+      return {
+        success: true,
+        message: {
+          ar: 'تم استرجاع تقدم الجلسات بنجاح',
+          en: 'Session progress retrieved successfully',
+        },
+        data: progress,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: {
+          ar: 'فشل استرجاع تقدم الجلسات',
+          en: 'Failed to retrieve session progress',
+        },
         error: error.message,
       };
     }
@@ -253,19 +397,25 @@ export class AppointmentController {
       const result = await this.appointmentService.getAppointments(query);
       return {
         success: true,
-        message: 'Appointments retrieved successfully',
+        message: {
+          ar: 'تم استرجاع المواعيد بنجاح',
+          en: 'Appointments retrieved successfully',
+        },
         data: result.appointments,
         pagination: {
           total: result.total,
           page: result.page,
           totalPages: result.totalPages,
-          limit: parseInt(query.limit || '10'),
+          limit: parseInt(String(query.limit) || '10'),
         },
       };
     } catch (error) {
       return {
         success: false,
-        message: 'Failed to retrieve appointments',
+        message: {
+          ar: 'فشل استرجاع المواعيد',
+          en: 'Failed to retrieve appointments',
+        },
         error: error.message,
       };
     }
@@ -318,15 +468,22 @@ export class AppointmentController {
   async getAppointment(@Param('id') id: string) {
     try {
       const appointment = await this.appointmentService.getAppointmentById(id);
+      const enriched = await this.appointmentSessionService.enrichAppointmentWithSession(appointment);
       return {
         success: true,
-        message: 'Appointment retrieved successfully',
-        data: appointment,
+        message: {
+          ar: 'تم استرجاع الموعد بنجاح',
+          en: 'Appointment retrieved successfully',
+        },
+        data: enriched,
       };
     } catch (error) {
       return {
         success: false,
-        message: 'Failed to retrieve appointment',
+        message: {
+          ar: 'فشل استرجاع الموعد',
+          en: 'Failed to retrieve appointment',
+        },
         error: error.message,
       };
     }
@@ -356,13 +513,19 @@ export class AppointmentController {
       const result = await this.appointmentService.getAppointmentsCalendar(query);
       return {
         success: true,
-        message: 'Calendar retrieved successfully',
+        message: {
+          ar: 'تم استرجاع التقويم بنجاح',
+          en: 'Calendar retrieved successfully',
+        },
         data: result,
       };
     } catch (error) {
       return {
         success: false,
-        message: 'Failed to retrieve calendar',
+        message: {
+          ar: 'فشل استرجاع التقويم',
+          en: 'Failed to retrieve calendar',
+        },
         error: error.message,
       };
     }
@@ -436,13 +599,19 @@ export class AppointmentController {
       );
       return {
         success: true,
-        message: 'Appointment updated successfully',
+        message: {
+          ar: 'تم تحديث الموعد بنجاح',
+          en: 'Appointment updated successfully',
+        },
         data: appointment,
       };
     } catch (error) {
       return {
         success: false,
-        message: 'Failed to update appointment',
+        message: {
+          ar: 'فشل تحديث الموعد',
+          en: 'Failed to update appointment',
+        },
         error: error.message,
       };
     }
@@ -499,12 +668,116 @@ export class AppointmentController {
       await this.appointmentService.deleteAppointment(id, req.user?.userId);
       return {
         success: true,
-        message: 'Appointment deleted successfully',
+        message: {
+          ar: 'تم حذف الموعد بنجاح',
+          en: 'Appointment deleted successfully',
+        },
       };
     } catch (error) {
       return {
         success: false,
-        message: 'Failed to delete appointment',
+        message: {
+          ar: 'فشل حذف الموعد',
+          en: 'Failed to delete appointment',
+        },
+        error: error.message,
+      };
+    }
+  }
+
+  /**
+   * Restore deleted appointment
+   * POST /appointments/:id/restore
+   * Task 13.6 - Requirements: 13.6, 13.7
+   */
+  @ApiOperation({
+    summary: 'Restore deleted appointment',
+    description:
+      'Restores a soft-deleted appointment by clearing the deletion markers. Only Admin users can restore appointments. The appointment will be available in all queries after restoration.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Appointment restored successfully',
+    schema: {
+      example: {
+        success: true,
+        message: {
+          ar: 'تم استعادة الموعد بنجاح',
+          en: 'Appointment restored successfully',
+        },
+        data: {
+          id: '507f1f77bcf86cd799439011',
+          status: 'scheduled',
+          appointmentDate: '2024-03-15',
+          appointmentTime: '14:30',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad Request - Invalid appointment ID format',
+    schema: {
+      example: {
+        success: false,
+        message: {
+          ar: 'معرف الموعد غير صالح',
+          en: 'Invalid appointment ID format',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - Authentication required',
+    schema: {
+      example: SWAGGER_EXAMPLES.UNAUTHORIZED_ERROR,
+    },
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Admin role required',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Not Found - Deleted appointment does not exist',
+    schema: {
+      example: {
+        success: false,
+        message: {
+          ar: 'الموعد المحذوف غير موجود',
+          en: 'Deleted appointment not found',
+        },
+      },
+    },
+  })
+  @ApiParam({
+    name: 'id',
+    type: String,
+    description: 'Appointment ID (MongoDB ObjectId)',
+    example: '507f1f77bcf86cd799439011',
+  })
+  @Post(':id/restore')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN)
+  @HttpCode(HttpStatus.OK)
+  async restoreAppointment(@Param('id') id: string) {
+    try {
+      const appointment = await this.appointmentService.restoreAppointment(id);
+      return {
+        success: true,
+        message: {
+          ar: 'تم استعادة الموعد بنجاح',
+          en: 'Appointment restored successfully',
+        },
+        data: appointment,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: {
+          ar: 'فشل استعادة الموعد',
+          en: 'Failed to restore appointment',
+        },
         error: error.message,
       };
     }
@@ -577,13 +850,19 @@ export class AppointmentController {
       );
       return {
         success: true,
-        message: 'Appointment rescheduled successfully',
+        message: {
+          ar: 'تم إعادة جدولة الموعد بنجاح',
+          en: 'Appointment rescheduled successfully',
+        },
         data: appointment,
       };
     } catch (error) {
       return {
         success: false,
-        message: 'Failed to reschedule appointment',
+        message: {
+          ar: 'فشل إعادة جدولة الموعد',
+          en: 'Failed to reschedule appointment',
+        },
         error: error.message,
       };
     }
@@ -648,13 +927,19 @@ export class AppointmentController {
       );
       return {
         success: true,
-        message: 'Appointment cancelled successfully',
+        message: {
+          ar: 'تم إلغاء الموعد بنجاح',
+          en: 'Appointment cancelled successfully',
+        },
         data: appointment,
       };
     } catch (error) {
       return {
         success: false,
-        message: 'Failed to cancel appointment',
+        message: {
+          ar: 'فشل إلغاء الموعد',
+          en: 'Failed to cancel appointment',
+        },
         error: error.message,
       };
     }
@@ -719,13 +1004,19 @@ export class AppointmentController {
       );
       return {
         success: true,
-        message: 'Appointment confirmed successfully',
+        message: {
+          ar: 'تم تأكيد الموعد بنجاح',
+          en: 'Appointment confirmed successfully',
+        },
         data: appointment,
       };
     } catch (error) {
       return {
         success: false,
-        message: 'Failed to confirm appointment',
+        message: {
+          ar: 'فشل تأكيد الموعد',
+          en: 'Failed to confirm appointment',
+        },
         error: error.message,
       };
     }
@@ -759,13 +1050,19 @@ export class AppointmentController {
       );
       return {
         success: true,
-        message: 'Appointment status updated successfully',
+        message: {
+          ar: 'تم تحديث حالة الموعد بنجاح',
+          en: 'Appointment status updated successfully',
+        },
         data: appointment,
       };
     } catch (error) {
       return {
         success: false,
-        message: 'Failed to update appointment status',
+        message: {
+          ar: 'فشل تحديث حالة الموعد',
+          en: 'Failed to update appointment status',
+        },
         error: error.message,
       };
     }
@@ -794,14 +1091,20 @@ export class AppointmentController {
       const result = await this.appointmentService.startAppointment(id, req.user?.userId);
       return {
         success: true,
-        message: 'Appointment started successfully',
+        message: {
+          ar: 'تم بدء الموعد بنجاح',
+          en: 'Appointment started successfully',
+        },
         data: result.appointment,
         redirectTo: result.redirectTo,
       };
     } catch (error) {
       return {
         success: false,
-        message: 'Failed to start appointment',
+        message: {
+          ar: 'فشل بدء الموعد',
+          en: 'Failed to start appointment',
+        },
         error: error.message,
       };
     }
@@ -831,13 +1134,19 @@ export class AppointmentController {
       const appointment = await this.appointmentService.endAppointment(id, endDto, req.user?.userId);
       return {
         success: true,
-        message: 'Appointment ended successfully',
+        message: {
+          ar: 'تم إنهاء الموعد بنجاح',
+          en: 'Appointment ended successfully',
+        },
         data: appointment,
       };
     } catch (error) {
       return {
         success: false,
-        message: 'Failed to end appointment',
+        message: {
+          ar: 'فشل إنهاء الموعد',
+          en: 'Failed to end appointment',
+        },
         error: error.message,
       };
     }
@@ -867,13 +1176,19 @@ export class AppointmentController {
       const appointment = await this.appointmentService.concludeAppointment(id, concludeDto, req.user?.userId);
       return {
         success: true,
-        message: 'Appointment concluded successfully',
+        message: {
+          ar: 'تم إتمام الموعد بنجاح',
+          en: 'Appointment concluded successfully',
+        },
         data: appointment,
       };
     } catch (error) {
       return {
         success: false,
-        message: 'Failed to conclude appointment',
+        message: {
+          ar: 'فشل إتمام الموعد',
+          en: 'Failed to conclude appointment',
+        },
         error: error.message,
       };
     }
@@ -936,6 +1251,13 @@ export class AppointmentController {
     description: 'Appointment duration in minutes (default: 30)',
     example: 30,
   })
+  @ApiQuery({
+    name: 'sessionId',
+    required: false,
+    type: String,
+    description: 'Session ID — when provided, availability is calculated using the session-specific duration',
+    example: '507f1f77bcf86cd799439015',
+  })
   @Get('availability/:doctorId')
   async getDoctorAvailability(
     @Param('doctorId') doctorId: string,
@@ -943,30 +1265,38 @@ export class AppointmentController {
     @Query('clinicId') clinicId?: string,
     @Query('durationMinutes', new ParseIntPipe({ optional: true }))
     durationMinutes?: number,
+    @Query('sessionId') sessionId?: string,
   ) {
     try {
       if (!date) {
         throw new BadRequestException('Date parameter is required');
       }
 
-      const availabilityQuery: AppointmentAvailabilityQueryDto = {
+      const availabilityQuery: AppointmentAvailabilityQueryDto & { sessionId?: string } = {
         doctorId,
         date,
         clinicId,
         durationMinutes,
+        sessionId,
       };
 
       const availability =
         await this.appointmentService.getDoctorAvailability(availabilityQuery);
       return {
         success: true,
-        message: 'Doctor availability retrieved successfully',
+        message: {
+          ar: 'تم استرجاع توفر الطبيب بنجاح',
+          en: 'Doctor availability retrieved successfully',
+        },
         data: availability,
       };
     } catch (error) {
       return {
         success: false,
-        message: 'Failed to retrieve doctor availability',
+        message: {
+          ar: 'فشل استرجاع توفر الطبيب',
+          en: 'Failed to retrieve doctor availability',
+        },
         error: error.message,
       };
     }

@@ -1,91 +1,158 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
 
+/**
+ * Appointment Schema
+ * Represents a scheduled medical consultation between a patient and a doctor
+ * for a specific service at a specific clinic.
+ * 
+ * M6 Appointments Management Module
+ * Requirements: 1.1-1.12, 16.1-16.7
+ */
 @Schema({
   timestamps: true,
   collection: 'appointments',
 })
 export class Appointment extends Document {
-  @Prop({ type: Types.ObjectId, ref: 'Patient', required: true })
+  // ==================== Relationships ====================
+  
+  @Prop({ type: Types.ObjectId, ref: 'Patient', required: true, index: true })
   patientId: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: 'User', required: true })
+  @Prop({ type: Types.ObjectId, ref: 'User', required: true, index: true })
   doctorId: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: 'Clinic', required: true })
-  clinicId: Types.ObjectId;
-
-  @Prop({ type: Types.ObjectId, ref: 'Service', required: true })
+  @Prop({ type: Types.ObjectId, ref: 'Service', required: true, index: true })
   serviceId: Types.ObjectId;
 
-  @Prop({ required: true })
+  @Prop({ type: Types.ObjectId, ref: 'Clinic', required: true, index: true })
+  clinicId: Types.ObjectId;
+
+  @Prop({ type: Types.ObjectId, ref: 'Department', required: false, index: true })
+  departmentId?: Types.ObjectId;
+
+  @Prop({ type: Types.ObjectId, ref: 'Complex', required: false })
+  complexId?: Types.ObjectId;
+
+  // ==================== Appointment Details ====================
+  
+  @Prop({ required: true, type: Date, index: true })
   appointmentDate: Date;
 
   @Prop({ required: true })
-  appointmentTime: string; // HH:mm format
+  appointmentTime: string; // Format: "HH:mm"
 
-  @Prop({ default: 30 })
-  durationMinutes: number;
+  @Prop({ required: true })
+  durationMinutes: number; // Duration in minutes (from service)
 
   @Prop({
-    enum: [
-      'scheduled',
-      'confirmed',
-      'in_progress',
-      'completed',
-      'cancelled',
-      'no_show',
-    ],
+    required: true,
+    enum: ['scheduled', 'confirmed', 'in_progress', 'completed', 'cancelled', 'no_show'],
     default: 'scheduled',
+    index: true,
   })
   status: string;
 
   @Prop({
+    required: false,
     enum: ['low', 'medium', 'high', 'urgent'],
     default: 'medium',
   })
-  urgencyLevel: string;
+  urgency?: string;
 
-  @Prop()
+  @Prop({ type: String, required: false, index: true })
+  sessionId?: string; // References session._id within service.sessions array
+
+  @Prop({ required: false })
   notes?: string;
 
-  @Prop()
-  cancellationReason?: string;
+  @Prop({ required: false })
+  internalNotes?: string;
 
-  @Prop()
-  cancelledAt?: Date;
+  // ==================== Booking Information ====================
+  
+  @Prop({ required: false, enum: ['web', 'phone', 'walk-in'], default: 'web' })
+  bookingChannel?: string;
 
-  @Prop({ type: Types.ObjectId, ref: 'User' })
-  cancelledBy?: Types.ObjectId;
+  @Prop({ required: false })
+  reason?: string;
 
-  @Prop({ default: false })
-  rescheduleOption?: boolean;
-
-  // Start / End tracking fields (M6)
-  @Prop()
+  // ==================== Time Tracking ====================
+  
+  @Prop({ type: Date, required: false })
   actualStartTime?: Date;
 
-  @Prop()
+  @Prop({ type: Date, required: false })
   actualEndTime?: Date;
 
-  @Prop({ type: Types.ObjectId, ref: 'User' })
-  startedBy?: Types.ObjectId;
+  // ==================== Status-Specific Fields ====================
+  
+  @Prop({ required: false })
+  completionNotes?: string;
 
-  @Prop({ type: Types.ObjectId, ref: 'User' })
-  completedBy?: Types.ObjectId;
+  @Prop({ required: false })
+  cancellationReason?: string;
 
-  // Booking metadata
-  @Prop()
-  bookingChannel?: string; // 'staff' | 'portal' | 'walk-in'
+  @Prop({ type: Date, required: false })
+  cancelledAt?: Date;
 
-  @Prop({ type: Types.ObjectId, ref: 'User' })
-  bookedBy?: Types.ObjectId;
+  @Prop({ type: Types.ObjectId, ref: 'User', required: false })
+  cancelledBy?: Types.ObjectId;
 
-  // Medical record placeholder (M7 integration)
-  @Prop({ type: Types.ObjectId })
-  medicalRecordId?: Types.ObjectId;
+  @Prop({ required: false, default: false })
+  rescheduleRequested?: boolean;
 
-  // Status audit trail
+  @Prop({ required: false })
+  rescheduledReason?: string;
+
+  @Prop({ type: Date, required: false })
+  rescheduledAt?: Date;
+
+  @Prop({ type: Types.ObjectId, ref: 'Appointment', required: false })
+  transferredFrom?: Types.ObjectId;
+
+  @Prop({ type: Date, required: false })
+  transferredAt?: Date;
+
+  @Prop({ type: Types.ObjectId, ref: 'User', required: false })
+  transferredBy?: Types.ObjectId;
+
+  // ==================== Medical Record Integration ====================
+  
+  @Prop({ type: Types.ObjectId, ref: 'MedicalReport', required: false })
+  medicalReportId?: Types.ObjectId;
+
+  @Prop({ required: false, default: false })
+  isDocumented?: boolean;
+
+  // ==================== Rescheduling History ====================
+  
+  @Prop({
+    type: [
+      {
+        previousDate: Date,
+        previousTime: String,
+        newDate: Date,
+        newTime: String,
+        reason: String,
+        rescheduledAt: Date,
+        rescheduledBy: { type: Types.ObjectId, ref: 'User' },
+      },
+    ],
+    required: false,
+  })
+  rescheduleHistory?: Array<{
+    previousDate: Date;
+    previousTime: string;
+    newDate: Date;
+    newTime: string;
+    reason?: string;
+    rescheduledAt: Date;
+    rescheduledBy: Types.ObjectId;
+  }>;
+
+  // ==================== Status History ====================
+  
   @Prop({
     type: [
       {
@@ -95,7 +162,7 @@ export class Appointment extends Document {
         reason: String,
       },
     ],
-    default: [],
+    required: false,
   })
   statusHistory?: Array<{
     status: string;
@@ -104,68 +171,109 @@ export class Appointment extends Document {
     reason?: string;
   }>;
 
-  // Appointment transfer tracking fields (Requirements 7.3, 7.4)
-  @Prop({ type: Types.ObjectId, ref: 'User' })
-  transferredFrom?: Types.ObjectId; // Original doctor ID before transfer
-
-  @Prop()
-  transferredAt?: Date; // Timestamp when appointment was transferred
-
-  @Prop({ type: Types.ObjectId, ref: 'User' })
-  transferredBy?: Types.ObjectId; // Admin who performed the transfer
-
-  // Rescheduling tracking fields (Requirements 7.3, 7.4)
-  @Prop()
-  rescheduledFrom?: Date; // Original appointment date/time before rescheduling
-
-  @Prop()
-  rescheduledReason?: string; // Reason for rescheduling
-
-  @Prop()
-  rescheduledAt?: Date; // Timestamp when appointment was rescheduled
-
-  @Prop()
-  markedForReschedulingAt?: Date; // Timestamp when marked for manual rescheduling
-
+  // ==================== Audit Fields ====================
+  
   @Prop({ type: Types.ObjectId, ref: 'User', required: true })
   createdBy: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: 'User' })
+  @Prop({ type: Types.ObjectId, ref: 'User', required: false })
   updatedBy?: Types.ObjectId;
 
-  @Prop()
+  @Prop({ type: Types.ObjectId, ref: 'User', required: false })
+  deletedBy?: Types.ObjectId;
+
+  // ==================== Soft Delete ====================
+  
+  @Prop({ required: false, default: false, index: true })
+  isDeleted?: boolean;
+
+  @Prop({ type: Date, required: false })
   deletedAt?: Date;
+
+  // ==================== Timestamps (managed by Mongoose) ====================
+  
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export const AppointmentSchema = SchemaFactory.createForClass(Appointment);
 
-// Indexes
-AppointmentSchema.index({ clinicId: 1, appointmentDate: 1 });
-AppointmentSchema.index({ doctorId: 1, appointmentDate: 1 });
-AppointmentSchema.index({ patientId: 1, appointmentDate: 1 });
-AppointmentSchema.index({ serviceId: 1 });
-AppointmentSchema.index({ status: 1 });
-AppointmentSchema.index({ urgencyLevel: 1 });
-AppointmentSchema.index({ deletedAt: 1 });
-AppointmentSchema.index({ transferredFrom: 1 }); // Index for transfer tracking queries
-AppointmentSchema.index({ doctorId: 1, status: 1, appointmentDate: 1 }); // Composite index for appointment transfer queries
+// ==================== Compound Indexes for Performance ====================
 
-// Optimized indexes for conflict detection and rescheduling
+// Primary conflict detection index - optimized for checking doctor availability
+AppointmentSchema.index({ 
+  doctorId: 1, 
+  appointmentDate: 1, 
+  appointmentTime: 1 
+});
+
+// Clinic-based queries - for clinic schedule views
+AppointmentSchema.index({ 
+  clinicId: 1, 
+  appointmentDate: 1, 
+  appointmentTime: 1 
+});
+
+// Patient appointment history
+AppointmentSchema.index({ 
+  patientId: 1, 
+  appointmentDate: 1 
+});
+
+// Status-based filtering with date range
+AppointmentSchema.index({ 
+  status: 1, 
+  appointmentDate: 1 
+});
+
+// Soft delete filtering - exclude deleted appointments efficiently
+AppointmentSchema.index({ 
+  isDeleted: 1, 
+  status: 1, 
+  appointmentDate: 1 
+});
+
+// Department-based queries
+AppointmentSchema.index({ 
+  departmentId: 1, 
+  appointmentDate: 1 
+});
+
+// Medical record integration - find appointments by medical report
+AppointmentSchema.index({ 
+  medicalReportId: 1 
+});
+
+// Audit trail - find appointments by creator/updater
 AppointmentSchema.index({
-  doctorId: 1,
-  appointmentDate: 1,
+  createdBy: 1,
+  createdAt: 1
+});
+
+AppointmentSchema.index({
+  updatedBy: 1,
+  updatedAt: 1
+});
+
+// Compound index for duplicate session booking detection
+// Requirements: 4.5, 15.1
+AppointmentSchema.index({
+  patientId: 1,
+  serviceId: 1,
+  sessionId: 1,
   status: 1,
-  deletedAt: 1,
-}); // Composite index for efficient conflict detection queries
+});
 
+// Compound index for session availability queries
+// Requirement: 15.2
 AppointmentSchema.index({
-  doctorId: 1,
+  serviceId: 1,
+  sessionId: 1,
   appointmentDate: 1,
-  appointmentTime: 1,
-}); // Index for time-based queries
+});
 
-// Composite index for clinic capacity patient count queries
+// Index for session-specific queries
 AppointmentSchema.index({
-  clinicId: 1,
-  deletedAt: 1,
-}); // Optimized for patient aggregation in capacity calculations
+  sessionId: 1,
+  status: 1,
+});

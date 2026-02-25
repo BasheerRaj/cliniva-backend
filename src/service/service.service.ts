@@ -11,12 +11,15 @@ import { Appointment } from '../database/schemas/appointment.schema';
 import { Notification } from '../database/schemas/notification.schema';
 import { User } from '../database/schemas/user.schema';
 import { CreateServiceDto, AssignServicesDto } from './dto/create-service.dto';
+import { CreateServiceWithSessionsDto } from './dto/create-service-with-sessions.dto';
 import { UpdateServiceDto } from './dto/update-service.dto';
+import { UpdateServiceWithSessionsDto } from './dto/update-service-with-sessions.dto';
 import { ChangeServiceStatusDto } from './dto/change-service-status.dto';
 import { BulkStatusChangeDto } from './dto/bulk-status-change.dto';
 import { ServiceOfferService } from '../service-offer/service-offer.service';
 import { CalculateServicePriceDto } from '../service-offer/dto/calculate-service-price.dto';
 import { PriceCalculation } from '../service-offer/interfaces/price-calculation.interface';
+import { SessionManagerService } from './services/session-manager.service';
 
 @Injectable()
 export class ServiceService {
@@ -30,9 +33,10 @@ export class ServiceService {
     private readonly notificationModel: Model<Notification>,
     @InjectModel('User') private readonly userModel: Model<User>,
     private readonly serviceOfferService: ServiceOfferService,
+    private readonly sessionManagerService: SessionManagerService,
   ) {}
 
-  async createService(createDto: CreateServiceDto): Promise<Service> {
+  async createService(createDto: CreateServiceWithSessionsDto): Promise<Service> {
     // Validate service name length
     if (createDto.name.trim().length < 2) {
       throw new BadRequestException(
@@ -106,6 +110,14 @@ export class ServiceService {
     // Add clinic ID only if provided (for clinic-specific services)
     if (createDto.clinicId) {
       serviceData.clinicId = new Types.ObjectId(createDto.clinicId);
+    }
+
+    // Process sessions if provided (Requirements: 1.1-1.7)
+    if (createDto.sessions && createDto.sessions.length > 0) {
+      serviceData.sessions = this.sessionManagerService.validateAndProcessSessions(
+        createDto.sessions,
+        serviceData.durationMinutes,
+      );
     }
 
     const service = new this.serviceModel(serviceData);
@@ -275,7 +287,7 @@ export class ServiceService {
 
   async updateService(
     serviceId: string,
-    updateDto: UpdateServiceDto,
+    updateDto: UpdateServiceWithSessionsDto,
   ): Promise<Service> {
     const service = await this.serviceModel.findOne({
       _id: new Types.ObjectId(serviceId),
@@ -394,6 +406,30 @@ export class ServiceService {
       }
     }
 
+    // Handle session management (Requirements: 13.1-13.4, 14.2)
+    if (updateDto.sessions !== undefined) {
+      const effectiveDuration =
+        updateDto.durationMinutes ?? service.durationMinutes;
+
+      // Validate that removed sessions have no active appointments
+      if (updateDto.removedSessionIds && updateDto.removedSessionIds.length > 0) {
+        await this.sessionManagerService.validateSessionRemoval(
+          serviceId,
+          updateDto.removedSessionIds,
+        );
+      }
+
+      // Replace sessions array (empty array = clear all sessions)
+      if (updateDto.sessions.length > 0) {
+        service.sessions = this.sessionManagerService.validateAndProcessSessions(
+          updateDto.sessions,
+          effectiveDuration,
+        ) as any;
+      } else {
+        service.sessions = [];
+      }
+    }
+
     const savedService = await service.save();
     return savedService;
   }
@@ -416,8 +452,7 @@ export class ServiceService {
     const activeAppointments = await this.appointmentModel.countDocuments({
       serviceId: new Types.ObjectId(serviceId),
       status: { $in: ['scheduled', 'confirmed'] },
-      appointmentDate: { $gte: new Date() },
-      deletedAt: { $exists: false },
+      isDeleted: { $ne: true },
     });
 
     if (activeAppointments > 0) {

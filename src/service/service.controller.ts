@@ -26,6 +26,8 @@ import {
 import { ServiceService } from './service.service';
 import { CreateServiceDto, AssignServicesDto } from './dto/create-service.dto';
 import { UpdateServiceDto } from './dto/update-service.dto';
+import { CreateServiceWithSessionsDto } from './dto/create-service-with-sessions.dto';
+import { UpdateServiceWithSessionsDto } from './dto/update-service-with-sessions.dto';
 import { ChangeServiceStatusDto } from './dto/change-service-status.dto';
 import { BulkStatusChangeDto } from './dto/bulk-status-change.dto';
 import { Service } from '../database/schemas/service.schema';
@@ -76,12 +78,12 @@ export class ServiceController {
     },
   })
   @ApiBearerAuth()
-  @ApiBody({ type: CreateServiceDto })
+  @ApiBody({ type: CreateServiceWithSessionsDto })
   @Post()
   @HttpCode(HttpStatus.CREATED)
   async createService(
     @Body(new ValidationPipe({ transform: true, whitelist: true }))
-    createServiceDto: CreateServiceDto,
+    createServiceDto: CreateServiceWithSessionsDto,
   ): Promise<Service> {
     return this.serviceService.createService(createServiceDto);
   }
@@ -123,8 +125,13 @@ export class ServiceController {
     example: '507f1f77bcf86cd799439011',
   })
   @Get(':id')
-  async getServiceById(@Param('id') id: string): Promise<Service> {
-    return this.serviceService.getService(id);
+  async getServiceById(@Param('id') id: string): Promise<any> {
+    const service = await this.serviceService.getService(id);
+    const plain = service.toObject ? service.toObject() : { ...service };
+    if (Array.isArray(plain.sessions) && plain.sessions.length > 0) {
+      plain.sessions = [...plain.sessions].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+    }
+    return plain;
   }
 
   /**
@@ -179,12 +186,26 @@ export class ServiceController {
     type: String,
     example: '507f1f77bcf86cd799439011',
   })
-  @ApiBody({ type: UpdateServiceDto })
+  @ApiResponse({
+    status: 409,
+    description: 'Conflict - Cannot remove session with active appointments',
+    schema: {
+      example: {
+        statusCode: 409,
+        message: {
+          ar: 'لا يمكن حذف الجلسة لأنها تحتوي على مواعيد نشطة',
+          en: 'Cannot remove session with active appointments',
+        },
+        code: 'CANNOT_REMOVE_SESSION_WITH_ACTIVE_APPOINTMENTS',
+      },
+    },
+  })
+  @ApiBody({ type: UpdateServiceWithSessionsDto })
   @Put(':id')
   async updateService(
     @Param('id') id: string,
     @Body(new ValidationPipe({ transform: true, whitelist: true }))
-    updateServiceDto: UpdateServiceDto,
+    updateServiceDto: UpdateServiceWithSessionsDto,
   ): Promise<Service> {
     return this.serviceService.updateService(id, updateServiceDto);
   }

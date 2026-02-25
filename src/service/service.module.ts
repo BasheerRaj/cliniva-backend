@@ -12,6 +12,8 @@ import { NotificationSchema } from '../database/schemas/notification.schema';
 import { CommonModule } from '../common/common.module';
 import { AuthModule } from '../auth/auth.module';
 import { ServiceOfferModule } from '../service-offer/service-offer.module';
+import { SessionManagerService } from './services/session-manager.service';
+import { SessionValidationService } from '../appointment/services/session-validation.service';
 
 @Module({
   imports: [
@@ -29,7 +31,7 @@ import { ServiceOfferModule } from '../service-offer/service-offer.module';
     ServiceOfferModule,
   ],
   controllers: [ServiceController],
-  providers: [ServiceService],
-  exports: [ServiceService],
+  providers: [ServiceService, SessionManagerService, SessionValidationService],
+  exports: [ServiceService, SessionManagerService, SessionValidationService],
 })
 export class ServiceModule {}

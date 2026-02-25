@@ -36,6 +36,25 @@ export class Service extends Document {
   @Prop()
   deactivationReason?: string;
 
+  @Prop({
+    type: [
+      {
+        _id: { type: String, default: () => new Types.ObjectId().toString() },
+        name: { type: String, required: true },
+        duration: { type: Number, required: false },
+        order: { type: Number, required: true },
+      },
+    ],
+    default: [],
+    required: false,
+  })
+  sessions?: Array<{
+    _id: string;
+    name: string;
+    duration?: number;
+    order: number;
+  }>;
+
   @Prop({ default: 0 })
   activeAppointmentsCount?: number;
 
@@ -63,3 +82,6 @@ ServiceSchema.index(
   { unique: true, sparse: true },
 );
 ServiceSchema.index({ clinicId: 1, name: 1 }, { unique: true, sparse: true });
+
+// Index for session lookups by session ID within service
+ServiceSchema.index({ 'sessions._id': 1 });
