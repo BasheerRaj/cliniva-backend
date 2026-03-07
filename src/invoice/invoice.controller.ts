@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Put,
+  Patch,
   Delete,
   Body,
   Param,
@@ -469,6 +470,53 @@ export class InvoiceController {
       return {
         success: true,
         message: SUCCESS_MESSAGES.INVOICE_UPDATED,
+        data: invoice,
+      };
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
+   * Cancel an invoice
+   * Requirements: Rule BZR-0e1f2a3b
+   */
+  @Patch(':id/cancel')
+  @HttpCode(HttpStatus.OK)
+  @Roles(UserRole.STAFF, UserRole.ADMIN, UserRole.MANAGER, UserRole.OWNER)
+  @ApiOperation({
+    summary: 'Cancel an invoice',
+    description:
+      'Marks an invoice as Cancelled. Only invoices with no payments can be cancelled. ' +
+      'Requires authentication and Staff/Admin/Manager/Owner role.',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'Invoice ID (MongoDB ObjectId)',
+    example: '507f1f77bcf86cd799439014',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Invoice cancelled successfully',
+  })
+  async cancelInvoice(@Param('id') id: string, @Request() req: any) {
+    try {
+      const userId = req.user?.id || req.user?.userId || req.user?.sub;
+      if (!userId) {
+        throw new BadRequestException({
+          message: AUTH_ERRORS.UNAUTHORIZED_ACCESS,
+          code: 'UNAUTHORIZED',
+        });
+      }
+
+      const invoice = await this.invoiceService.cancelInvoice(id, userId);
+
+      return {
+        success: true,
+        message: {
+          ar: 'تم إلغاء الفاتورة بنجاح',
+          en: 'Invoice cancelled successfully',
+        },
         data: invoice,
       };
     } catch (error) {

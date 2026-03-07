@@ -457,6 +457,45 @@ export class InvoiceService {
   }
 
   /**
+   * Cancel an invoice
+   * Rule BZR-0e1f2a3b: If all appointments for a patient are deleted, the associated invoice will be marked as Cancelled.
+   */
+  async cancelInvoice(id: string, userId: string): Promise<InvoiceResponseDto> {
+    const invoice = await this.invoiceModel.findById(id);
+
+    if (!invoice || invoice.deletedAt) {
+      throw new NotFoundException(NOT_FOUND_ERRORS.INVOICE);
+    }
+
+    // Only Draft or Unpaid (Posted) invoices with no payments can be cancelled
+    if (invoice.paidAmount > 0) {
+      throw new BadRequestException({
+        message: {
+          ar: 'لا يمكن إلغاء فاتورة تحتوي على مدفوعات',
+          en: 'Cannot cancel an invoice that has associated payments',
+        },
+        code: 'INVOICE_HAS_PAYMENTS',
+      });
+    }
+
+    invoice.invoiceStatus = 'cancelled';
+    invoice.updatedBy = new Types.ObjectId(userId);
+    await invoice.save();
+
+    this.logger.log(
+      `Invoice cancelled: ${invoice.invoiceNumber} by user ${userId}`,
+    );
+
+    return this.mapToResponseDto(
+      await invoice.populate([
+        { path: 'patientId', select: 'firstName lastName patientNumber' },
+        { path: 'serviceId', select: 'name price' },
+        { path: 'clinicId', select: 'name' },
+      ]),
+    );
+  }
+
+  /**
    * Map invoice document to response DTO
    */
   private mapToResponseDto(invoice: any): InvoiceResponseDto {

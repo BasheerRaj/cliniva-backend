@@ -1089,6 +1089,14 @@ export class EmployeeSearchQueryDto {
   @IsEnum(['asc', 'desc'])
   @IsOptional()
   sortOrder?: 'asc' | 'desc';
+
+  @IsEnum(['asc', 'desc'])
+  @IsOptional()
+  order?: 'asc' | 'desc';
+
+  @IsString()
+  @IsOptional()
+  filter_fields?: string;
 }
 
 // Bulk Operations DTOs

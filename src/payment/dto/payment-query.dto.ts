@@ -19,6 +19,7 @@ export enum PaymentSortField {
   AMOUNT = 'amount',
   PATIENT_NAME = 'patientName',
   CREATED_AT = 'createdAt',
+  ID = '_id',
 }
 
 /**

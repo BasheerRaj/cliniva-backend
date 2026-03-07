@@ -1078,6 +1078,7 @@ export class AppointmentService {
 
   /**
    * Soft delete appointment
+   * Rule BZR-0e1f2a3b: If all appointments for a patient are deleted, the associated invoice will be marked as Cancelled.
    */
   async deleteAppointment(
     appointmentId: string,
@@ -1089,28 +1090,52 @@ export class AppointmentService {
 
     this.logger.log(`Soft deleting appointment: ${appointmentId}`);
 
-    const result = await this.appointmentModel
-      .findOneAndUpdate(
-        {
-          _id: new Types.ObjectId(appointmentId),
-          deletedAt: { $exists: false },
-        },
-        {
-          $set: {
-            deletedAt: new Date(),
-            updatedBy: deletedByUserId
-              ? new Types.ObjectId(deletedByUserId)
-              : undefined,
-          },
-        },
-      )
-      .exec();
+    const appointment = await this.appointmentModel.findOne({
+      _id: new Types.ObjectId(appointmentId),
+      deletedAt: { $exists: false },
+    });
 
-    if (!result) {
+    if (!appointment) {
       throw new NotFoundException('Appointment not found');
     }
 
+    // Perform soft delete
+    appointment.deletedAt = new Date();
+    appointment.isDeleted = true;
+    if (deletedByUserId) {
+      appointment.deletedBy = new Types.ObjectId(deletedByUserId);
+      appointment.updatedBy = new Types.ObjectId(deletedByUserId);
+    }
+    await appointment.save();
+
     this.logger.log(`Appointment soft deleted successfully: ${appointmentId}`);
+
+    // Rule BZR-0e1f2a3b Implementation:
+    // If the appointment was linked to an invoice, check if there are any other active appointments for this invoice
+    if (appointment.invoiceId) {
+      const remainingAppointments = await this.appointmentModel.countDocuments({
+        invoiceId: appointment.invoiceId,
+        deletedAt: { $exists: false },
+        status: { $nin: ['cancelled'] },
+      });
+
+      if (remainingAppointments === 0) {
+        this.logger.log(
+          `No active appointments remaining for invoice ${appointment.invoiceId}. Cancelling invoice per rule BZR-0e1f2a3b.`,
+        );
+        try {
+          await this.invoiceService.cancelInvoice(
+            appointment.invoiceId.toString(),
+            deletedByUserId || appointment.createdBy.toString(),
+          );
+        } catch (error) {
+          // Log error but don't fail the appointment deletion
+          this.logger.error(
+            `Failed to auto-cancel invoice ${appointment.invoiceId} after deleting last appointment: ${error.message}`,
+          );
+        }
+      }
+    }
   }
 
   /**
@@ -1927,6 +1952,36 @@ export class AppointmentService {
   // M6 – Get Appointments Calendar (UC-d2e3f4c)
   // Tasks: 9.1, 9.2, 9.3, 9.4
   // =========================================================================
+  /**
+   * Send manual reminder for appointment
+   * Requirements: UC-405a92ak
+   */
+  async sendManualReminder(id: string, userId?: string): Promise<void> {
+    const appointment = await this.appointmentModel
+      .findOne({ _id: new Types.ObjectId(id), isDeleted: { $ne: true } })
+      .populate('patientId')
+      .exec();
+
+    if (!appointment) {
+      throw new NotFoundException('Appointment not found');
+    }
+
+    const patient: any = appointment.patientId;
+    
+    await this.notificationService.create({
+      recipientId: patient._id.toString(),
+      title: 'Appointment Reminder',
+      message: `Friendly reminder for your appointment on ${new Date(appointment.appointmentDate).toLocaleDateString()} at ${appointment.appointmentTime}.`,
+      notificationType: 'appointment_reminder',
+      priority: 'high',
+      relatedEntityType: 'appointment',
+      relatedEntityId: id,
+      deliveryMethod: 'sms', // Default to SMS for reminders
+    });
+
+    this.logger.log(`Manual reminder sent for appointment ${id} by user ${userId}`);
+  }
+
   /**
    * Return appointments grouped for calendar views (day / week / month).
    * 

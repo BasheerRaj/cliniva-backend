@@ -1772,4 +1772,39 @@ export class AppointmentController {
       };
     }
   }
+
+  /**
+   * Send manual reminder for appointment
+   * Requirements: UC-405a92ak
+   */
+  @Post(':id/reminder')
+  @HttpCode(HttpStatus.OK)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
+  @ApiOperation({
+    summary: 'Send manual reminder',
+    description: 'Triggers a manual reminder notification (SMS/Email) to the patient for an upcoming appointment.',
+  })
+  @ApiParam({ name: 'id', type: String, description: 'Appointment ID' })
+  @ApiResponse({ status: 200, description: 'Reminder sent successfully' })
+  async sendManualReminder(@Param('id') id: string, @Request() req: any) {
+    try {
+      await this.appointmentService.sendManualReminder(id, req.user?.userId);
+      return {
+        success: true,
+        message: {
+          ar: 'تم إرسال التذكير بنجاح',
+          en: 'Reminder sent successfully',
+        },
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: {
+          ar: 'فشل إرسال التذكير',
+          en: 'Failed to send reminder',
+        },
+        error: error.message,
+      };
+    }
+  }
 }

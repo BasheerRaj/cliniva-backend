@@ -467,19 +467,61 @@ export class EmployeeService {
       lastName,
       email,
       employeeNumber,
-      role,
       jobTitle,
       organizationId,
       complexId,
       clinicId,
-      isActive,
       dateHiredFrom,
       dateHiredTo,
       page = '1',
       limit = '10',
       sortBy = 'createdAt',
-      sortOrder = 'desc',
+      sortOrder: originalSortOrder,
+      order,
+      filter_fields,
     } = query;
+
+    let { role, isActive } = query;
+    let sortOrder = originalSortOrder || 'desc';
+
+    // Handle 'order' as alias for 'sortOrder'
+    if (order && !originalSortOrder) {
+      sortOrder = order;
+    }
+
+    // Handle filter_fields JSON string (used by frontend generic list)
+    if (filter_fields) {
+      try {
+        const parsedFilters = JSON.parse(filter_fields);
+        
+        // Map employeeType to role
+        if (parsedFilters.employeeType === 'Doctor' && !role) {
+          role = 'doctor';
+        } else if ((parsedFilters.employeeType === 'Staff' || parsedFilters.employeeType === 'Staff Member') && !role) {
+          role = 'staff';
+        }
+
+        // Map roleName to role
+        if (parsedFilters.roleName && !role) {
+          const roleMap: Record<string, string> = {
+            'Doctor': 'doctor',
+            'Staff': 'staff',
+            'Admin': 'admin',
+            'Owner': 'owner',
+            'Super Admin': 'super_admin',
+            'Patient': 'patient'
+          };
+          role = roleMap[parsedFilters.roleName] || parsedFilters.roleName.toLowerCase();
+        }
+
+        // Map isActive
+        if (parsedFilters.isActive !== undefined && isActive === undefined) {
+          isActive = parsedFilters.isActive === 'true' || parsedFilters.isActive === true;
+        }
+      } catch (e) {
+        this.logger.warn(`Failed to parse filter_fields: ${filter_fields}`);
+      }
+    }
 
     // Build user filter
     const userFilter: any = {};
