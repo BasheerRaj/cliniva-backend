@@ -165,4 +165,14 @@ export class CreateAppointmentDto {
     message: '{"ar":"سبب الموعد يجب أن يكون نصاً","en":"Reason must be a string"}',
   })
   reason?: string;
+
+  @ApiPropertyOptional({
+    description: 'Invoice ID (MongoDB ObjectId) - Optional, links appointment to invoice',
+    example: '507f1f77bcf86cd799439020',
+  })
+  @IsOptional()
+  @IsMongoId({
+    message: '{"ar":"معرف الفاتورة غير صالح","en":"Invalid invoice ID"}',
+  })
+  invoiceId?: string;
 }

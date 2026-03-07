@@ -1,60 +1,83 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
 
+/**
+ * Payment Schema - M7 Billing & Payments MVP
+ * Represents a financial transaction recording money received from a patient.
+ * 
+ * Requirements: 6.9, 13.11
+ */
 @Schema({
   timestamps: true,
   collection: 'payments',
 })
 export class Payment extends Document {
-  @Prop({ required: true, unique: true })
-  paymentNumber: string;
+  // ==================== Identification ====================
+  
+  @Prop({ required: true, unique: true, index: true })
+  paymentId: string; // Auto-generated unique ID
 
-  @Prop({ type: Types.ObjectId, ref: 'Invoice', required: true })
+  // ==================== References ====================
+  
+  @Prop({ type: Types.ObjectId, ref: 'Invoice', required: true, index: true })
   invoiceId: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: 'Patient', required: true })
+  @Prop({ type: Types.ObjectId, ref: 'Patient', required: true, index: true })
   patientId: Types.ObjectId;
 
-  @Prop({ required: true, type: Number })
+  @Prop({ type: Types.ObjectId, ref: 'Clinic', required: true, index: true })
+  clinicId: Types.ObjectId;
+
+  // ==================== Payment Details ====================
+  
+  @Prop({ required: true, type: Number, min: 0.01 })
   amount: number;
 
   @Prop({
     required: true,
-    enum: [
-      'cash',
-      'card',
-      'bank_transfer',
-      'insurance',
-      'check',
-      'digital_wallet',
-    ],
+    enum: ['cash', 'card', 'bank_transfer', 'insurance', 'check', 'digital_wallet'],
+    index: true,
   })
   paymentMethod: string;
 
-  @Prop()
-  paymentReference?: string; // Transaction ID, check number, etc.
-
-  @Prop({ required: true })
+  @Prop({ required: true, index: true })
   paymentDate: Date;
 
-  @Prop({
-    enum: ['pending', 'completed', 'failed', 'refunded'],
-    default: 'completed',
-  })
-  status: string;
-
-  @Prop()
+  @Prop({ required: false, maxlength: 500 })
   notes?: string;
 
+  // ==================== Audit Fields ====================
+  
   @Prop({ type: Types.ObjectId, ref: 'User', required: true })
-  processedBy: Types.ObjectId;
+  addedBy: Types.ObjectId;
+
+  @Prop({ type: Types.ObjectId, ref: 'User', required: false })
+  updatedBy?: Types.ObjectId;
+
+  // ==================== Timestamps (managed by Mongoose) ====================
+  
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export const PaymentSchema = SchemaFactory.createForClass(Payment);
 
-// Indexes (paymentNumber index is already created by unique: true in @Prop)
-PaymentSchema.index({ invoiceId: 1 });
-PaymentSchema.index({ patientId: 1 });
-PaymentSchema.index({ paymentDate: 1 });
+// ==================== Indexes for Performance ====================
+
+// Primary unique index (paymentId index is already created by unique: true in @Prop)
+// Requirement: 13.11
+
+// Invoice-based queries with date sorting
+PaymentSchema.index({ invoiceId: 1, paymentDate: -1 });
+
+// Patient and clinic-based queries
+PaymentSchema.index({ patientId: 1, clinicId: 1 });
+
+// Payment method filtering
 PaymentSchema.index({ paymentMethod: 1 });
-PaymentSchema.index({ status: 1 });
+
+// Date range queries
+PaymentSchema.index({ paymentDate: 1 });
+
+// List queries with default sort
+PaymentSchema.index({ createdAt: -1 });

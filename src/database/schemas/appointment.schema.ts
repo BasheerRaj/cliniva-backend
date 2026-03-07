@@ -125,6 +125,11 @@ export class Appointment extends Document {
   @Prop({ required: false, default: false })
   isDocumented?: boolean;
 
+  // ==================== Billing Integration ====================
+  
+  @Prop({ type: Types.ObjectId, ref: 'Invoice', required: false, index: true })
+  invoiceId?: Types.ObjectId;
+
   // ==================== Rescheduling History ====================
   
   @Prop({
@@ -276,4 +281,9 @@ AppointmentSchema.index({
 AppointmentSchema.index({
   sessionId: 1,
   status: 1,
+});
+
+// Index for invoice integration - find appointments by invoice
+AppointmentSchema.index({
+  invoiceId: 1,
 });

@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { AppointmentService } from './appointment.service';
 import { AppointmentController } from './appointment.controller';
@@ -20,6 +20,7 @@ import { SubscriptionModule } from '../subscription/subscription.module';
 import { PatientModule } from '../patient/patient.module';
 import { AuthModule } from '../auth/auth.module';
 import { WorkingHoursModule } from '../working-hours/working-hours.module';
+import { InvoiceModule } from '../invoice/invoice.module';
 import { WorkingHoursIntegrationService } from './services/working-hours-integration.service';
 import { AppointmentWorkingHoursService } from './services/appointment-working-hours.service';
 import { AppointmentValidationService } from './services/appointment-validation.service';
@@ -49,6 +50,7 @@ import { AppointmentSessionService } from './services/appointment-session.servic
     PatientModule,
     AuthModule,
     WorkingHoursModule,
+    forwardRef(() => InvoiceModule),
   ],
   controllers: [AppointmentController],
   providers: [

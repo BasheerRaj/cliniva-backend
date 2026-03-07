@@ -41,6 +41,7 @@ import {
 import { CreateAppointmentWithSessionDto } from './dto/create-appointment-with-session.dto';
 import { AppointmentSessionService } from './services/appointment-session.service';
 import { SESSION_ERROR_MESSAGES } from './constants/session-error-messages.constant';
+import { InvoiceService } from '../invoice/invoice.service';
 
 @Injectable()
 export class AppointmentService {
@@ -60,6 +61,7 @@ export class AppointmentService {
     private readonly notificationService: NotificationService,
     private readonly auditService: AuditService,
     private readonly appointmentSessionService: AppointmentSessionService,
+    private readonly invoiceService: InvoiceService,
   ) { }
 
   /**
@@ -484,6 +486,9 @@ export class AppointmentService {
       internalNotes: createAppointmentDto.internalNotes,
       bookingChannel: createAppointmentDto.bookingChannel || 'web',
       reason: createAppointmentDto.reason,
+      invoiceId: (createAppointmentDto as any).invoiceId
+        ? new Types.ObjectId((createAppointmentDto as any).invoiceId)
+        : undefined,
       createdBy: new Types.ObjectId(createdByUserId), // Requirement 1.12
     };
 
@@ -943,6 +948,8 @@ export class AppointmentService {
 
   /**
    * Confirm appointment
+   * M7 Integration: Transitions linked draft invoices to Posted status
+   * Requirements: 15.1, 15.2, 15.3, 15.4, 15.5, 15.6, 15.7
    */
   async confirmAppointment(
     appointmentId: string,
@@ -976,6 +983,68 @@ export class AppointmentService {
       .exec();
 
     this.logger.log(`Appointment confirmed: ${appointmentId}`);
+
+    // M7 Integration: Transition linked invoice to Posted status
+    // Requirements: 15.1, 15.2, 15.3, 15.4, 15.5, 15.6, 15.7
+    if (appointment.invoiceId) {
+      try {
+        this.logger.log(
+          `Transitioning linked invoice ${appointment.invoiceId} to Posted status`,
+        );
+        await this.invoiceService.transitionToPosted(
+          appointment.invoiceId.toString(),
+        );
+        this.logger.log(
+          `Invoice ${appointment.invoiceId} successfully transitioned to Posted`,
+        );
+
+        // Audit log for integration event
+        if (updatedByUserId) {
+          await this.auditService.logSecurityEvent({
+            eventType: 'INVOICE_TRANSITIONED_ON_APPOINTMENT_CONFIRMATION',
+            userId: updatedByUserId,
+            actorId: updatedByUserId,
+            ipAddress: '0.0.0.0',
+            userAgent: 'System',
+            timestamp: new Date(),
+            metadata: {
+              appointmentId,
+              invoiceId: appointment.invoiceId.toString(),
+              action: 'invoice_transition_to_posted',
+            },
+          });
+        }
+      } catch (error) {
+        // Handle errors gracefully - log but don't fail appointment confirmation
+        // Requirement: 15.7
+        this.logger.error(
+          `Failed to transition invoice ${appointment.invoiceId} to Posted: ${error.message}`,
+          error.stack,
+        );
+
+        // Log the error for monitoring
+        if (updatedByUserId) {
+          await this.auditService.logSecurityEvent({
+            eventType: 'INVOICE_TRANSITION_FAILED',
+            userId: updatedByUserId,
+            actorId: updatedByUserId,
+            ipAddress: '0.0.0.0',
+            userAgent: 'System',
+            timestamp: new Date(),
+            metadata: {
+              appointmentId,
+              invoiceId: appointment.invoiceId.toString(),
+              error: error.message,
+            },
+          });
+        }
+
+        // Continue with appointment confirmation despite invoice transition failure
+        this.logger.warn(
+          `Appointment ${appointmentId} confirmed successfully, but invoice transition failed`,
+        );
+      }
+    }
 
     // Send notification to patient
     await this.notificationService.create({

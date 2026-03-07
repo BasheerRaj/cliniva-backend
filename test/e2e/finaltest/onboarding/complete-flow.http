@@ -169,7 +169,7 @@ POST {{baseUrl}}/auth/reset-password
 Content-Type: {{contentType}}
 
 {
-  "token": "test-reset-token-32-characters-long-minimum",
+  "token": "1147f9b9898674b4ab8dd101d33686797bfa1c848aa8214fed357dbafa30025e",
   "newPassword": "NewSecurePass123!",
   "confirmPassword": "NewSecurePass123!"
 }
