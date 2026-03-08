@@ -665,6 +665,7 @@ export class AppointmentService {
 
   /**
    * Get appointments with filtering and pagination
+   * UC-e1f2d3c: View list of Appointments
    */
   async getAppointments(query: AppointmentSearchQueryDto): Promise<{
     appointments: Appointment[];
@@ -699,16 +700,67 @@ export class AppointmentService {
     if (doctorId) filter.doctorId = new Types.ObjectId(doctorId);
     if (clinicId) filter.clinicId = new Types.ObjectId(clinicId);
     if (serviceId) filter.serviceId = new Types.ObjectId(serviceId);
-    if (status) filter.status = status;
+    
+    // Status validation (P2 - MEDIUM)
+    if (status) {
+      const validStatuses = ['scheduled', 'confirmed', 'in_progress', 'completed', 'cancelled', 'no_show'];
+      if (!validStatuses.includes(status)) {
+        throw new BadRequestException({
+          message: {
+            ar: `حالة الموعد غير صالحة. القيم المسموحة: ${validStatuses.join(', ')}`,
+            en: `Invalid appointment status. Allowed values: ${validStatuses.join(', ')}`,
+          },
+          code: 'INVALID_STATUS',
+          providedStatus: status,
+          validStatuses,
+        });
+      }
+      filter.status = status;
+    }
+    
     if (urgencyLevel) filter.urgencyLevel = urgencyLevel;
 
-    // Date filtering
+    // Date filtering with range limit validation (P2 - MEDIUM)
     if (appointmentDate) {
       filter.appointmentDate = new Date(appointmentDate);
     } else if (dateFrom || dateTo) {
       filter.appointmentDate = {};
       if (dateFrom) filter.appointmentDate.$gte = new Date(dateFrom);
       if (dateTo) filter.appointmentDate.$lte = new Date(dateTo);
+      
+      // Validate date range limit (max 365 days)
+      if (dateFrom && dateTo) {
+        const fromDate = new Date(dateFrom);
+        const toDate = new Date(dateTo);
+        const daysDiff = Math.ceil((toDate.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24));
+        
+        if (daysDiff > 365) {
+          throw new BadRequestException({
+            message: {
+              ar: 'نطاق التاريخ كبير جداً. الحد الأقصى المسموح به هو 365 يوماً',
+              en: 'Date range too large. Maximum allowed is 365 days',
+            },
+            code: 'DATE_RANGE_TOO_LARGE',
+            requestedDays: daysDiff,
+            maxDays: 365,
+          });
+        }
+      }
+    }
+
+    // Search functionality (P1 - HIGH)
+    // Text search on patient name, doctor name, appointment notes
+    if (search && search.trim()) {
+      const searchRegex = new RegExp(search.trim(), 'i');
+      
+      // We need to search in populated fields, so we'll use aggregation
+      // For now, we'll search in notes and reason fields directly
+      // Patient/Doctor name search requires aggregation or separate queries
+      filter.$or = [
+        { notes: searchRegex },
+        { reason: searchRegex },
+        { internalNotes: searchRegex },
+      ];
     }
 
     // Pagination
@@ -716,9 +768,19 @@ export class AppointmentService {
     const pageSize = Math.max(1, Math.min(100, parseInt(String(limit))));
     const skip = (pageNum - 1) * pageSize;
 
+    // Sort field validation (P1 - HIGH)
+    const validSortFields = ['appointmentDate', 'appointmentTime', 'status', 'createdAt', 'urgencyLevel', 'updatedAt'];
+    const sortField = validSortFields.includes(sortBy) ? sortBy : 'appointmentDate';
+    
+    if (sortBy && !validSortFields.includes(sortBy)) {
+      this.logger.warn(
+        `Invalid sort field "${sortBy}" provided. Defaulting to "appointmentDate". Valid fields: ${validSortFields.join(', ')}`,
+      );
+    }
+
     // Sorting
     const sort: any = {};
-    sort[sortBy] = sortOrder === 'asc' ? 1 : -1;
+    sort[sortField] = sortOrder === 'asc' ? 1 : -1;
 
     const [appointments, total] = await Promise.all([
       this.appointmentModel

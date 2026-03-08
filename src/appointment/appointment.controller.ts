@@ -390,9 +390,12 @@ export class AppointmentController {
     description: 'Sort order (default: desc)',
     example: 'desc',
   })
+  @UseGuards(RoleScopeGuard) // UC-e1f2d3c: Apply role-based filtering
+  @Roles(UserRole.ADMIN, UserRole.STAFF, UserRole.DOCTOR)
   @Get()
   async getAppointments(
     @Query(new ValidationPipe()) query: AppointmentSearchQueryDto,
+    @Request() req: any, // UC-e1f2d3c: Get user from request for role filtering
   ) {
     try {
       const result = await this.appointmentService.getAppointments(query);
