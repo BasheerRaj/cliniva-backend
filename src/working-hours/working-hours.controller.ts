@@ -35,7 +35,7 @@ import {
   UpdateWorkingHoursDto,
 } from './dto/create-working-hours.dto';
 import {
-  ValidateWorkingHoursDto,
+  ValidateEntityWorkingHoursDto,
   ValidateWorkingHoursResponse,
 } from './dto/validate-working-hours.dto';
 import {
@@ -458,7 +458,7 @@ export class WorkingHoursController {
    * - BZR-u5a0f7d3: Child hours must be within parent hours
    * - BZR-42: Child cannot be open when parent is closed
    *
-   * @param {ValidateWorkingHoursDto} validateDto - Validation request data
+   * @param {ValidateEntityWorkingHoursDto} validateDto - Validation request data
    * @returns {Promise<ValidateWorkingHoursResponse>} Validation result with errors and suggestions
    *
    * @example
@@ -488,7 +488,7 @@ export class WorkingHoursController {
       'Returns validation errors with suggested time ranges.',
   })
   @ApiBody({
-    type: ValidateWorkingHoursDto,
+    type: ValidateEntityWorkingHoursDto,
     description: 'Working hours validation request',
     examples: {
       'user-clinic': {
@@ -584,7 +584,7 @@ export class WorkingHoursController {
     description: 'Invalid request data',
   })
   async validateWorkingHours(
-    @Body() validateDto: ValidateWorkingHoursDto,
+    @Body() validateDto: ValidateEntityWorkingHoursDto,
   ): Promise<ValidateWorkingHoursResponse> {
     try {
       // Perform hierarchical validation using the validation service

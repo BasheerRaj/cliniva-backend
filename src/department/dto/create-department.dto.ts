@@ -91,7 +91,7 @@ export class UpdateDepartmentStatusDto {
   status: 'active' | 'inactive';
 }
 
-export class DeactivateWithTransferDto {
+export class DeactivateDepartmentWithTransferDto {
   @ApiProperty({
     description:
       'Target department ID to transfer clinics to (must be active)',

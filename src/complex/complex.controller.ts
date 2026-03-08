@@ -29,7 +29,7 @@ import { ComplexService } from './complex.service';
 import { CreateComplexDto, UpdateComplexDto } from './dto/create-complex.dto';
 import { ListComplexesQueryDto } from './dto/list-complexes-query.dto';
 import { UpdateComplexStatusDto } from './dto/update-complex-status.dto';
-import { AssignPICDto } from './dto/assign-pic.dto';
+import { AssignComplexPICDto } from './dto/assign-pic.dto';
 import { TransferClinicsDto } from './dto/transfer-clinics.dto';
 
 /**
@@ -1652,7 +1652,7 @@ export class ComplexController {
     example: '507f1f77bcf86cd799439011',
   })
   @ApiBody({
-    type: AssignPICDto,
+    type: AssignComplexPICDto,
     description: 'Person-in-charge assignment data',
     examples: {
       'Assign PIC': {
@@ -1722,7 +1722,7 @@ export class ComplexController {
   })
   async assignPersonInCharge(
     @Param('id') id: string,
-    @Body() assignPICDto: AssignPICDto,
+    @Body() assignPICDto: AssignComplexPICDto,
     @Request() req: any,
   ) {
     try {

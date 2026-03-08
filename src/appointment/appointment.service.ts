@@ -32,7 +32,7 @@ import {
   DayScheduleDto,
   AppointmentConflictDto,
   ConfirmAppointmentDto,
-  ChangeStatusDto,
+  ChangeAppointmentStatusDto,
   StartAppointmentDto,
   EndAppointmentDto,
   ConcludeAppointmentDto,

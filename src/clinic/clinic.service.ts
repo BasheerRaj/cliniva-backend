@@ -15,7 +15,7 @@ import {
   SetupBusinessProfileDto,
 } from './dto/create-clinic.dto';
 import { ClinicFilterDto } from './dto/clinic-filter.dto';
-import { AssignPICDto } from './dto/assign-pic.dto';
+import { AssignClinicPICDto } from './dto/assign-pic.dto';
 import { ValidationUtil } from '../common/utils/validation.util';
 import { ResponseBuilder } from '../common/utils/response-builder.util';
 import { ERROR_MESSAGES } from '../common/utils/error-messages.constant';
@@ -742,7 +742,7 @@ export class ClinicService {
    */
   async assignPersonInCharge(
     clinicId: string,
-    assignPICDto: AssignPICDto,
+    assignPICDto: AssignClinicPICDto,
   ): Promise<Clinic> {
     // 1. Validate clinic exists
     const clinic = await this.clinicModel.findById(clinicId).exec();

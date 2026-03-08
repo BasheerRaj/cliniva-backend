@@ -1,11 +1,11 @@
 import { validate } from 'class-validator';
 import { plainToClass } from 'class-transformer';
-import { ValidateWorkingHoursDto } from './validate-working-hours.dto';
+import { ValidateEntityWorkingHoursDto } from './validate-working-hours.dto';
 
-describe('ValidateWorkingHoursDto', () => {
+describe('ValidateEntityWorkingHoursDto', () => {
   describe('Valid DTO', () => {
     it('should pass validation with valid data', async () => {
-      const dto = plainToClass(ValidateWorkingHoursDto, {
+      const dto = plainToClass(ValidateEntityWorkingHoursDto, {
         entityType: 'user',
         entityId: '507f1f77bcf86cd799439011',
         parentEntityType: 'clinic',
@@ -29,7 +29,7 @@ describe('ValidateWorkingHoursDto', () => {
     });
 
     it('should pass validation with clinic entity type', async () => {
-      const dto = plainToClass(ValidateWorkingHoursDto, {
+      const dto = plainToClass(ValidateEntityWorkingHoursDto, {
         entityType: 'clinic',
         entityId: '507f1f77bcf86cd799439011',
         parentEntityType: 'complex',
@@ -51,7 +51,7 @@ describe('ValidateWorkingHoursDto', () => {
 
   describe('Invalid entityType', () => {
     it('should fail validation with invalid entityType', async () => {
-      const dto = plainToClass(ValidateWorkingHoursDto, {
+      const dto = plainToClass(ValidateEntityWorkingHoursDto, {
         entityType: 'organization', // Not allowed for validation
         entityId: '507f1f77bcf86cd799439011',
         parentEntityType: 'clinic',
@@ -65,7 +65,7 @@ describe('ValidateWorkingHoursDto', () => {
     });
 
     it('should fail validation with missing entityType', async () => {
-      const dto = plainToClass(ValidateWorkingHoursDto, {
+      const dto = plainToClass(ValidateEntityWorkingHoursDto, {
         entityId: '507f1f77bcf86cd799439011',
         parentEntityType: 'clinic',
         parentEntityId: '507f1f77bcf86cd799439012',
@@ -81,7 +81,7 @@ describe('ValidateWorkingHoursDto', () => {
 
   describe('Invalid entityId', () => {
     it('should fail validation with empty entityId', async () => {
-      const dto = plainToClass(ValidateWorkingHoursDto, {
+      const dto = plainToClass(ValidateEntityWorkingHoursDto, {
         entityType: 'user',
         entityId: '',
         parentEntityType: 'clinic',
@@ -95,7 +95,7 @@ describe('ValidateWorkingHoursDto', () => {
     });
 
     it('should fail validation with missing entityId', async () => {
-      const dto = plainToClass(ValidateWorkingHoursDto, {
+      const dto = plainToClass(ValidateEntityWorkingHoursDto, {
         entityType: 'user',
         parentEntityType: 'clinic',
         parentEntityId: '507f1f77bcf86cd799439012',
@@ -111,7 +111,7 @@ describe('ValidateWorkingHoursDto', () => {
 
   describe('Invalid parentEntityType', () => {
     it('should fail validation with invalid parentEntityType', async () => {
-      const dto = plainToClass(ValidateWorkingHoursDto, {
+      const dto = plainToClass(ValidateEntityWorkingHoursDto, {
         entityType: 'user',
         entityId: '507f1f77bcf86cd799439011',
         parentEntityType: 'organization', // Not allowed
@@ -125,7 +125,7 @@ describe('ValidateWorkingHoursDto', () => {
     });
 
     it('should fail validation with missing parentEntityType', async () => {
-      const dto = plainToClass(ValidateWorkingHoursDto, {
+      const dto = plainToClass(ValidateEntityWorkingHoursDto, {
         entityType: 'user',
         entityId: '507f1f77bcf86cd799439011',
         parentEntityId: '507f1f77bcf86cd799439012',
@@ -143,7 +143,7 @@ describe('ValidateWorkingHoursDto', () => {
 
   describe('Invalid parentEntityId', () => {
     it('should fail validation with empty parentEntityId', async () => {
-      const dto = plainToClass(ValidateWorkingHoursDto, {
+      const dto = plainToClass(ValidateEntityWorkingHoursDto, {
         entityType: 'user',
         entityId: '507f1f77bcf86cd799439011',
         parentEntityType: 'clinic',
@@ -157,7 +157,7 @@ describe('ValidateWorkingHoursDto', () => {
     });
 
     it('should fail validation with missing parentEntityId', async () => {
-      const dto = plainToClass(ValidateWorkingHoursDto, {
+      const dto = plainToClass(ValidateEntityWorkingHoursDto, {
         entityType: 'user',
         entityId: '507f1f77bcf86cd799439011',
         parentEntityType: 'clinic',
@@ -175,7 +175,7 @@ describe('ValidateWorkingHoursDto', () => {
 
   describe('Invalid schedule', () => {
     it('should fail validation with missing schedule', async () => {
-      const dto = plainToClass(ValidateWorkingHoursDto, {
+      const dto = plainToClass(ValidateEntityWorkingHoursDto, {
         entityType: 'user',
         entityId: '507f1f77bcf86cd799439011',
         parentEntityType: 'clinic',
@@ -189,7 +189,7 @@ describe('ValidateWorkingHoursDto', () => {
     });
 
     it('should fail validation with non-array schedule', async () => {
-      const dto = plainToClass(ValidateWorkingHoursDto, {
+      const dto = plainToClass(ValidateEntityWorkingHoursDto, {
         entityType: 'user',
         entityId: '507f1f77bcf86cd799439011',
         parentEntityType: 'clinic',
@@ -203,7 +203,7 @@ describe('ValidateWorkingHoursDto', () => {
     });
 
     it('should fail validation with invalid schedule items', async () => {
-      const dto = plainToClass(ValidateWorkingHoursDto, {
+      const dto = plainToClass(ValidateEntityWorkingHoursDto, {
         entityType: 'user',
         entityId: '507f1f77bcf86cd799439011',
         parentEntityType: 'clinic',
@@ -225,7 +225,7 @@ describe('ValidateWorkingHoursDto', () => {
 
   describe('Edge Cases', () => {
     it('should pass validation with empty schedule array', async () => {
-      const dto = plainToClass(ValidateWorkingHoursDto, {
+      const dto = plainToClass(ValidateEntityWorkingHoursDto, {
         entityType: 'user',
         entityId: '507f1f77bcf86cd799439011',
         parentEntityType: 'clinic',
@@ -238,7 +238,7 @@ describe('ValidateWorkingHoursDto', () => {
     });
 
     it('should pass validation with all days in schedule', async () => {
-      const dto = plainToClass(ValidateWorkingHoursDto, {
+      const dto = plainToClass(ValidateEntityWorkingHoursDto, {
         entityType: 'user',
         entityId: '507f1f77bcf86cd799439011',
         parentEntityType: 'clinic',

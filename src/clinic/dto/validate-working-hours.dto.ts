@@ -146,9 +146,9 @@ export class WorkingHourDto {
  * The clinic ID is provided as a route parameter, so only the working
  * hours schedule needs to be included in the request body.
  *
- * @class ValidateWorkingHoursDto
+ * @class ValidateClinicWorkingHoursDto
  */
-export class ValidateWorkingHoursDto {
+export class ValidateClinicWorkingHoursDto {
   @ApiProperty({
     description: 'Working hours schedule to validate for the clinic',
     type: [WorkingHourDto],

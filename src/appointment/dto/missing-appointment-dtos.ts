@@ -133,11 +133,11 @@ export class ConfirmAppointmentDto {
 }
 
 // ---------------------------------------------------------------------------
-// ChangeStatusDto
+// ChangeAppointmentStatusDto
 // ---------------------------------------------------------------------------
 
 /** DTO for changing appointment status */
-export class ChangeStatusDto {
+export class ChangeAppointmentStatusDto {
   @ApiProperty({ description: 'New status', example: 'confirmed' })
   @IsString()
   @IsNotEmpty()

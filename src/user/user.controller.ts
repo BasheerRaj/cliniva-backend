@@ -42,7 +42,7 @@ import {
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UpdateOwnProfileDto } from './dto/update-own-profile.dto';
 import { UpdateUserStatusDto } from './dto/update-user-status.dto';
-import { DeactivateWithTransferDto } from './dto/deactivate-with-transfer.dto';
+import { DeactivateUserWithTransferDto } from './dto/deactivate-with-transfer.dto';
 import { TransferAppointmentsDto } from './dto/transfer-appointments.dto';
 import { GetUsersFilterDto } from './dto/get-users-filter.dto';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -1753,13 +1753,13 @@ export class UserController {
     type: String,
     example: '507f1f77bcf86cd799439011',
   })
-  @ApiBody({ type: DeactivateWithTransferDto })
+  @ApiBody({ type: DeactivateUserWithTransferDto })
   @Post(':id/deactivate-with-transfer')
   @UseGuards(JwtAuthGuard, AdminGuard)
   @HttpCode(HttpStatus.OK)
   async deactivateDoctorWithTransfer(
     @Param('id') doctorId: string,
-    @Body() transferDto: DeactivateWithTransferDto,
+    @Body() transferDto: DeactivateUserWithTransferDto,
     @Request() req: any,
   ) {
     try {

@@ -25,7 +25,7 @@ import {
  *
  * @example
  * // Deactivate clinic and transfer staff
- * const changeStatusDto: ChangeStatusDto = {
+ * const changeStatusDto: ChangeClinicStatusDto = {
  *   status: 'inactive',
  *   reason: 'Temporary closure for renovation',
  *   transferDoctors: true,
@@ -37,13 +37,13 @@ import {
  *
  * @example
  * // Activate clinic
- * const changeStatusDto: ChangeStatusDto = {
+ * const changeStatusDto: ChangeClinicStatusDto = {
  *   status: 'active'
  * };
  *
  * @example
  * // Suspend clinic without transfer
- * const changeStatusDto: ChangeStatusDto = {
+ * const changeStatusDto: ChangeClinicStatusDto = {
  *   status: 'suspended',
  *   reason: 'Pending license renewal'
  * };
@@ -70,9 +70,9 @@ import {
  * - notifyStaff: Optional boolean to send notifications to staff
  * - notifyPatients: Optional boolean to send notifications to patients
  *
- * @class ChangeStatusDto
+ * @class ChangeClinicStatusDto
  */
-export class ChangeStatusDto {
+export class ChangeClinicStatusDto {
   @ApiProperty({
     description: 'New clinic status',
     enum: ['active', 'inactive', 'suspended'],

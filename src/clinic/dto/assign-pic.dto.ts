@@ -16,13 +16,13 @@ import { IsMongoId, IsNotEmpty } from 'class-validator';
  *
  * @example
  * // Assign PIC to clinic
- * const assignPICDto: AssignPICDto = {
+ * const assignPICDto: AssignClinicPICDto = {
  *   personInChargeId: '507f1f77bcf86cd799439011'
  * };
  *
  * @example
  * // Update existing PIC
- * const assignPICDto: AssignPICDto = {
+ * const assignPICDto: AssignClinicPICDto = {
  *   personInChargeId: '507f1f77bcf86cd799439012'
  * };
  *
@@ -46,9 +46,9 @@ import { IsMongoId, IsNotEmpty } from 'class-validator';
  * - CLINIC_002: Person in charge must be from complex PICs
  * - CLINIC_007: Clinic not found
  *
- * @class AssignPICDto
+ * @class AssignClinicPICDto
  */
-export class AssignPICDto {
+export class AssignClinicPICDto {
   @ApiProperty({
     description: 'User ID of person-in-charge (must be PIC of parent complex)',
     example: '507f1f77bcf86cd799439011',

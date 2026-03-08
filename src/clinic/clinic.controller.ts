@@ -26,9 +26,9 @@ import {
 import { ClinicService } from './clinic.service';
 import { CreateClinicDto, UpdateClinicDto } from './dto/create-clinic.dto';
 import { ClinicFilterDto } from './dto/clinic-filter.dto';
-import { ValidateWorkingHoursDto } from './dto/validate-working-hours.dto';
-import { ChangeStatusDto } from './dto/change-status.dto';
-import { AssignPICDto } from './dto/assign-pic.dto';
+import { ValidateClinicWorkingHoursDto } from './dto/validate-working-hours.dto';
+import { ChangeClinicStatusDto } from './dto/change-status.dto';
+import { AssignClinicPICDto } from './dto/assign-pic.dto';
 import { TransferStaffDto } from './dto/transfer-staff.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
@@ -964,7 +964,7 @@ export class ClinicController {
       'Validate proposed working hours against complex hours and detect conflicts with appointments and staff schedules',
   })
   @ApiBody({
-    type: ValidateWorkingHoursDto,
+    type: ValidateClinicWorkingHoursDto,
     description: 'Proposed working hours schedule to validate',
     examples: {
       fullWeek: {
@@ -1230,7 +1230,7 @@ export class ClinicController {
   @HttpCode(HttpStatus.OK)
   async validateWorkingHours(
     @Param('id') id: string,
-    @Body() validateDto: ValidateWorkingHoursDto,
+    @Body() validateDto: ValidateClinicWorkingHoursDto,
   ) {
     try {
       const validationResult =
@@ -1308,7 +1308,7 @@ export class ClinicController {
       'Change clinic status with optional staff transfer, appointment rescheduling, and notifications. Requires transfer decision when deactivating with active resources. Restricted to owners and admins.',
   })
   @ApiBody({
-    type: ChangeStatusDto,
+    type: ChangeClinicStatusDto,
     description: 'Status change options including transfer settings',
     examples: {
       deactivateWithTransfer: {
@@ -1506,7 +1506,7 @@ export class ClinicController {
   @HttpCode(HttpStatus.OK)
   async changeStatus(
     @Param('id') id: string,
-    @Body() changeStatusDto: ChangeStatusDto,
+    @Body() changeStatusDto: ChangeClinicStatusDto,
     @Request() req: any,
   ) {
     try {
@@ -1602,7 +1602,7 @@ export class ClinicController {
       'Assign a person-in-charge (PIC) to a clinic. The PIC must be selected from the parent complex PICs.',
   })
   @ApiBody({
-    type: AssignPICDto,
+    type: AssignClinicPICDto,
     description: 'Person-in-charge assignment data',
     examples: {
       assignPIC: {
@@ -1720,7 +1720,7 @@ export class ClinicController {
   @HttpCode(HttpStatus.OK)
   async assignPersonInCharge(
     @Param('id') id: string,
-    @Body() assignPICDto: AssignPICDto,
+    @Body() assignPICDto: AssignClinicPICDto,
   ) {
     try {
       // Call clinic service to assign PIC

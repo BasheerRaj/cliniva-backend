@@ -5,7 +5,7 @@ import { WorkingHoursValidationService } from './services/working-hours-validati
 import { WorkingHoursSuggestionService } from './services/working-hours-suggestion.service';
 import { AppointmentConflictService } from './services/appointment-conflict.service';
 import { WorkingHoursReschedulingService } from './services/working-hours-rescheduling.service';
-import { ValidateWorkingHoursDto } from './dto/validate-working-hours.dto';
+import { ValidateEntityWorkingHoursDto } from './dto/validate-working-hours.dto';
 import {
   CreateWorkingHoursDto,
   UpdateWorkingHoursDto,
@@ -88,7 +88,7 @@ describe('WorkingHoursController - Validation Endpoint', () => {
 
   describe('POST /working-hours/validate', () => {
     it('should validate working hours successfully when valid', async () => {
-      const validateDto: ValidateWorkingHoursDto = {
+      const validateDto: ValidateEntityWorkingHoursDto = {
         entityType: 'user',
         entityId: '507f1f77bcf86cd799439011',
         parentEntityType: 'clinic',
@@ -131,7 +131,7 @@ describe('WorkingHoursController - Validation Endpoint', () => {
     });
 
     it('should return validation errors when hours are invalid', async () => {
-      const validateDto: ValidateWorkingHoursDto = {
+      const validateDto: ValidateEntityWorkingHoursDto = {
         entityType: 'user',
         entityId: '507f1f77bcf86cd799439011',
         parentEntityType: 'clinic',
@@ -179,7 +179,7 @@ describe('WorkingHoursController - Validation Endpoint', () => {
     });
 
     it('should handle validation service errors gracefully', async () => {
-      const validateDto: ValidateWorkingHoursDto = {
+      const validateDto: ValidateEntityWorkingHoursDto = {
         entityType: 'user',
         entityId: '507f1f77bcf86cd799439011',
         parentEntityType: 'clinic',
@@ -218,7 +218,7 @@ describe('WorkingHoursController - Validation Endpoint', () => {
     });
 
     it('should validate clinic hours against complex', async () => {
-      const validateDto: ValidateWorkingHoursDto = {
+      const validateDto: ValidateEntityWorkingHoursDto = {
         entityType: 'clinic',
         entityId: '507f1f77bcf86cd799439013',
         parentEntityType: 'complex',
@@ -254,7 +254,7 @@ describe('WorkingHoursController - Validation Endpoint', () => {
     });
 
     it('should return errors with suggested ranges', async () => {
-      const validateDto: ValidateWorkingHoursDto = {
+      const validateDto: ValidateEntityWorkingHoursDto = {
         entityType: 'user',
         entityId: '507f1f77bcf86cd799439011',
         parentEntityType: 'clinic',

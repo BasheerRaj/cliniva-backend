@@ -70,7 +70,7 @@ import { BilingualMessage } from '../../common/types/bilingual-message.type';
  *
  * @class ValidateWorkingHoursDto
  */
-export class ValidateWorkingHoursDto {
+export class ValidateEntityWorkingHoursDto {
   @ApiProperty({
     description: 'Type of the child entity being validated',
     enum: ['clinic', 'user'],

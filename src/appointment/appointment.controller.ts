@@ -38,7 +38,7 @@ import {
   AppointmentAvailabilityQueryDto,
   ConfirmAppointmentDto,
   AppointmentStatsDto,
-  ChangeStatusDto,
+  ChangeAppointmentStatusDto,
   StartAppointmentDto,
   EndAppointmentDto,
   ConcludeAppointmentDto,
@@ -1031,7 +1031,7 @@ export class AppointmentController {
       'Changes the appointment status with business-rule validation. Completed and cancelled are final states. Cancelled requires reason, completed requires notes, rescheduled requires new date/time.',
   })
   @ApiParam({ name: 'id', type: String, description: 'Appointment ID', example: '507f1f77bcf86cd799439011' })
-  @ApiBody({ type: ChangeStatusDto })
+  @ApiBody({ type: ChangeAppointmentStatusDto })
   @ApiResponse({ status: 200, description: 'Status changed successfully' })
   @ApiResponse({ status: 400, description: 'Invalid transition or missing required fields' })
   @ApiResponse({ status: 404, description: 'Appointment not found' })
@@ -1039,7 +1039,7 @@ export class AppointmentController {
   @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.MANAGER, UserRole.DOCTOR, UserRole.STAFF)
   async changeAppointmentStatus(
     @Param('id') id: string,
-    @Body(new ValidationPipe()) changeStatusDto: ChangeStatusDto,
+    @Body(new ValidationPipe()) changeStatusDto: ChangeAppointmentStatusDto,
     @Request() req: any,
   ) {
     try {

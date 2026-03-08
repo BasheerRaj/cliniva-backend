@@ -26,7 +26,7 @@ import {
   AssignDepartmentsDto,
   UpdateDepartmentDto,
   UpdateDepartmentStatusDto,
-  DeactivateWithTransferDto,
+  DeactivateDepartmentWithTransferDto,
 } from './dto/create-department.dto';
 import { Department } from '../database/schemas/department.schema';
 import { ComplexDepartment } from '../database/schemas/complex-department.schema';
@@ -891,7 +891,7 @@ export class DepartmentController {
     required: true,
   })
   @ApiBody({
-    type: DeactivateWithTransferDto,
+    type: DeactivateDepartmentWithTransferDto,
     description: 'Target department information',
     examples: {
       transfer: {
@@ -978,7 +978,7 @@ export class DepartmentController {
   async deactivateWithTransfer(
     @Param('id') id: string,
     @Body(new ValidationPipe({ transform: true, whitelist: true }))
-    deactivateDto: DeactivateWithTransferDto,
+    deactivateDto: DeactivateDepartmentWithTransferDto,
   ): Promise<DeactivateWithTransferResult> {
     return this.departmentService.deactivateWithTransfer(
       id,

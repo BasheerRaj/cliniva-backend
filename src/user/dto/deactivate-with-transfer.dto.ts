@@ -6,7 +6,7 @@ import { IsBoolean, IsOptional, IsString, ValidateIf } from 'class-validator';
  *
  * Business Rule: BZR-q0d8a9f1 - Doctor appointment transfer on deactivation
  */
-export class DeactivateWithTransferDto {
+export class DeactivateUserWithTransferDto {
   @ApiProperty({
     description: 'Whether to transfer appointments to another doctor',
     example: true,

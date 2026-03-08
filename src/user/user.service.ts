@@ -17,7 +17,7 @@ import { Appointment } from '../database/schemas/appointment.schema';
 import { UserEntitiesResponseDto } from './dto/check-user-entities.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UpdateUserStatusDto } from './dto/update-user-status.dto';
-import { DeactivateWithTransferDto } from './dto/deactivate-with-transfer.dto';
+import { DeactivateUserWithTransferDto } from './dto/deactivate-with-transfer.dto';
 import { SessionService } from '../auth/session.service';
 import { EmailService } from '../auth/email.service';
 import { AuditService } from '../auth/audit.service';
@@ -553,7 +553,7 @@ export class UserService {
    */
   async deactivateDoctorWithTransfer(
     doctorId: string,
-    transferData: DeactivateWithTransferDto,
+    transferData: DeactivateUserWithTransferDto,
     currentUserId: string,
     ipAddress: string,
     userAgent: string,
