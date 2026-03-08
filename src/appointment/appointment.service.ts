@@ -1979,7 +1979,13 @@ export class AppointmentService {
     userId?: string,
   ): Promise<{ appointment: Appointment; redirectTo: string }> {
     if (!Types.ObjectId.isValid(appointmentId)) {
-      throw new BadRequestException('Invalid appointment ID format');
+      throw new BadRequestException({
+        message: {
+          ar: 'تنسيق معرف الموعد غير صالح',
+          en: 'Invalid appointment ID format',
+        },
+        code: 'INVALID_APPOINTMENT_ID',
+      });
     }
 
     const appointment = await this.getAppointmentById(appointmentId);
@@ -2055,7 +2061,13 @@ export class AppointmentService {
     userId?: string,
   ): Promise<Appointment> {
     if (!Types.ObjectId.isValid(appointmentId)) {
-      throw new BadRequestException('Invalid appointment ID format');
+      throw new BadRequestException({
+        message: {
+          ar: 'تنسيق معرف الموعد غير صالح',
+          en: 'Invalid appointment ID format',
+        },
+        code: 'INVALID_APPOINTMENT_ID',
+      });
     }
 
     const appointment = await this.getAppointmentById(appointmentId);

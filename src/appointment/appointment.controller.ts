@@ -1084,32 +1084,22 @@ export class AppointmentController {
   @ApiResponse({ status: 400, description: 'Appointment is not in scheduled/confirmed status' })
   @ApiResponse({ status: 404, description: 'Appointment not found' })
   @Post(':id/start')
+  @UseGuards(JwtAuthGuard, RolesGuard, RoleScopeGuard)
   @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.MANAGER, UserRole.DOCTOR, UserRole.STAFF)
   async startAppointment(
     @Param('id') id: string,
     @Request() req: any,
   ) {
-    try {
-      const result = await this.appointmentService.startAppointment(id, req.user?.userId);
-      return {
-        success: true,
-        message: {
-          ar: 'تم بدء الموعد بنجاح',
-          en: 'Appointment started successfully',
-        },
-        data: result.appointment,
-        redirectTo: result.redirectTo,
-      };
-    } catch (error) {
-      return {
-        success: false,
-        message: {
-          ar: 'فشل بدء الموعد',
-          en: 'Failed to start appointment',
-        },
-        error: error.message,
-      };
-    }
+    const result = await this.appointmentService.startAppointment(id, req.user?.userId);
+    return {
+      success: true,
+      message: {
+        ar: 'تم بدء الموعد بنجاح',
+        en: 'Appointment started successfully',
+      },
+      data: result.appointment,
+      redirectTo: result.redirectTo,
+    };
   }
 
   // =========================================================================
@@ -1126,32 +1116,22 @@ export class AppointmentController {
   @ApiResponse({ status: 400, description: 'Appointment is not in_progress' })
   @ApiResponse({ status: 404, description: 'Appointment not found' })
   @Post(':id/end')
+  @UseGuards(JwtAuthGuard, RolesGuard, RoleScopeGuard)
   @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.MANAGER, UserRole.DOCTOR)
   async endAppointment(
     @Param('id') id: string,
     @Body(new ValidationPipe()) endDto: EndAppointmentDto,
     @Request() req: any,
   ) {
-    try {
-      const appointment = await this.appointmentService.endAppointment(id, endDto, req.user?.userId);
-      return {
-        success: true,
-        message: {
-          ar: 'تم إنهاء الموعد بنجاح',
-          en: 'Appointment ended successfully',
-        },
-        data: appointment,
-      };
-    } catch (error) {
-      return {
-        success: false,
-        message: {
-          ar: 'فشل إنهاء الموعد',
-          en: 'Failed to end appointment',
-        },
-        error: error.message,
-      };
-    }
+    const appointment = await this.appointmentService.endAppointment(id, endDto, req.user?.userId);
+    return {
+      success: true,
+      message: {
+        ar: 'تم إنهاء الموعد بنجاح',
+        en: 'Appointment ended successfully',
+      },
+      data: appointment,
+    };
   }
 
   // =========================================================================
