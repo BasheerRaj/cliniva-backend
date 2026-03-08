@@ -112,8 +112,10 @@ export class InvoiceController {
     @Request() req: any,
   ) {
     const userId = req.user?.id || req.user?.userId || req.user?.sub;
+    const userRole = req.user?.role;
+    const userClinicId = req.user?.clinicId;
     
-    if (!userId) {
+    if (!userId || !userRole) {
       throw new BadRequestException({
         message: AUTH_ERRORS.UNAUTHORIZED_ACCESS,
         code: 'UNAUTHORIZED',
@@ -123,6 +125,8 @@ export class InvoiceController {
     const invoice = await this.invoiceService.createInvoice(
       createInvoiceDto,
       userId,
+      userRole,
+      userClinicId,
     );
 
     return {

@@ -36,11 +36,27 @@ export class InvoiceService {
   /**
    * Create a new invoice
    * Requirements: 1.2, 1.3, 1.4, 1.5, 1.7, 1.8, 1.9, 1.10, 1.11, 1.12, 1.13, 13.1, 13.2, 13.3, 13.6
+   * Business Rules: BZR-b3c4d5e6, BZR-a9b0c1d2, BZR-7f8a9b0c
    */
   async createInvoice(
     createInvoiceDto: CreateInvoiceDto,
     userId: string,
+    userRole: string,
+    userClinicId?: string,
   ): Promise<InvoiceResponseDto> {
+    // Validate clinic access for Staff/Doctor roles
+    if (userRole === 'staff' || userRole === 'doctor') {
+      if (!userClinicId || userClinicId !== createInvoiceDto.clinicId) {
+        throw new ForbiddenException({
+          message: {
+            ar: 'لا يمكنك إنشاء فاتورة لعيادة غير مخصصة لك',
+            en: 'You cannot create an invoice for a clinic not assigned to you',
+          },
+          code: 'CLINIC_ACCESS_DENIED',
+        });
+      }
+    }
+
     // Validate patient exists
     const patient = await this.patientModel.findById(
       createInvoiceDto.patientId,
@@ -49,7 +65,7 @@ export class InvoiceService {
       throw new NotFoundException(NOT_FOUND_ERRORS.PATIENT);
     }
 
-    // Validate service exists and isActive=true
+    // Validate service exists and isActive=true (BZR-7f8a9b0c)
     const service = await this.serviceModel.findById(
       createInvoiceDto.serviceId,
     );
@@ -60,6 +76,24 @@ export class InvoiceService {
       throw new BadRequestException(INVOICE_ERRORS.SERVICE_NOT_ACTIVE);
     }
 
+    // Check for duplicate service invoice (BZR-a9b0c1d2)
+    const existingInvoice = await this.invoiceModel.findOne({
+      patientId: new Types.ObjectId(createInvoiceDto.patientId),
+      serviceId: new Types.ObjectId(createInvoiceDto.serviceId),
+      invoiceStatus: { $in: ['draft', 'posted'] }, // Not cancelled
+      deletedAt: { $exists: false },
+    });
+
+    if (existingInvoice) {
+      throw new BadRequestException({
+        message: {
+          ar: 'يوجد فاتورة بالفعل لهذا المريض بنفس الخدمة. رقم الفاتورة: ' + existingInvoice.invoiceNumber,
+          en: 'An invoice already exists for this patient with the same service. Invoice number: ' + existingInvoice.invoiceNumber,
+        },
+        code: 'DUPLICATE_SERVICE_INVOICE',
+      });
+    }
+
     // Validate issue date is not in future
     const issueDate = new Date(createInvoiceDto.issueDate);
     const today = new Date();
@@ -68,19 +102,32 @@ export class InvoiceService {
       throw new BadRequestException(INVOICE_ERRORS.ISSUE_DATE_FUTURE);
     }
 
-    // Generate DFT-xxxx invoice number
-    const invoiceNumber =
-      await this.invoiceNumberService.generateDraftNumber();
-
     // Calculate subtotal (service price × sessions)
     const sessions = createInvoiceDto.sessions || 1;
     const servicePrice = service.price || 0;
     const subtotal = servicePrice * sessions;
 
-    // Calculate totalAmount (subtotal - discount + tax)
+    // Calculate discount and validate
     const discountAmount = createInvoiceDto.discountAmount || 0;
+    
+    // Validate discount doesn't exceed subtotal
+    if (discountAmount > subtotal) {
+      throw new BadRequestException({
+        message: {
+          ar: 'الخصم لا يمكن أن يتجاوز المبلغ الإجمالي الفرعي (' + subtotal + ')',
+          en: 'Discount cannot exceed subtotal amount (' + subtotal + ')',
+        },
+        code: 'DISCOUNT_EXCEEDS_SUBTOTAL',
+      });
+    }
+
+    // Calculate totalAmount (subtotal - discount + tax)
     const taxAmount = createInvoiceDto.taxAmount || 0;
     const totalAmount = subtotal - discountAmount + taxAmount;
+
+    // Generate DFT-xxxx invoice number (BZR-b3c4d5e6)
+    const invoiceNumber =
+      await this.invoiceNumberService.generateDraftNumber();
 
     // Create invoice
     const invoice = new this.invoiceModel({
@@ -107,7 +154,7 @@ export class InvoiceService {
 
     // Log audit event
     this.logger.log(
-      `Invoice created: ${invoiceNumber} by user ${userId} for patient ${patient.patientNumber}`,
+      `Invoice created: ${invoiceNumber} by user ${userId} for patient ${patient.patientNumber} (service: ${service.name})`,
     );
 
     // Return invoice with populated references
@@ -422,6 +469,28 @@ export class InvoiceService {
       if (!service.isActive) {
         throw new BadRequestException(INVOICE_ERRORS.SERVICE_NOT_ACTIVE);
       }
+      
+      // Check for duplicate if service is changing (BZR-a9b0c1d2)
+      if (invoice.serviceId.toString() !== updateInvoiceDto.serviceId) {
+        const existingInvoice = await this.invoiceModel.findOne({
+          _id: { $ne: invoice._id }, // Exclude current invoice
+          patientId: invoice.patientId,
+          serviceId: new Types.ObjectId(updateInvoiceDto.serviceId),
+          invoiceStatus: { $in: ['draft', 'posted'] },
+          deletedAt: { $exists: false },
+        });
+        
+        if (existingInvoice) {
+          throw new BadRequestException({
+            message: {
+              ar: 'يوجد فاتورة بالفعل لهذا المريض بنفس الخدمة. رقم الفاتورة: ' + existingInvoice.invoiceNumber,
+              en: 'An invoice already exists for this patient with the same service. Invoice number: ' + existingInvoice.invoiceNumber,
+            },
+            code: 'DUPLICATE_SERVICE_INVOICE',
+          });
+        }
+      }
+      
       invoice.serviceId = new Types.ObjectId(updateInvoiceDto.serviceId);
       needsRecalculation = true;
     }
@@ -443,6 +512,18 @@ export class InvoiceService {
       const service = await this.serviceModel.findById(invoice.serviceId);
       const servicePrice = service?.price || 0;
       invoice.subtotal = servicePrice * invoice.sessions;
+      
+      // Validate discount doesn't exceed subtotal
+      if (invoice.discountAmount > invoice.subtotal) {
+        throw new BadRequestException({
+          message: {
+            ar: 'الخصم لا يمكن أن يتجاوز المبلغ الإجمالي الفرعي (' + invoice.subtotal + ')',
+            en: 'Discount cannot exceed subtotal amount (' + invoice.subtotal + ')',
+          },
+          code: 'DISCOUNT_EXCEEDS_SUBTOTAL',
+        });
+      }
+      
       invoice.totalAmount =
         invoice.subtotal - invoice.discountAmount + invoice.taxAmount;
       // Outstanding balance = totalAmount - paidAmount (should be totalAmount for draft)
