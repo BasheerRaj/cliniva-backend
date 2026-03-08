@@ -864,7 +864,10 @@ export class AppointmentService {
 
   /**
    * Update appointment
+   * UC-b6d5c4e: Edit Appointment details
+   * 
    * Task 6.9: Re-validate when doctor or service changes (Requirement 9.3)
+   * Precondition: Appointment status must not be 'completed'
    */
   async updateAppointment(
     appointmentId: string,
@@ -872,7 +875,13 @@ export class AppointmentService {
     updatedByUserId?: string,
   ): Promise<Appointment> {
     if (!Types.ObjectId.isValid(appointmentId)) {
-      throw new BadRequestException('Invalid appointment ID format');
+      throw new BadRequestException({
+        message: {
+          ar: 'معرف الموعد غير صالح',
+          en: 'Invalid appointment ID format',
+        },
+        code: 'INVALID_APPOINTMENT_ID',
+      });
     }
 
     this.logger.log(`Updating appointment: ${appointmentId}`);
@@ -884,7 +893,26 @@ export class AppointmentService {
     });
 
     if (!existingAppointment) {
-      throw new NotFoundException('Appointment not found');
+      throw new NotFoundException({
+        message: {
+          ar: 'الموعد غير موجود',
+          en: 'Appointment not found',
+        },
+        code: 'APPOINTMENT_NOT_FOUND',
+      });
+    }
+
+    // UC-b6d5c4e Precondition: Cannot edit completed appointments
+    if (existingAppointment.status === 'completed') {
+      throw new BadRequestException({
+        message: {
+          ar: 'لا يمكن تعديل موعد مكتمل',
+          en: 'Cannot edit completed appointment',
+        },
+        code: 'APPOINTMENT_COMPLETED',
+        appointmentId,
+        currentStatus: existingAppointment.status,
+      });
     }
 
     // Task 6.9: Re-validate entities and relationships when they change
@@ -970,7 +998,13 @@ export class AppointmentService {
       .exec();
 
     if (!appointment) {
-      throw new NotFoundException('Appointment not found');
+      throw new NotFoundException({
+        message: {
+          ar: 'الموعد غير موجود',
+          en: 'Appointment not found',
+        },
+        code: 'APPOINTMENT_NOT_FOUND',
+      });
     }
 
     this.logger.log(`Appointment updated successfully: ${appointmentId}`);

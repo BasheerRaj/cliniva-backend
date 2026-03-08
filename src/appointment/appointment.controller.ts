@@ -594,12 +594,13 @@ export class AppointmentController {
     example: '507f1f77bcf86cd799439011',
   })
   @ApiBody({ type: UpdateAppointmentDto })
+  @UseGuards(RoleScopeGuard) // UC-b6d5c4e: Apply role-based filtering
   @Put(':id')
   @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   async updateAppointment(
     @Param('id') id: string,
     @Body(new ValidationPipe()) updateAppointmentDto: UpdateAppointmentDto,
-    @Request() req: any,
+    @Request() req: any, // UC-b6d5c4e: Get user for role-based access
   ) {
     try {
       const appointment = await this.appointmentService.updateAppointment(
