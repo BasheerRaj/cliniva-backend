@@ -38,6 +38,7 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from './guards/optional-jwt-auth.guard';
 import { FirstLoginGuard } from './guards/first-login.guard';
 import { RateLimitGuard } from './guards/rate-limit.guard';
+import { RoleScopeGuard } from './guards/role-scope.guard';
 import { RateLimitService } from './rate-limit.service';
 import { WorkingHoursModule } from '../working-hours/working-hours.module';
 
@@ -88,6 +89,7 @@ import { WorkingHoursModule } from '../working-hours/working-hours.module';
     OptionalJwtAuthGuard,
     FirstLoginGuard,
     RateLimitGuard,
+    RoleScopeGuard,
     TokenService,
     SessionService,
     AuditService,
@@ -103,6 +105,7 @@ import { WorkingHoursModule } from '../working-hours/working-hours.module';
     OptionalJwtAuthGuard,
     FirstLoginGuard,
     RateLimitGuard,
+    RoleScopeGuard,
     TokenService,
     SessionService,
     AuditService,

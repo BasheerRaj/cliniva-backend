@@ -9,6 +9,7 @@ import { PatientSchema } from '../database/schemas/patient.schema';
 import { UserSchema } from '../database/schemas/user.schema';
 import { ClinicSchema } from '../database/schemas/clinic.schema';
 import { ServiceSchema } from '../database/schemas/service.schema';
+import { InvoiceSchema } from '../database/schemas/invoice.schema';
 import { DepartmentSchema } from '../database/schemas/department.schema';
 import { MedicalReportSchema } from '../database/schemas/medical-report.schema';
 import { SubscriptionSchema } from '../database/schemas/subscription.schema';
@@ -38,6 +39,7 @@ import { AppointmentSessionService } from './services/appointment-session.servic
       { name: 'User', schema: UserSchema },
       { name: 'Clinic', schema: ClinicSchema },
       { name: 'Service', schema: ServiceSchema },
+      { name: 'Invoice', schema: InvoiceSchema },
       { name: 'Department', schema: DepartmentSchema },
       { name: 'MedicalReport', schema: MedicalReportSchema },
       { name: 'Subscription', schema: SubscriptionSchema },

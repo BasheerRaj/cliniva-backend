@@ -12,6 +12,7 @@ import { Patient } from '../database/schemas/patient.schema';
 import { User } from '../database/schemas/user.schema';
 import { Clinic } from '../database/schemas/clinic.schema';
 import { Service } from '../database/schemas/service.schema';
+import { Invoice } from '../database/schemas/invoice.schema';
 import { WorkingHoursIntegrationService } from './services/working-hours-integration.service';
 import { AppointmentValidationService } from './services/appointment-validation.service';
 import { AppointmentStatusService } from './services/appointment-status.service';
@@ -54,6 +55,7 @@ export class AppointmentService {
     @InjectModel('User') private readonly userModel: Model<User>,
     @InjectModel('Clinic') private readonly clinicModel: Model<Clinic>,
     @InjectModel('Service') private readonly serviceModel: Model<Service>,
+    @InjectModel('Invoice') private readonly invoiceModel: Model<Invoice>,
     private readonly workingHoursIntegrationService: WorkingHoursIntegrationService,
     private readonly appointmentValidationService: AppointmentValidationService,
     private readonly appointmentStatusService: AppointmentStatusService,
@@ -414,6 +416,54 @@ export class AppointmentService {
         createAppointmentDto.departmentId,
       );
 
+    // UC-7b6a5c3 Requirement: Validate invoice precondition
+    // Invoice must exist with status Unpaid or Partially Paid
+    let validatedInvoice: Invoice | null = null;
+    if ((createAppointmentDto as any).invoiceId) {
+      const invoiceId = (createAppointmentDto as any).invoiceId;
+      
+      // Find invoice
+      const invoice = await this.invoiceModel.findById(invoiceId);
+      
+      if (!invoice || invoice.deletedAt) {
+        throw new NotFoundException({
+          message: {
+            ar: 'الفاتورة غير موجودة',
+            en: 'Invoice not found',
+          },
+          code: 'INVOICE_NOT_FOUND',
+        });
+      }
+      
+      // Validate invoice belongs to patient
+      if (invoice.patientId.toString() !== createAppointmentDto.patientId) {
+        throw new BadRequestException({
+          message: {
+            ar: 'الفاتورة لا تنتمي للمريض المحدد',
+            en: 'Invoice does not belong to the specified patient',
+          },
+          code: 'INVOICE_PATIENT_MISMATCH',
+        });
+      }
+      
+      // Validate invoice payment status (Unpaid or Partially Paid)
+      const validPaymentStatuses = ['unpaid', 'partially_paid'];
+      if (!validPaymentStatuses.includes(invoice.paymentStatus)) {
+        throw new BadRequestException({
+          message: {
+            ar: `حالة دفع الفاتورة يجب أن تكون "غير مدفوعة" أو "مدفوعة جزئياً". الحالة الحالية: ${invoice.paymentStatus}`,
+            en: `Invoice payment status must be "Unpaid" or "Partially Paid". Current status: ${invoice.paymentStatus}`,
+          },
+          code: 'INVALID_INVOICE_PAYMENT_STATUS',
+        });
+      }
+      
+      validatedInvoice = invoice;
+      this.logger.log(
+        `Invoice ${invoiceId} validated for appointment booking (status: ${invoice.paymentStatus})`,
+      );
+    }
+
     const { sessionId } = createAppointmentDto;
 
     // Enforce sessionId when service has sessions (Requirement 3.1)
@@ -546,6 +596,69 @@ export class AppointmentService {
         doctorId: createAppointmentDto.doctorId,
       },
     });
+
+    // UC-7b6a5c3 Postcondition & BZR-9d0a1b2c: Transition invoice to Posted when appointment booked
+    // M7 Integration: Transition linked invoice to Posted status
+    if (validatedInvoice) {
+      try {
+        const invoiceIdStr = (validatedInvoice._id as any).toString();
+        this.logger.log(
+          `Transitioning linked invoice ${invoiceIdStr} to Posted status (UC-7b6a5c3)`,
+        );
+        
+        await this.invoiceService.transitionToPosted(invoiceIdStr);
+        
+        this.logger.log(
+          `Invoice ${invoiceIdStr} successfully transitioned to Posted`,
+        );
+
+        // Audit log for M6-M7 integration event
+        await this.auditService.logSecurityEvent({
+          eventType: 'INVOICE_TRANSITIONED_ON_APPOINTMENT_BOOKING',
+          userId: createdByUserId,
+          actorId: createdByUserId,
+          ipAddress: '0.0.0.0',
+          userAgent: 'System',
+          timestamp: new Date(),
+          metadata: {
+            appointmentId: (savedAppointment._id as any).toString(),
+            invoiceId: invoiceIdStr,
+            action: 'invoice_transition_to_posted',
+            trigger: 'appointment_booking',
+          },
+        });
+      } catch (error) {
+        // Log error but don't fail appointment creation
+        // This maintains appointment booking even if invoice transition fails
+        const invoiceIdStr = (validatedInvoice._id as any).toString();
+        this.logger.error(
+          `Failed to transition invoice ${invoiceIdStr} to Posted: ${error.message}`,
+          error.stack,
+        );
+
+        // Log the error for monitoring
+        await this.auditService.logSecurityEvent({
+          eventType: 'INVOICE_TRANSITION_FAILED',
+          userId: createdByUserId,
+          actorId: createdByUserId,
+          ipAddress: '0.0.0.0',
+          userAgent: 'System',
+          timestamp: new Date(),
+          metadata: {
+            appointmentId: (savedAppointment._id as any).toString(),
+            invoiceId: invoiceIdStr,
+            error: error.message,
+            trigger: 'appointment_booking',
+          },
+        });
+
+        // Note: We continue with appointment creation despite invoice transition failure
+        // This is a business decision to prioritize appointment booking
+        this.logger.warn(
+          `Appointment ${savedAppointment._id} created successfully, but invoice transition failed`,
+        );
+      }
+    }
 
     return populatedAppointment!;
   }

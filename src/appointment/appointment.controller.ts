@@ -28,6 +28,7 @@ import {
 import { AppointmentService } from './appointment.service';
 import { AppointmentSessionService } from './services/appointment-session.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RoleScopeGuard } from '../auth/guards/role-scope.guard';
 import {
   CreateAppointmentDto,
   UpdateAppointmentDto,
@@ -500,11 +501,12 @@ export class AppointmentController {
   })
   @ApiQuery({ name: 'view', required: false, enum: ['day', 'week', 'month'], description: 'Calendar view mode (default: week)' })
   @ApiQuery({ name: 'date', required: false, type: String, description: 'Anchor date YYYY-MM-DD (default: today)' })
-  @ApiQuery({ name: 'clinicId', required: false, type: String })
-  @ApiQuery({ name: 'doctorId', required: false, type: String })
+  @ApiQuery({ name: 'clinicId', required: false, type: String, description: 'Filter by clinic (auto-restricted for Staff role)' })
+  @ApiQuery({ name: 'doctorId', required: false, type: String, description: 'Filter by doctor (auto-restricted for Doctor role)' })
   @ApiQuery({ name: 'status', required: false, enum: ['scheduled', 'confirmed', 'in_progress', 'completed', 'cancelled', 'no_show'] })
   @ApiResponse({ status: 200, description: 'Calendar data retrieved successfully' })
   @Get('calendar')
+  @UseGuards(RoleScopeGuard)
   @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.MANAGER, UserRole.DOCTOR, UserRole.STAFF)
   async getAppointmentsCalendar(
     @Query(new ValidationPipe({ transform: true })) query: CalendarQueryDto,
