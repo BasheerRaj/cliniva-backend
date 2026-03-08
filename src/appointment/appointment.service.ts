@@ -1324,7 +1324,13 @@ export class AppointmentService {
     deletedByUserId?: string,
   ): Promise<void> {
     if (!Types.ObjectId.isValid(appointmentId)) {
-      throw new BadRequestException('Invalid appointment ID format');
+      throw new BadRequestException({
+        message: {
+          ar: 'تنسيق معرف الموعد غير صالح',
+          en: 'Invalid appointment ID format',
+        },
+        code: 'INVALID_APPOINTMENT_ID',
+      });
     }
 
     this.logger.log(`Soft deleting appointment: ${appointmentId}`);
@@ -1335,7 +1341,24 @@ export class AppointmentService {
     });
 
     if (!appointment) {
-      throw new NotFoundException('Appointment not found');
+      throw new NotFoundException({
+        message: {
+          ar: 'الموعد غير موجود',
+          en: 'Appointment not found',
+        },
+        code: 'APPOINTMENT_NOT_FOUND',
+      });
+    }
+
+    // Precondition: Cannot delete completed or in-progress appointments
+    if (['completed', 'in_progress'].includes(appointment.status)) {
+      throw new BadRequestException({
+        message: {
+          ar: 'لا يمكن حذف المواعيد المكتملة أو الجارية',
+          en: 'Cannot delete completed or in-progress appointments',
+        },
+        code: 'APPOINTMENT_CANNOT_DELETE',
+      });
     }
 
     // Perform soft delete
@@ -1870,7 +1893,14 @@ export class AppointmentService {
   /**
    * Change appointment status with proper validation
    * Uses AppointmentStatusService for status transition validation
+   * 
+   * UC-6b5a4c3: Change Appointment Status by Staff
+   * UC-6b5a4c9: Change Appointment Status by Doctor
    * Requirements: 6.1-6.12
+   * 
+   * Note: UC-6b5a4c9 mentions invoice status update postcondition.
+   * This is handled by the invoice module when appointment is completed.
+   * See invoice.service.ts for invoice status transition logic.
    */
   async changeAppointmentStatus(
     appointmentId: string,
@@ -1878,7 +1908,13 @@ export class AppointmentService {
     userId?: string,
   ): Promise<Appointment> {
     if (!Types.ObjectId.isValid(appointmentId)) {
-      throw new BadRequestException('Invalid appointment ID format');
+      throw new BadRequestException({
+        message: {
+          ar: 'معرف الموعد غير صالح',
+          en: 'Invalid appointment ID format',
+        },
+        code: 'INVALID_APPOINTMENT_ID',
+      });
     }
 
     if (!userId) {
@@ -1922,7 +1958,12 @@ export class AppointmentService {
       }
     }
 
-    this.logger.log(`Appointment ${appointmentId} status changed to ${statusDto.status}`);
+    this.logger.log(`Appointment ${appointmentId} status changed to ${statusDto.status} by user ${userId}`);
+    
+    // UC-6b5a4c9 Note: Invoice status update is handled by invoice module
+    // when appointment is completed. The invoice service listens for
+    // appointment completion events or is called directly by the frontend.
+    
     return updatedAppointment;
   }
 

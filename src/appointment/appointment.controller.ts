@@ -672,28 +672,18 @@ export class AppointmentController {
     example: '507f1f77bcf86cd799439011',
   })
   @Delete(':id')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN)
+  @UseGuards(JwtAuthGuard, RolesGuard, RoleScopeGuard)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.STAFF)
   @HttpCode(HttpStatus.OK)
   async deleteAppointment(@Param('id') id: string, @Request() req: any) {
-    try {
-      await this.appointmentService.deleteAppointment(id, req.user?.userId);
-      return {
-        success: true,
-        message: {
-          ar: 'تم حذف الموعد بنجاح',
-          en: 'Appointment deleted successfully',
-        },
-      };
-    } catch (error) {
-      return {
-        success: false,
-        message: {
-          ar: 'فشل حذف الموعد',
-          en: 'Failed to delete appointment',
-        },
-        error: error.message,
-      };
-    }
+    await this.appointmentService.deleteAppointment(id, req.user?.userId);
+    return {
+      success: true,
+      message: {
+        ar: 'تم حذف الموعد بنجاح',
+        en: 'Appointment deleted successfully',
+      },
+    };
   }
 
   /**
@@ -1046,12 +1036,13 @@ export class AppointmentController {
   @ApiResponse({ status: 200, description: 'Status changed successfully' })
   @ApiResponse({ status: 400, description: 'Invalid transition or missing required fields' })
   @ApiResponse({ status: 404, description: 'Appointment not found' })
+  @UseGuards(RoleScopeGuard) // UC-6b5a4c3 & UC-6b5a4c9: Apply role-based filtering
   @Patch(':id/status')
   @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.MANAGER, UserRole.DOCTOR, UserRole.STAFF)
   async changeAppointmentStatus(
     @Param('id') id: string,
     @Body(new ValidationPipe()) changeStatusDto: ChangeAppointmentStatusDto,
-    @Request() req: any,
+    @Request() req: any, // UC-6b5a4c3 & UC-6b5a4c9: Get user for role-based access
   ) {
     try {
       const appointment = await this.appointmentService.changeAppointmentStatus(
