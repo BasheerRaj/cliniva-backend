@@ -3,6 +3,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { InvoiceController } from './invoice.controller';
 import { InvoiceService } from './invoice.service';
 import { InvoiceNumberService } from './invoice-number.service';
+import { InvoiceScopeGuard } from './guards/invoice-scope.guard';
 import { Invoice, InvoiceSchema } from '../database/schemas/invoice.schema';
 import { Patient, PatientSchema } from '../database/schemas/patient.schema';
 import { Service, ServiceSchema } from '../database/schemas/service.schema';
@@ -16,7 +17,7 @@ import { Service, ServiceSchema } from '../database/schemas/service.schema';
     ]),
   ],
   controllers: [InvoiceController],
-  providers: [InvoiceService, InvoiceNumberService],
+  providers: [InvoiceService, InvoiceNumberService, InvoiceScopeGuard],
   exports: [InvoiceService, InvoiceNumberService],
 })
 export class InvoiceModule {}

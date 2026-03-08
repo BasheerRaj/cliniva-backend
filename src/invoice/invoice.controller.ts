@@ -31,6 +31,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { UserRole } from '../common/enums/user-role.enum';
+import { InvoiceScopeGuard } from './guards/invoice-scope.guard';
 import { INVOICE_ERRORS, SUCCESS_MESSAGES, NOT_FOUND_ERRORS, AUTH_ERRORS } from './constants/invoice-messages';
 
 /**
@@ -110,29 +111,25 @@ export class InvoiceController {
     @Body() createInvoiceDto: CreateInvoiceDto,
     @Request() req: any,
   ) {
-    try {
-      const userId = req.user?.id || req.user?.userId || req.user?.sub;
-      
-      if (!userId) {
-        throw new BadRequestException({
-          message: AUTH_ERRORS.UNAUTHORIZED_ACCESS,
-          code: 'UNAUTHORIZED',
-        });
-      }
-
-      const invoice = await this.invoiceService.createInvoice(
-        createInvoiceDto,
-        userId,
-      );
-
-      return {
-        success: true,
-        message: SUCCESS_MESSAGES.INVOICE_CREATED,
-        data: invoice,
-      };
-    } catch (error) {
-      throw error;
+    const userId = req.user?.id || req.user?.userId || req.user?.sub;
+    
+    if (!userId) {
+      throw new BadRequestException({
+        message: AUTH_ERRORS.UNAUTHORIZED_ACCESS,
+        code: 'UNAUTHORIZED',
+      });
     }
+
+    const invoice = await this.invoiceService.createInvoice(
+      createInvoiceDto,
+      userId,
+    );
+
+    return {
+      success: true,
+      message: SUCCESS_MESSAGES.INVOICE_CREATED,
+      data: invoice,
+    };
   }
 
   /**
@@ -145,6 +142,7 @@ export class InvoiceController {
    */
   @Get()
   @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard, RolesGuard, InvoiceScopeGuard)
   @Roles(
     UserRole.STAFF,
     UserRole.ADMIN,
@@ -243,36 +241,13 @@ export class InvoiceController {
     description: 'Unauthorized - Invalid or missing token',
   })
   async getInvoices(@Query() query: InvoiceQueryDto, @Request() req: any) {
-    try {
-      const user = req.user;
-      
-      if (!user) {
-        throw new BadRequestException({
-          message: AUTH_ERRORS.UNAUTHORIZED_ACCESS,
-          code: 'UNAUTHORIZED',
-        });
-      }
+    const result = await this.invoiceService.getInvoices(query);
 
-      // Extract user details for role-based filtering
-      const userId = user.id || user.userId || user.sub;
-      const userRole = user.role;
-      const userClinicIds = user.clinicId ? [user.clinicId] : [];
-
-      const result = await this.invoiceService.getInvoices(
-        query,
-        userId,
-        userRole,
-        userClinicIds,
-      );
-
-      return {
-        success: true,
-        data: result.data,
-        meta: result.meta,
-      };
-    } catch (error) {
-      throw error;
-    }
+    return {
+      success: true,
+      data: result.data,
+      meta: result.meta,
+    };
   }
 
   /**
@@ -345,42 +320,38 @@ export class InvoiceController {
     description: 'Invoice not found',
   })
   async getInvoiceById(@Param('id') id: string, @Request() req: any) {
-    try {
-      const user = req.user;
-      
-      if (!user) {
-        throw new BadRequestException({
-          message: AUTH_ERRORS.UNAUTHORIZED_ACCESS,
-          code: 'UNAUTHORIZED',
-        });
-      }
-
-      // Extract user details for role-based access control
-      const userId = user.id || user.userId || user.sub;
-      const userRole = user.role;
-      const userClinicIds = user.clinicId ? [user.clinicId] : [];
-
-      const invoice = await this.invoiceService.getInvoiceById(
-        id,
-        userId,
-        userRole,
-        userClinicIds,
-      );
-
-      if (!invoice) {
-        throw new NotFoundException({
-          message: NOT_FOUND_ERRORS.INVOICE,
-          code: 'INVOICE_NOT_FOUND',
-        });
-      }
-
-      return {
-        success: true,
-        data: invoice,
-      };
-    } catch (error) {
-      throw error;
+    const user = req.user;
+    
+    if (!user) {
+      throw new BadRequestException({
+        message: AUTH_ERRORS.UNAUTHORIZED_ACCESS,
+        code: 'UNAUTHORIZED',
+      });
     }
+
+    // Extract user details for role-based access control
+    const userId = user.id || user.userId || user.sub;
+    const userRole = user.role;
+    const userClinicIds = user.clinicId ? [user.clinicId] : [];
+
+    const invoice = await this.invoiceService.getInvoiceById(
+      id,
+      userId,
+      userRole,
+      userClinicIds,
+    );
+
+    if (!invoice) {
+      throw new NotFoundException({
+        message: NOT_FOUND_ERRORS.INVOICE,
+        code: 'INVOICE_NOT_FOUND',
+      });
+    }
+
+    return {
+      success: true,
+      data: invoice,
+    };
   }
 
   /**
@@ -447,34 +418,30 @@ export class InvoiceController {
     @Body() updateInvoiceDto: UpdateInvoiceDto,
     @Request() req: any,
   ) {
-    try {
-      const userId = req.user?.id || req.user?.userId || req.user?.sub;
-      const user = req.user;
-      
-      if (!userId || !user) {
-        throw new BadRequestException({
-          message: AUTH_ERRORS.UNAUTHORIZED_ACCESS,
-          code: 'UNAUTHORIZED',
-        });
-      }
-
-      const userRole = user.role;
-
-      const invoice = await this.invoiceService.updateInvoice(
-        id,
-        updateInvoiceDto,
-        userId,
-        userRole,
-      );
-
-      return {
-        success: true,
-        message: SUCCESS_MESSAGES.INVOICE_UPDATED,
-        data: invoice,
-      };
-    } catch (error) {
-      throw error;
+    const userId = req.user?.id || req.user?.userId || req.user?.sub;
+    const user = req.user;
+    
+    if (!userId || !user) {
+      throw new BadRequestException({
+        message: AUTH_ERRORS.UNAUTHORIZED_ACCESS,
+        code: 'UNAUTHORIZED',
+      });
     }
+
+    const userRole = user.role;
+
+    const invoice = await this.invoiceService.updateInvoice(
+      id,
+      updateInvoiceDto,
+      userId,
+      userRole,
+    );
+
+    return {
+      success: true,
+      message: SUCCESS_MESSAGES.INVOICE_UPDATED,
+      data: invoice,
+    };
   }
 
   /**
@@ -500,28 +467,24 @@ export class InvoiceController {
     description: 'Invoice cancelled successfully',
   })
   async cancelInvoice(@Param('id') id: string, @Request() req: any) {
-    try {
-      const userId = req.user?.id || req.user?.userId || req.user?.sub;
-      if (!userId) {
-        throw new BadRequestException({
-          message: AUTH_ERRORS.UNAUTHORIZED_ACCESS,
-          code: 'UNAUTHORIZED',
-        });
-      }
-
-      const invoice = await this.invoiceService.cancelInvoice(id, userId);
-
-      return {
-        success: true,
-        message: {
-          ar: 'تم إلغاء الفاتورة بنجاح',
-          en: 'Invoice cancelled successfully',
-        },
-        data: invoice,
-      };
-    } catch (error) {
-      throw error;
+    const userId = req.user?.id || req.user?.userId || req.user?.sub;
+    if (!userId) {
+      throw new BadRequestException({
+        message: AUTH_ERRORS.UNAUTHORIZED_ACCESS,
+        code: 'UNAUTHORIZED',
+      });
     }
+
+    const invoice = await this.invoiceService.cancelInvoice(id, userId);
+
+    return {
+      success: true,
+      message: {
+        ar: 'تم إلغاء الفاتورة بنجاح',
+        en: 'Invoice cancelled successfully',
+      },
+      data: invoice,
+    };
   }
 
   /**
@@ -577,25 +540,21 @@ export class InvoiceController {
     description: 'Invoice not found',
   })
   async deleteInvoice(@Param('id') id: string, @Request() req: any) {
-    try {
-      const userId = req.user?.id || req.user?.userId || req.user?.sub;
-      const userRole = req.user?.role;
-      
-      if (!userId || !userRole) {
-        throw new BadRequestException({
-          message: AUTH_ERRORS.UNAUTHORIZED_ACCESS,
-          code: 'UNAUTHORIZED',
-        });
-      }
-
-      await this.invoiceService.deleteInvoice(id, userId, userRole);
-
-      return {
-        success: true,
-        message: SUCCESS_MESSAGES.INVOICE_DELETED,
-      };
-    } catch (error) {
-      throw error;
+    const userId = req.user?.id || req.user?.userId || req.user?.sub;
+    const userRole = req.user?.role;
+    
+    if (!userId || !userRole) {
+      throw new BadRequestException({
+        message: AUTH_ERRORS.UNAUTHORIZED_ACCESS,
+        code: 'UNAUTHORIZED',
+      });
     }
+
+    await this.invoiceService.deleteInvoice(id, userId, userRole);
+
+    return {
+      success: true,
+      message: SUCCESS_MESSAGES.INVOICE_DELETED,
+    };
   }
 }

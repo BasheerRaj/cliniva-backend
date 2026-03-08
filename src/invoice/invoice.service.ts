@@ -127,24 +127,14 @@ export class InvoiceService {
    */
   async getInvoices(
     queryDto: InvoiceQueryDto,
-    userId: string,
-    userRole: string,
-    userClinicIds: string[],
   ): Promise<{ data: InvoiceResponseDto[]; meta: any }> {
     // Build query filter
     const filter: any = { deletedAt: { $exists: false } };
 
-    // Apply role-based clinic filtering
-    if (userRole === 'staff' || userRole === 'doctor') {
-      // Staff sees only their clinic
-      filter.clinicId = { $in: userClinicIds.map((id) => new Types.ObjectId(id)) };
-    } else if (userRole === 'admin' || userRole === 'manager') {
-      // Admin sees clinics they have access to
-      if (userClinicIds.length > 0) {
-        filter.clinicId = { $in: userClinicIds.map((id) => new Types.ObjectId(id)) };
-      }
+    // clinicId is set by InvoiceScopeGuard based on user role
+    if (queryDto.clinicId) {
+      filter.clinicId = new Types.ObjectId(queryDto.clinicId);
     }
-    // Super admin and owner see all
 
     // Support filtering by invoiceStatus
     if (queryDto.invoiceStatus) {
@@ -172,19 +162,9 @@ export class InvoiceService {
       filter.patientId = new Types.ObjectId(queryDto.patientId);
     }
 
-    // Support filtering by clinicId (additional filter)
-    if (queryDto.clinicId) {
-      filter.clinicId = new Types.ObjectId(queryDto.clinicId);
-    }
-
-    // Support search by invoiceNumber, patientName, invoiceTitle
+    // Patient name search requires aggregation pipeline
     if (queryDto.search) {
-      const searchRegex = new RegExp(queryDto.search, 'i');
-      filter.$or = [
-        { invoiceNumber: searchRegex },
-        { invoiceTitle: searchRegex },
-      ];
-      // Note: Patient name search requires aggregation pipeline
+      return this.getInvoicesWithSearch(queryDto, filter);
     }
 
     // Pagination
@@ -215,6 +195,122 @@ export class InvoiceService {
 
     return {
       data: invoices.map((invoice) => this.mapToResponseDto(invoice)),
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  /**
+   * Get invoices with patient name search using aggregation pipeline
+   */
+  private async getInvoicesWithSearch(
+    queryDto: InvoiceQueryDto,
+    baseFilter: any,
+  ): Promise<{ data: InvoiceResponseDto[]; meta: any }> {
+    // Ensure search term exists
+    if (!queryDto.search) {
+      throw new BadRequestException({
+        message: {
+          ar: 'مصطلح البحث مطلوب',
+          en: 'Search term is required',
+        },
+        code: 'SEARCH_TERM_REQUIRED',
+      });
+    }
+
+    const searchRegex = new RegExp(queryDto.search, 'i');
+    
+    // Pagination
+    const page = queryDto.page || 1;
+    const limit = queryDto.limit || 10;
+    const skip = (page - 1) * limit;
+    
+    // Sorting
+    const sortBy = queryDto.sortBy || 'createdAt';
+    const sortOrder = queryDto.sortOrder === 'asc' ? 1 : -1;
+    const sortStage: any = {};
+    sortStage[sortBy] = sortOrder;
+    
+    const pipeline: any[] = [
+      // Match base filters
+      { $match: baseFilter },
+      
+      // Lookup patient
+      {
+        $lookup: {
+          from: 'patients',
+          localField: 'patientId',
+          foreignField: '_id',
+          as: 'patient',
+        },
+      },
+      { $unwind: { path: '$patient', preserveNullAndEmptyArrays: true } },
+      
+      // Search in invoice number, title, or patient name
+      {
+        $match: {
+          $or: [
+            { invoiceNumber: searchRegex },
+            { invoiceTitle: searchRegex },
+            { 'patient.firstName': searchRegex },
+            { 'patient.lastName': searchRegex },
+          ],
+        },
+      },
+      
+      // Lookup service
+      {
+        $lookup: {
+          from: 'services',
+          localField: 'serviceId',
+          foreignField: '_id',
+          as: 'service',
+        },
+      },
+      { $unwind: { path: '$service', preserveNullAndEmptyArrays: true } },
+      
+      // Lookup clinic
+      {
+        $lookup: {
+          from: 'clinics',
+          localField: 'clinicId',
+          foreignField: '_id',
+          as: 'clinic',
+        },
+      },
+      { $unwind: { path: '$clinic', preserveNullAndEmptyArrays: true } },
+      
+      // Sort
+      { $sort: sortStage },
+      
+      // Facet for pagination and count
+      {
+        $facet: {
+          data: [{ $skip: skip }, { $limit: limit }],
+          metadata: [{ $count: 'total' }],
+        },
+      },
+    ];
+    
+    const result = await this.invoiceModel.aggregate(pipeline);
+    
+    const invoices = result[0]?.data || [];
+    const total = result[0]?.metadata[0]?.total || 0;
+    
+    // Transform aggregation results to match populated format
+    const transformedInvoices = invoices.map((invoice: any) => ({
+      ...invoice,
+      patientId: invoice.patient,
+      serviceId: invoice.service,
+      clinicId: invoice.clinic,
+    }));
+    
+    return {
+      data: transformedInvoices.map((invoice: any) => this.mapToResponseDto(invoice)),
       meta: {
         page,
         limit,
