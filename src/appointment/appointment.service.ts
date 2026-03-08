@@ -808,10 +808,24 @@ export class AppointmentService {
 
   /**
    * Get appointment by ID
+   * UC-1c3a2b0 & UC-6e5f4d3: View Appointment Details
+   * 
+   * Returns complete appointment information including:
+   * - Core appointment data
+   * - Populated patient, doctor, clinic, service, department
+   * - Invoice details (number, title, status, amount)
+   * - Medical report (for completed appointments with prescriptions)
+   * - Audit trail (created/updated/cancelled by users)
    */
   async getAppointmentById(appointmentId: string): Promise<Appointment> {
     if (!Types.ObjectId.isValid(appointmentId)) {
-      throw new BadRequestException('Invalid appointment ID format');
+      throw new BadRequestException({
+        message: {
+          ar: 'معرف الموعد غير صالح',
+          en: 'Invalid appointment ID format',
+        },
+        code: 'INVALID_APPOINTMENT_ID',
+      });
     }
 
     const appointment = await this.appointmentModel
@@ -819,14 +833,30 @@ export class AppointmentService {
         _id: new Types.ObjectId(appointmentId),
         deletedAt: { $exists: false },
       })
-      .populate('patientId', 'firstName lastName phone email dateOfBirth')
-      .populate('doctorId', 'firstName lastName email phone')
-      .populate('clinicId', 'name address phone')
-      .populate('serviceId', 'name description durationMinutes price')
+      // Core entities with enhanced fields
+      .populate('patientId', 'firstName lastName phone email dateOfBirth gender bloodType')
+      .populate('doctorId', 'firstName lastName email phone profilePictureUrl')
+      .populate('clinicId', 'name address phone email overview specialization licenseNumber')
+      .populate('serviceId', 'name description durationMinutes price sessions')
+      .populate('departmentId', 'name description')
+      // Invoice details (UC-1c3a2b0 requirement)
+      .populate('invoiceId', 'invoiceNumber title status totalAmount paidAmount dueAmount paymentStatus')
+      // Medical report for completed appointments (prescriptions)
+      .populate('medicalReportId', 'diagnosis symptoms medications treatmentPlan followUpInstructions')
+      // Audit trail
+      .populate('createdBy', 'firstName lastName email')
+      .populate('updatedBy', 'firstName lastName email')
+      .populate('cancelledBy', 'firstName lastName email')
       .exec();
 
     if (!appointment) {
-      throw new NotFoundException('Appointment not found');
+      throw new NotFoundException({
+        message: {
+          ar: 'الموعد غير موجود',
+          en: 'Appointment not found',
+        },
+        code: 'APPOINTMENT_NOT_FOUND',
+      });
     }
 
     return appointment;

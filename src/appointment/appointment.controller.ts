@@ -468,8 +468,13 @@ export class AppointmentController {
     description: 'Appointment ID (MongoDB ObjectId)',
     example: '507f1f77bcf86cd799439011',
   })
+  @UseGuards(RoleScopeGuard) // UC-1c3a2b0: Apply role-based filtering
+  @Roles(UserRole.ADMIN, UserRole.STAFF, UserRole.DOCTOR)
   @Get(':id')
-  async getAppointment(@Param('id') id: string) {
+  async getAppointment(
+    @Param('id') id: string,
+    @Request() req: any, // UC-1c3a2b0: Get user for role-based access
+  ) {
     try {
       const appointment = await this.appointmentService.getAppointmentById(id);
       const enriched = await this.appointmentSessionService.enrichAppointmentWithSession(appointment);
