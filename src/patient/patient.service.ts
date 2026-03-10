@@ -709,7 +709,7 @@ export class PatientService {
       // Log deactivation event with cancelled appointment count
       if (updatedByUserId) {
         await this.auditService.logSecurityEvent({
-          eventType: 'PATIENT_DEACTIVATED',
+          eventType: 'user_status_change',
           userId: patientId,
           actorId: updatedByUserId,
           ipAddress: '0.0.0.0',
@@ -797,7 +797,7 @@ export class PatientService {
 
     if (updatedByUserId) {
       await this.auditService.logSecurityEvent({
-        eventType: 'PATIENT_ACTIVATED',
+        eventType: 'user_status_change',
         userId: patientId,
         actorId: updatedByUserId,
         ipAddress: '0.0.0.0',
