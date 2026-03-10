@@ -9,6 +9,16 @@ export class Patient extends Document {
   @Prop({ type: Types.ObjectId, ref: 'User' })
   userId?: Types.ObjectId; // Future: Link to user account for patient portal access
 
+  // Tenant scoping — UC-3at2c5 (M5 patient list complex-level scoping)
+  @Prop({ type: Types.ObjectId, ref: 'Clinic' })
+  clinicId?: Types.ObjectId; // The clinic where the patient was registered
+
+  @Prop({ type: Types.ObjectId, ref: 'Complex' })
+  complexId?: Types.ObjectId; // Denormalized from Clinic.complexId for query performance
+
+  @Prop({ type: Types.ObjectId, ref: 'Organization' })
+  organizationId?: Types.ObjectId; // Denormalized from Clinic.organizationId for traceability
+
   @Prop({ required: true, unique: true })
   patientNumber: string;
 
@@ -143,3 +153,14 @@ PatientSchema.index({ phone: 1 });
 PatientSchema.index({ firstName: 1, lastName: 1 });
 PatientSchema.index({ status: 1 });
 PatientSchema.index({ deletedAt: 1 });
+
+// UC-3at2c5: Complex-scoped patient list indexes
+PatientSchema.index({ complexId: 1 });
+PatientSchema.index({ clinicId: 1 });
+PatientSchema.index({ organizationId: 1 });
+PatientSchema.index({ complexId: 1, deletedAt: 1 });
+PatientSchema.index({ complexId: 1, status: 1, deletedAt: 1 });
+PatientSchema.index({ complexId: 1, insuranceStatus: 1, deletedAt: 1 });
+PatientSchema.index({ complexId: 1, gender: 1, deletedAt: 1 });
+PatientSchema.index({ complexId: 1, status: 1, insuranceStatus: 1, deletedAt: 1 });
+PatientSchema.index({ clinicId: 1, status: 1, deletedAt: 1 });

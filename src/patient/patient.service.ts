@@ -6,8 +6,8 @@ import {
   Logger,
   InternalServerErrorException,
 } from '@nestjs/common';
-import { InjectModel, InjectConnection } from '@nestjs/mongoose';
-import { Model, Types, Connection, ClientSession } from 'mongoose';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model, Types, FilterQuery } from 'mongoose';
 import { Patient } from '../database/schemas/patient.schema';
 import { Appointment } from '../database/schemas/appointment.schema';
 import { AuditService } from '../auth/audit.service';
@@ -20,7 +20,11 @@ import {
   CreateEmergencyContactDto,
   PatientStatsDto,
   PatientResponseDto,
+  PatientListQueryDto,
+  PatientListItemDto,
 } from './dto';
+import { PatientScopeContext } from './types/patient-scope-context.interface';
+import { UserRole } from '../common/enums/user-role.enum';
 
 @Injectable()
 export class PatientService {
@@ -30,7 +34,6 @@ export class PatientService {
     @InjectModel('Patient') private readonly patientModel: Model<Patient>,
     @InjectModel('Appointment')
     private readonly appointmentModel: Model<Appointment>,
-    @InjectConnection() private readonly connection: Connection,
     private readonly auditService: AuditService,
   ) {}
 
@@ -213,12 +216,232 @@ export class PatientService {
   }
 
   /**
-   * Get all patients with filtering and pagination
+   * Map a raw Patient document to PatientListItemDto.
+   * Strips PHI fields and computes derived fields (fullName, age).
+   * UC-3at2c5
    */
-  async getPatients(query: PatientSearchQueryDto): Promise<{
+  private toListItem(patient: Patient): PatientListItemDto {
+    return {
+      _id: (patient._id as any).toString(),
+      patientNumber: patient.patientNumber,
+      fullName: `${patient.firstName} ${patient.lastName}`,
+      age: this.calculateAge(patient.dateOfBirth),
+      gender: patient.gender,
+      insuranceCompany: patient.insuranceCompany,
+      insuranceStatus: patient.insuranceStatus ?? 'None',
+      status: patient.status,
+      phone: patient.phone,
+      profilePicture: patient.profilePicture,
+      clinicId: (patient as any).clinicId?.toString(),
+      complexId: (patient as any).complexId?.toString(),
+      createdAt: (patient as any).createdAt,
+    };
+  }
+
+  /**
+   * Resolve the effective complexId from scope context and query params.
+   *
+   * Resolution rules:
+   *   - super_admin: must supply query.complexId — throws 400 if absent
+   *   - owner: uses query.complexId if provided; falls back to organizationId scope
+   *   - admin/manager/doctor/staff: always use JWT complexId; query.complexId is IGNORED (IDOR prevention)
+   * UC-3at2c5
+   */
+  private resolveComplexId(
+    scope: PatientScopeContext,
+    query: PatientListQueryDto,
+  ): string | null {
+    const { role, complexId: jwtComplexId } = scope;
+
+    if (role === UserRole.SUPER_ADMIN) {
+      if (!query.complexId) {
+        throw new BadRequestException({
+          message: {
+            ar: 'يجب تحديد معرف المجمع للمشرف العام',
+            en: 'complexId query parameter is required for super_admin',
+          },
+          code: 'COMPLEX_ID_REQUIRED',
+        });
+      }
+      return query.complexId;
+    }
+
+    if (role === UserRole.OWNER) {
+      // Owner can optionally narrow to a specific complex via query param.
+      // If not provided, the caller falls back to organizationId scoping.
+      return query.complexId ?? null;
+    }
+
+    // admin, manager, doctor, staff — always enforced from JWT
+    if (!jwtComplexId) {
+      throw new BadRequestException({
+        message: {
+          ar: 'لم يتم العثور على معرف المجمع في رمز المصادقة',
+          en: 'complexId not found in authentication token',
+        },
+        code: 'COMPLEX_ID_MISSING_IN_TOKEN',
+      });
+    }
+    return jwtComplexId;
+  }
+
+  /**
+   * Get a paginated, filtered, sorted list of patients scoped to a complex.
+   * UC-3at2c5 (M5 Patients Management)
+   *
+   * @param query - Validated query parameters from the HTTP request
+   * @param scope - User identity and role context extracted from JWT.
+   *               When absent, delegates to getPatientsLegacy() for backward compat.
+   */
+  async getPatients(
+    query: PatientListQueryDto,
+    scope?: PatientScopeContext,
+  ): Promise<{
+    patients: PatientListItemDto[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }> {
+    // Backward-compatibility: callers without scope get the legacy unscoped result.
+    // Remove once all callers pass scope.
+    if (!scope) {
+      const legacyResult = await this.getPatientsLegacy(query as any);
+      return {
+        patients: legacyResult.patients.map((p) => this.toListItem(p)),
+        total: legacyResult.total,
+        page: legacyResult.page,
+        limit: legacyResult.limit,
+        totalPages: legacyResult.totalPages,
+      };
+    }
+
+    const {
+      search,
+      status,
+      insuranceStatus,
+      gender,
+      page = 1,
+      limit = 10,
+      sortBy = 'createdAt',
+      sortOrder = 'desc',
+    } = query;
+
+    // Scope resolution
+    const resolvedComplexId = this.resolveComplexId(scope, query);
+
+    // Build filter
+    const filter: FilterQuery<Patient> = {
+      deletedAt: { $exists: false },
+    };
+
+    // Apply complexId scope — mandatory for all except owner without explicit complexId
+    if (resolvedComplexId) {
+      filter.complexId = new Types.ObjectId(resolvedComplexId);
+    } else if (scope.role === UserRole.OWNER && scope.organizationId) {
+      filter.organizationId = new Types.ObjectId(scope.organizationId);
+    }
+
+    // Clinic sub-scope: staff/doctor/manager are always locked to JWT clinicId
+    if (
+      scope.role === UserRole.STAFF ||
+      scope.role === UserRole.DOCTOR ||
+      scope.role === UserRole.MANAGER
+    ) {
+      if (scope.clinicId) {
+        filter.clinicId = new Types.ObjectId(scope.clinicId);
+      }
+    } else if (
+      query.clinicId &&
+      (scope.role === UserRole.ADMIN ||
+        scope.role === UserRole.OWNER ||
+        scope.role === UserRole.SUPER_ADMIN)
+    ) {
+      filter.clinicId = new Types.ObjectId(query.clinicId);
+    }
+
+    // Optional filters
+    if (status)          filter.status = status;
+    if (insuranceStatus) filter.insuranceStatus = insuranceStatus;
+    if (gender)          filter.gender = gender;
+
+    // Search: name (full or partial) or patientNumber
+    if (search && search.trim().length > 0) {
+      const searchTerm = search.trim();
+      filter.$or = [
+        { firstName: { $regex: searchTerm, $options: 'i' } },
+        { lastName: { $regex: searchTerm, $options: 'i' } },
+        { patientNumber: { $regex: searchTerm, $options: 'i' } },
+        {
+          $expr: {
+            $regexMatch: {
+              input: { $concat: ['$firstName', ' ', '$lastName'] },
+              regex: searchTerm,
+              options: 'i',
+            },
+          },
+        },
+      ];
+    }
+
+    // Pagination
+    const pageNum  = Math.max(1, page);
+    const pageSize = Math.max(1, Math.min(50, limit));
+    const skip     = (pageNum - 1) * pageSize;
+
+    // Sorting — 'age' sorts by dateOfBirth inverted
+    const sort: Record<string, 1 | -1> = {};
+    if (sortBy === 'age') {
+      sort['dateOfBirth'] = sortOrder === 'asc' ? -1 : 1;
+    } else {
+      sort[sortBy] = sortOrder === 'asc' ? 1 : -1;
+    }
+
+    // Projection: only fields needed for the list DTO — excludes PHI
+    const projection = {
+      patientNumber: 1,
+      firstName: 1,
+      lastName: 1,
+      dateOfBirth: 1,
+      gender: 1,
+      insuranceCompany: 1,
+      insuranceStatus: 1,
+      status: 1,
+      phone: 1,
+      profilePicture: 1,
+      clinicId: 1,
+      complexId: 1,
+      createdAt: 1,
+    };
+
+    // Execute find and count in parallel
+    const [rawPatients, total] = await Promise.all([
+      this.patientModel
+        .find(filter, projection)
+        .sort(sort)
+        .skip(skip)
+        .limit(pageSize)
+        .lean()
+        .exec(),
+      this.patientModel.countDocuments(filter).exec(),
+    ]);
+
+    const patients = rawPatients.map((p) => this.toListItem(p as unknown as Patient));
+    const totalPages = Math.ceil(total / pageSize);
+
+    return { patients, total, page: pageNum, limit: pageSize, totalPages };
+  }
+
+  /**
+   * Legacy getPatients — backward-compatible wrapper preserving the original
+   * unscoped behavior. Used when no PatientScopeContext is provided.
+   * Remove once all callers pass a scope.
+   */
+  private async getPatientsLegacy(query: PatientSearchQueryDto): Promise<{
     patients: Patient[];
     total: number;
     page: number;
+    limit: number;
     totalPages: number;
   }> {
     const {
@@ -239,12 +462,10 @@ export class PatientService {
       sortOrder = 'desc',
     } = query;
 
-    // Build filter object
     const filter: any = {
-      deletedAt: { $exists: false }, // Exclude soft-deleted patients
+      deletedAt: { $exists: false },
     };
 
-    // Search across multiple fields
     if (search) {
       filter.$or = [
         { firstName: { $regex: search, $options: 'i' } },
@@ -256,7 +477,6 @@ export class PatientService {
       ];
     }
 
-    // Individual field filters
     if (firstName) filter.firstName = { $regex: firstName, $options: 'i' };
     if (lastName) filter.lastName = { $regex: lastName, $options: 'i' };
     if (phone) filter.phone = { $regex: phone, $options: 'i' };
@@ -270,33 +490,20 @@ export class PatientService {
       filter.nationality = { $regex: nationality, $options: 'i' };
     if (isPortalEnabled !== undefined) filter.isPortalEnabled = isPortalEnabled;
 
-    // Pagination
-    const pageNum = Math.max(1, parseInt(page));
-    const pageSize = Math.max(1, Math.min(50, parseInt(limit))); // Max 50 per page (Requirement 9.5)
-    const skip = (pageNum - 1) * pageSize;
+    const pageNum  = Math.max(1, parseInt(page));
+    const pageSize = Math.max(1, Math.min(50, parseInt(limit)));
+    const skip     = (pageNum - 1) * pageSize;
 
-    // Sorting
     const sort: any = {};
     sort[sortBy] = sortOrder === 'asc' ? 1 : -1;
 
     const [patients, total] = await Promise.all([
-      this.patientModel
-        .find(filter)
-        .sort(sort)
-        .skip(skip)
-        .limit(pageSize)
-        .exec(),
+      this.patientModel.find(filter).sort(sort).skip(skip).limit(pageSize).exec(),
       this.patientModel.countDocuments(filter),
     ]);
 
     const totalPages = Math.ceil(total / pageSize);
-
-    return {
-      patients,
-      total,
-      page: pageNum,
-      totalPages,
-    };
+    return { patients, total, page: pageNum, limit: pageSize, totalPages };
   }
 
   /**
@@ -460,10 +667,6 @@ export class PatientService {
       return existingPatient;
     }
 
-    // Start MongoDB session for transaction
-    const session: ClientSession = await this.connection.startSession();
-    session.startTransaction();
-
     try {
       // Update patient status to "Inactive"
       const patient = await this.patientModel
@@ -477,7 +680,7 @@ export class PatientService {
                 : undefined,
             },
           },
-          { new: true, session },
+          { new: true },
         )
         .exec();
 
@@ -501,11 +704,7 @@ export class PatientService {
               : undefined,
           },
         },
-        { session },
       );
-
-      // Commit transaction
-      await session.commitTransaction();
 
       // Log deactivation event with cancelled appointment count
       if (updatedByUserId) {
@@ -526,8 +725,6 @@ export class PatientService {
 
       return patient;
     } catch (error) {
-      // Rollback transaction on error
-      await session.abortTransaction();
       this.logger.error(`Failed to deactivate patient ${patientId}:`, error);
 
       if (
@@ -543,9 +740,6 @@ export class PatientService {
           en: 'Failed to deactivate patient',
         },
       });
-    } finally {
-      // End session
-      session.endSession();
     }
   }
 

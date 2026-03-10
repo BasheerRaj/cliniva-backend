@@ -5,6 +5,7 @@ import { DatabaseService } from './database.service';
 import { DatabaseController } from './database.controller';
 import { DatabaseSeederService } from './seeders/database-seeder.service';
 import { EntitiesSeederService } from './seeders/entities.seeder';
+import { ExampleDataSeederService } from './seeders/example-data.seeder';
 import { DatabaseInitializerService } from './database-initializer.service';
 import {
   ServiceOffer,
@@ -174,11 +175,13 @@ import {
     DatabaseService,
     DatabaseSeederService,
     EntitiesSeederService,
+    ExampleDataSeederService,
     DatabaseInitializerService,
   ],
   exports: [
     DatabaseService,
     DatabaseSeederService,
+    ExampleDataSeederService,
     DatabaseInitializerService,
     MongooseModule,
   ],

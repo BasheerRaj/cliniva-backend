@@ -242,6 +242,56 @@ export const GET_PATIENTS_RESPONSE_EXAMPLE = {
 };
 
 // ============================================================================
+// GET PATIENTS LIST (UC-3at2c5 — complex-scoped, ResponseBuilder.paginated shape)
+// ============================================================================
+
+export const GET_PATIENTS_LIST_RESPONSE_EXAMPLE = {
+  success: true,
+  data: [
+    {
+      _id: '507f1f77bcf86cd799439011',
+      patientNumber: 'PAT2024001',
+      fullName: 'Ahmed Hassan',
+      age: 35,
+      gender: 'male',
+      insuranceCompany: 'Bupa Arabia',
+      insuranceStatus: 'Active',
+      status: 'Active',
+      phone: '+966501234567',
+      profilePicture: null,
+      clinicId: '507f1f77bcf86cd799439022',
+      complexId: '507f1f77bcf86cd799439033',
+      createdAt: '2024-01-15T08:30:00.000Z',
+    },
+    {
+      _id: '507f1f77bcf86cd799439044',
+      patientNumber: 'PAT2024002',
+      fullName: 'Sara Al-Otaibi',
+      age: 28,
+      gender: 'female',
+      insuranceCompany: null,
+      insuranceStatus: 'None',
+      status: 'Active',
+      phone: '+966509876543',
+      profilePicture: null,
+      clinicId: '507f1f77bcf86cd799439022',
+      complexId: '507f1f77bcf86cd799439033',
+      createdAt: '2024-02-01T10:15:00.000Z',
+    },
+  ],
+  meta: {
+    page: 1,
+    limit: 10,
+    total: 87,
+    totalPages: 9,
+  },
+  message: {
+    ar: 'تم جلب قائمة المرضى بنجاح',
+    en: 'Patient list retrieved successfully',
+  },
+};
+
+// ============================================================================
 // SEARCH PATIENTS EXAMPLES
 // ============================================================================
 

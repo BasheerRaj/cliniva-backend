@@ -38,7 +38,11 @@ import {
   CreateEmergencyContactDto,
   PatientResponseDto,
   PatientStatsDto,
+  PatientListQueryDto,
+  PATIENT_LIST_SORTABLE_FIELDS,
 } from './dto';
+import { PatientScopeContext } from './types/patient-scope-context.interface';
+import { ResponseBuilder } from '../common/utils/response-builder.util';
 import * as SwaggerExamples from './examples/swagger-examples';
 
 @ApiTags('Patients')
@@ -147,107 +151,74 @@ export class PatientController {
   }
 
   /**
-   * Get all patients with filtering and pagination
+   * Get paginated list of patients (complex-scoped)
    * GET /patients
+   * UC-3at2c5 (M5 Patients Management)
    */
   @Get()
+  @UseGuards(RolesGuard)
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.OWNER,
+    UserRole.ADMIN,
+    UserRole.MANAGER,
+    UserRole.DOCTOR,
+    UserRole.STAFF,
+  )
   @ApiOperation({
-    summary: 'Get list of patients with filters',
-    description: `Retrieves a paginated list of patients with optional filtering.
-    
-**Features:**
-- Pagination support (page, limit)
-- Multi-field search (firstName, lastName, phone, email, patientNumber, cardNumber)
-- Filtering by status, gender, insurance status
-- Sorting by any field (ascending/descending)
-- Excludes soft-deleted patients
+    summary: 'Get paginated list of patients (complex-scoped)',
+    description: `Returns a paginated, filterable, sortable list of patients.
 
-**Query Parameters:**
-- page: Page number (default: 1)
-- limit: Items per page (default: 10, max: 100)
-- search: Search term for multi-field search
-- status: Filter by patient status (Active/Inactive)
-- gender: Filter by gender (male/female/other)
-- insuranceStatus: Filter by insurance status
-- sortBy: Field to sort by (default: createdAt)
-- sortOrder: Sort direction (asc/desc, default: desc)`,
+Scope is enforced by the caller's role:
+- admin/staff/doctor/manager: scoped to their JWT complexId (IDOR-safe)
+- owner: scoped to their organization, optional complexId narrowing
+- super_admin: must supply complexId as a query parameter
+- patient role: 403 Forbidden`,
   })
-  @ApiQuery({
-    name: 'page',
-    required: false,
-    type: Number,
-    description: 'Page number',
-    example: 1,
-  })
-  @ApiQuery({
-    name: 'limit',
-    required: false,
-    type: Number,
-    description: 'Items per page',
-    example: 10,
-  })
-  @ApiQuery({
-    name: 'search',
-    required: false,
-    type: String,
-    description: 'Search term',
-  })
-  @ApiQuery({
-    name: 'status',
-    required: false,
-    enum: ['Active', 'Inactive'],
-    description: 'Patient status',
-  })
-  @ApiQuery({
-    name: 'gender',
-    required: false,
-    enum: ['male', 'female', 'other'],
-    description: 'Patient gender',
-  })
-  @ApiQuery({
-    name: 'sortBy',
-    required: false,
-    type: String,
-    description: 'Sort field',
-    example: 'createdAt',
-  })
-  @ApiQuery({
-    name: 'sortOrder',
-    required: false,
-    enum: ['asc', 'desc'],
-    description: 'Sort direction',
-    example: 'desc',
-  })
+  @ApiQuery({ name: 'search',          required: false, type: String,  description: 'Search by name or patient number', example: 'Ahmed' })
+  @ApiQuery({ name: 'status',          required: false, enum: ['Active', 'Inactive'],                        description: 'Filter by patient status' })
+  @ApiQuery({ name: 'insuranceStatus', required: false, enum: ['Active', 'Expired', 'Pending', 'None'],      description: 'Filter by insurance status' })
+  @ApiQuery({ name: 'gender',          required: false, enum: ['male', 'female', 'other'],                   description: 'Filter by gender' })
+  @ApiQuery({ name: 'complexId',       required: false, type: String,  description: 'Required for super_admin. Optional narrowing for owner.', example: '507f1f77bcf86cd799439011' })
+  @ApiQuery({ name: 'clinicId',        required: false, type: String,  description: 'Further scope to a single clinic within the complex', example: '507f1f77bcf86cd799439022' })
+  @ApiQuery({ name: 'page',            required: false, type: Number,  description: 'Page number (1-indexed)', example: 1 })
+  @ApiQuery({ name: 'limit',           required: false, type: Number,  description: 'Items per page (max 50)', example: 10 })
+  @ApiQuery({ name: 'sortBy',          required: false, type: String,  description: `Sort field: ${PATIENT_LIST_SORTABLE_FIELDS.join(' | ')}`, example: 'createdAt' })
+  @ApiQuery({ name: 'sortOrder',       required: false, enum: ['asc', 'desc'], description: 'Sort direction', example: 'desc' })
   @ApiResponse({
     status: 200,
-    description: 'Patients retrieved successfully',
-    schema: {
-      example: SwaggerExamples.GET_PATIENTS_RESPONSE_EXAMPLE,
-    },
+    description: 'Patient list retrieved successfully',
+    schema: { example: SwaggerExamples.GET_PATIENTS_LIST_RESPONSE_EXAMPLE },
   })
-  @UseGuards(RolesGuard)
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.MANAGER, UserRole.DOCTOR, UserRole.STAFF)
-  async getPatients(@Query(new ValidationPipe()) query: PatientSearchQueryDto) {
-    try {
-      const result = await this.patientService.getPatients(query);
-      return {
-        success: true,
-        message: 'Patients retrieved successfully',
-        data: result.patients,
-        pagination: {
-          total: result.total,
-          page: result.page,
-          totalPages: result.totalPages,
-          limit: parseInt(query.limit || '10'),
-        },
-      };
-    } catch (error) {
-      return {
-        success: false,
-        message: 'Failed to retrieve patients',
-        error: error.message,
-      };
-    }
+  @ApiResponse({ status: 400, description: 'complexId required (super_admin) or invalid format' })
+  @ApiResponse({ status: 401, description: 'JWT token missing or invalid' })
+  @ApiResponse({ status: 403, description: 'Insufficient role' })
+  async getPatients(
+    @Query(new ValidationPipe({ transform: true })) query: PatientListQueryDto,
+    @Request() req: any,
+  ) {
+    const user = req.user;
+
+    const scope: PatientScopeContext = {
+      requestingUserId: user.userId,
+      role:             user.role as UserRole,
+      complexId:        user.complexId  ?? null,
+      clinicId:         user.clinicId   ?? null,
+      organizationId:   user.organizationId ?? null,
+    };
+
+    const result = await this.patientService.getPatients(query, scope);
+
+    return ResponseBuilder.paginated(
+      result.patients,
+      result.page,
+      result.limit,
+      result.total,
+      {
+        ar: 'تم جلب قائمة المرضى بنجاح',
+        en: 'Patient list retrieved successfully',
+      },
+    );
   }
 
   /**
