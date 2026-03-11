@@ -83,6 +83,15 @@ export const UPDATE_ORGANIZATION_REQUEST_EXAMPLE = {
     'To provide world-class healthcare services with innovation and compassion',
   vision: 'To be the premier healthcare provider globally',
   website: 'https://www.healthcaresolutions.international',
+  socialMediaLinks: {
+    facebook: 'https://www.facebook.com/healthcaresolutions',
+    instagram: 'https://www.instagram.com/healthcaresolutions',
+    twitter: 'https://twitter.com/healthcaresolutions',
+    linkedin: 'https://www.linkedin.com/company/healthcaresolutions',
+    whatsapp: 'https://wa.me/966501234567',
+    youtube: 'https://www.youtube.com/@healthcaresolutions',
+    website: 'https://blog.healthcaresolutions.com',
+  },
 };
 
 export const UPDATE_ORGANIZATION_SUCCESS_EXAMPLE = {
