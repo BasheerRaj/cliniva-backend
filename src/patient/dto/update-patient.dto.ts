@@ -10,8 +10,10 @@ import {
   IsIn,
   IsNumber,
   IsArray,
+  ValidateNested,
 } from 'class-validator';
-import { Transform } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
+import { PatientDocumentDto } from './create-patient.dto';
 
 /**
  * Data Transfer Object for updating patient information.
@@ -90,9 +92,10 @@ export class UpdatePatientDto {
   profilePicture?: string;
 
   @IsArray()
-  @IsString({ each: true })
+  @ValidateNested({ each: true })
+  @Type(() => PatientDocumentDto)
   @IsOptional()
-  documents?: string[];
+  documents?: PatientDocumentDto[];
 
   // Emergency Contact Information
   @IsString()

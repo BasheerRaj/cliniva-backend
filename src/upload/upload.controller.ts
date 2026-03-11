@@ -84,9 +84,8 @@ export class UploadController {
         throw new BadRequestException('File size cannot exceed 10MB');
       }
 
-      // Generate file URL (in production, this would be a CDN URL)
-      const baseUrl = process.env.BASE_URL || 'http://localhost:3000';
-      const fileUrl = `${baseUrl}/uploads/${file.filename}`;
+      // Return relative path instead of full URL for frontend flexibility
+      const fileUrl = `/uploads/${file.filename}`;
 
       return {
         success: true,
@@ -253,8 +252,8 @@ export class UploadController {
         throw new BadRequestException('No document uploaded');
       }
 
-      const baseUrl = process.env.BASE_URL || 'http://localhost:3000';
-      const documentUrl = `${baseUrl}/uploads/documents/${file.filename}`;
+      // Return relative path instead of full URL for frontend flexibility
+      const documentUrl = `/uploads/documents/${file.filename}`;
 
       return {
         success: true,

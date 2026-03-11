@@ -73,8 +73,17 @@ export class Patient extends Document {
   @Prop()
   profilePicture?: string;
 
-  @Prop([String])
-  documents?: string[];
+  @Prop({
+    type: [
+      {
+        title: { type: String },
+        url: { type: String, required: true },
+        date: { type: Date },
+      },
+    ],
+    default: [],
+  })
+  documents?: { title?: string; url: string; date?: Date }[];
 
   // Emergency Contact Information
   @Prop()

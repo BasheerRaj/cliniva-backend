@@ -12,8 +12,23 @@ import {
   IsIn,
   IsNumber,
   IsArray,
+  ValidateNested,
 } from 'class-validator';
-import { Transform } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
+
+export class PatientDocumentDto {
+  @IsString()
+  @IsOptional()
+  title?: string;
+
+  @IsString()
+  @IsNotEmpty()
+  url: string;
+
+  @IsDateString()
+  @IsOptional()
+  date?: string;
+}
 
 /**
  * Data Transfer Object for creating a new patient.
@@ -101,9 +116,10 @@ export class CreatePatientDto {
   profilePicture?: string;
 
   @IsArray()
-  @IsString({ each: true })
+  @ValidateNested({ each: true })
+  @Type(() => PatientDocumentDto)
   @IsOptional()
-  documents?: string[];
+  documents?: PatientDocumentDto[];
 
   // Emergency Contact Information
   @IsString()
@@ -219,7 +235,7 @@ export class PatientResponseDto {
   religion?: string;
   preferredLanguage: string;
   profilePicture?: string;
-  documents?: string[];
+  documents?: PatientDocumentDto[];
   emergencyContactName?: string;
   emergencyContactPhone?: string;
   emergencyContactRelationship?: string;
