@@ -7,8 +7,42 @@ import {
   IsNumber,
   IsArray,
   IsBoolean,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+
+export class ClinicAddressDto {
+  @ApiPropertyOptional({ description: 'Street address', example: '123 Medical Street' })
+  @IsString()
+  @IsOptional()
+  street?: string;
+
+  @ApiPropertyOptional({ description: 'City', example: 'Dhaka' })
+  @IsString()
+  @IsOptional()
+  city?: string;
+
+  @ApiPropertyOptional({ description: 'State / Province', example: 'Dhaka Division' })
+  @IsString()
+  @IsOptional()
+  state?: string;
+
+  @ApiPropertyOptional({ description: 'Postal / ZIP code', example: '1207' })
+  @IsString()
+  @IsOptional()
+  postalCode?: string;
+
+  @ApiPropertyOptional({ description: 'Country', example: 'Bangladesh' })
+  @IsString()
+  @IsOptional()
+  country?: string;
+
+  @ApiPropertyOptional({ description: 'Google Maps URL', example: 'https://maps.google.com/?q=23.8103,90.4125' })
+  @IsString()
+  @IsOptional()
+  googleLocation?: string;
+}
 
 export class CreateClinicDto {
   @ApiPropertyOptional({
@@ -60,21 +94,12 @@ export class CreateClinicDto {
 
   @ApiPropertyOptional({
     description: 'Clinic address',
-    example: '123 Medical Street, Riyadh',
-    type: String,
+    type: ClinicAddressDto,
   })
-  @IsString()
+  @ValidateNested()
+  @Type(() => ClinicAddressDto)
   @IsOptional()
-  address?: string;
-
-  @ApiPropertyOptional({
-    description: 'Google Maps location URL',
-    example: 'https://maps.google.com/?q=24.7136,46.6753',
-    type: String,
-  })
-  @IsString()
-  @IsOptional()
-  googleLocation?: string;
+  address?: ClinicAddressDto;
 
   @ApiPropertyOptional({
     description: 'Clinic phone number',
@@ -265,21 +290,12 @@ export class UpdateClinicDto {
 
   @ApiPropertyOptional({
     description: 'Clinic address',
-    example: '123 Medical Street, Riyadh',
-    type: String,
+    type: ClinicAddressDto,
   })
-  @IsString()
+  @ValidateNested()
+  @Type(() => ClinicAddressDto)
   @IsOptional()
-  address?: string;
-
-  @ApiPropertyOptional({
-    description: 'Google Maps location URL',
-    example: 'https://maps.google.com/?q=24.7136,46.6753',
-    type: String,
-  })
-  @IsString()
-  @IsOptional()
-  googleLocation?: string;
+  address?: ClinicAddressDto;
 
   @ApiPropertyOptional({
     description: 'Clinic phone number',

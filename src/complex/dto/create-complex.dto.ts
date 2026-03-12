@@ -5,8 +5,46 @@ import {
   IsEmail,
   IsUrl,
   IsNumber,
+  IsArray,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+
+export class AddressDto {
+  @ApiPropertyOptional({ description: 'Street address', example: '515, 17, Ishwarganj Upazila' })
+  @IsString()
+  @IsOptional()
+  street?: string;
+
+  @ApiPropertyOptional({ description: 'City', example: 'Mymensingh' })
+  @IsString()
+  @IsOptional()
+  city?: string;
+
+  @ApiPropertyOptional({ description: 'State / Province', example: 'Mymensingh Division' })
+  @IsString()
+  @IsOptional()
+  state?: string;
+
+  @ApiPropertyOptional({ description: 'Postal / ZIP code', example: '2200' })
+  @IsString()
+  @IsOptional()
+  postalCode?: string;
+
+  @ApiPropertyOptional({ description: 'Country', example: 'Bangladesh' })
+  @IsString()
+  @IsOptional()
+  country?: string;
+
+  @ApiPropertyOptional({
+    description: 'Google Maps or OpenStreetMap URL',
+    example: 'https://maps.google.com/?q=24.7136,46.6753',
+  })
+  @IsString()
+  @IsOptional()
+  googleLocation?: string;
+}
 
 /**
  * DTO for creating a new medical complex
@@ -63,22 +101,12 @@ export class CreateComplexDto {
 
   @ApiPropertyOptional({
     description: 'Physical address of the complex',
-    example: 'King Fahd Road, Riyadh, Saudi Arabia',
-    type: String,
+    type: AddressDto,
   })
-  @IsString()
+  @ValidateNested()
+  @Type(() => AddressDto)
   @IsOptional()
-  address?: string;
-
-  @ApiPropertyOptional({
-    description:
-      'Google Maps location URL or coordinates (for geographic data)',
-    example: 'https://maps.google.com/?q=24.7136,46.6753',
-    type: String,
-  })
-  @IsString()
-  @IsOptional()
-  googleLocation?: string;
+  address?: AddressDto;
 
   @ApiPropertyOptional({
     description: 'Primary phone number',
@@ -183,6 +211,16 @@ export class CreateComplexDto {
   @IsString()
   @IsOptional()
   crNumber?: string;
+
+  @ApiPropertyOptional({
+    description: 'Array of department IDs to associate with the complex at creation',
+    example: ['507f1f77bcf86cd799439015', '507f1f77bcf86cd799439016'],
+    type: [String],
+    isArray: true,
+  })
+  @IsArray()
+  @IsOptional()
+  departmentIds?: string[];
 }
 
 /**
@@ -212,22 +250,12 @@ export class UpdateComplexDto {
 
   @ApiPropertyOptional({
     description: 'Physical address of the complex',
-    example: 'King Fahd Road, Riyadh, Saudi Arabia',
-    type: String,
+    type: AddressDto,
   })
-  @IsString()
+  @ValidateNested()
+  @Type(() => AddressDto)
   @IsOptional()
-  address?: string;
-
-  @ApiPropertyOptional({
-    description:
-      'Google Maps location URL or coordinates (for geographic data)',
-    example: 'https://maps.google.com/?q=24.7136,46.6753',
-    type: String,
-  })
-  @IsString()
-  @IsOptional()
-  googleLocation?: string;
+  address?: AddressDto;
 
   @ApiPropertyOptional({
     description: 'Primary phone number',
