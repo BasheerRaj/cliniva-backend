@@ -322,17 +322,13 @@ export class ClinicService {
         );
       }
 
-      // Validate capacity for clinic plan
-      if (!createClinicDto.maxPatients) {
-        throw new BadRequestException(
-          'Clinic plan requires maximum patient capacity',
-        );
+      // Apply schema defaults for capacity when not provided (e.g. from onboarding clinic/overview)
+      // ClinicOverviewDto intentionally omits capacity; schema defaults: maxPatients=1000, sessionDuration=30
+      if (createClinicDto.maxPatients == null || createClinicDto.maxPatients <= 0) {
+        createClinicDto.maxPatients = 1000;
       }
-
-      if (!createClinicDto.sessionDuration) {
-        throw new BadRequestException(
-          'Clinic plan requires default session duration',
-        );
+      if (createClinicDto.sessionDuration == null || createClinicDto.sessionDuration <= 0) {
+        createClinicDto.sessionDuration = 30;
       }
     }
 

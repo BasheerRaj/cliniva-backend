@@ -144,7 +144,7 @@ export class OrganizationService {
     );
 
     try {
-      // Prepare organization data with logo normalization
+      // Prepare organization data with logo normalization and schema-compatible address
       const organizationData = {
         ...createOrganizationDto,
         subscriptionId: new Types.ObjectId(
@@ -160,7 +160,12 @@ export class OrganizationService {
         );
       }
 
-      const organization = new this.organizationModel(organizationData);
+      // Transform address string to structured object for schema compatibility
+      const preparedData = this.prepareOrganizationUpdatePayload(
+        organizationData,
+      );
+
+      const organization = new this.organizationModel(preparedData);
       const savedOrganization = await organization.save(
         TransactionUtil.getSessionOptions(session, useTransaction),
       );
@@ -311,10 +316,15 @@ export class OrganizationService {
       );
     }
 
+    // Transform DTO to match schema - address must be structured object, not string
+    const updatePayload = this.prepareOrganizationUpdatePayload(
+      updateOrganizationDto,
+    );
+
     // Use findByIdAndUpdate instead of save()
     const updatedOrganization = await this.organizationModel.findByIdAndUpdate(
       organizationId,
-      updateOrganizationDto,
+      updatePayload,
       { new: true, runValidators: true },
     );
 
@@ -426,6 +436,36 @@ export class OrganizationService {
       data.vatNumber ||
       data.crNumber
     );
+  }
+
+  /**
+   * Prepares update payload to match organization schema.
+   * Transforms flat address string to structured { street, city, ... } object.
+   */
+  private prepareOrganizationUpdatePayload(dto: any): Record<string, any> {
+    const payload = { ...dto };
+
+    // Schema expects address as object { street, city, state, postalCode, country, googleLocation }
+    // DTO may send address as string - transform for schema compatibility
+    if (payload.address !== undefined) {
+      if (typeof payload.address === 'string') {
+        payload.address = {
+          street: payload.address,
+          ...(payload.googleLocation && {
+            googleLocation: payload.googleLocation,
+          }),
+        };
+        // Remove top-level googleLocation if merged into address
+        delete payload.googleLocation;
+      }
+    } else if (payload.googleLocation) {
+      // Only googleLocation provided - update address with googleLocation
+      // Use $set to preserve existing address fields (handled in update call)
+      payload.address = { googleLocation: payload.googleLocation };
+      delete payload.googleLocation;
+    }
+
+    return payload;
   }
 
   // ======== VALIDATION METHODS ========

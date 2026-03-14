@@ -10,6 +10,7 @@ import {
   Patch,
   NotFoundException,
   BadRequestException,
+  ForbiddenException,
   HttpStatus,
   UseGuards,
   Request,
@@ -719,6 +720,21 @@ export class ComplexController {
               en: 'Complex not found',
             },
             details: errorResponse.details,
+          },
+        };
+      }
+
+      // Handle ForbiddenException with bilingual error
+      if (error instanceof ForbiddenException) {
+        const errorResponse = error.getResponse() as any;
+        return {
+          success: false,
+          error: {
+            code: errorResponse.code || 'INSUFFICIENT_PERMISSIONS',
+            message: errorResponse.message || {
+              ar: 'ليس لديك صلاحية للوصول إلى هذا المجمع',
+              en: 'You do not have permission to access this complex',
+            },
           },
         };
       }

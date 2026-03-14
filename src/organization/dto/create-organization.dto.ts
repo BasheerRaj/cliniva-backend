@@ -10,6 +10,74 @@ import {
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
+/**
+ * Social media links DTO - used for organization social media profiles
+ */
+export class SocialMediaLinksDto {
+  @ApiPropertyOptional({
+    description: 'Facebook profile or page URL',
+    example: 'https://www.facebook.com/healthcaresolutions',
+    type: String,
+  })
+  @IsOptional()
+  @IsString()
+  facebook?: string;
+
+  @ApiPropertyOptional({
+    description: 'Instagram profile URL',
+    example: 'https://www.instagram.com/healthcaresolutions',
+    type: String,
+  })
+  @IsOptional()
+  @IsString()
+  instagram?: string;
+
+  @ApiPropertyOptional({
+    description: 'Twitter/X profile URL',
+    example: 'https://twitter.com/healthcaresolutions',
+    type: String,
+  })
+  @IsOptional()
+  @IsString()
+  twitter?: string;
+
+  @ApiPropertyOptional({
+    description: 'LinkedIn company page URL',
+    example: 'https://www.linkedin.com/company/healthcaresolutions',
+    type: String,
+  })
+  @IsOptional()
+  @IsString()
+  linkedin?: string;
+
+  @ApiPropertyOptional({
+    description: 'WhatsApp contact link',
+    example: 'https://wa.me/966501234567',
+    type: String,
+  })
+  @IsOptional()
+  @IsString()
+  whatsapp?: string;
+
+  @ApiPropertyOptional({
+    description: 'YouTube channel URL',
+    example: 'https://www.youtube.com/@healthcaresolutions',
+    type: String,
+  })
+  @IsOptional()
+  @IsString()
+  youtube?: string;
+
+  @ApiPropertyOptional({
+    description: 'Secondary website URL',
+    example: 'https://blog.healthcaresolutions.com',
+    type: String,
+  })
+  @IsOptional()
+  @IsString()
+  website?: string;
+}
+
 export class CreateOrganizationDto {
   @ApiProperty({
     description:
@@ -160,6 +228,15 @@ export class CreateOrganizationDto {
   @IsString()
   @IsOptional()
   crNumber?: string;
+
+  @ApiPropertyOptional({
+    description: 'Social media profile links',
+    type: SocialMediaLinksDto,
+  })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => SocialMediaLinksDto)
+  socialMediaLinks?: SocialMediaLinksDto;
 }
 
 export class UpdateOrganizationDto {
@@ -302,6 +379,15 @@ export class UpdateOrganizationDto {
   @IsString()
   @IsOptional()
   crNumber?: string;
+
+  @ApiPropertyOptional({
+    description: 'Social media profile links',
+    type: SocialMediaLinksDto,
+  })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => SocialMediaLinksDto)
+  socialMediaLinks?: SocialMediaLinksDto;
 }
 
 export class SetupLegalInfoDto {

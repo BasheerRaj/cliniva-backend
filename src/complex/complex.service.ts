@@ -222,7 +222,7 @@ export class ComplexService {
     };
   }
 
-  async createComplex(createComplexDto: CreateComplexDto, requestingUser?: any): Promise<Complex> {
+  async createComplex(createComplexDto: CreateComplexDto, requestingUser?: any): Promise<any> {
     // TENANT ISOLATION (ISSUE-009)
     if (requestingUser && requestingUser.role !== 'super_admin') {
       if (requestingUser.subscriptionId && createComplexDto.subscriptionId !== requestingUser.subscriptionId) {
@@ -308,15 +308,28 @@ export class ComplexService {
       });
     }
 
+    const { phone, googleLocation, departmentIds: createDepartmentIds, ...restDto } = createComplexDto as any;
+
     const complexData: any = {
-      ...createComplexDto,
+      ...restDto,
       organizationId: createComplexDto.organizationId
         ? new Types.ObjectId(createComplexDto.organizationId)
         : null,
       subscriptionId: new Types.ObjectId(createComplexDto.subscriptionId),
       ownerId: new Types.ObjectId(createComplexDto.ownerId),
-      status: 'active', // Set default status to 'active'
+      status: 'active',
     };
+
+    if (phone) {
+      complexData.phoneNumbers = [{ number: phone, type: 'primary' }];
+    }
+
+    if (googleLocation) {
+      complexData.address = {
+        ...(complexData.address || {}),
+        googleLocation,
+      };
+    }
 
     // Create the complex first to get its ID
     const complex = new this.complexModel(complexData);
@@ -345,6 +358,19 @@ export class ComplexService {
       await savedComplex.save();
     }
 
+    // Link departments to this complex if provided
+    if (createDepartmentIds && createDepartmentIds.length > 0) {
+      await this.complexModel.db.collection('complex_departments').insertMany(
+        createDepartmentIds.map((departmentId: string) => ({
+          complexId: savedComplex._id,
+          departmentId: new Types.ObjectId(departmentId),
+          isActive: true,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        })),
+      );
+    }
+
     // Populate relationships in response
     const populatedComplex = await this.complexModel
       .findById(savedComplex._id)
@@ -361,7 +387,30 @@ export class ComplexService {
       });
     }
 
-    return populatedComplex;
+    // Fetch linked departments for response
+    const departments = createDepartmentIds?.length
+      ? await this.complexModel.db
+          .collection('complex_departments')
+          .aggregate([
+            { $match: { complexId: savedComplex._id, isActive: true } },
+            {
+              $lookup: {
+                from: 'departments',
+                localField: 'departmentId',
+                foreignField: '_id',
+                as: 'department',
+              },
+            },
+            { $unwind: '$department' },
+            { $replaceRoot: { newRoot: '$department' } },
+          ])
+          .toArray()
+      : [];
+
+    return {
+      ...(populatedComplex as any).toObject(),
+      departments,
+    };
   }
 
   /**
@@ -392,8 +441,34 @@ export class ComplexService {
     }
 
     // TENANT ISOLATION (ISSUE-009)
+    // Note: ownerId, subscriptionId, organizationId are populated objects at this point,
+    // so we must extract _id from them instead of calling .toString() directly.
     if (requestingUser && requestingUser.role !== 'super_admin') {
-      if (requestingUser.subscriptionId && complex.subscriptionId?.toString() !== requestingUser.subscriptionId) {
+      const complexSubscriptionId =
+        (complex.subscriptionId as any)?._id?.toString() ??
+        complex.subscriptionId?.toString();
+
+      const complexOrganizationId =
+        (complex.organizationId as any)?._id?.toString() ??
+        complex.organizationId?.toString();
+
+      const complexOwnerId =
+        (complex.ownerId as any)?._id?.toString() ??
+        complex.ownerId?.toString();
+
+      const requestingUserId = requestingUser.userId || requestingUser.sub;
+
+      const subscriptionMatch =
+        !requestingUser.subscriptionId ||
+        complexSubscriptionId === requestingUser.subscriptionId;
+
+      const organizationMatch =
+        !!requestingUser.organizationId &&
+        complexOrganizationId === requestingUser.organizationId;
+
+      const isOwnerOfComplex = complexOwnerId === requestingUserId;
+
+      if (!subscriptionMatch && !organizationMatch && !isOwnerOfComplex) {
         throw new ForbiddenException({
           message: {
             ar: 'ليس لديك صلاحية للوصول إلى هذا المجمع',
@@ -411,13 +486,28 @@ export class ComplexService {
     // Calculate clinics assigned count
     const clinicsAssignedCount = await this.calculateClinicsAssigned(complexId);
 
-    // Query departments count
-    const departmentsCount = await this.complexModel.db
+    // Query departments with full details
+    const departments = await this.complexModel.db
       .collection('complex_departments')
-      .countDocuments({
-        complexId: new Types.ObjectId(complexId),
-        isActive: true,
-      });
+      .aggregate([
+        {
+          $match: {
+            complexId: new Types.ObjectId(complexId),
+            isActive: true,
+          },
+        },
+        {
+          $lookup: {
+            from: 'departments',
+            localField: 'departmentId',
+            foreignField: '_id',
+            as: 'department',
+          },
+        },
+        { $unwind: '$department' },
+        { $replaceRoot: { newRoot: '$department' } },
+      ])
+      .toArray();
 
     // Calculate capacity breakdown
     const capacity = await this.calculateCapacity(complexId);
@@ -433,7 +523,8 @@ export class ComplexService {
         personInCharge: complex.personInChargeId,
         scheduledAppointmentsCount,
         clinicsAssignedCount,
-        departmentsCount,
+        departmentsCount: departments.length,
+        departments,
         capacity,
       },
       message: {
@@ -533,6 +624,7 @@ export class ComplexService {
 
     // Check department restrictions if departmentIds are being updated (Requirements 4.2, 4.3, 4.4)
     let departmentRestrictions: DepartmentRestriction[] | undefined;
+    let currentDepartmentIds: string[] = [];
     if (updateComplexDto.departmentIds !== undefined) {
       // Get current department IDs from complex_departments
       const currentComplexDepartments = await this.complexModel.db
@@ -543,7 +635,7 @@ export class ComplexService {
         })
         .toArray();
 
-      const currentDepartmentIds = currentComplexDepartments.map((cd) =>
+      currentDepartmentIds = currentComplexDepartments.map((cd) =>
         cd.departmentId.toString(),
       );
 
@@ -627,7 +719,18 @@ export class ComplexService {
     }
 
     // Update complex fields (excluding departmentIds as it's not a direct field)
-    const { departmentIds, ...updateData } = updateComplexDto;
+    const { departmentIds, phone: updatePhone, googleLocation: updateGoogleLocation, ...updateData } = updateComplexDto as any;
+
+    if (updatePhone) {
+      (updateData as any).phoneNumbers = [{ number: updatePhone, type: 'primary' }];
+    }
+
+    if (updateGoogleLocation) {
+      (updateData as any).address = {
+        ...(complex.address || {}),
+        googleLocation: updateGoogleLocation,
+      };
+    }
 
     // Convert personInChargeId to ObjectId if provided
     if (updateData.personInChargeId) {
@@ -639,6 +742,40 @@ export class ComplexService {
     Object.assign(complex, updateData);
     await complex.save();
 
+    // Sync complex_departments if departmentIds were provided
+    if (departmentIds !== undefined) {
+      const newDepartmentIds = departmentIds as string[];
+
+      // Add departments that are in new list but not currently linked
+      const depsToAdd = newDepartmentIds.filter(
+        (id) => !currentDepartmentIds.includes(id),
+      );
+      if (depsToAdd.length > 0) {
+        await this.complexModel.db.collection('complex_departments').insertMany(
+          depsToAdd.map((departmentId) => ({
+            complexId: new Types.ObjectId(complexId),
+            departmentId: new Types.ObjectId(departmentId),
+            isActive: true,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })),
+        );
+      }
+
+      // Remove departments that were dropped from the list
+      const depsToRemove = currentDepartmentIds.filter(
+        (id) => !newDepartmentIds.includes(id),
+      );
+      if (depsToRemove.length > 0) {
+        await this.complexModel.db.collection('complex_departments').deleteMany({
+          complexId: new Types.ObjectId(complexId),
+          departmentId: {
+            $in: depsToRemove.map((id) => new Types.ObjectId(id)),
+          },
+        });
+      }
+    }
+
     // Populate relationships in response (Requirement 4.8)
     const populatedComplex = await this.complexModel
       .findById(complexId)
@@ -648,10 +785,36 @@ export class ComplexService {
       .populate('personInChargeId', 'firstName lastName email role')
       .exec();
 
+    // Fetch linked departments for response
+    const departments = await this.complexModel.db
+      .collection('complex_departments')
+      .aggregate([
+        {
+          $match: {
+            complexId: new Types.ObjectId(complexId),
+            isActive: true,
+          },
+        },
+        {
+          $lookup: {
+            from: 'departments',
+            localField: 'departmentId',
+            foreignField: '_id',
+            as: 'department',
+          },
+        },
+        { $unwind: '$department' },
+        { $replaceRoot: { newRoot: '$department' } },
+      ])
+      .toArray();
+
     // Return updated complex with departmentRestrictions if any
     return {
       success: true,
-      data: populatedComplex,
+      data: {
+        ...(populatedComplex as any).toObject(),
+        departments,
+      },
       departmentRestrictions,
       message: {
         ar: 'تم تحديث المجمع بنجاح',
