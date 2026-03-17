@@ -68,7 +68,7 @@ export class AppointmentValidationService {
 
     const patient = await this.patientModel.findOne({
       _id: new Types.ObjectId(patientId),
-      isDeleted: false,
+      deletedAt: { $exists: false },
     });
 
     if (!patient) {
@@ -77,7 +77,7 @@ export class AppointmentValidationService {
       });
     }
 
-    if (patient.status !== 'Active') {
+    if (patient.status && patient.status.toLowerCase() !== 'active') {
       throw new BadRequestException({
         message: {
           ar: 'المريض غير نشط. لا يمكن حجز مواعيد',

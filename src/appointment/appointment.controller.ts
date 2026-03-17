@@ -136,7 +136,7 @@ export class AppointmentController {
           ar: 'فشل إنشاء الموعد',
           en: 'Failed to create appointment',
         },
-        error: error.message,
+        error: error.response?.message || error.message,
       };
     }
   }
@@ -398,7 +398,12 @@ export class AppointmentController {
     @Request() req: any, // UC-e1f2d3c: Get user from request for role filtering
   ) {
     try {
-      const result = await this.appointmentService.getAppointments(query);
+      const result = await this.appointmentService.getAppointments(
+        query,
+        req.user?.userId,
+        req.user?.role,
+        req.user?.clinicId,
+      );
       return {
         success: true,
         message: {
@@ -419,6 +424,150 @@ export class AppointmentController {
         message: {
           ar: 'فشل استرجاع المواعيد',
           en: 'Failed to retrieve appointments',
+        },
+        error: error.message,
+      };
+    }
+  }
+
+  /**
+   * Get appointment by ID
+   * GET /appointments/:id
+   */
+  @ApiOperation({
+    summary: 'Get appointment by ID',
+    description:
+      'Retrieves detailed information about a specific appointment including populated patient, doctor, clinic, and service details. Returns full appointment data with all related entity information.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Appointment retrieved successfully',
+    schema: {
+      example: SWAGGER_EXAMPLES.GET_SUCCESS,
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad Request - Invalid appointment ID format',
+    schema: {
+      example: SWAGGER_EXAMPLES.INVALID_ID_ERROR,
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - Authentication required',
+    schema: {
+      example: SWAGGER_EXAMPLES.UNAUTHORIZED_ERROR,
+    },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Not Found - Appointment does not exist',
+    schema: {
+      example: SWAGGER_EXAMPLES.NOT_FOUND_ERROR,
+    },
+  })
+  @ApiParam({
+    name: 'id',
+    type: String,
+    description: 'Appointment ID (MongoDB ObjectId)',
+    example: '507f1f77bcf86cd799439011',
+  })
+  // =========================================================================
+  // M6 – GET /appointments/available-clinics (UC-d2e3f4c QuickAdd drawer)
+  // MUST be declared BEFORE ':id' route so the literal path is not captured as ID
+  // =========================================================================
+  @ApiOperation({
+    summary: 'Get clinics available at a specific date and time',
+    description:
+      'Returns clinics that are open at the given date and time slot. Used by the QuickAddDrawer when "All Clinics" is selected.',
+  })
+  @ApiQuery({ name: 'date', required: true, type: String, description: 'Date in YYYY-MM-DD format' })
+  @ApiQuery({ name: 'time', required: true, type: String, description: 'Time in HH:mm (24-hour)' })
+  @ApiQuery({ name: 'clinicCollectionId', required: false, type: String, description: 'Optional complex ID filter' })
+  @ApiResponse({ status: 200, description: 'Available clinics returned successfully' })
+  @Get('available-clinics')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.MANAGER, UserRole.DOCTOR, UserRole.STAFF)
+  async getAvailableClinics(
+    @Request() req: any,
+    @Query('date') date: string,
+    @Query('time') time: string,
+    @Query('clinicCollectionId') clinicCollectionId?: string,
+  ) {
+    if (!date || !time) {
+      throw new BadRequestException('date and time query parameters are required');
+    }
+    try {
+      const clinics = await this.appointmentService.getAvailableClinics(
+        date,
+        time,
+        clinicCollectionId,
+        req.user?.clinicId,
+        req.user?.organizationId,
+        req.user?.role,
+      );
+      return {
+        success: true,
+        message: {
+          ar: 'تم استرجاع العيادات المتاحة بنجاح',
+          en: 'Available clinics retrieved successfully',
+        },
+        data: clinics,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: {
+          ar: 'فشل استرجاع العيادات المتاحة',
+          en: 'Failed to retrieve available clinics',
+        },
+        error: error.message,
+      };
+    }
+  }
+
+  // =========================================================================
+  // M6 – GET /appointments/calendar  (UC-d2e3f4c)
+  // MUST be declared BEFORE ':id' route so "calendar" is not captured as an ID
+  // =========================================================================
+  @ApiOperation({
+    summary: 'Get appointments calendar',
+    description:
+      'Returns appointments grouped by date for calendar views. Supports day, week, and month views with optional filtering by clinic, doctor, and status. Doctors only see their own appointments.',
+  })
+  @ApiQuery({ name: 'view', required: false, enum: ['day', 'week', 'month'], description: 'Calendar view mode (default: week)' })
+  @ApiQuery({ name: 'date', required: false, type: String, description: 'Anchor date YYYY-MM-DD (default: today)' })
+  @ApiQuery({ name: 'clinicId', required: false, type: String, description: 'Filter by clinic (auto-restricted for Staff role)' })
+  @ApiQuery({ name: 'doctorId', required: false, type: String, description: 'Filter by doctor (auto-restricted for Doctor role)' })
+  @ApiQuery({ name: 'status', required: false, enum: ['scheduled', 'confirmed', 'in_progress', 'completed', 'cancelled', 'no_show'] })
+  @ApiResponse({ status: 200, description: 'Calendar data retrieved successfully' })
+  @Get('calendar')
+  @UseGuards(RoleScopeGuard)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.MANAGER, UserRole.DOCTOR, UserRole.STAFF)
+  async getAppointmentsCalendar(
+    @Query(new ValidationPipe({ transform: true })) query: CalendarQueryDto,
+    @Request() req: any,
+  ) {
+    try {
+      const result = await this.appointmentService.getAppointmentsCalendar(
+        query,
+        req.user?.userId,
+        req.user?.role,
+      );
+      return {
+        success: true,
+        message: {
+          ar: 'تم استرجاع التقويم بنجاح',
+          en: 'Calendar retrieved successfully',
+        },
+        data: result,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: {
+          ar: 'فشل استرجاع التقويم',
+          en: 'Failed to retrieve calendar',
         },
         error: error.message,
       };
@@ -492,49 +641,6 @@ export class AppointmentController {
         message: {
           ar: 'فشل استرجاع الموعد',
           en: 'Failed to retrieve appointment',
-        },
-        error: error.message,
-      };
-    }
-  }
-
-  // =========================================================================
-  // M6 – GET /appointments/calendar  (UC-d2e3f4c)
-  // Must be declared BEFORE ':id' routes
-  // =========================================================================
-  @ApiOperation({
-    summary: 'Get appointments calendar',
-    description:
-      'Returns appointments grouped by date for calendar views. Supports day, week, and month views with optional filtering by clinic, doctor, and status.',
-  })
-  @ApiQuery({ name: 'view', required: false, enum: ['day', 'week', 'month'], description: 'Calendar view mode (default: week)' })
-  @ApiQuery({ name: 'date', required: false, type: String, description: 'Anchor date YYYY-MM-DD (default: today)' })
-  @ApiQuery({ name: 'clinicId', required: false, type: String, description: 'Filter by clinic (auto-restricted for Staff role)' })
-  @ApiQuery({ name: 'doctorId', required: false, type: String, description: 'Filter by doctor (auto-restricted for Doctor role)' })
-  @ApiQuery({ name: 'status', required: false, enum: ['scheduled', 'confirmed', 'in_progress', 'completed', 'cancelled', 'no_show'] })
-  @ApiResponse({ status: 200, description: 'Calendar data retrieved successfully' })
-  @Get('calendar')
-  @UseGuards(RoleScopeGuard)
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.MANAGER, UserRole.DOCTOR, UserRole.STAFF)
-  async getAppointmentsCalendar(
-    @Query(new ValidationPipe({ transform: true })) query: CalendarQueryDto,
-  ) {
-    try {
-      const result = await this.appointmentService.getAppointmentsCalendar(query);
-      return {
-        success: true,
-        message: {
-          ar: 'تم استرجاع التقويم بنجاح',
-          en: 'Calendar retrieved successfully',
-        },
-        data: result,
-      };
-    } catch (error) {
-      return {
-        success: false,
-        message: {
-          ar: 'فشل استرجاع التقويم',
-          en: 'Failed to retrieve calendar',
         },
         error: error.message,
       };

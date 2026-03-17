@@ -11,6 +11,7 @@ import { Payment } from '../database/schemas/payment.schema';
 import { Invoice } from '../database/schemas/invoice.schema';
 import { Patient } from '../database/schemas/patient.schema';
 import { Clinic } from '../database/schemas/clinic.schema';
+import { Counter } from '../database/schemas/counter.schema';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { UpdatePaymentDto } from './dto/update-payment.dto';
 import { PaymentQueryDto } from './dto/payment-query.dto';
@@ -36,6 +37,7 @@ export class PaymentService {
     @InjectModel(Invoice.name) private invoiceModel: Model<Invoice>,
     @InjectModel(Patient.name) private patientModel: Model<Patient>,
     @InjectModel(Clinic.name) private clinicModel: Model<Clinic>,
+    @InjectModel(Counter.name) private counterModel: Model<Counter>,
     @InjectConnection() private connection: Connection,
     private paymentBalanceService: PaymentBalanceService,
   ) {}
@@ -43,6 +45,7 @@ export class PaymentService {
   /**
    * Create a new payment
    * Requirements: 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 6.8, 6.9, 6.10, 6.11, 6.12, 7.7, 7.8, 13.7, 13.8
+   * PART G: session allocation support via createPaymentDto.sessionAllocations
    */
   async createPayment(
     createPaymentDto: CreatePaymentDto,
@@ -87,7 +90,6 @@ export class PaymentService {
     if (invoice.paymentStatus === 'paid') {
       throw new BadRequestException(PAYMENT_ERRORS.INVOICE_ALREADY_PAID);
     }
-    // Note: Invoice schema doesn't have 'cancelled' status, only 'draft' and 'posted'
 
     // Validate patient exists
     const patient = await this.patientModel.findById(
@@ -102,8 +104,30 @@ export class PaymentService {
       throw new BadRequestException(PAYMENT_ERRORS.PATIENT_MISMATCH);
     }
 
-    // Generate unique Payment ID
-    const paymentId = await this.generatePaymentId();
+    // Validate sessionAllocations if provided
+    if (
+      createPaymentDto.sessionAllocations &&
+      createPaymentDto.sessionAllocations.length > 0
+    ) {
+      const allocTotal = createPaymentDto.sessionAllocations.reduce(
+        (sum, a) => sum + a.amount,
+        0,
+      );
+      // Allow a small floating-point tolerance
+      if (Math.abs(allocTotal - createPaymentDto.amount) > 0.01) {
+        throw new BadRequestException({
+          message: {
+            ar: 'مجموع التوزيعات يجب أن يساوي المبلغ الإجمالي للدفعة',
+            en: 'Session allocations total must equal the payment amount',
+          },
+          code: 'ALLOCATION_SUM_MISMATCH',
+        });
+      }
+    }
+
+    // Generate unique Payment ID (atomic via counter)
+    const organizationId = (invoice as any).organizationId?.toString();
+    const paymentId = await this.generatePaymentId(organizationId);
 
     // Start database transaction
     const session = await this.connection.startSession();
@@ -125,7 +149,84 @@ export class PaymentService {
 
       await payment.save({ session });
 
-      // Call balance service to update invoice
+      // Apply per-session payment allocations if provided (PART G)
+      if (
+        createPaymentDto.sessionAllocations &&
+        createPaymentDto.sessionAllocations.length > 0
+      ) {
+        // S-2: Cross-invoice IDOR protection — all allocations must reference the payment's invoice
+        const invalidAllocations = createPaymentDto.sessionAllocations.filter(
+          alloc => alloc.invoiceId !== createPaymentDto.invoiceId
+        );
+        if (invalidAllocations.length > 0) {
+          throw new BadRequestException({
+            message: { ar: 'معرف الفاتورة في التخصيص لا يطابق الفاتورة المحددة', en: 'Session allocation invoiceId does not match the payment invoiceId' },
+            code: 'PAYMENT_ALLOCATION_INVOICE_MISMATCH',
+          });
+        }
+
+        // S-4: Load invoice for per-session balance validation
+        const invoiceForValidation = await this.invoiceModel
+          .findOne({ _id: new Types.ObjectId(createPaymentDto.invoiceId), deletedAt: { $exists: false } })
+          .lean();
+
+        for (const alloc of createPaymentDto.sessionAllocations) {
+          if (alloc.amount <= 0) continue;
+
+          // Find the session to validate balance
+          let sessionFound = false;
+          for (const svc of (invoiceForValidation as any).services || []) {
+            const session = (svc.sessions || []).find(
+              (s: any) => s.invoiceItemId?.toString() === alloc.invoiceItemId
+            );
+            if (session) {
+              sessionFound = true;
+              const remaining = session.lineTotal - (session.paidAmount || 0);
+              if (alloc.amount > remaining + 0.001) {
+                throw new BadRequestException({
+                  message: { ar: 'مبلغ التخصيص يتجاوز الرصيد المتبقي للجلسة', en: 'Allocation amount exceeds remaining session balance' },
+                  code: 'ALLOCATION_EXCEEDS_SESSION_BALANCE',
+                  invoiceItemId: alloc.invoiceItemId,
+                  remaining,
+                  requested: alloc.amount,
+                });
+              }
+              break;
+            }
+          }
+          if (!sessionFound) {
+            throw new BadRequestException({
+              message: { ar: 'معرف عنصر الفاتورة غير موجود', en: 'Invoice item not found in invoice' },
+              code: 'INVOICE_ITEM_NOT_FOUND',
+            });
+          }
+        }
+
+        for (const alloc of createPaymentDto.sessionAllocations) {
+          if (alloc.amount <= 0) continue;
+          await this.invoiceModel.updateOne(
+            {
+              _id: new Types.ObjectId(alloc.invoiceId),
+              deletedAt: { $exists: false },
+            },
+            {
+              $inc: {
+                'services.$[].sessions.$[item].paidAmount': alloc.amount,
+              },
+            },
+            {
+              arrayFilters: [
+                {
+                  'item.invoiceItemId': new Types.ObjectId(alloc.invoiceItemId),
+                },
+              ],
+              session,
+            },
+          );
+        }
+      }
+
+      // Call balance service to update invoice-level paidAmount and paymentStatus
       await this.paymentBalanceService.updateInvoiceBalances(
         createPaymentDto.invoiceId,
         createPaymentDto.amount,
@@ -235,7 +336,10 @@ export class PaymentService {
 
     // Support search by paymentId, patientName, invoiceNumber
     if (queryDto.search) {
-      const searchRegex = new RegExp(queryDto.search, 'i');
+      if (queryDto.search.length > 100) {
+        throw new BadRequestException({ message: { ar: 'النص المدخل طويل جداً', en: 'Search term too long' } });
+      }
+      const searchRegex = new RegExp(this.escapeRegex(queryDto.search), 'i');
       filter.$or = [{ paymentId: searchRegex }];
       // Note: Patient name and invoice number search requires aggregation pipeline
     }
@@ -534,21 +638,23 @@ export class PaymentService {
   }
 
   /**
-   * Generate unique payment ID
+   * Escape special regex characters to prevent ReDoS attacks (S-6).
    */
-  private async generatePaymentId(): Promise<string> {
-    const count = await this.paymentModel.countDocuments();
-    const paddedNumber = String(count + 1).padStart(4, '0');
-    const paymentId = `PAY-${paddedNumber}`;
+  private escapeRegex(str: string): string {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
 
-    // Check for uniqueness (in case of concurrent creation)
-    const existing = await this.paymentModel.findOne({ paymentId });
-    if (existing) {
-      // Retry with timestamp suffix
-      return `PAY-${paddedNumber}-${Date.now()}`;
-    }
-
-    return paymentId;
+  /**
+   * Generate unique payment ID using atomic counter (S-5: prevents race conditions).
+   */
+  private async generatePaymentId(organizationId?: string): Promise<string> {
+    const key = `PAY:${organizationId || 'global'}`;
+    const counter = await this.counterModel.findOneAndUpdate(
+      { key },
+      { $inc: { seq: 1 } },
+      { new: true, upsert: true }
+    );
+    return `PAY-${String(counter.seq).padStart(4, '0')}`;
   }
 
   /**

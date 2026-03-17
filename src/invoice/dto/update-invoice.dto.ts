@@ -1,14 +1,9 @@
-import { PartialType, OmitType } from '@nestjs/swagger';
+import { PartialType } from '@nestjs/mapped-types';
 import { CreateInvoiceDto } from './create-invoice.dto';
 
 /**
  * DTO for updating an existing invoice
- * Requirements: 4.3, 4.4
- * 
- * Extends CreateInvoiceDto with all fields optional
- * Omits patientId as it cannot be modified (Requirement 4.4)
- * All validation messages remain bilingual (Arabic & English)
+ * PART C — M7 redesign
+ * All fields optional via PartialType
  */
-export class UpdateInvoiceDto extends PartialType(
-  OmitType(CreateInvoiceDto, ['patientId'] as const),
-) {}
+export class UpdateInvoiceDto extends PartialType(CreateInvoiceDto) {}

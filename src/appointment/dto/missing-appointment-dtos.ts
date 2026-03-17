@@ -39,6 +39,10 @@ export class AppointmentSearchQueryDto {
   @ApiPropertyOptional() @IsOptional() limit?: string | number;
   @ApiPropertyOptional() @IsOptional() @IsString() sortBy?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() sortOrder?: string;
+  /** Comma-separated clinic IDs for multi-select filter */
+  @ApiPropertyOptional() @IsOptional() @IsString() clinicIds?: string;
+  /** Comma-separated doctor IDs for multi-select filter */
+  @ApiPropertyOptional() @IsOptional() @IsString() doctorIds?: string;
 }
 
 /**

@@ -6,11 +6,14 @@ import {
   IsMongoId,
   IsNumber,
   IsEnum,
+  IsArray,
+  ValidateNested,
   MaxLength,
   Min,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { SessionAllocationDto } from './session-allocation.dto';
 
 /**
  * Payment method enumeration
@@ -28,7 +31,8 @@ export enum PaymentMethod {
 /**
  * DTO for creating a new payment
  * Requirements: 6.2, 6.4, 6.5, 6.6, 13.7, 13.8, 13.9
- * 
+ * PART G: added sessionAllocations for per-session payment tracking
+ *
  * All validation messages are bilingual (Arabic & English)
  */
 export class CreatePaymentDto {
@@ -68,11 +72,13 @@ export class CreatePaymentDto {
   @IsNumber(
     {},
     {
-      message: '{"ar":"مبلغ الدفع يجب أن يكون رقماً","en":"Payment amount must be a number"}',
+      message:
+        '{"ar":"مبلغ الدفع يجب أن يكون رقماً","en":"Payment amount must be a number"}',
     },
   )
   @Min(0.01, {
-    message: '{"ar":"مبلغ الدفع لا يمكن أن يكون صفراً","en":"The Payment Amount cannot be zero"}',
+    message:
+      '{"ar":"مبلغ الدفع لا يمكن أن يكون صفراً","en":"The Payment Amount cannot be zero"}',
   })
   amount: number;
 
@@ -113,7 +119,19 @@ export class CreatePaymentDto {
     message: '{"ar":"الملاحظات يجب أن تكون نصاً","en":"Notes must be a string"}',
   })
   @MaxLength(500, {
-    message: '{"ar":"الملاحظات يجب ألا تتجاوز 500 حرف","en":"Notes must not exceed 500 characters"}',
+    message:
+      '{"ar":"الملاحظات يجب ألا تتجاوز 500 حرف","en":"Notes must not exceed 500 characters"}',
   })
   notes?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Per-session payment allocations. If provided, the payment amount is distributed across the specified invoice sessions.',
+    type: [SessionAllocationDto],
+  })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => SessionAllocationDto)
+  sessionAllocations?: SessionAllocationDto[];
 }

@@ -21,7 +21,7 @@ export class InvoicePatientDto {
 /**
  * Service information in invoice response
  */
-export class InvoiceServiceDto {
+export class InvoiceServiceResponseDto {
   @ApiProperty({ example: '507f1f77bcf86cd799439013' })
   _id: string;
 
@@ -91,8 +91,8 @@ export class InvoiceResponseDto {
   @ApiPropertyOptional({ example: '507f1f77bcf86cd799439016' })
   appointmentId?: string;
 
-  @ApiPropertyOptional({ type: InvoiceServiceDto })
-  service?: InvoiceServiceDto;
+  @ApiPropertyOptional({ type: InvoiceServiceResponseDto })
+  service?: InvoiceServiceResponseDto;
 
   @ApiProperty({ example: 200 })
   subtotal: number;
@@ -112,8 +112,14 @@ export class InvoiceResponseDto {
   @ApiProperty({ example: 165 })
   outstandingBalance: number;
 
+  @ApiProperty({ example: 165 })
+  balanceDue: number;
+
   @ApiProperty({ enum: InvoiceStatus, example: InvoiceStatus.DRAFT })
   invoiceStatus: InvoiceStatus;
+
+  @ApiProperty({ enum: InvoiceStatus, example: InvoiceStatus.DRAFT })
+  status: InvoiceStatus;
 
   @ApiProperty({ enum: PaymentStatus, example: PaymentStatus.NOT_DUE })
   paymentStatus: PaymentStatus;

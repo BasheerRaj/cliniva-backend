@@ -28,6 +28,9 @@ export class Payment extends Document {
   @Prop({ type: Types.ObjectId, ref: 'Clinic', required: true, index: true })
   clinicId: Types.ObjectId;
 
+  @Prop({ type: Types.ObjectId, ref: 'Organization', required: true, index: true })
+  organizationId: Types.ObjectId;
+
   // ==================== Payment Details ====================
   
   @Prop({ required: true, type: Number, min: 0.01 })
@@ -45,6 +48,27 @@ export class Payment extends Document {
 
   @Prop({ required: false, maxlength: 500 })
   notes?: string;
+
+  @Prop({
+    type: [
+      {
+        invoiceId: { type: Types.ObjectId, ref: 'Invoice', required: true },
+        invoiceItemId: { type: Types.ObjectId, required: true },
+        serviceName: { type: String, required: false },
+        sessionName: { type: String, required: false },
+        amount: { type: Number, required: true, min: 0 },
+      },
+    ],
+    default: [],
+    required: false,
+  })
+  sessionAllocations?: Array<{
+    invoiceId: Types.ObjectId;
+    invoiceItemId: Types.ObjectId;
+    serviceName?: string;
+    sessionName?: string;
+    amount: number;
+  }>;
 
   // ==================== Audit Fields ====================
   

@@ -56,10 +56,10 @@ import {
   AppointmentOfferSchema,
   Invoice,
   InvoiceSchema,
-  InvoiceItem,
-  InvoiceItemSchema,
   Payment,
   PaymentSchema,
+  Counter,
+  CounterSchema,
   InsuranceClaim,
   InsuranceClaimSchema,
   Notification,
@@ -76,6 +76,9 @@ import {
   WorkingHoursSchema,
   EmployeeShift,
   EmployeeShiftSchema,
+  EmployeeProfile,
+  EmployeeProfileSchema,
+  DoctorServiceSchema,
   AuditLog,
   AuditLogSchema,
   TokenBlacklist,
@@ -145,9 +148,9 @@ import {
 
       // Billing & Payment Management
       { name: Invoice.name, schema: InvoiceSchema },
-      { name: InvoiceItem.name, schema: InvoiceItemSchema },
       { name: Payment.name, schema: PaymentSchema },
       { name: InsuranceClaim.name, schema: InsuranceClaimSchema },
+      { name: Counter.name, schema: CounterSchema },
 
       // Notification & Communication System
       { name: Notification.name, schema: NotificationSchema },
@@ -161,6 +164,8 @@ import {
 
       // Employee Management
       { name: EmployeeShift.name, schema: EmployeeShiftSchema },
+      { name: EmployeeProfile.name, schema: EmployeeProfileSchema },
+      { name: 'DoctorService', schema: DoctorServiceSchema },
 
       // Audit Trail
       { name: AuditLog.name, schema: AuditLogSchema },

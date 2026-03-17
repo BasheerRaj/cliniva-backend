@@ -531,6 +531,7 @@ export class EmployeeService {
     if (email) userFilter.email = { $regex: email, $options: 'i' };
     if (role) userFilter.role = role;
     if (isActive !== undefined) userFilter.isActive = isActive;
+    if (clinicId) userFilter.clinicId = new Types.ObjectId(clinicId);
 
     // Search across multiple fields
     if (search) {

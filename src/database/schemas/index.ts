@@ -24,6 +24,7 @@ export * from './patient.schema';
 // Services & Appointments
 export * from './service.schema';
 export * from './clinic-service.schema';
+export * from './doctor-service.schema';
 export * from './appointment.schema';
 export * from './medical-report.schema';
 
@@ -37,6 +38,7 @@ export * from './invoice.schema';
 export * from './invoice-item.schema';
 export * from './payment.schema';
 export * from './insurance-claim.schema';
+export * from './counter.schema';
 
 // Notification & Communication System
 export * from './notification.schema';
