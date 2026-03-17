@@ -77,6 +77,17 @@ export class CreateServiceDto {
   @IsOptional()
   @Min(0)
   price?: number;
+
+  @ApiPropertyOptional({
+    description: 'Service category label',
+    example: 'Consultation',
+    type: String,
+    maxLength: 100,
+  })
+  @IsString()
+  @IsOptional()
+  @MaxLength(100)
+  serviceCategory?: string;
 }
 
 export class ServiceAssignmentDto {

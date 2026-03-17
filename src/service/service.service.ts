@@ -6,10 +6,14 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Service } from '../database/schemas/service.schema';
+import { ServiceCategory } from '../database/schemas/service-category.schema';
 import { ClinicService } from '../database/schemas/clinic-service.schema';
 import { Appointment } from '../database/schemas/appointment.schema';
 import { Notification } from '../database/schemas/notification.schema';
 import { User } from '../database/schemas/user.schema';
+import { DoctorService } from '../database/schemas/doctor-service.schema';
+import { Clinic } from '../database/schemas/clinic.schema';
+import { EmployeeShift } from '../database/schemas/employee-shift.schema';
 import { CreateServiceDto, AssignServicesDto } from './dto/create-service.dto';
 import { CreateServiceWithSessionsDto } from './dto/create-service-with-sessions.dto';
 import { UpdateServiceDto } from './dto/update-service.dto';
@@ -25,6 +29,8 @@ import { SessionManagerService } from './services/session-manager.service';
 export class ServiceService {
   constructor(
     @InjectModel('Service') private readonly serviceModel: Model<Service>,
+    @InjectModel('ServiceCategory')
+    private readonly serviceCategoryModel: Model<ServiceCategory>,
     @InjectModel('ClinicService')
     private readonly clinicServiceModel: Model<ClinicService>,
     @InjectModel('Appointment')
@@ -32,6 +38,11 @@ export class ServiceService {
     @InjectModel('Notification')
     private readonly notificationModel: Model<Notification>,
     @InjectModel('User') private readonly userModel: Model<User>,
+    @InjectModel('DoctorService')
+    private readonly doctorServiceModel: Model<DoctorService>,
+    @InjectModel('Clinic') private readonly clinicModel: Model<Clinic>,
+    @InjectModel('EmployeeShift')
+    private readonly employeeShiftModel: Model<EmployeeShift>,
     private readonly serviceOfferService: ServiceOfferService,
     private readonly sessionManagerService: SessionManagerService,
   ) {}
@@ -98,6 +109,7 @@ export class ServiceService {
       description: createDto.description?.trim() || undefined,
       durationMinutes: createDto.durationMinutes || 30,
       price: createDto.price || 0,
+      serviceCategory: createDto.serviceCategory?.trim() || undefined,
     };
 
     // Add complex department ID only if provided
@@ -120,8 +132,145 @@ export class ServiceService {
       );
     }
 
+    if (serviceData.serviceCategory) {
+      await this.ensureServiceCategoryExists(serviceData.serviceCategory);
+    }
+
+    // doctorIds requires clinicId — reject early before any DB writes
+    if (createDto.doctorIds && createDto.doctorIds.length > 0) {
+      if (!createDto.clinicId) {
+        throw new BadRequestException({
+          message: {
+            ar: 'يجب تحديد معرّف العيادة (clinicId) عند إرسال قائمة الأطباء',
+            en: 'clinicId is required when doctorIds are provided',
+          },
+        });
+      }
+      await this.validateDoctorAssignments(createDto.doctorIds, createDto.clinicId);
+    }
+
     const service = new this.serviceModel(serviceData);
-    return await service.save();
+    let savedService: Service;
+    try {
+      savedService = await service.save();
+    } catch (error) {
+      this.handleServiceDuplicateNameError(error, createDto.name);
+      throw error;
+    }
+
+    // Create doctor assignments after service is persisted
+    if (createDto.doctorIds && createDto.doctorIds.length > 0) {
+      const assignmentResults = await this.processDoctorAssignments(
+        (savedService._id as Types.ObjectId).toString(),
+        createDto.doctorIds,
+        createDto.clinicId!,
+      );
+      return {
+        ...savedService.toObject(),
+        doctorAssignments: assignmentResults,
+      };
+    }
+
+    return savedService;
+  }
+
+  /**
+   * Validates all doctor IDs upfront (before any DB write) using the
+   * service-level clinicId as the scope for every assignment.
+   */
+  private async validateDoctorAssignments(
+    doctorIds: string[],
+    clinicId: string,
+  ): Promise<void> {
+    // --- Clinic must exist ---
+    const clinic = await this.clinicModel.findById(clinicId);
+    if (!clinic) {
+      throw new BadRequestException({
+        message: {
+          ar: `العيادة ${clinicId} غير موجودة`,
+          en: `Clinic ${clinicId} not found`,
+        },
+        clinicId,
+      });
+    }
+
+    for (const doctorId of doctorIds) {
+      // --- Doctor must exist and be active with role 'doctor' ---
+      const doctor = await this.userModel.findOne({
+        _id: new Types.ObjectId(doctorId),
+        role: 'doctor',
+        isActive: true,
+      });
+      if (!doctor) {
+        throw new BadRequestException({
+          message: {
+            ar: `الطبيب ${doctorId} غير موجود أو غير نشط`,
+            en: `Doctor ${doctorId} not found or inactive`,
+          },
+          doctorId,
+        });
+      }
+
+      // --- Doctor must work at the clinic ---
+      const doctorWorksAtClinic =
+        doctor.clinicId?.toString() === clinicId ||
+        (await this.employeeShiftModel.exists({
+          userId: new Types.ObjectId(doctorId),
+          entityType: 'clinic',
+          entityId: new Types.ObjectId(clinicId),
+          isActive: true,
+        }));
+
+      if (!doctorWorksAtClinic) {
+        throw new BadRequestException({
+          message: {
+            ar: `الطبيب ${doctorId} لا يعمل في العيادة ${clinicId}`,
+            en: `Doctor ${doctorId} does not work at clinic ${clinicId}`,
+          },
+          doctorId,
+          clinicId,
+        });
+      }
+    }
+  }
+
+  /**
+   * Ensures the ClinicService junction record exists and creates a
+   * DoctorService assignment for each doctor ID under the same clinicId.
+   */
+  private async processDoctorAssignments(
+    serviceId: string,
+    doctorIds: string[],
+    clinicId: string,
+  ): Promise<any[]> {
+    // Ensure ClinicService junction record exists once for this clinic
+    const existing = await this.clinicServiceModel.findOne({
+      clinicId: new Types.ObjectId(clinicId),
+      serviceId: new Types.ObjectId(serviceId),
+    });
+    if (!existing) {
+      await this.clinicServiceModel.create({
+        clinicId: new Types.ObjectId(clinicId),
+        serviceId: new Types.ObjectId(serviceId),
+        isActive: true,
+      });
+    } else if (!existing.isActive) {
+      existing.isActive = true;
+      await existing.save();
+    }
+
+    const results: any[] = [];
+    for (const doctorId of doctorIds) {
+      const doctorService = new this.doctorServiceModel({
+        doctorId: new Types.ObjectId(doctorId),
+        serviceId: new Types.ObjectId(serviceId),
+        clinicId: new Types.ObjectId(clinicId),
+        isActive: true,
+      });
+      results.push(await doctorService.save());
+    }
+
+    return results;
   }
 
   async getServicesByComplexDepartment(
@@ -130,8 +279,21 @@ export class ServiceService {
     return this.serviceModel
       .find({
         complexDepartmentId: new Types.ObjectId(complexDepartmentId),
+        deletedAt: { $exists: false },
       })
       .exec();
+  }
+
+  async getAllServices(complexDepartmentId?: string): Promise<Service[]> {
+    const query: any = {
+      deletedAt: { $exists: false },
+    };
+
+    if (complexDepartmentId) {
+      query.complexDepartmentId = new Types.ObjectId(complexDepartmentId);
+    }
+
+    return this.serviceModel.find(query).exec();
   }
 
   // New method: Validate service names for clinic onboarding to prevent duplicates across forms
@@ -285,6 +447,29 @@ export class ServiceService {
     return service;
   }
 
+  async getAssignedDoctors(serviceId: string): Promise<any[]> {
+    const doctorServices = await this.doctorServiceModel
+      .find({
+        serviceId: new Types.ObjectId(serviceId),
+        isActive: true,
+      })
+      .populate('doctorId', 'firstName lastName email role profilePicture')
+      .populate('clinicId', 'name')
+      .sort({ createdAt: -1 })
+      .exec();
+
+    return doctorServices.map((ds: any) => {
+      const plain = ds?.toObject ? ds.toObject() : { ...ds };
+      return {
+        assignmentId: plain._id,
+        doctor: plain.doctorId,
+        clinic: plain.clinicId,
+        isActive: plain.isActive,
+        assignedAt: plain.createdAt,
+      };
+    });
+  }
+
   async updateService(
     serviceId: string,
     updateDto: UpdateServiceWithSessionsDto,
@@ -383,6 +568,12 @@ export class ServiceService {
     if (updateDto.price !== undefined) {
       service.price = updateDto.price;
     }
+    if (updateDto.serviceCategory !== undefined) {
+      service.serviceCategory = updateDto.serviceCategory?.trim() || undefined;
+      if (service.serviceCategory) {
+        await this.ensureServiceCategoryExists(service.serviceCategory);
+      }
+    }
 
     // Handle complexDepartmentId change
     if (updateDto.complexDepartmentId !== undefined) {
@@ -430,8 +621,207 @@ export class ServiceService {
       }
     }
 
-    const savedService = await service.save();
-    return savedService;
+    try {
+      const savedService = await service.save();
+      return savedService;
+    } catch (error) {
+      this.handleServiceDuplicateNameError(error, updateDto.name ?? service.name);
+      throw error;
+    }
+  }
+
+  private handleServiceDuplicateNameError(
+    error: any,
+    serviceName?: string,
+  ): never | void {
+    if (error?.code !== 11000) {
+      return;
+    }
+
+    const duplicateName =
+      serviceName?.trim() ||
+      error?.keyValue?.name ||
+      'This service name';
+
+    throw new BadRequestException({
+      message: {
+        ar: `اسم الخدمة "${duplicateName}" مستخدم بالفعل في نفس النطاق. يرجى اختيار اسم آخر`,
+        en: `Service name "${duplicateName}" already exists in this scope. Please choose a different name.`,
+      },
+      code: 'SERVICE_NAME_ALREADY_EXISTS',
+    });
+  }
+
+  async updateServiceCategory(
+    serviceId: string,
+    serviceCategory: string,
+  ): Promise<Service> {
+    const service = await this.serviceModel.findOne({
+      _id: new Types.ObjectId(serviceId),
+      deletedAt: { $exists: false },
+    });
+
+    if (!service) {
+      throw new NotFoundException({
+        message: {
+          ar: 'الخدمة غير موجودة',
+          en: 'Service not found',
+        },
+      });
+    }
+
+    service.serviceCategory = serviceCategory.trim();
+    if (service.serviceCategory) {
+      await this.ensureServiceCategoryExists(service.serviceCategory);
+    }
+    return service.save();
+  }
+
+  async getServiceCategoryList(): Promise<Array<{ id: string; name: string }>> {
+    const usedCategories = await this.serviceModel.distinct('serviceCategory', {
+      deletedAt: { $exists: false },
+      serviceCategory: { $exists: true, $nin: ['', null] },
+    });
+
+    const normalizedUsedNames = Array.from(
+      new Set(
+        usedCategories
+          .map((value) => (typeof value === 'string' ? value.trim() : ''))
+          .filter((value) => value.length > 0),
+      ),
+    );
+
+    if (normalizedUsedNames.length > 0) {
+      const existing = await this.serviceCategoryModel
+        .find()
+        .select('name')
+        .lean();
+
+      const existingNames = new Set(
+        existing.map((item) => item.name.trim().toLowerCase()),
+      );
+
+      const missingNames = normalizedUsedNames.filter(
+        (name) => !existingNames.has(name.toLowerCase()),
+      );
+
+      if (missingNames.length > 0) {
+        try {
+          await this.serviceCategoryModel.insertMany(
+            missingNames.map((name) => ({ name })),
+            { ordered: false },
+          );
+        } catch {
+          // Ignore duplicate key races; final list is fetched below.
+        }
+      }
+    }
+
+    const categories = await this.serviceCategoryModel
+      .find()
+      .sort({ name: 1 })
+      .exec();
+
+    return categories.map((category) => ({
+      id: (category._id as Types.ObjectId).toString(),
+      name: category.name,
+    }));
+  }
+
+  async createServiceCategory(name: string): Promise<{ name: string }> {
+    const normalizedName = name.trim();
+
+    if (!normalizedName) {
+      throw new BadRequestException('Service category name is required');
+    }
+
+    if (normalizedName.length > 100) {
+      throw new BadRequestException(
+        'Service category name cannot exceed 100 characters',
+      );
+    }
+
+    const existing = await this.serviceCategoryModel.findOne({
+      name: { $regex: new RegExp(`^${normalizedName}$`, 'i') },
+    });
+
+    if (existing) {
+      throw new BadRequestException(
+        `Service category "${normalizedName}" already exists`,
+      );
+    }
+
+    const created = await this.serviceCategoryModel.create({
+      name: normalizedName,
+    });
+
+    return { name: created.name };
+  }
+
+  async updateServiceCategoryById(
+    id: string,
+    name: string,
+  ): Promise<{ _id: string; name: string }> {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new BadRequestException('Invalid service category ID');
+    }
+
+    const normalizedName = name.trim();
+
+    if (!normalizedName) {
+      throw new BadRequestException('Service category name is required');
+    }
+
+    if (normalizedName.length > 100) {
+      throw new BadRequestException(
+        'Service category name cannot exceed 100 characters',
+      );
+    }
+
+    const existingWithSameName = await this.serviceCategoryModel.findOne({
+      _id: { $ne: new Types.ObjectId(id) },
+      name: { $regex: new RegExp(`^${normalizedName}$`, 'i') },
+    });
+
+    if (existingWithSameName) {
+      throw new BadRequestException(
+        `Service category "${normalizedName}" already exists`,
+      );
+    }
+
+    const updated = await this.serviceCategoryModel.findByIdAndUpdate(
+      id,
+      { name: normalizedName },
+      { new: true },
+    );
+
+    if (!updated) {
+      throw new NotFoundException('Service category not found');
+    }
+
+    return {
+      _id: (updated._id as Types.ObjectId).toString(),
+      name: updated.name,
+    };
+  }
+
+  private async ensureServiceCategoryExists(categoryName: string): Promise<void> {
+    const normalizedName = categoryName.trim();
+    if (!normalizedName) {
+      return;
+    }
+
+    const existing = await this.serviceCategoryModel.findOne({
+      name: { $regex: new RegExp(`^${normalizedName}$`, 'i') },
+    });
+
+    if (!existing) {
+      try {
+        await this.serviceCategoryModel.create({ name: normalizedName });
+      } catch {
+        // Ignore duplicate key races.
+      }
+    }
   }
 
   async deleteService(serviceId: string, userId?: string): Promise<void> {

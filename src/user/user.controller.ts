@@ -1433,6 +1433,160 @@ export class UserController {
   }
 
   /**
+   * Get users for dropdown
+   * BZR-q4f3e1b8: Deactivated user restrictions in dropdowns
+   *
+   * Task 11.2: Create user dropdown endpoint
+   * Requirements: 10.1, 10.2
+   * Design: Section 2.3 - User Dropdown Service
+   *
+   * This endpoint returns users for dropdown selection with optional filters.
+   * By default, only active users are returned. Results are cached for 5 minutes.
+   *
+   * @param role - Optional role filter
+   * @param complexId - Optional complex ID filter
+   * @param clinicId - Optional clinic ID filter
+   * @param includeDeactivated - Optional flag to include deactivated users
+   * @returns List of users for dropdown
+   */
+  @ApiOperation({
+    summary: 'Get users for dropdown',
+    description:
+      'Get users for dropdown selection with optional filters. Only returns active users by default. Results are cached for 5 minutes.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Users retrieved successfully',
+    schema: {
+      example: EXAMPLES.USERS_DROPDOWN_RESPONSE_EXAMPLE,
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - Invalid or missing token',
+    schema: {
+      example: EXAMPLES.ERROR_UNAUTHORIZED_EXAMPLE,
+    },
+  })
+  @ApiBearerAuth()
+  @ApiQuery({
+    name: 'role',
+    required: false,
+    type: String,
+    description: 'Filter by user role',
+    example: 'doctor',
+  })
+  @ApiQuery({
+    name: 'complexId',
+    required: false,
+    type: String,
+    description: 'Filter by complex ID',
+    example: '507f1f77bcf86cd799439013',
+  })
+  @ApiQuery({
+    name: 'clinicId',
+    required: false,
+    type: String,
+    description: 'Filter by clinic ID',
+    example: '507f1f77bcf86cd799439014',
+  })
+  @ApiQuery({
+    name: 'includeDeactivated',
+    required: false,
+    type: Boolean,
+    description: 'Include deactivated users in results',
+    example: false,
+  })
+  @Get('dropdown')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @HttpCode(HttpStatus.OK)
+  async getUsersForDropdown(
+    @Query('role') role?: string,
+    @Query('complexId') complexId?: string,
+    @Query('clinicId') clinicId?: string,
+    @Query('includeDeactivated') includeDeactivated?: string,
+  ) {
+    try {
+      // Parse includeDeactivated as boolean
+      const includeDeactivatedBool = includeDeactivated === 'true';
+
+      // Create cache key from query parameters
+      const cacheKey = JSON.stringify({
+        role,
+        complexId,
+        clinicId,
+        includeDeactivated: includeDeactivatedBool,
+      });
+
+      // Check cache
+      const cached = this.dropdownCache.get(cacheKey);
+      const now = Date.now();
+
+      if (cached && now - cached.timestamp < this.CACHE_TTL) {
+        this.logger.log('Returning cached dropdown results');
+        return cached.data;
+      }
+
+      // Call UserDropdownService.getUsersForDropdown()
+      const users = await this.userDropdownService.getUsersForDropdown({
+        role,
+        complexId,
+        clinicId,
+        includeDeactivated: includeDeactivatedBool,
+      });
+
+      // Build response
+      const response = {
+        success: true,
+        data: users,
+        message: {
+          ar: 'تم جلب قائمة المستخدمين بنجاح',
+          en: 'Users retrieved successfully',
+        },
+      };
+
+      // Cache the result for 5 minutes
+      this.dropdownCache.set(cacheKey, {
+        data: response,
+        timestamp: now,
+      });
+
+      // Clean up old cache entries (simple cleanup strategy)
+      if (this.dropdownCache.size > 100) {
+        const keysToDelete: string[] = [];
+        this.dropdownCache.forEach((value, key) => {
+          if (now - value.timestamp >= this.CACHE_TTL) {
+            keysToDelete.push(key);
+          }
+        });
+        keysToDelete.forEach((key) => this.dropdownCache.delete(key));
+      }
+
+      return response;
+    } catch (error: any) {
+      // Re-throw if already an HTTP exception
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      this.logger.error(
+        `Get users for dropdown failed: ${error?.message}`,
+        error?.stack,
+      );
+      throw new HttpException(
+        {
+          message: {
+            ar: 'فشل جلب قائمة المستخدمين',
+            en: 'Failed to retrieve users list',
+          },
+          code: 'USERS_DROPDOWN_FAILED',
+        },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+  }
+
+  /**
    * Get user by ID
    *
    * Retrieves detailed information about a specific user by their ID.
@@ -1971,160 +2125,6 @@ export class UserController {
             en: 'Failed to transfer appointments',
           },
           code: 'APPOINTMENT_TRANSFER_FAILED',
-        },
-        HttpStatus.BAD_REQUEST,
-      );
-    }
-  }
-
-  /**
-   * Get users for dropdown
-   * BZR-q4f3e1b8: Deactivated user restrictions in dropdowns
-   *
-   * Task 11.2: Create user dropdown endpoint
-   * Requirements: 10.1, 10.2
-   * Design: Section 2.3 - User Dropdown Service
-   *
-   * This endpoint returns users for dropdown selection with optional filters.
-   * By default, only active users are returned. Results are cached for 5 minutes.
-   *
-   * @param role - Optional role filter
-   * @param complexId - Optional complex ID filter
-   * @param clinicId - Optional clinic ID filter
-   * @param includeDeactivated - Optional flag to include deactivated users
-   * @returns List of users for dropdown
-   */
-  @ApiOperation({
-    summary: 'Get users for dropdown',
-    description:
-      'Get users for dropdown selection with optional filters. Only returns active users by default. Results are cached for 5 minutes.',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Users retrieved successfully',
-    schema: {
-      example: EXAMPLES.USERS_DROPDOWN_RESPONSE_EXAMPLE,
-    },
-  })
-  @ApiResponse({
-    status: 401,
-    description: 'Unauthorized - Invalid or missing token',
-    schema: {
-      example: EXAMPLES.ERROR_UNAUTHORIZED_EXAMPLE,
-    },
-  })
-  @ApiBearerAuth()
-  @ApiQuery({
-    name: 'role',
-    required: false,
-    type: String,
-    description: 'Filter by user role',
-    example: 'doctor',
-  })
-  @ApiQuery({
-    name: 'complexId',
-    required: false,
-    type: String,
-    description: 'Filter by complex ID',
-    example: '507f1f77bcf86cd799439013',
-  })
-  @ApiQuery({
-    name: 'clinicId',
-    required: false,
-    type: String,
-    description: 'Filter by clinic ID',
-    example: '507f1f77bcf86cd799439014',
-  })
-  @ApiQuery({
-    name: 'includeDeactivated',
-    required: false,
-    type: Boolean,
-    description: 'Include deactivated users in results',
-    example: false,
-  })
-  @Get('dropdown')
-  @UseGuards(JwtAuthGuard, AdminGuard)
-  @HttpCode(HttpStatus.OK)
-  async getUsersForDropdown(
-    @Query('role') role?: string,
-    @Query('complexId') complexId?: string,
-    @Query('clinicId') clinicId?: string,
-    @Query('includeDeactivated') includeDeactivated?: string,
-  ) {
-    try {
-      // Parse includeDeactivated as boolean
-      const includeDeactivatedBool = includeDeactivated === 'true';
-
-      // Create cache key from query parameters
-      const cacheKey = JSON.stringify({
-        role,
-        complexId,
-        clinicId,
-        includeDeactivated: includeDeactivatedBool,
-      });
-
-      // Check cache
-      const cached = this.dropdownCache.get(cacheKey);
-      const now = Date.now();
-
-      if (cached && now - cached.timestamp < this.CACHE_TTL) {
-        this.logger.log('Returning cached dropdown results');
-        return cached.data;
-      }
-
-      // Call UserDropdownService.getUsersForDropdown()
-      const users = await this.userDropdownService.getUsersForDropdown({
-        role,
-        complexId,
-        clinicId,
-        includeDeactivated: includeDeactivatedBool,
-      });
-
-      // Build response
-      const response = {
-        success: true,
-        data: users,
-        message: {
-          ar: 'تم جلب قائمة المستخدمين بنجاح',
-          en: 'Users retrieved successfully',
-        },
-      };
-
-      // Cache the result for 5 minutes
-      this.dropdownCache.set(cacheKey, {
-        data: response,
-        timestamp: now,
-      });
-
-      // Clean up old cache entries (simple cleanup strategy)
-      if (this.dropdownCache.size > 100) {
-        const keysToDelete: string[] = [];
-        this.dropdownCache.forEach((value, key) => {
-          if (now - value.timestamp >= this.CACHE_TTL) {
-            keysToDelete.push(key);
-          }
-        });
-        keysToDelete.forEach((key) => this.dropdownCache.delete(key));
-      }
-
-      return response;
-    } catch (error: any) {
-      // Re-throw if already an HTTP exception
-      if (error instanceof HttpException) {
-        throw error;
-      }
-
-      this.logger.error(
-        `Get users for dropdown failed: ${error?.message}`,
-        error?.stack,
-      );
-      throw new HttpException(
-        {
-          message: {
-            ar: 'فشل جلب قائمة المستخدمين',
-            en: 'Failed to retrieve users list',
-          },
-          code: 'USERS_DROPDOWN_FAILED',
         },
         HttpStatus.BAD_REQUEST,
       );
