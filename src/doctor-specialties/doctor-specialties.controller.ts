@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Put,
+  Patch,
   Delete,
   Body,
   Param,
@@ -18,6 +19,7 @@ import {
   DoctorSpecialtySearchDto,
   DoctorSpecialtyResponseDto,
   BulkAssignSpecialtiesDto,
+  ToggleDoctorSpecialtyStatusDto,
 } from './dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
@@ -53,6 +55,7 @@ export class DoctorSpecialtiesController {
         id: (assignment as any)._id.toString(),
         doctorId: assignment.doctorId.toString(),
         specialtyId: assignment.specialtyId.toString(),
+        isActive: (assignment as any).isActive,
         yearsOfExperience: assignment.yearsOfExperience,
         certificationNumber: assignment.certificationNumber,
         createdAt: (assignment as any).createdAt || new Date(),
@@ -98,6 +101,10 @@ export class DoctorSpecialtiesController {
             id: (specialty as any)._id.toString(),
             doctorId: doctorIdStr,
             specialtyId: specialtyIdStr,
+            doctorName: `${(specialty.doctorId as any).firstName || ''} ${(specialty.doctorId as any).lastName || ''}`.trim(),
+            clinicName:
+              ((specialty.doctorId as any).clinicId as any)?.name || undefined,
+            isActive: (specialty as any).isActive,
             yearsOfExperience: specialty.yearsOfExperience,
             certificationNumber: specialty.certificationNumber,
             createdAt: (specialty as any).createdAt || new Date(),
@@ -108,6 +115,9 @@ export class DoctorSpecialtiesController {
                   firstName: (specialty.doctorId as any).firstName,
                   lastName: (specialty.doctorId as any).lastName,
                   email: (specialty.doctorId as any).email,
+                  clinicName:
+                    ((specialty.doctorId as any).clinicId as any)?.name ||
+                    undefined,
                 }
               : undefined,
             specialty: specialty.specialtyId
@@ -160,6 +170,9 @@ export class DoctorSpecialtiesController {
           id: (doctor as any)._id.toString(),
           doctorId: doctorIdStr,
           specialtyId: specialtyIdStr,
+          doctorName: `${(doctor.doctorId as any).firstName || ''} ${(doctor.doctorId as any).lastName || ''}`.trim(),
+          clinicName: ((doctor.doctorId as any).clinicId as any)?.name || undefined,
+          isActive: (doctor as any).isActive,
           yearsOfExperience: doctor.yearsOfExperience,
           certificationNumber: doctor.certificationNumber,
           createdAt: (doctor as any).createdAt || new Date(),
@@ -170,6 +183,8 @@ export class DoctorSpecialtiesController {
                 firstName: (doctor.doctorId as any).firstName,
                 lastName: (doctor.doctorId as any).lastName,
                 email: (doctor.doctorId as any).email,
+                clinicName:
+                  ((doctor.doctorId as any).clinicId as any)?.name || undefined,
               }
             : undefined,
           specialty: doctor.specialtyId
@@ -222,6 +237,10 @@ export class DoctorSpecialtiesController {
         id: (assignment as any)._id.toString(),
         doctorId: doctorIdStr,
         specialtyId: specialtyIdStr,
+        doctorName: `${(assignment.doctorId as any).firstName || ''} ${(assignment.doctorId as any).lastName || ''}`.trim(),
+        clinicName:
+          ((assignment.doctorId as any).clinicId as any)?.name || undefined,
+        isActive: (assignment as any).isActive,
         yearsOfExperience: assignment.yearsOfExperience,
         certificationNumber: assignment.certificationNumber,
         createdAt: (assignment as any).createdAt || new Date(),
@@ -232,6 +251,9 @@ export class DoctorSpecialtiesController {
               firstName: (assignment.doctorId as any).firstName,
               lastName: (assignment.doctorId as any).lastName,
               email: (assignment.doctorId as any).email,
+              clinicName:
+                ((assignment.doctorId as any).clinicId as any)?.name ||
+                undefined,
             }
           : undefined,
         specialty: assignment.specialtyId
@@ -273,6 +295,12 @@ export class DoctorSpecialtiesController {
           id: assignment._id.toString(),
           doctorId: assignment.doctorId.toString(),
           specialtyId: assignment.specialtyId.toString(),
+          doctorName:
+            `${assignment.doctor?.firstName || ''} ${assignment.doctor?.lastName || ''}`.trim() ||
+            undefined,
+          clinicName: assignment.clinicName || undefined,
+          isActive:
+            assignment.isActive !== undefined ? assignment.isActive : true,
           yearsOfExperience: assignment.yearsOfExperience,
           certificationNumber: assignment.certificationNumber,
           createdAt: assignment.createdAt || new Date(),
@@ -285,6 +313,7 @@ export class DoctorSpecialtiesController {
                 firstName: assignment.doctor.firstName,
                 lastName: assignment.doctor.lastName,
                 email: assignment.doctor.email,
+                clinicName: assignment.clinicName || undefined,
               }
             : undefined,
           specialty: assignment.specialty
@@ -348,6 +377,10 @@ export class DoctorSpecialtiesController {
         id: (assignment as any)._id.toString(),
         doctorId: doctorIdStr,
         specialtyId: specialtyIdStr,
+        doctorName: `${(assignment.doctorId as any).firstName || ''} ${(assignment.doctorId as any).lastName || ''}`.trim(),
+        clinicName:
+          ((assignment.doctorId as any).clinicId as any)?.name || undefined,
+        isActive: (assignment as any).isActive,
         yearsOfExperience: assignment.yearsOfExperience,
         certificationNumber: assignment.certificationNumber,
         createdAt: (assignment as any).createdAt || new Date(),
@@ -358,6 +391,9 @@ export class DoctorSpecialtiesController {
               firstName: (assignment.doctorId as any).firstName,
               lastName: (assignment.doctorId as any).lastName,
               email: (assignment.doctorId as any).email,
+              clinicName:
+                ((assignment.doctorId as any).clinicId as any)?.name ||
+                undefined,
             }
           : undefined,
         specialty: assignment.specialtyId
@@ -376,6 +412,74 @@ export class DoctorSpecialtiesController {
       };
     } catch (error) {
       this.logger.error(`Failed to update assignment: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Toggle assignment status
+   * PATCH /doctor-specialties/:id/status
+   */
+  @Patch(':id/status')
+  async toggleAssignmentStatus(
+    @Param('id') id: string,
+    @Body(new ValidationPipe()) dto: ToggleDoctorSpecialtyStatusDto,
+  ) {
+    try {
+      this.logger.log(`Toggling assignment status: ${id}`);
+
+      const assignment = await this.doctorSpecialtiesService.toggleAssignmentStatus(
+        id,
+        dto.isActive,
+      );
+
+      const doctorIdStr = (assignment.doctorId as any)._id
+        ? (assignment.doctorId as any)._id.toString()
+        : assignment.doctorId.toString();
+
+      const specialtyIdStr = (assignment.specialtyId as any)._id
+        ? (assignment.specialtyId as any)._id.toString()
+        : assignment.specialtyId.toString();
+
+      const response: DoctorSpecialtyResponseDto = {
+        id: (assignment as any)._id.toString(),
+        doctorId: doctorIdStr,
+        specialtyId: specialtyIdStr,
+        doctorName: `${(assignment.doctorId as any).firstName || ''} ${(assignment.doctorId as any).lastName || ''}`.trim(),
+        clinicName:
+          ((assignment.doctorId as any).clinicId as any)?.name || undefined,
+        isActive: (assignment as any).isActive,
+        yearsOfExperience: assignment.yearsOfExperience,
+        certificationNumber: assignment.certificationNumber,
+        createdAt: (assignment as any).createdAt || new Date(),
+        updatedAt: (assignment as any).updatedAt || new Date(),
+        doctor: assignment.doctorId
+          ? {
+              id: doctorIdStr,
+              firstName: (assignment.doctorId as any).firstName,
+              lastName: (assignment.doctorId as any).lastName,
+              email: (assignment.doctorId as any).email,
+              clinicName:
+                ((assignment.doctorId as any).clinicId as any)?.name ||
+                undefined,
+            }
+          : undefined,
+        specialty: assignment.specialtyId
+          ? {
+              id: specialtyIdStr,
+              name: (assignment.specialtyId as any).name,
+              description: (assignment.specialtyId as any).description,
+            }
+          : undefined,
+      };
+
+      return {
+        success: true,
+        message: 'Assignment status updated successfully',
+        data: response,
+      };
+    } catch (error) {
+      this.logger.error(`Failed to toggle assignment status: ${error.message}`);
       throw error;
     }
   }
