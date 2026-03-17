@@ -17,6 +17,9 @@ export class DoctorSpecialty extends Document {
 
   @Prop()
   certificationNumber?: string;
+
+  @Prop({ default: true })
+  isActive: boolean;
 }
 
 export const DoctorSpecialtySchema =

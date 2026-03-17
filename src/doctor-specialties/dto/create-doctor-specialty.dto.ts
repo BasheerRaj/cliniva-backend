@@ -4,6 +4,7 @@ import {
   IsOptional,
   IsNumber,
   Min,
+  IsBoolean,
 } from 'class-validator';
 
 export class CreateDoctorSpecialtyDto {
@@ -23,6 +24,10 @@ export class CreateDoctorSpecialtyDto {
   @IsOptional()
   @IsString()
   certificationNumber?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean = true;
 }
 
 export class UpdateDoctorSpecialtyDto {
@@ -40,8 +45,11 @@ export class DoctorSpecialtyResponseDto {
   id: string;
   doctorId: string;
   specialtyId: string;
+  doctorName?: string;
+  clinicName?: string;
   yearsOfExperience: number;
   certificationNumber?: string;
+  isActive?: boolean;
   createdAt: Date;
   updatedAt: Date;
   doctor?: {
@@ -49,12 +57,19 @@ export class DoctorSpecialtyResponseDto {
     firstName: string;
     lastName: string;
     email: string;
+    clinicName?: string;
   };
   specialty?: {
     id: string;
     name: string;
     description?: string;
   };
+}
+
+export class ToggleDoctorSpecialtyStatusDto {
+  @IsBoolean()
+  @IsNotEmpty()
+  isActive: boolean;
 }
 
 export class DoctorSpecialtySearchDto {

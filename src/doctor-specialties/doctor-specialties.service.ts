@@ -71,6 +71,7 @@ export class DoctorSpecialtiesService {
       specialtyId: new Types.ObjectId(createDto.specialtyId),
       yearsOfExperience: createDto.yearsOfExperience || 0,
       certificationNumber: createDto.certificationNumber,
+      isActive: createDto.isActive !== undefined ? createDto.isActive : true,
     };
 
     const assignment = new this.doctorSpecialtyModel(assignmentData);
@@ -93,7 +94,11 @@ export class DoctorSpecialtiesService {
     const specialties = await this.doctorSpecialtyModel
       .find({ doctorId: new Types.ObjectId(doctorId) })
       .populate('specialtyId', 'name description')
-      .populate('doctorId', 'firstName lastName email')
+      .populate({
+        path: 'doctorId',
+        select: 'firstName lastName email clinicId',
+        populate: { path: 'clinicId', select: 'name' },
+      })
       .exec();
 
     return specialties;
@@ -111,7 +116,11 @@ export class DoctorSpecialtiesService {
 
     const doctors = await this.doctorSpecialtyModel
       .find({ specialtyId: new Types.ObjectId(specialtyId) })
-      .populate('doctorId', 'firstName lastName email')
+      .populate({
+        path: 'doctorId',
+        select: 'firstName lastName email clinicId',
+        populate: { path: 'clinicId', select: 'name' },
+      })
       .populate('specialtyId', 'name description')
       .exec();
 
@@ -128,7 +137,11 @@ export class DoctorSpecialtiesService {
 
     const assignment = await this.doctorSpecialtyModel
       .findById(assignmentId)
-      .populate('doctorId', 'firstName lastName email')
+      .populate({
+        path: 'doctorId',
+        select: 'firstName lastName email clinicId',
+        populate: { path: 'clinicId', select: 'name' },
+      })
       .populate('specialtyId', 'name description')
       .exec();
 
@@ -158,7 +171,11 @@ export class DoctorSpecialtiesService {
         { $set: updateDto },
         { new: true, runValidators: true },
       )
-      .populate('doctorId', 'firstName lastName email')
+      .populate({
+        path: 'doctorId',
+        select: 'firstName lastName email clinicId',
+        populate: { path: 'clinicId', select: 'name' },
+      })
       .populate('specialtyId', 'name description')
       .exec();
 
@@ -187,6 +204,38 @@ export class DoctorSpecialtiesService {
     }
 
     this.logger.log(`Assignment removed successfully: ${assignmentId}`);
+  }
+
+  /**
+   * Toggle assignment active status
+   */
+  async toggleAssignmentStatus(
+    assignmentId: string,
+    isActive: boolean,
+  ): Promise<DoctorSpecialty> {
+    if (!Types.ObjectId.isValid(assignmentId)) {
+      throw new BadRequestException('Invalid assignment ID format');
+    }
+
+    const assignment = await this.doctorSpecialtyModel
+      .findByIdAndUpdate(
+        assignmentId,
+        { $set: { isActive } },
+        { new: true, runValidators: true },
+      )
+      .populate({
+        path: 'doctorId',
+        select: 'firstName lastName email clinicId',
+        populate: { path: 'clinicId', select: 'name' },
+      })
+      .populate('specialtyId', 'name description')
+      .exec();
+
+    if (!assignment) {
+      throw new NotFoundException('Doctor specialty assignment not found');
+    }
+
+    return assignment;
   }
 
   /**
@@ -240,6 +289,14 @@ export class DoctorSpecialtiesService {
       },
       {
         $lookup: {
+          from: 'clinics',
+          localField: 'doctor.clinicId',
+          foreignField: '_id',
+          as: 'clinic',
+        },
+      },
+      {
+        $lookup: {
           from: 'specialties',
           localField: 'specialtyId',
           foreignField: '_id',
@@ -248,6 +305,11 @@ export class DoctorSpecialtiesService {
       },
       { $unwind: { path: '$doctor', preserveNullAndEmptyArrays: true } },
       { $unwind: { path: '$specialty', preserveNullAndEmptyArrays: true } },
+      {
+        $addFields: {
+          clinicName: { $arrayElemAt: ['$clinic.name', 0] },
+        },
+      },
     ];
 
     // Add search filter if provided
@@ -260,6 +322,7 @@ export class DoctorSpecialtiesService {
             { 'doctor.email': { $regex: search, $options: 'i' } },
             { 'specialty.name': { $regex: search, $options: 'i' } },
             { certificationNumber: { $regex: search, $options: 'i' } },
+            { 'clinic.name': { $regex: search, $options: 'i' } },
           ],
         },
       });

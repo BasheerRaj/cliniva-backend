@@ -109,14 +109,114 @@ export class SpecialtyService {
         },
       },
       {
+        $lookup: {
+          from: 'clinics',
+          localField: 'doctors.clinicId',
+          foreignField: '_id',
+          as: 'clinics',
+        },
+      },
+      {
         $addFields: {
+          doctorAssignments: {
+            $map: {
+              input: '$doctorAssignments',
+              as: 'assignment',
+              in: {
+                _id: '$$assignment._id',
+                doctorId: '$$assignment.doctorId',
+                specialtyId: '$$assignment.specialtyId',
+                yearsOfExperience: '$$assignment.yearsOfExperience',
+                certificationNumber: '$$assignment.certificationNumber',
+                createdAt: '$$assignment.createdAt',
+                updatedAt: '$$assignment.updatedAt',
+                __v: '$$assignment.__v',
+                isActive: { $ifNull: ['$$assignment.isActive', true] },
+                doctorName: {
+                  $let: {
+                    vars: {
+                      matchedDoctor: {
+                        $arrayElemAt: [
+                          {
+                            $filter: {
+                              input: '$doctors',
+                              as: 'doc',
+                              cond: {
+                                $eq: ['$$doc._id', '$$assignment.doctorId'],
+                              },
+                            },
+                          },
+                          0,
+                        ],
+                      },
+                    },
+                    in: {
+                      $trim: {
+                        input: {
+                          $concat: [
+                            { $ifNull: ['$$matchedDoctor.firstName', ''] },
+                            ' ',
+                            { $ifNull: ['$$matchedDoctor.lastName', ''] },
+                          ],
+                        },
+                      },
+                    },
+                  },
+                },
+                clinicName: {
+                  $let: {
+                    vars: {
+                      matchedDoctor: {
+                        $arrayElemAt: [
+                          {
+                            $filter: {
+                              input: '$doctors',
+                              as: 'doc',
+                              cond: {
+                                $eq: ['$$doc._id', '$$assignment.doctorId'],
+                              },
+                            },
+                          },
+                          0,
+                        ],
+                      },
+                    },
+                    in: {
+                      $let: {
+                        vars: {
+                          matchedClinic: {
+                            $arrayElemAt: [
+                              {
+                                $filter: {
+                                  input: '$clinics',
+                                  as: 'clinic',
+                                  cond: {
+                                    $eq: [
+                                      '$$clinic._id',
+                                      '$$matchedDoctor.clinicId',
+                                    ],
+                                  },
+                                },
+                              },
+                              0,
+                            ],
+                          },
+                        },
+                        in: '$$matchedClinic.name',
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
           assignedDoctorsCount: { $size: '$doctorAssignments' },
           activeDoctorsCount: {
             $size: {
               $filter: {
-                input: '$doctors',
-                as: 'doc',
-                cond: { $eq: ['$$doc.isActive', true] },
+                input: '$doctorAssignments',
+                as: 'assignment',
+                cond: { $eq: [{ $ifNull: ['$$assignment.isActive', true] }, true] },
               },
             },
           },
@@ -209,6 +309,8 @@ export class SpecialtyService {
       },
       {
         $project: {
+          _id: 1,
+          specialtyId: '$specialtyId',
           doctorId: '$doctor._id',
           doctorName: {
             $concat: [
@@ -220,6 +322,10 @@ export class SpecialtyService {
           clinicName: { $arrayElemAt: ['$clinic.name', 0] },
           yearsOfExperience: 1,
           certificationNumber: 1,
+          createdAt: 1,
+          updatedAt: 1,
+          __v: 1,
+          isActive: { $ifNull: ['$isActive', true] },
           appointmentsCount: {
             $ifNull: [{ $arrayElemAt: ['$appointmentCount.count', 0] }, 0],
           },
@@ -241,6 +347,7 @@ export class SpecialtyService {
     return {
       ...specialtyDoc.toObject(),
       assignedDoctors: doctorAssignments,
+      doctorAssignments,
       statistics: {
         totalDoctors,
         totalAppointments,
@@ -471,16 +578,7 @@ export class SpecialtyService {
   private async getActiveDoctorCount(specialtyId: string): Promise<number> {
     const result = await this.doctorSpecialtyModel.aggregate([
       { $match: { specialtyId: new Types.ObjectId(specialtyId) } },
-      {
-        $lookup: {
-          from: 'users',
-          localField: 'doctorId',
-          foreignField: '_id',
-          as: 'doctor',
-        },
-      },
-      { $unwind: '$doctor' },
-      { $match: { 'doctor.isActive': true } },
+      { $match: { $expr: { $eq: [{ $ifNull: ['$isActive', true] }, true] } } },
       { $count: 'count' },
     ]);
     return result[0]?.count || 0;
