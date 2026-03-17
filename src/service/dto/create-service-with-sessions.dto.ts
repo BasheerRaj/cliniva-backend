@@ -1,4 +1,4 @@
-import { IsArray, IsOptional, ValidateNested, ArrayMaxSize } from 'class-validator';
+import { IsArray, IsOptional, IsMongoId, ValidateNested, ArrayMaxSize } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { CreateServiceDto } from './create-service.dto';
@@ -33,4 +33,20 @@ export class CreateServiceWithSessionsDto extends CreateServiceDto {
     message: '{"ar":"لا يمكن أن يحتوي الخدمة على أكثر من 50 جلسة","en":"Service cannot have more than 50 sessions"}',
   })
   sessions?: ServiceSessionDto[];
+
+  @ApiPropertyOptional({
+    description:
+      'Optional list of doctor IDs to assign to this service at creation time. ' +
+      'Requires `clinicId` to be set on the service — the clinic ID is used as the ' +
+      'scope for all assignments. Doctors are validated to ensure they work at that clinic.',
+    type: [String],
+    example: [
+      '507f1f77bcf86cd799439012',
+      '507f1f77bcf86cd799439016',
+    ],
+  })
+  @IsOptional()
+  @IsArray()
+  @IsMongoId({ each: true })
+  doctorIds?: string[];
 }

@@ -30,6 +30,7 @@ import { CreateServiceWithSessionsDto } from './dto/create-service-with-sessions
 import { UpdateServiceWithSessionsDto } from './dto/update-service-with-sessions.dto';
 import { ChangeServiceStatusDto } from './dto/change-service-status.dto';
 import { BulkStatusChangeDto } from './dto/bulk-status-change.dto';
+import { UpdateServiceCategoryDto } from './dto/update-service-category.dto';
 import { Service } from '../database/schemas/service.schema';
 import { ClinicService } from '../database/schemas/clinic-service.schema';
 import { SERVICE_SWAGGER_EXAMPLES } from './constants/swagger-examples';
@@ -89,6 +90,49 @@ export class ServiceController {
   }
 
   /**
+   * Add or update service category for a service
+   */
+  @ApiOperation({
+    summary: 'Add or update service category',
+    description:
+      'Adds a category for a service when missing, or updates it when already set.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Service category saved successfully',
+    schema: {
+      example: {
+        _id: '507f1f77bcf86cd799439011',
+        name: 'General Consultation',
+        serviceCategory: 'Consultation',
+      },
+    },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Service not found',
+    schema: {
+      example: SERVICE_SWAGGER_EXAMPLES.SERVICE_NOT_FOUND,
+    },
+  })
+  @ApiBearerAuth()
+  @ApiParam({
+    name: 'id',
+    description: 'Service ID',
+    type: String,
+    example: '507f1f77bcf86cd799439011',
+  })
+  @ApiBody({ type: UpdateServiceCategoryDto })
+  @Patch(':id/category')
+  async updateServiceCategory(
+    @Param('id') id: string,
+    @Body(new ValidationPipe({ transform: true, whitelist: true }))
+    dto: UpdateServiceCategoryDto,
+  ): Promise<Service> {
+    return this.serviceService.updateServiceCategory(id, dto.serviceCategory);
+  }
+
+  /**
    * Get service by ID
    */
   @ApiOperation({
@@ -127,11 +171,11 @@ export class ServiceController {
   @Get(':id')
   async getServiceById(@Param('id') id: string): Promise<any> {
     const service = await this.serviceService.getService(id);
-    const plain = service.toObject ? service.toObject() : { ...service };
-    if (Array.isArray(plain.sessions) && plain.sessions.length > 0) {
-      plain.sessions = [...plain.sessions].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-    }
-    return plain;
+    const assignedDoctors = await this.serviceService.getAssignedDoctors(id);
+    return {
+      ...this.enrichServiceResponse(service),
+      assignedDoctors,
+    };
   }
 
   /**
@@ -490,10 +534,11 @@ export class ServiceController {
   @Get('complex-departments/:complexDepartmentId')
   async getServicesByComplexDepartment(
     @Param('complexDepartmentId') complexDepartmentId: string,
-  ): Promise<Service[]> {
-    return this.serviceService.getServicesByComplexDepartment(
+  ): Promise<any[]> {
+    const services = await this.serviceService.getServicesByComplexDepartment(
       complexDepartmentId,
     );
+    return services.map((service) => this.enrichServiceResponse(service));
   }
 
   /**
@@ -589,8 +634,9 @@ export class ServiceController {
   @Get('clinics/:clinicId')
   async getServicesByClinic(
     @Param('clinicId') clinicId: string,
-  ): Promise<Service[]> {
-    return this.serviceService.getServicesByClinic(clinicId);
+  ): Promise<any[]> {
+    const services = await this.serviceService.getServicesByClinic(clinicId);
+    return services.map((service) => this.enrichServiceResponse(service));
   }
 
   /**
@@ -632,8 +678,9 @@ export class ServiceController {
   @Get('clinics/:clinicId/owned')
   async getServicesOwnedByClinic(
     @Param('clinicId') clinicId: string,
-  ): Promise<Service[]> {
-    return this.serviceService.getServicesOwnedByClinic(clinicId);
+  ): Promise<any[]> {
+    const services = await this.serviceService.getServicesOwnedByClinic(clinicId);
+    return services.map((service) => this.enrichServiceResponse(service));
   }
 
   /**
@@ -669,8 +716,11 @@ export class ServiceController {
   @Get('clinic')
   async getServicesForClinic(
     @Query('complexDepartmentId') complexDepartmentId?: string,
-  ): Promise<Service[]> {
-    return this.serviceService.getServicesForClinic(complexDepartmentId);
+  ): Promise<any[]> {
+    const services = await this.serviceService.getServicesForClinic(
+      complexDepartmentId,
+    );
+    return services.map((service) => this.enrichServiceResponse(service));
   }
 
   /**
@@ -712,8 +762,11 @@ export class ServiceController {
   @Get('clinic/:complexDepartmentId')
   async getServicesForClinicWithDepartment(
     @Param('complexDepartmentId') complexDepartmentId: string,
-  ): Promise<Service[]> {
-    return this.serviceService.getServicesForClinic(complexDepartmentId);
+  ): Promise<any[]> {
+    const services = await this.serviceService.getServicesForClinic(
+      complexDepartmentId,
+    );
+    return services.map((service) => this.enrichServiceResponse(service));
   }
 
   /**
@@ -749,15 +802,23 @@ export class ServiceController {
   @Get()
   async getAllServices(
     @Query('complexDepartmentId') complexDepartmentId?: string,
-  ): Promise<Service[]> {
-    if (complexDepartmentId) {
-      return this.serviceService.getServicesByComplexDepartment(
-        complexDepartmentId,
-      );
-    }
-    // If no specific filtering is needed, you could implement a general getAll method
-    // For now, returning empty array as base service doesn't have getAll
-    return [];
+  ): Promise<any[]> {
+    const services = await this.serviceService.getAllServices(complexDepartmentId);
+    return services.map((service) => this.enrichServiceResponse(service));
+  }
+
+  private enrichServiceResponse(service: any): any {
+    const plain = service?.toObject ? service.toObject() : { ...service };
+    const sessions = Array.isArray(plain.sessions)
+      ? [...plain.sessions].sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+      : [];
+
+    return {
+      ...plain,
+      sessions,
+      sessionCount: sessions.length,
+      categoryName: plain.serviceCategory ?? null,
+    };
   }
 
   /**
@@ -920,8 +981,12 @@ export class ServiceController {
   async getActiveServices(
     @Query('complexDepartmentId') complexDepartmentId?: string,
     @Query('clinicId') clinicId?: string,
-  ): Promise<Service[]> {
-    return this.serviceService.getActiveServices(complexDepartmentId, clinicId);
+  ): Promise<any[]> {
+    const services = await this.serviceService.getActiveServices(
+      complexDepartmentId,
+      clinicId,
+    );
+    return services.map((service) => this.enrichServiceResponse(service));
   }
 
   /**

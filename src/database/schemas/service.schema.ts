@@ -24,6 +24,9 @@ export class Service extends Document {
   @Prop({ type: Number })
   price?: number;
 
+  @Prop({ type: String, trim: true })
+  serviceCategory?: string;
+
   @Prop({ default: true })
   isActive?: boolean;
 
@@ -74,6 +77,7 @@ export const ServiceSchema = SchemaFactory.createForClass(Service);
 ServiceSchema.index({ complexDepartmentId: 1 });
 ServiceSchema.index({ clinicId: 1 });
 ServiceSchema.index({ name: 1 });
+ServiceSchema.index({ serviceCategory: 1 });
 ServiceSchema.index({ isActive: 1 });
 ServiceSchema.index({ deletedAt: 1 });
 // Allow same service names across different clinics and complex departments

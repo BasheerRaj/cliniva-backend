@@ -313,6 +313,57 @@ export class ClinicController {
   }
 
   /**
+   * Get clinics for dropdown
+   *
+   * Task 7.5: Add getClinicsForDropdown endpoint to ClinicController
+   * Requirements: 3.4
+   * Design: Section 3.6.2
+   *
+   * This endpoint returns only active clinics for dropdown selection,
+   * with optional filtering by complex.
+   *
+   * @param complexId - Optional complex ID filter
+   * @returns List of active clinics
+   */
+  @Get('dropdown')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Get clinics for dropdown',
+    description:
+      'Get active clinics for dropdown selection with optional complex filter',
+  })
+  @ApiResponse({ status: 200, description: 'Clinics retrieved successfully' })
+  @HttpCode(HttpStatus.OK)
+  async getClinicsForDropdown(@Query('complexId') complexId?: string) {
+    try {
+      return await this.clinicService.getClinicsForDropdown(
+        complexId ? { complexId } : undefined,
+      );
+    } catch (error) {
+      // Re-throw if already an HTTP exception
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      this.logger.error(
+        `Get clinics for dropdown failed: ${error.message}`,
+        error.stack,
+      );
+      throw new HttpException(
+        {
+          message: {
+            ar: 'فشل جلب قائمة العيادات',
+            en: 'Failed to retrieve clinics list',
+          },
+          code: 'CLINICS_DROPDOWN_FAILED',
+        },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+  }
+
+  /**
    * Get clinic details with capacity calculation
    * Task 10.2: Enhance GET /clinics/:id endpoint
    * Requirements: 5.2 (Enhanced Endpoints)
@@ -702,57 +753,6 @@ export class ClinicController {
             en: 'Failed to retrieve clinics by complex',
           },
           code: 'CLINICS_BY_COMPLEX_FAILED',
-        },
-        HttpStatus.BAD_REQUEST,
-      );
-    }
-  }
-
-  /**
-   * Get clinics for dropdown
-   *
-   * Task 7.5: Add getClinicsForDropdown endpoint to ClinicController
-   * Requirements: 3.4
-   * Design: Section 3.6.2
-   *
-   * This endpoint returns only active clinics for dropdown selection,
-   * with optional filtering by complex.
-   *
-   * @param complexId - Optional complex ID filter
-   * @returns List of active clinics
-   */
-  @Get('dropdown')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({
-    summary: 'Get clinics for dropdown',
-    description:
-      'Get active clinics for dropdown selection with optional complex filter',
-  })
-  @ApiResponse({ status: 200, description: 'Clinics retrieved successfully' })
-  @HttpCode(HttpStatus.OK)
-  async getClinicsForDropdown(@Query('complexId') complexId?: string) {
-    try {
-      return await this.clinicService.getClinicsForDropdown(
-        complexId ? { complexId } : undefined,
-      );
-    } catch (error) {
-      // Re-throw if already an HTTP exception
-      if (error instanceof HttpException) {
-        throw error;
-      }
-
-      this.logger.error(
-        `Get clinics for dropdown failed: ${error.message}`,
-        error.stack,
-      );
-      throw new HttpException(
-        {
-          message: {
-            ar: 'فشل جلب قائمة العيادات',
-            en: 'Failed to retrieve clinics list',
-          },
-          code: 'CLINICS_DROPDOWN_FAILED',
         },
         HttpStatus.BAD_REQUEST,
       );
