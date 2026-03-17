@@ -10,6 +10,8 @@ import { Model, Types } from 'mongoose';
 import { Invoice } from '../database/schemas/invoice.schema';
 import { Patient } from '../database/schemas/patient.schema';
 import { Service } from '../database/schemas/service.schema';
+import { Clinic } from '../database/schemas/clinic.schema';
+import { Counter } from '../database/schemas/counter.schema';
 import { InvoiceNumberService } from './invoice-number.service';
 import { CreateInvoiceDto } from './dto/create-invoice.dto';
 import { UpdateInvoiceDto } from './dto/update-invoice.dto';
@@ -30,13 +32,15 @@ export class InvoiceService {
     @InjectModel(Invoice.name) private invoiceModel: Model<Invoice>,
     @InjectModel(Patient.name) private patientModel: Model<Patient>,
     @InjectModel(Service.name) private serviceModel: Model<Service>,
+    @InjectModel(Clinic.name) private clinicModel: Model<Clinic>,
+    @InjectModel(Counter.name) private counterModel: Model<Counter>,
     private invoiceNumberService: InvoiceNumberService,
   ) {}
 
   /**
    * Create a new invoice
+   * M7 redesign: supports multiple services, each with multiple sessions.
    * Requirements: 1.2, 1.3, 1.4, 1.5, 1.7, 1.8, 1.9, 1.10, 1.11, 1.12, 1.13, 13.1, 13.2, 13.3, 13.6
-   * Business Rules: BZR-b3c4d5e6, BZR-a9b0c1d2, BZR-7f8a9b0c
    */
   async createInvoice(
     createInvoiceDto: CreateInvoiceDto,
@@ -57,44 +61,28 @@ export class InvoiceService {
       }
     }
 
-    // Validate patient exists
-    const patient = await this.patientModel.findById(
-      createInvoiceDto.patientId,
-    );
-    if (!patient || patient.deletedAt) {
+    // 1. Find clinic by dto.clinicId (validate exists, not deleted)
+    const clinic = await this.clinicModel.findOne({
+      _id: new Types.ObjectId(createInvoiceDto.clinicId),
+      deletedAt: { $exists: false },
+    });
+    if (!clinic) {
+      throw new NotFoundException(NOT_FOUND_ERRORS.CLINIC);
+    }
+
+    // 2. Derive organizationId from clinic
+    const organizationId = clinic.organizationId;
+
+    // 3. Find patient by dto.patientId (validate exists, not deleted)
+    const patient = await this.patientModel.findOne({
+      _id: new Types.ObjectId(createInvoiceDto.patientId),
+      deletedAt: { $exists: false },
+    });
+    if (!patient) {
       throw new NotFoundException(NOT_FOUND_ERRORS.PATIENT);
     }
 
-    // Validate service exists and isActive=true (BZR-7f8a9b0c)
-    const service = await this.serviceModel.findById(
-      createInvoiceDto.serviceId,
-    );
-    if (!service || service.deletedAt) {
-      throw new NotFoundException(NOT_FOUND_ERRORS.SERVICE);
-    }
-    if (!service.isActive) {
-      throw new BadRequestException(INVOICE_ERRORS.SERVICE_NOT_ACTIVE);
-    }
-
-    // Check for duplicate service invoice (BZR-a9b0c1d2)
-    const existingInvoice = await this.invoiceModel.findOne({
-      patientId: new Types.ObjectId(createInvoiceDto.patientId),
-      serviceId: new Types.ObjectId(createInvoiceDto.serviceId),
-      invoiceStatus: { $in: ['draft', 'posted'] }, // Not cancelled
-      deletedAt: { $exists: false },
-    });
-
-    if (existingInvoice) {
-      throw new BadRequestException({
-        message: {
-          ar: 'يوجد فاتورة بالفعل لهذا المريض بنفس الخدمة. رقم الفاتورة: ' + existingInvoice.invoiceNumber,
-          en: 'An invoice already exists for this patient with the same service. Invoice number: ' + existingInvoice.invoiceNumber,
-        },
-        code: 'DUPLICATE_SERVICE_INVOICE',
-      });
-    }
-
-    // Validate issue date is not in future
+    // 4. Validate issue date is not in the future
     const issueDate = new Date(createInvoiceDto.issueDate);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -102,66 +90,109 @@ export class InvoiceService {
       throw new BadRequestException(INVOICE_ERRORS.ISSUE_DATE_FUTURE);
     }
 
-    // Calculate subtotal (service price × sessions)
-    const sessions = createInvoiceDto.sessions || 1;
-    const servicePrice = service.price || 0;
-    const subtotal = servicePrice * sessions;
+    // 5. For each serviceDto in dto.services: validate service, build embedded sessions
+    const builtServices: Invoice['services'] = [];
+    let subtotal = 0;
+    let totalDiscount = 0;
+    let totalTax = 0;
 
-    // Calculate discount and validate
-    const discountAmount = createInvoiceDto.discountAmount || 0;
-    
-    // Validate discount doesn't exceed subtotal
-    if (discountAmount > subtotal) {
-      throw new BadRequestException({
-        message: {
-          ar: 'الخصم لا يمكن أن يتجاوز المبلغ الإجمالي الفرعي (' + subtotal + ')',
-          en: 'Discount cannot exceed subtotal amount (' + subtotal + ')',
-        },
-        code: 'DISCOUNT_EXCEEDS_SUBTOTAL',
+    for (const serviceDto of createInvoiceDto.services) {
+      // Find service (validate isActive === true, not deleted)
+      const service = await this.serviceModel.findOne({
+        _id: new Types.ObjectId(serviceDto.serviceId),
+        deletedAt: { $exists: false },
+      });
+      if (!service) {
+        throw new NotFoundException(NOT_FOUND_ERRORS.SERVICE);
+      }
+      if (!service.isActive) {
+        throw new BadRequestException(INVOICE_ERRORS.SERVICE_NOT_ACTIVE);
+      }
+
+      // Build sessions for this service
+      const builtSessions: Invoice['services'][0]['sessions'] = [];
+      for (const sessionDto of serviceDto.sessions) {
+        const unitPrice = sessionDto.unitPrice;
+        const discountPercent = sessionDto.discountPercent ?? 0;
+        const taxRate = sessionDto.taxRate ?? 0;
+
+        const discountAmount = +(unitPrice * discountPercent / 100).toFixed(2);
+        const priceAfterDiscount = unitPrice - discountAmount;
+        const taxAmount = +(priceAfterDiscount * taxRate / 100).toFixed(2);
+        const lineTotal = +(priceAfterDiscount + taxAmount).toFixed(2);
+
+        subtotal += unitPrice;
+        totalDiscount += discountAmount;
+        totalTax += taxAmount;
+
+        builtSessions.push({
+          invoiceItemId: new Types.ObjectId(),
+          sessionId: sessionDto.sessionId,
+          sessionName: sessionDto.sessionName,
+          sessionOrder: sessionDto.sessionOrder,
+          doctorId: sessionDto.doctorId
+            ? new Types.ObjectId(sessionDto.doctorId)
+            : undefined,
+          unitPrice,
+          discountPercent,
+          discountAmount,
+          taxRate,
+          taxAmount,
+          lineTotal,
+          paidAmount: 0,
+          sessionStatus: 'pending',
+        });
+      }
+
+      builtServices.push({
+        serviceId: new Types.ObjectId(serviceDto.serviceId),
+        serviceName: service.name,
+        serviceCategory: service.description,
+        paymentPlan: service.paymentPlan || 'single_payment',
+        sessions: builtSessions,
       });
     }
 
-    // Calculate totalAmount (subtotal - discount + tax)
-    const taxAmount = createInvoiceDto.taxAmount || 0;
-    const totalAmount = subtotal - discountAmount + taxAmount;
+    subtotal = +subtotal.toFixed(2);
+    totalDiscount = +totalDiscount.toFixed(2);
+    totalTax = +totalTax.toFixed(2);
+    const totalAmount = +(subtotal - totalDiscount + totalTax).toFixed(2);
 
-    // Generate DFT-xxxx invoice number (BZR-b3c4d5e6)
-    const invoiceNumber =
-      await this.invoiceNumberService.generateDraftNumber();
+    // 6. Generate draft number via counterModel (atomic)
+    const invoiceNumber = await this.invoiceNumberService.generateDraftNumber(
+      organizationId ? organizationId.toString() : 'global',
+    );
 
-    // Create invoice
+    // 7. Create invoice
     const invoice = new this.invoiceModel({
       invoiceNumber,
       invoiceTitle: createInvoiceDto.invoiceTitle,
-      patientId: createInvoiceDto.patientId,
-      clinicId: createInvoiceDto.clinicId,
-      serviceId: createInvoiceDto.serviceId,
-      appointmentId: createInvoiceDto.appointmentId,
+      patientId: new Types.ObjectId(createInvoiceDto.patientId),
+      clinicId: new Types.ObjectId(createInvoiceDto.clinicId),
+      organizationId: organizationId ? organizationId : undefined,
+      services: builtServices,
       subtotal,
-      discountAmount,
-      taxAmount,
+      discountAmount: totalDiscount,
+      taxAmount: totalTax,
       totalAmount,
       paidAmount: 0,
       invoiceStatus: 'draft',
       paymentStatus: 'not_due',
       issueDate,
-      sessions,
       notes: createInvoiceDto.notes,
       createdBy: new Types.ObjectId(userId),
     });
 
     await invoice.save();
 
-    // Log audit event
     this.logger.log(
-      `Invoice created: ${invoiceNumber} by user ${userId} for patient ${patient.patientNumber} (service: ${service.name})`,
+      `Invoice created: ${invoiceNumber} by user ${userId} for patient ${patient._id}`,
     );
 
-    // Return invoice with populated references
+    // 8. Return via ResponseBuilder.success shape
     return this.mapToResponseDto(
       await invoice.populate([
         { path: 'patientId', select: 'firstName lastName patientNumber' },
-        { path: 'serviceId', select: 'name price' },
         { path: 'clinicId', select: 'name' },
         { path: 'createdBy', select: 'firstName lastName email' },
       ]),
@@ -233,7 +264,6 @@ export class InvoiceService {
         .limit(limit)
         .populate([
           { path: 'patientId', select: 'firstName lastName patientNumber' },
-          { path: 'serviceId', select: 'name price' },
           { path: 'clinicId', select: 'name' },
         ])
         .exec(),
@@ -252,13 +282,19 @@ export class InvoiceService {
   }
 
   /**
+   * Escape special regex characters to prevent ReDoS attacks.
+   */
+  private escapeRegex(str: string): string {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  /**
    * Get invoices with patient name search using aggregation pipeline
    */
   private async getInvoicesWithSearch(
     queryDto: InvoiceQueryDto,
     baseFilter: any,
   ): Promise<{ data: InvoiceResponseDto[]; meta: any }> {
-    // Ensure search term exists
     if (!queryDto.search) {
       throw new BadRequestException({
         message: {
@@ -269,24 +305,25 @@ export class InvoiceService {
       });
     }
 
-    const searchRegex = new RegExp(queryDto.search, 'i');
-    
+    if (queryDto.search && queryDto.search.length > 100) {
+      throw new BadRequestException({ message: { ar: 'النص المدخل طويل جداً', en: 'Search term too long' } });
+    }
+
+    const searchRegex = new RegExp(this.escapeRegex(queryDto.search), 'i');
+
     // Pagination
     const page = queryDto.page || 1;
     const limit = queryDto.limit || 10;
     const skip = (page - 1) * limit;
-    
+
     // Sorting
     const sortBy = queryDto.sortBy || 'createdAt';
     const sortOrder = queryDto.sortOrder === 'asc' ? 1 : -1;
     const sortStage: any = {};
     sortStage[sortBy] = sortOrder;
-    
+
     const pipeline: any[] = [
-      // Match base filters
       { $match: baseFilter },
-      
-      // Lookup patient
       {
         $lookup: {
           from: 'patients',
@@ -296,8 +333,6 @@ export class InvoiceService {
         },
       },
       { $unwind: { path: '$patient', preserveNullAndEmptyArrays: true } },
-      
-      // Search in invoice number, title, or patient name
       {
         $match: {
           $or: [
@@ -308,19 +343,6 @@ export class InvoiceService {
           ],
         },
       },
-      
-      // Lookup service
-      {
-        $lookup: {
-          from: 'services',
-          localField: 'serviceId',
-          foreignField: '_id',
-          as: 'service',
-        },
-      },
-      { $unwind: { path: '$service', preserveNullAndEmptyArrays: true } },
-      
-      // Lookup clinic
       {
         $lookup: {
           from: 'clinics',
@@ -330,11 +352,7 @@ export class InvoiceService {
         },
       },
       { $unwind: { path: '$clinic', preserveNullAndEmptyArrays: true } },
-      
-      // Sort
       { $sort: sortStage },
-      
-      // Facet for pagination and count
       {
         $facet: {
           data: [{ $skip: skip }, { $limit: limit }],
@@ -342,22 +360,22 @@ export class InvoiceService {
         },
       },
     ];
-    
+
     const result = await this.invoiceModel.aggregate(pipeline);
-    
+
     const invoices = result[0]?.data || [];
     const total = result[0]?.metadata[0]?.total || 0;
-    
-    // Transform aggregation results to match populated format
+
     const transformedInvoices = invoices.map((invoice: any) => ({
       ...invoice,
       patientId: invoice.patient,
-      serviceId: invoice.service,
       clinicId: invoice.clinic,
     }));
-    
+
     return {
-      data: transformedInvoices.map((invoice: any) => this.mapToResponseDto(invoice)),
+      data: transformedInvoices.map((invoice: any) =>
+        this.mapToResponseDto(invoice),
+      ),
       meta: {
         page,
         limit,
@@ -377,24 +395,20 @@ export class InvoiceService {
     userRole: string,
     userClinicIds: string[],
   ): Promise<InvoiceResponseDto> {
-    // Find invoice by ID
     const invoice = await this.invoiceModel
       .findById(id)
       .populate([
         { path: 'patientId', select: 'firstName lastName patientNumber' },
-        { path: 'serviceId', select: 'name price' },
         { path: 'clinicId', select: 'name' },
         { path: 'createdBy', select: 'firstName lastName email' },
         { path: 'updatedBy', select: 'firstName lastName email' },
       ])
       .exec();
 
-    // Return 404 if not found
     if (!invoice || invoice.deletedAt) {
       throw new NotFoundException(NOT_FOUND_ERRORS.INVOICE);
     }
 
-    // Check role-based access permissions
     if (userRole === 'staff' || userRole === 'doctor') {
       const hasAccess = userClinicIds.some(
         (clinicId) => clinicId === invoice.clinicId.toString(),
@@ -416,31 +430,31 @@ export class InvoiceService {
     updateInvoiceDto: UpdateInvoiceDto,
     userId: string,
     userRole: string,
+    userOrganizationId?: string,
   ): Promise<InvoiceResponseDto> {
-    // Find invoice by ID
-    const invoice = await this.invoiceModel.findById(id);
+    const query: any = {
+      _id: new Types.ObjectId(id),
+      deletedAt: { $exists: false },
+    };
+    if (userOrganizationId) {
+      query.organizationId = new Types.ObjectId(userOrganizationId);
+    }
+    const invoice = await this.invoiceModel.findOne(query);
 
     if (!invoice || invoice.deletedAt) {
       throw new NotFoundException(NOT_FOUND_ERRORS.INVOICE);
     }
 
-    // Check if invoiceStatus is 'draft' (reject if not)
     if (invoice.invoiceStatus !== 'draft') {
       throw new BadRequestException(INVOICE_ERRORS.CANNOT_EDIT_NON_DRAFT);
     }
 
-    // Check edit permissions
     if (userRole === 'staff' || userRole === 'doctor') {
-      // Staff can only edit own invoices
       if (invoice.createdBy.toString() !== userId) {
         throw new ForbiddenException(AUTH_ERRORS.INSUFFICIENT_PERMISSIONS);
       }
     }
-    // Admin can edit any Draft invoice
 
-    // Patient field cannot be modified (already omitted from UpdateInvoiceDto)
-
-    // Update fields
     if (updateInvoiceDto.invoiceTitle) {
       invoice.invoiceTitle = updateInvoiceDto.invoiceTitle;
     }
@@ -457,93 +471,85 @@ export class InvoiceService {
       invoice.notes = updateInvoiceDto.notes;
     }
 
-    // Recalculate if service, sessions, discount, or tax changed
-    let needsRecalculation = false;
-    if (updateInvoiceDto.serviceId) {
-      const service = await this.serviceModel.findById(
-        updateInvoiceDto.serviceId,
-      );
-      if (!service || service.deletedAt) {
-        throw new NotFoundException(NOT_FOUND_ERRORS.SERVICE);
-      }
-      if (!service.isActive) {
-        throw new BadRequestException(INVOICE_ERRORS.SERVICE_NOT_ACTIVE);
-      }
-      
-      // Check for duplicate if service is changing (BZR-a9b0c1d2)
-      if (invoice.serviceId.toString() !== updateInvoiceDto.serviceId) {
-        const existingInvoice = await this.invoiceModel.findOne({
-          _id: { $ne: invoice._id }, // Exclude current invoice
-          patientId: invoice.patientId,
-          serviceId: new Types.ObjectId(updateInvoiceDto.serviceId),
-          invoiceStatus: { $in: ['draft', 'posted'] },
+    // If new services array provided, rebuild and recalculate totals
+    if (updateInvoiceDto.services && updateInvoiceDto.services.length > 0) {
+      const builtServices: Invoice['services'] = [];
+      let subtotal = 0;
+      let totalDiscount = 0;
+      let totalTax = 0;
+
+      for (const serviceDto of updateInvoiceDto.services) {
+        const service = await this.serviceModel.findOne({
+          _id: new Types.ObjectId(serviceDto.serviceId),
           deletedAt: { $exists: false },
         });
-        
-        if (existingInvoice) {
-          throw new BadRequestException({
-            message: {
-              ar: 'يوجد فاتورة بالفعل لهذا المريض بنفس الخدمة. رقم الفاتورة: ' + existingInvoice.invoiceNumber,
-              en: 'An invoice already exists for this patient with the same service. Invoice number: ' + existingInvoice.invoiceNumber,
-            },
-            code: 'DUPLICATE_SERVICE_INVOICE',
+        if (!service) {
+          throw new NotFoundException(NOT_FOUND_ERRORS.SERVICE);
+        }
+        if (!service.isActive) {
+          throw new BadRequestException(INVOICE_ERRORS.SERVICE_NOT_ACTIVE);
+        }
+
+        const builtSessions: Invoice['services'][0]['sessions'] = [];
+        for (const sessionDto of serviceDto.sessions) {
+          const unitPrice = sessionDto.unitPrice;
+          const discountPercent = sessionDto.discountPercent ?? 0;
+          const taxRate = sessionDto.taxRate ?? 0;
+
+          const discountAmount = +(unitPrice * discountPercent / 100).toFixed(2);
+          const priceAfterDiscount = unitPrice - discountAmount;
+          const taxAmount = +(priceAfterDiscount * taxRate / 100).toFixed(2);
+          const lineTotal = +(priceAfterDiscount + taxAmount).toFixed(2);
+
+          subtotal += unitPrice;
+          totalDiscount += discountAmount;
+          totalTax += taxAmount;
+
+          builtSessions.push({
+            invoiceItemId: new Types.ObjectId(),
+            sessionId: sessionDto.sessionId,
+            sessionName: sessionDto.sessionName,
+            sessionOrder: sessionDto.sessionOrder,
+            doctorId: sessionDto.doctorId
+              ? new Types.ObjectId(sessionDto.doctorId)
+              : undefined,
+            unitPrice,
+            discountPercent,
+            discountAmount,
+            taxRate,
+            taxAmount,
+            lineTotal,
+            paidAmount: 0,
+            sessionStatus: 'pending',
           });
         }
-      }
-      
-      invoice.serviceId = new Types.ObjectId(updateInvoiceDto.serviceId);
-      needsRecalculation = true;
-    }
-    if (updateInvoiceDto.sessions !== undefined) {
-      invoice.sessions = updateInvoiceDto.sessions;
-      needsRecalculation = true;
-    }
-    if (updateInvoiceDto.discountAmount !== undefined) {
-      invoice.discountAmount = updateInvoiceDto.discountAmount;
-      needsRecalculation = true;
-    }
-    if (updateInvoiceDto.taxAmount !== undefined) {
-      invoice.taxAmount = updateInvoiceDto.taxAmount;
-      needsRecalculation = true;
-    }
 
-    // Recalculate subtotal, totalAmount, outstandingBalance
-    if (needsRecalculation) {
-      const service = await this.serviceModel.findById(invoice.serviceId);
-      const servicePrice = service?.price || 0;
-      invoice.subtotal = servicePrice * invoice.sessions;
-      
-      // Validate discount doesn't exceed subtotal
-      if (invoice.discountAmount > invoice.subtotal) {
-        throw new BadRequestException({
-          message: {
-            ar: 'الخصم لا يمكن أن يتجاوز المبلغ الإجمالي الفرعي (' + invoice.subtotal + ')',
-            en: 'Discount cannot exceed subtotal amount (' + invoice.subtotal + ')',
-          },
-          code: 'DISCOUNT_EXCEEDS_SUBTOTAL',
+        builtServices.push({
+          serviceId: new Types.ObjectId(serviceDto.serviceId),
+          serviceName: service.name,
+          serviceCategory: service.description,
+          paymentPlan: service.paymentPlan || 'single_payment',
+          sessions: builtSessions,
         });
       }
-      
-      invoice.totalAmount =
-        invoice.subtotal - invoice.discountAmount + invoice.taxAmount;
-      // Outstanding balance = totalAmount - paidAmount (should be totalAmount for draft)
+
+      invoice.services = builtServices;
+      invoice.subtotal = +subtotal.toFixed(2);
+      invoice.discountAmount = +totalDiscount.toFixed(2);
+      invoice.taxAmount = +totalTax.toFixed(2);
+      invoice.totalAmount = +(subtotal - totalDiscount + totalTax).toFixed(2);
     }
 
-    // Update updatedBy and updatedAt timestamps
     invoice.updatedBy = new Types.ObjectId(userId);
-
     await invoice.save();
 
-    // Log audit event
     this.logger.log(
       `Invoice updated: ${invoice.invoiceNumber} by user ${userId}`,
     );
 
-    // Return updated invoice
     return this.mapToResponseDto(
       await invoice.populate([
         { path: 'patientId', select: 'firstName lastName patientNumber' },
-        { path: 'serviceId', select: 'name price' },
         { path: 'clinicId', select: 'name' },
         { path: 'createdBy', select: 'firstName lastName email' },
         { path: 'updatedBy', select: 'firstName lastName email' },
@@ -552,18 +558,28 @@ export class InvoiceService {
   }
 
   /**
-   * Transition invoice from Draft to Posted
+   * Transition invoice from Draft to Posted (idempotent).
+   * If already posted, returns the invoice as-is instead of throwing.
    * Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7, 13.14, 15.1, 15.2, 15.3, 15.4
    */
   async transitionToPosted(invoiceId: string): Promise<InvoiceResponseDto> {
-    // Find invoice by ID
     const invoice = await this.invoiceModel.findById(invoiceId);
 
     if (!invoice || invoice.deletedAt) {
       throw new NotFoundException(NOT_FOUND_ERRORS.INVOICE);
     }
 
-    // Check if invoiceStatus is 'draft'
+    // Idempotent: if already posted, return as-is
+    if (invoice.invoiceStatus === 'posted') {
+      return this.mapToResponseDto(
+        await invoice.populate([
+          { path: 'patientId', select: 'firstName lastName patientNumber' },
+          { path: 'clinicId', select: 'name' },
+          { path: 'createdBy', select: 'firstName lastName email' },
+        ]),
+      );
+    }
+
     if (invoice.invoiceStatus !== 'draft') {
       throw new BadRequestException(INVOICE_ERRORS.ALREADY_POSTED);
     }
@@ -571,22 +587,19 @@ export class InvoiceService {
     // Preserve original DFT-xxxx as draftNumber
     invoice.draftNumber = invoice.invoiceNumber;
 
-    // Generate official INV-xxxx number
+    // Generate official INV-xxxx number (atomic via Counter)
+    const organizationId = invoice.organizationId
+      ? invoice.organizationId.toString()
+      : 'global';
     invoice.invoiceNumber =
-      await this.invoiceNumberService.generatePostedNumber();
+      await this.invoiceNumberService.generatePostedNumber(organizationId);
 
-    // Update invoiceStatus to 'posted'
     invoice.invoiceStatus = 'posted';
-
-    // Update paymentStatus from 'not_due' to 'unpaid'
     invoice.paymentStatus = 'unpaid';
-
-    // Set postedAt timestamp
     invoice.postedAt = new Date();
 
     await invoice.save();
 
-    // Log status transition
     this.logger.log(
       `Invoice transitioned to Posted: ${invoice.invoiceNumber} (was ${invoice.draftNumber})`,
     );
@@ -594,11 +607,174 @@ export class InvoiceService {
     return this.mapToResponseDto(
       await invoice.populate([
         { path: 'patientId', select: 'firstName lastName patientNumber' },
-        { path: 'serviceId', select: 'name price' },
         { path: 'clinicId', select: 'name' },
         { path: 'createdBy', select: 'firstName lastName email' },
       ]),
     );
+  }
+
+  /**
+   * Transition invoice paymentStatus back to 'unpaid' from 'partially_paid'.
+   * Used when a payment is refunded or removed.
+   */
+  async transitionPaymentToUnpaid(invoiceId: string): Promise<void> {
+    const invoice = await this.invoiceModel.findById(invoiceId);
+
+    if (!invoice || invoice.deletedAt) {
+      throw new NotFoundException(NOT_FOUND_ERRORS.INVOICE);
+    }
+
+    if (invoice.invoiceStatus !== 'posted') {
+      throw new BadRequestException({
+        message: {
+          ar: 'يجب أن تكون الفاتورة في حالة منشورة',
+          en: 'Invoice must be in posted status',
+        },
+        code: 'INVOICE_NOT_POSTED',
+      });
+    }
+
+    // Only transition if currently partially_paid
+    if (invoice.paymentStatus === 'partially_paid') {
+      invoice.paymentStatus = 'unpaid';
+      await invoice.save();
+      this.logger.log(
+        `Invoice paymentStatus set to unpaid: ${invoice.invoiceNumber}`,
+      );
+    }
+  }
+
+  /**
+   * Update the sessionStatus of a specific session within the invoice.
+   * Used by appointment hooks (PART B) to keep invoice sessions in sync.
+   * @param invoiceId - The invoice _id
+   * @param invoiceItemId - The session's invoiceItemId (ObjectId string)
+   * @param sessionStatus - New session status
+   */
+  async updateSessionStatus(
+    invoiceId: string,
+    invoiceItemId: string,
+    sessionStatus: 'pending' | 'booked' | 'in_progress' | 'completed' | 'cancelled',
+  ): Promise<void> {
+    const result = await this.invoiceModel.updateOne(
+      {
+        _id: new Types.ObjectId(invoiceId),
+        deletedAt: { $exists: false },
+      },
+      {
+        $set: {
+          'services.$[].sessions.$[item].sessionStatus': sessionStatus,
+        },
+      },
+      {
+        arrayFilters: [
+          { 'item.invoiceItemId': new Types.ObjectId(invoiceItemId) },
+        ],
+      },
+    );
+
+    if (result.matchedCount === 0) {
+      throw new NotFoundException(NOT_FOUND_ERRORS.INVOICE);
+    }
+
+    this.logger.log(
+      `Invoice session status updated: invoiceId=${invoiceId}, invoiceItemId=${invoiceItemId}, status=${sessionStatus}`,
+    );
+  }
+
+  /**
+   * Get invoice for booking — returns a posted invoice for a patient with pending sessions.
+   * Used by the appointment booking flow (PART I).
+   * Returns the first posted invoice matching patientId + clinicId + invoiceId (if given).
+   */
+  async getInvoiceForBooking(
+    patientId: string,
+    clinicId: string,
+    invoiceId?: string,
+    userId?: string,
+    userRole?: string,
+    userClinicId?: string,
+  ): Promise<any> {
+    const filter: any = {
+      patientId: new Types.ObjectId(patientId),
+      clinicId: new Types.ObjectId(clinicId),
+      invoiceStatus: 'posted',
+      paymentStatus: { $ne: 'paid' },
+      deletedAt: { $exists: false },
+    };
+
+    // For staff role: enforce clinic scope
+    if (userRole && ['staff'].includes(userRole) && userClinicId) {
+      if (clinicId && clinicId !== userClinicId) {
+        throw new ForbiddenException({
+          message: { ar: 'ليس لديك صلاحية الوصول إلى فواتير هذه العيادة', en: 'You do not have access to invoices for this clinic' },
+          code: 'INVOICE_CLINIC_ACCESS_DENIED',
+        });
+      }
+      // Force clinicId to staff's clinic
+      filter.clinicId = new Types.ObjectId(userClinicId);
+    }
+
+    if (invoiceId) {
+      filter._id = new Types.ObjectId(invoiceId);
+    }
+
+    const invoice = await this.invoiceModel
+      .findOne(filter)
+      .populate([
+        { path: 'patientId', select: 'firstName lastName patientNumber' },
+        { path: 'clinicId', select: 'name' },
+      ])
+      .exec();
+
+    if (!invoice) {
+      throw new NotFoundException({
+        message: {
+          ar: 'لا توجد فاتورة منشورة لهذا المريض',
+          en: 'No posted invoice found for this patient',
+        },
+        code: 'INVOICE_NOT_FOUND_FOR_BOOKING',
+      });
+    }
+
+    // Return full invoice with sessions flattened for the booking UI
+    return this.mapToResponseDto(invoice);
+  }
+
+  /**
+   * Get ALL posted, unpaid/partially-paid invoices for a patient+clinic.
+   * Used by the appointment booking flow to display the invoice list.
+   */
+  async getInvoicesListForBooking(
+    patientId: string,
+    clinicId: string,
+    userRole?: string,
+    userClinicId?: string,
+  ): Promise<any[]> {
+    // For staff/doctor role: enforce clinic scope
+    const effectiveClinicId =
+      userRole && ['staff', 'doctor'].includes(userRole) && userClinicId
+        ? userClinicId
+        : clinicId;
+
+    const filter: any = {
+      patientId: new Types.ObjectId(patientId),
+      clinicId: new Types.ObjectId(effectiveClinicId),
+      invoiceStatus: 'posted',
+      paymentStatus: { $ne: 'paid' },
+      deletedAt: { $exists: false },
+    };
+
+    const invoices = await this.invoiceModel
+      .find(filter)
+      .sort({ createdAt: -1 })
+      .populate([
+        { path: 'patientId', select: 'firstName lastName patientNumber' },
+        { path: 'clinicId', select: 'name' },
+      ])
+      .exec();
+
+    return invoices.map((inv) => this.mapToResponseDto(inv));
   }
 
   /**
@@ -608,19 +784,25 @@ export class InvoiceService {
     id: string,
     userId: string,
     userRole: string,
+    userOrganizationId?: string,
   ): Promise<void> {
-    const invoice = await this.invoiceModel.findById(id);
+    const query: any = {
+      _id: new Types.ObjectId(id),
+      deletedAt: { $exists: false },
+    };
+    if (userOrganizationId) {
+      query.organizationId = new Types.ObjectId(userOrganizationId);
+    }
+    const invoice = await this.invoiceModel.findOne(query);
 
     if (!invoice || invoice.deletedAt) {
       throw new NotFoundException(NOT_FOUND_ERRORS.INVOICE);
     }
 
-    // Check if invoice has payments (prevent deletion)
     if (invoice.paidAmount > 0) {
       throw new BadRequestException(INVOICE_ERRORS.HAS_PAYMENTS);
     }
 
-    // Only admin and above can delete
     if (userRole === 'staff' || userRole === 'doctor') {
       throw new ForbiddenException(AUTH_ERRORS.INSUFFICIENT_PERMISSIONS);
     }
@@ -634,8 +816,9 @@ export class InvoiceService {
   }
 
   /**
-   * Cancel an invoice
+   * Cancel an invoice.
    * Rule BZR-0e1f2a3b: If all appointments for a patient are deleted, the associated invoice will be marked as Cancelled.
+   * Also cancels all embedded sessions.
    */
   async cancelInvoice(id: string, userId: string): Promise<InvoiceResponseDto> {
     const invoice = await this.invoiceModel.findById(id);
@@ -644,7 +827,7 @@ export class InvoiceService {
       throw new NotFoundException(NOT_FOUND_ERRORS.INVOICE);
     }
 
-    // Only Draft or Unpaid (Posted) invoices with no payments can be cancelled
+    // Only Draft or Posted invoices with no paidAmount can be cancelled
     if (invoice.paidAmount > 0) {
       throw new BadRequestException({
         message: {
@@ -657,6 +840,14 @@ export class InvoiceService {
 
     invoice.invoiceStatus = 'cancelled';
     invoice.updatedBy = new Types.ObjectId(userId);
+
+    // Cancel all embedded sessions
+    for (const svc of invoice.services) {
+      for (const sess of svc.sessions) {
+        sess.sessionStatus = 'cancelled';
+      }
+    }
+
     await invoice.save();
 
     this.logger.log(
@@ -666,7 +857,6 @@ export class InvoiceService {
     return this.mapToResponseDto(
       await invoice.populate([
         { path: 'patientId', select: 'firstName lastName patientNumber' },
-        { path: 'serviceId', select: 'name price' },
         { path: 'clinicId', select: 'name' },
       ]),
     );
@@ -688,54 +878,58 @@ export class InvoiceService {
       invoiceTitle: invoice.invoiceTitle,
       patient: invoice.patientId
         ? {
-            _id: invoice.patientId._id.toString(),
+            _id: invoice.patientId._id
+              ? invoice.patientId._id.toString()
+              : invoice.patientId.toString(),
             firstName: invoice.patientId.firstName,
             lastName: invoice.patientId.lastName,
             patientNumber: invoice.patientId.patientNumber,
           }
         : undefined,
-      service: invoice.serviceId
-        ? {
-            _id: invoice.serviceId._id.toString(),
-            name: invoice.serviceId.name,
-            price: invoice.serviceId.price,
-          }
-        : undefined,
       clinic: invoice.clinicId
         ? {
-            _id: invoice.clinicId._id.toString(),
+            _id: invoice.clinicId._id
+              ? invoice.clinicId._id.toString()
+              : invoice.clinicId.toString(),
             name: invoice.clinicId.name,
           }
         : undefined,
+      services: invoice.services,
       subtotal: invoice.subtotal,
       discountAmount: invoice.discountAmount,
       taxAmount: invoice.taxAmount,
       totalAmount: invoice.totalAmount,
       paidAmount: invoice.paidAmount,
+      balanceDue: outstandingBalance,
       outstandingBalance,
+      status: invoice.invoiceStatus,
       invoiceStatus: invoice.invoiceStatus,
       paymentStatus: invoice.paymentStatus,
       issueDate: invoice.issueDate,
       lastPaymentDate: invoice.lastPaymentDate,
       postedAt: invoice.postedAt,
-      sessions: invoice.sessions,
       notes: invoice.notes,
-      createdBy: invoice.createdBy && invoice.createdBy._id
-        ? {
-            _id: invoice.createdBy._id?.toString() || invoice.createdBy.toString(),
-            firstName: invoice.createdBy.firstName,
-            lastName: invoice.createdBy.lastName,
-            email: invoice.createdBy.email,
-          }
-        : {
-            _id: invoice.createdBy?.toString() || '',
-            firstName: '',
-            lastName: '',
-            email: '',
-          },
+      createdBy:
+        invoice.createdBy && invoice.createdBy._id
+          ? {
+              _id:
+                invoice.createdBy._id?.toString() ||
+                invoice.createdBy.toString(),
+              firstName: invoice.createdBy.firstName,
+              lastName: invoice.createdBy.lastName,
+              email: invoice.createdBy.email,
+            }
+          : {
+              _id: invoice.createdBy?.toString() || '',
+              firstName: '',
+              lastName: '',
+              email: '',
+            },
       updatedBy: invoice.updatedBy
         ? {
-            _id: invoice.updatedBy._id?.toString() || invoice.updatedBy.toString(),
+            _id:
+              invoice.updatedBy._id?.toString() ||
+              invoice.updatedBy.toString(),
             firstName: invoice.updatedBy.firstName,
             lastName: invoice.updatedBy.lastName,
             email: invoice.updatedBy.email,
@@ -743,6 +937,6 @@ export class InvoiceService {
         : undefined,
       createdAt: invoice.createdAt,
       updatedAt: invoice.updatedAt,
-    };
+    } as any;
   }
 }

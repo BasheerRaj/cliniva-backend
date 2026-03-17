@@ -19,9 +19,7 @@ import { AppointmentStatusService } from './services/appointment-status.service'
 import { AppointmentCalendarService } from './services/appointment-calendar.service';
 import { NotificationService } from '../notification/notification.service';
 import { AuditService } from '../auth/audit.service';
-import { ERROR_MESSAGES } from '../common/utils/error-messages.constant';
 import {
-  CreateAppointmentDto,
   UpdateAppointmentDto,
   RescheduleAppointmentDto,
   CancelAppointmentDto,
@@ -43,6 +41,11 @@ import { CreateAppointmentWithSessionDto } from './dto/create-appointment-with-s
 import { AppointmentSessionService } from './services/appointment-session.service';
 import { SESSION_ERROR_MESSAGES } from './constants/session-error-messages.constant';
 import { InvoiceService } from '../invoice/invoice.service';
+import {
+  transformAppointment,
+  transformAppointmentList,
+  TransformedAppointment,
+} from './utils/appointment-transformer.util';
 
 @Injectable()
 export class AppointmentService {
@@ -65,186 +68,6 @@ export class AppointmentService {
     private readonly appointmentSessionService: AppointmentSessionService,
     private readonly invoiceService: InvoiceService,
   ) { }
-
-  /**
-   * Validate appointment data and check for conflicts
-   */
-  private async validateAppointmentData(
-    appointmentDto: CreateAppointmentDto | UpdateAppointmentDto,
-    excludeAppointmentId?: string,
-  ): Promise<void> {
-    const {
-      patientId,
-      doctorId,
-      clinicId,
-      serviceId,
-      appointmentDate,
-      appointmentTime,
-    } = appointmentDto;
-
-    // Validate patient exists
-    if (patientId) {
-      const patient = await this.patientModel.findOne({
-        _id: new Types.ObjectId(patientId),
-        deletedAt: { $exists: false },
-      });
-      if (!patient) {
-        throw new NotFoundException('Patient not found');
-      }
-    }
-
-    // Validate doctor exists and is active
-    if (doctorId) {
-      const doctor = await this.userModel.findOne({
-        _id: new Types.ObjectId(doctorId),
-        role: { $in: ['doctor', 'admin', 'owner'] },
-        isActive: true,
-      });
-      if (!doctor) {
-        throw new NotFoundException('Doctor not found or inactive');
-      }
-    }
-
-    // Validate clinic exists and is active
-    if (clinicId) {
-      const clinic = await this.clinicModel.findById(clinicId);
-      if (!clinic) {
-        throw new NotFoundException('Clinic not found or inactive');
-      }
-    }
-
-    // Validate service exists and is active
-    if (serviceId) {
-      const service = await this.serviceModel.findById(serviceId);
-      if (!service) {
-        throw new NotFoundException({
-          message: {
-            ar: 'الخدمة غير موجودة',
-            en: 'Service not found',
-          },
-        });
-      }
-
-      if (!service.isActive) {
-        throw new BadRequestException({
-          message: {
-            ar: 'الخدمة غير نشطة حالياً. لا يمكن حجز مواعيد',
-            en: 'Service is currently inactive. Cannot book appointments',
-          },
-          serviceId: service._id,
-          serviceName: service.name,
-          deactivationReason: service.deactivationReason,
-        });
-      }
-    }
-
-    // Validate appointment date and time
-    if (appointmentDate && appointmentTime) {
-      const appointmentDateTime = new Date(
-        `${appointmentDate}T${appointmentTime}:00`,
-      );
-      const now = new Date();
-
-      // Check if appointment is in the past
-      if (appointmentDateTime < now) {
-        throw new BadRequestException(
-          'Cannot schedule appointments in the past',
-        );
-      }
-
-      // Check if appointment is too far in the future (1 year)
-      const oneYearFromNow = new Date();
-      oneYearFromNow.setFullYear(now.getFullYear() + 1);
-      if (appointmentDateTime > oneYearFromNow) {
-        throw new BadRequestException(
-          'Cannot schedule appointments more than 1 year in advance',
-        );
-      }
-
-      // Working Hours and Holiday Validation
-      if (doctorId && clinicId) {
-        const effectiveHours =
-          await this.workingHoursIntegrationService.getEffectiveWorkingHours(
-            doctorId,
-            clinicId.toString(),
-            new Date(appointmentDate),
-          );
-
-        if (!effectiveHours) {
-          throw new BadRequestException({
-            message: ERROR_MESSAGES.FACILITY_CLOSED_OR_HOLIDAY,
-          });
-        }
-
-        const duration = (appointmentDto as any).durationMinutes || 30;
-        const appointmentEndTime = this.addMinutesToTime(
-          appointmentTime,
-          duration,
-        );
-
-        // Check if within opening/closing hours
-        if (
-          appointmentTime < effectiveHours.openingTime ||
-          appointmentEndTime > effectiveHours.closingTime
-        ) {
-          throw new BadRequestException({
-            message: ERROR_MESSAGES.APPOINTMENT_OUTSIDE_WORKING_HOURS,
-            details: {
-              openingTime: effectiveHours.openingTime,
-              closingTime: effectiveHours.closingTime,
-            },
-          });
-        }
-
-        // Check for break time overlap
-        if (effectiveHours.breakStartTime && effectiveHours.breakEndTime) {
-          if (
-            appointmentTime < effectiveHours.breakEndTime &&
-            appointmentEndTime > effectiveHours.breakStartTime
-          ) {
-            throw new BadRequestException({
-              message: ERROR_MESSAGES.APPOINTMENT_OVERLAPS_BREAK,
-            });
-          }
-        }
-
-        // Check for blocked time
-        const isBlocked =
-          await this.workingHoursIntegrationService.isTimeBlocked(
-            doctorId,
-            new Date(appointmentDate),
-            appointmentTime,
-            appointmentEndTime,
-          );
-
-        if (isBlocked) {
-          throw new BadRequestException({
-            message: ERROR_MESSAGES.TIME_SLOT_BLOCKED,
-          });
-        }
-      }
-
-      // Check for conflicts
-      if (patientId && doctorId) {
-        const conflicts = await this.checkAppointmentConflicts(
-          patientId,
-          doctorId,
-          appointmentDate instanceof Date ? appointmentDate.toISOString().split('T')[0] : String(appointmentDate),
-          appointmentTime,
-          (appointmentDto as any).durationMinutes || 30,
-          excludeAppointmentId,
-          (appointmentDto as any).serviceId,
-          (appointmentDto as any).sessionId,
-        );
-
-        if (conflicts.length > 0) {
-          throw new ConflictException(
-            `Appointment conflicts detected: ${conflicts.map((c) => c.message).join(', ')}`,
-          );
-        }
-      }
-    }
-  }
 
   /**
    * Check for appointment conflicts.
@@ -597,6 +420,35 @@ export class AppointmentService {
       },
     });
 
+    // Link appointment to the specific invoice session when invoiceItemId provided
+    const invoiceItemId = (createAppointmentDto as any).invoiceItemId;
+    if (validatedInvoice && invoiceItemId) {
+      try {
+        await this.invoiceModel.updateOne(
+          {
+            _id: validatedInvoice._id,
+            deletedAt: { $exists: false },
+          },
+          {
+            $set: {
+              'services.$[].sessions.$[item].sessionStatus': 'booked',
+              'services.$[].sessions.$[item].appointmentId': savedAppointment._id,
+            },
+          },
+          {
+            arrayFilters: [{ 'item.invoiceItemId': new Types.ObjectId(invoiceItemId) }],
+          },
+        );
+        this.logger.log(
+          `Invoice session ${invoiceItemId} marked as booked for appointment ${savedAppointment._id}`,
+        );
+      } catch (err) {
+        this.logger.error(
+          `Failed to mark invoice session ${invoiceItemId} as booked: ${err.message}`,
+        );
+      }
+    }
+
     // UC-7b6a5c3 Postcondition & BZR-9d0a1b2c: Transition invoice to Posted when appointment booked
     // M7 Integration: Transition linked invoice to Posted status
     if (validatedInvoice) {
@@ -667,8 +519,13 @@ export class AppointmentService {
    * Get appointments with filtering and pagination
    * UC-e1f2d3c: View list of Appointments
    */
-  async getAppointments(query: AppointmentSearchQueryDto): Promise<{
-    appointments: Appointment[];
+  async getAppointments(
+    query: AppointmentSearchQueryDto,
+    userId?: string,
+    userRole?: string,
+    userClinicId?: string,
+  ): Promise<{
+    appointments: TransformedAppointment[];
     total: number;
     page: number;
     totalPages: number;
@@ -678,6 +535,7 @@ export class AppointmentService {
       patientId,
       doctorId,
       clinicId,
+      clinicIds,
       serviceId,
       appointmentDate,
       dateFrom,
@@ -688,7 +546,7 @@ export class AppointmentService {
       limit = '10',
       sortBy = 'appointmentDate',
       sortOrder = 'desc',
-    } = query;
+    } = query as any;
 
     // Build filter object
     const filter: any = {
@@ -700,6 +558,35 @@ export class AppointmentService {
     if (doctorId) filter.doctorId = new Types.ObjectId(doctorId);
     if (clinicId) filter.clinicId = new Types.ObjectId(clinicId);
     if (serviceId) filter.serviceId = new Types.ObjectId(serviceId);
+
+    // Multi-select filters (comma-separated IDs override single ID filters)
+    if (clinicIds) {
+      const ids = String(clinicIds).split(',').filter(Boolean);
+      if (ids.length === 1) {
+        filter.clinicId = new Types.ObjectId(ids[0]);
+      } else if (ids.length > 1) {
+        filter.clinicId = { $in: ids.map((id) => new Types.ObjectId(id)) };
+      }
+    }
+    const doctorIds = (query as any).doctorIds;
+    if (doctorIds) {
+      const ids = String(doctorIds).split(',').filter(Boolean);
+      if (ids.length === 1) {
+        filter.doctorId = new Types.ObjectId(ids[0]);
+      } else if (ids.length > 1) {
+        filter.doctorId = { $in: ids.map((id) => new Types.ObjectId(id)) };
+      }
+    }
+
+    // Doctor role scoping: doctors can only see their own appointments (UC-d2e3f4c)
+    if (userRole === 'doctor' && userId) {
+      filter.doctorId = new Types.ObjectId(userId);
+    }
+
+    // Staff role scoping: staff can only see appointments for their assigned clinic
+    if (userRole === 'staff' && userClinicId) {
+      filter.clinicId = new Types.ObjectId(userClinicId);
+    }
     
     // Status validation (P2 - MEDIUM)
     if (status) {
@@ -718,7 +605,7 @@ export class AppointmentService {
       filter.status = status;
     }
     
-    if (urgencyLevel) filter.urgencyLevel = urgencyLevel;
+    if (urgencyLevel) filter.urgency = urgencyLevel;
 
     // Date filtering with range limit validation (P2 - MEDIUM)
     if (appointmentDate) {
@@ -751,12 +638,24 @@ export class AppointmentService {
     // Search functionality (P1 - HIGH)
     // Text search on patient name, doctor name, appointment notes
     if (search && search.trim()) {
-      const searchRegex = new RegExp(search.trim(), 'i');
-      
-      // We need to search in populated fields, so we'll use aggregation
-      // For now, we'll search in notes and reason fields directly
-      // Patient/Doctor name search requires aggregation or separate queries
+      if (search.trim().length > 100) {
+        throw new BadRequestException({ message: { ar: 'النص المدخل طويل جداً', en: 'Search term too long' } });
+      }
+      const searchRegex = new RegExp(this.escapeRegex(search.trim()), 'i');
+
+      // Pre-query patients and doctors matching the search term (BUG-011)
+      const matchingPatients = await this.patientModel
+        .find({ $or: [{ firstName: searchRegex }, { lastName: searchRegex }], deletedAt: { $exists: false } })
+        .select('_id').lean();
+      const patientIds = matchingPatients.map((p: any) => p._id);
+      const matchingDoctors = await this.userModel
+        .find({ $or: [{ firstName: searchRegex }, { lastName: searchRegex }], role: 'doctor', deletedAt: { $exists: false } })
+        .select('_id').lean();
+      const doctorIds = matchingDoctors.map((d: any) => d._id);
+
       filter.$or = [
+        { patientId: { $in: patientIds } },
+        { doctorId: { $in: doctorIds } },
         { notes: searchRegex },
         { reason: searchRegex },
         { internalNotes: searchRegex },
@@ -782,16 +681,17 @@ export class AppointmentService {
     const sort: any = {};
     sort[sortField] = sortOrder === 'asc' ? 1 : -1;
 
-    const [appointments, total] = await Promise.all([
+    const [rawAppointments, total] = await Promise.all([
       this.appointmentModel
         .find(filter)
-        .populate('patientId', 'firstName lastName phone email')
-        .populate('doctorId', 'firstName lastName email')
-        .populate('clinicId', 'name address')
-        .populate('serviceId', 'name durationMinutes price')
+        .populate('patientId', 'firstName lastName phone email profilePicture')
+        .populate('doctorId', 'firstName lastName specialty phone email')
+        .populate('clinicId', 'name')
+        .populate('serviceId', 'name durationMinutes price description')
         .sort(sort)
         .skip(skip)
         .limit(pageSize)
+        .lean()
         .exec(),
       this.appointmentModel.countDocuments(filter),
     ]);
@@ -799,7 +699,7 @@ export class AppointmentService {
     const totalPages = Math.ceil(total / pageSize);
 
     return {
-      appointments,
+      appointments: transformAppointmentList(rawAppointments),
       total,
       page: pageNum,
       totalPages,
@@ -817,7 +717,7 @@ export class AppointmentService {
    * - Medical report (for completed appointments with prescriptions)
    * - Audit trail (created/updated/cancelled by users)
    */
-  async getAppointmentById(appointmentId: string): Promise<Appointment> {
+  async getAppointmentById(appointmentId: string): Promise<any> {
     if (!Types.ObjectId.isValid(appointmentId)) {
       throw new BadRequestException({
         message: {
@@ -834,9 +734,9 @@ export class AppointmentService {
         deletedAt: { $exists: false },
       })
       // Core entities with enhanced fields
-      .populate('patientId', 'firstName lastName phone email dateOfBirth gender bloodType')
-      .populate('doctorId', 'firstName lastName email phone profilePictureUrl')
-      .populate('clinicId', 'name address phone email overview specialization licenseNumber')
+      .populate('patientId', 'firstName lastName phone email profilePicture dateOfBirth gender bloodType')
+      .populate('doctorId', 'firstName lastName specialty email phone')
+      .populate('clinicId', 'name address phone email')
       .populate('serviceId', 'name description durationMinutes price sessions')
       .populate('departmentId', 'name description')
       // Invoice details (UC-1c3a2b0 requirement)
@@ -847,6 +747,7 @@ export class AppointmentService {
       .populate('createdBy', 'firstName lastName email')
       .populate('updatedBy', 'firstName lastName email')
       .populate('cancelledBy', 'firstName lastName email')
+      .lean()
       .exec();
 
     if (!appointment) {
@@ -859,7 +760,7 @@ export class AppointmentService {
       });
     }
 
-    return appointment;
+    return transformAppointment(appointment);
   }
 
   /**
@@ -958,8 +859,6 @@ export class AppointmentService {
       );
     }
 
-    await this.validateAppointmentData(updateAppointmentDto, appointmentId);
-
     const updateData: any = {
       ...updateAppointmentDto,
       updatedBy: updatedByUserId
@@ -1033,9 +932,10 @@ export class AppointmentService {
     }
 
     // Validate new date/time and check conflicts
+    // BUG-001: appointment is TransformedAppointment; use .patient._id and .doctor._id
     const conflicts = await this.checkAppointmentConflicts(
-      appointment.patientId.toString(),
-      appointment.doctorId.toString(),
+      appointment.patient._id.toString(),
+      appointment.doctor._id.toString(),
       rescheduleDto.newAppointmentDate,
       rescheduleDto.newAppointmentTime,
       appointment.durationMinutes,
@@ -1048,15 +948,27 @@ export class AppointmentService {
       );
     }
 
+    // BUG-007: populate rescheduleHistory instead of appending to notes
     const updateData: any = {
       appointmentDate: new Date(rescheduleDto.newAppointmentDate),
       appointmentTime: rescheduleDto.newAppointmentTime,
-      notes: rescheduleDto.reason
-        ? `${appointment.notes || ''}\nRescheduled: ${rescheduleDto.reason}`.trim()
-        : appointment.notes,
+      rescheduledReason: rescheduleDto.reason,
+      rescheduledAt: new Date(),
+      rescheduleRequested: true,
       updatedBy: updatedByUserId
         ? new Types.ObjectId(updatedByUserId)
         : undefined,
+      $push: {
+        rescheduleHistory: {
+          previousDate: appointment.datetime ? new Date(appointment.datetime) : undefined,
+          previousTime: appointment.datetime ? appointment.datetime.substring(11, 16) : undefined,
+          newDate: new Date(rescheduleDto.newAppointmentDate),
+          newTime: rescheduleDto.newAppointmentTime,
+          reason: rescheduleDto.reason,
+          rescheduledAt: new Date(),
+          rescheduledBy: updatedByUserId ? new Types.ObjectId(updatedByUserId) : undefined,
+        },
+      },
     };
 
     const updatedAppointment = await this.appointmentModel
@@ -1065,9 +977,9 @@ export class AppointmentService {
 
     this.logger.log(`Appointment rescheduled: ${appointmentId}`);
 
-    // Send notification to patient
+    // Send notification to patient (BUG-001: use appointment.patient._id)
     await this.notificationService.create({
-      recipientId: appointment.patientId.toString(),
+      recipientId: appointment.patient._id.toString(),
       title: 'Appointment Rescheduled',
       message: `Your appointment has been rescheduled to ${rescheduleDto.newAppointmentDate} at ${rescheduleDto.newAppointmentTime}`,
       notificationType: 'appointment_rescheduled',
@@ -1077,9 +989,9 @@ export class AppointmentService {
       deliveryMethod: 'in_app',
     });
 
-    // Send notification to doctor
+    // Send notification to doctor (BUG-001: use appointment.doctor._id)
     await this.notificationService.create({
-      recipientId: appointment.doctorId.toString(),
+      recipientId: appointment.doctor._id.toString(),
       title: 'Appointment Rescheduled',
       message: `An appointment has been rescheduled to ${rescheduleDto.newAppointmentDate} at ${rescheduleDto.newAppointmentTime}`,
       notificationType: 'appointment_rescheduled',
@@ -1122,8 +1034,8 @@ export class AppointmentService {
 
     const appointment = await this.getAppointmentById(appointmentId);
 
-    // Check if appointment can be cancelled
-    if (['completed', 'cancelled'].includes(appointment.status)) {
+    // Check if appointment can be cancelled (BUG-005: also block in_progress)
+    if (['completed', 'cancelled', 'in_progress'].includes(appointment.status)) {
       throw new BadRequestException(
         'Cannot cancel appointment with current status',
       );
@@ -1132,6 +1044,9 @@ export class AppointmentService {
     const updateData: any = {
       status: 'cancelled',
       cancellationReason: cancelDto.cancellationReason,
+      // BUG-006: set cancelledAt and cancelledBy
+      cancelledAt: new Date(),
+      cancelledBy: updatedByUserId ? new Types.ObjectId(updatedByUserId) : undefined,
       updatedBy: updatedByUserId
         ? new Types.ObjectId(updatedByUserId)
         : undefined,
@@ -1143,9 +1058,29 @@ export class AppointmentService {
 
     this.logger.log(`Appointment cancelled: ${appointmentId}`);
 
-    // Send notification to patient
+    // Hook 4 (PART B): Update linked invoice session status to 'cancelled'
+    if (appointment.invoiceId) {
+      try {
+        const linkedInvoice = await this.invoiceModel.findById(appointment.invoiceId);
+        if (linkedInvoice) {
+          // Find the session linked to this appointment and set it to cancelled
+          const invoiceItemId = await this._findInvoiceItemId(linkedInvoice, appointmentId);
+          if (invoiceItemId) {
+            await this.invoiceModel.updateOne(
+              { _id: appointment.invoiceId },
+              { $set: { 'services.$[].sessions.$[item].sessionStatus': 'cancelled' } },
+              { arrayFilters: [{ 'item.invoiceItemId': new Types.ObjectId(invoiceItemId) }] },
+            );
+          }
+        }
+      } catch (err) {
+        this.logger.error(`Failed to update invoice session on cancel: ${err.message}`);
+      }
+    }
+
+    // Send notification to patient (BUG-001: use appointment.patient._id)
     await this.notificationService.create({
-      recipientId: appointment.patientId.toString(),
+      recipientId: appointment.patient._id.toString(),
       title: 'Appointment Cancelled',
       message: `Your appointment has been cancelled. Reason: ${cancelDto.cancellationReason || 'No reason provided'}`,
       notificationType: 'appointment_cancelled',
@@ -1155,9 +1090,9 @@ export class AppointmentService {
       deliveryMethod: 'in_app',
     });
 
-    // Send notification to doctor
+    // Send notification to doctor (BUG-001: use appointment.doctor._id)
     await this.notificationService.create({
-      recipientId: appointment.doctorId.toString(),
+      recipientId: appointment.doctor._id.toString(),
       title: 'Appointment Cancelled',
       message: `An appointment has been cancelled. Reason: ${cancelDto.cancellationReason || 'No reason provided'}`,
       notificationType: 'appointment_cancelled',
@@ -1223,35 +1158,38 @@ export class AppointmentService {
 
     this.logger.log(`Appointment confirmed: ${appointmentId}`);
 
-    // M7 Integration: Transition linked invoice to Posted status
+    // M7 Integration: Transition linked invoice to Posted status (BUG-012: guard against double transition)
     // Requirements: 15.1, 15.2, 15.3, 15.4, 15.5, 15.6, 15.7
     if (appointment.invoiceId) {
       try {
-        this.logger.log(
-          `Transitioning linked invoice ${appointment.invoiceId} to Posted status`,
-        );
-        await this.invoiceService.transitionToPosted(
-          appointment.invoiceId.toString(),
-        );
-        this.logger.log(
-          `Invoice ${appointment.invoiceId} successfully transitioned to Posted`,
-        );
+        const linkedInvoice = await this.invoiceModel.findById(appointment.invoiceId);
+        if (linkedInvoice && linkedInvoice.invoiceStatus !== 'posted') {
+          this.logger.log(
+            `Transitioning linked invoice ${appointment.invoiceId} to Posted status`,
+          );
+          await this.invoiceService.transitionToPosted(
+            appointment.invoiceId.toString(),
+          );
+          this.logger.log(
+            `Invoice ${appointment.invoiceId} successfully transitioned to Posted`,
+          );
 
-        // Audit log for integration event
-        if (updatedByUserId) {
-          await this.auditService.logSecurityEvent({
-            eventType: 'INVOICE_TRANSITIONED_ON_APPOINTMENT_CONFIRMATION',
-            userId: updatedByUserId,
-            actorId: updatedByUserId,
-            ipAddress: '0.0.0.0',
-            userAgent: 'System',
-            timestamp: new Date(),
-            metadata: {
-              appointmentId,
-              invoiceId: appointment.invoiceId.toString(),
-              action: 'invoice_transition_to_posted',
-            },
-          });
+          // Audit log for integration event
+          if (updatedByUserId) {
+            await this.auditService.logSecurityEvent({
+              eventType: 'INVOICE_TRANSITIONED_ON_APPOINTMENT_CONFIRMATION',
+              userId: updatedByUserId,
+              actorId: updatedByUserId,
+              ipAddress: '0.0.0.0',
+              userAgent: 'System',
+              timestamp: new Date(),
+              metadata: {
+                appointmentId,
+                invoiceId: appointment.invoiceId.toString(),
+                action: 'invoice_transition_to_posted',
+              },
+            });
+          }
         }
       } catch (error) {
         // Handle errors gracefully - log but don't fail appointment confirmation
@@ -1285,11 +1223,11 @@ export class AppointmentService {
       }
     }
 
-    // Send notification to patient
+    // Send notification to patient (BUG-001: use appointment.patient._id)
     await this.notificationService.create({
-      recipientId: appointment.patientId.toString(),
+      recipientId: appointment.patient._id.toString(),
       title: 'Appointment Confirmed',
-      message: `Your appointment has been confirmed for ${appointment.appointmentDate.toISOString().split('T')[0]} at ${appointment.appointmentTime}. ${confirmDto.confirmationNotes || ''}`,
+      message: `Your appointment has been confirmed for ${appointment.datetime?.split('T')[0] ?? ''} at ${appointment.datetime?.substring(11, 16) ?? ''}. ${confirmDto.confirmationNotes || ''}`,
       notificationType: 'appointment_confirmed',
       priority: 'high',
       relatedEntityType: 'appointment',
@@ -1423,9 +1361,8 @@ export class AppointmentService {
           deletedAt: { $exists: true },
         },
         {
-          $unset: {
-            deletedAt: '',
-          },
+          $unset: { deletedAt: '' },
+          $set: { isDeleted: false },
         },
         { new: true },
       )
@@ -1754,7 +1691,7 @@ export class AppointmentService {
       // Urgency distribution
       this.appointmentModel.aggregate([
         { $match: { deletedAt: { $exists: false } } },
-        { $group: { _id: '$urgencyLevel', count: { $sum: 1 } } },
+        { $group: { _id: '$urgency', count: { $sum: 1 } } },
       ]),
     ]);
 
@@ -1940,24 +1877,6 @@ export class AppointmentService {
       },
     );
 
-    // Handle rescheduling if new date/time provided
-    if (statusDto.status === 'rescheduled' && statusDto.newDate && statusDto.newTime) {
-      const rescheduledAppointment = await this.appointmentModel
-        .findByIdAndUpdate(
-          appointmentId,
-          {
-            appointmentDate: new Date(statusDto.newDate),
-            appointmentTime: statusDto.newTime,
-          },
-          { new: true },
-        )
-        .exec();
-      
-      if (rescheduledAppointment) {
-        return rescheduledAppointment;
-      }
-    }
-
     this.logger.log(`Appointment ${appointmentId} status changed to ${statusDto.status} by user ${userId}`);
     
     // UC-6b5a4c9 Note: Invoice status update is handled by invoice module
@@ -2023,6 +1942,25 @@ export class AppointmentService {
       .exec();
 
     this.logger.log(`Appointment ${appointmentId} started at ${now.toISOString()}`);
+
+    // Hook 5 (PART B): Update linked invoice session status to 'in_progress'
+    if (appointment.invoiceId) {
+      try {
+        const linkedInvoice = await this.invoiceModel.findById(appointment.invoiceId);
+        if (linkedInvoice) {
+          const invoiceItemId = await this._findInvoiceItemId(linkedInvoice, appointmentId);
+          if (invoiceItemId) {
+            await this.invoiceModel.updateOne(
+              { _id: appointment.invoiceId },
+              { $set: { 'services.$[].sessions.$[item].sessionStatus': 'in_progress' } },
+              { arrayFilters: [{ 'item.invoiceItemId': new Types.ObjectId(invoiceItemId) }] },
+            );
+          }
+        }
+      } catch (err) {
+        this.logger.error(`Failed to update invoice session on start: ${err.message}`);
+      }
+    }
 
     // Audit log
     if (userId) {
@@ -2103,7 +2041,8 @@ export class AppointmentService {
           actualEndTime: now,
           completedBy: userId ? new Types.ObjectId(userId) : undefined,
           updatedBy: userId ? new Types.ObjectId(userId) : undefined,
-          ...(internalNotes && { notes: internalNotes }),
+          // BUG-013: use completionNotes instead of notes
+          ...(internalNotes && { completionNotes: typeof internalNotes === 'string' ? internalNotes : JSON.stringify(internalNotes) }),
           $push: { statusHistory: historyEntry },
         },
         { new: true },
@@ -2111,6 +2050,28 @@ export class AppointmentService {
       .exec();
 
     this.logger.log(`Appointment ${appointmentId} ended at ${now.toISOString()}`);
+
+    // Hook 2 (PART B): Update linked invoice session status to 'completed' and payment to 'unpaid'
+    if (appointment.invoiceId) {
+      try {
+        const linkedInvoice = await this.invoiceModel.findById(appointment.invoiceId);
+        if (linkedInvoice) {
+          const invoiceItemId = await this._findInvoiceItemId(linkedInvoice, appointmentId);
+          if (invoiceItemId) {
+            await this.invoiceModel.updateOne(
+              { _id: appointment.invoiceId },
+              { $set: { 'services.$[].sessions.$[item].sessionStatus': 'completed' } },
+              { arrayFilters: [{ 'item.invoiceItemId': new Types.ObjectId(invoiceItemId) }] },
+            );
+          }
+          if (linkedInvoice.paymentStatus === 'not_due') {
+            await this.invoiceModel.findByIdAndUpdate(appointment.invoiceId, { paymentStatus: 'unpaid' });
+          }
+        }
+      } catch (err) {
+        this.logger.error(`Failed to update invoice session on end: ${err.message}`);
+      }
+    }
 
     if (userId) {
       await this.auditService.logSecurityEvent({
@@ -2198,7 +2159,8 @@ export class AppointmentService {
           actualEndTime: now,
           completedBy: userId ? new Types.ObjectId(userId) : undefined,
           updatedBy: userId ? new Types.ObjectId(userId) : undefined,
-          notes: JSON.stringify(conclusionPayload),
+          // BUG-013: use completionNotes instead of notes
+          completionNotes: typeof conclusionPayload === 'string' ? conclusionPayload : JSON.stringify(conclusionPayload),
           $push: { statusHistory: historyEntry },
         },
         { new: true },
@@ -2207,10 +2169,32 @@ export class AppointmentService {
 
     this.logger.log(`Appointment ${appointmentId} concluded at ${now.toISOString()}`);
 
-    // Schedule follow-up reminder if needed
+    // Hook 2 (PART B): Update linked invoice session status to 'completed' and payment to 'unpaid'
+    if (appointment.invoiceId) {
+      try {
+        const linkedInvoice = await this.invoiceModel.findById(appointment.invoiceId);
+        if (linkedInvoice) {
+          const invoiceItemId = await this._findInvoiceItemId(linkedInvoice, appointmentId);
+          if (invoiceItemId) {
+            await this.invoiceModel.updateOne(
+              { _id: appointment.invoiceId },
+              { $set: { 'services.$[].sessions.$[item].sessionStatus': 'completed' } },
+              { arrayFilters: [{ 'item.invoiceItemId': new Types.ObjectId(invoiceItemId) }] },
+            );
+          }
+          if (linkedInvoice.paymentStatus === 'not_due') {
+            await this.invoiceModel.findByIdAndUpdate(appointment.invoiceId, { paymentStatus: 'unpaid' });
+          }
+        }
+      } catch (err) {
+        this.logger.error(`Failed to update invoice session on conclude: ${err.message}`);
+      }
+    }
+
+    // Schedule follow-up reminder if needed (BUG-001: use appointment.doctor._id)
     if (conclusionData.followUp?.required) {
       await this.notificationService.create({
-        recipientId: appointment.doctorId.toString(),
+        recipientId: appointment.doctor._id.toString(),
         title: 'Follow-up Required',
         message: `Follow-up needed for appointment ${appointmentId}. Recommended duration: ${conclusionData.followUp.recommendedDuration || 'Not specified'}`,
         notificationType: 'follow_up_reminder',
@@ -2250,7 +2234,7 @@ export class AppointmentService {
    */
   async sendManualReminder(id: string, userId?: string): Promise<void> {
     const appointment = await this.appointmentModel
-      .findOne({ _id: new Types.ObjectId(id), isDeleted: { $ne: true } })
+      .findOne({ _id: new Types.ObjectId(id), deletedAt: { $exists: false } })
       .populate('patientId')
       .exec();
 
@@ -2285,33 +2269,147 @@ export class AppointmentService {
    * 
    * Requirements: 5.1-5.8
    */
-  async getAppointmentsCalendar(query: CalendarQueryDto): Promise<{
+  async getAppointmentsCalendar(
+    query: CalendarQueryDto,
+    userId?: string,
+    userRole?: string,
+  ): Promise<{
     view: string;
     startDate: string;
     endDate: string;
-    appointments: Appointment[];
-    groupedByDate: Record<string, Appointment[]>;
+    groupedByDate: Record<string, any[]>;
   }> {
     this.logger.log('Getting appointments calendar view');
 
-    // Delegate to calendar service (Tasks 9.1-9.4)
-    const calendarData = await this.appointmentCalendarService.getCalendarView(query);
+    // Delegate to calendar service, passing user context for role-scoping
+    const calendarData = await this.appointmentCalendarService.getCalendarView(
+      query,
+      userId,
+      userRole,
+    );
 
-    // Transform to legacy format for backward compatibility
-    const appointments: Appointment[] = [];
-    for (const dateKey in calendarData.appointments) {
-      for (const appt of calendarData.appointments[dateKey]) {
-        // Convert AppointmentDataDto back to Appointment for legacy response
-        appointments.push(appt as any);
-      }
-    }
-
+    // BUG-015: Return shape matching frontend expectation
     return {
       view: calendarData.view,
-      startDate: calendarData.dateRange.start.toISOString().split('T')[0],
-      endDate: calendarData.dateRange.end.toISOString().split('T')[0],
-      appointments,
-      groupedByDate: calendarData.appointments as any,
+      dateRange: {
+        start: calendarData.dateRange.start.toISOString().split('T')[0],
+        end: calendarData.dateRange.end.toISOString().split('T')[0],
+      },
+      appointments: calendarData.appointments,
+    } as any;
+  }
+
+  /**
+   * M6 UC-d2e3f4c – GET /appointments/available-clinics
+   *
+   * Returns clinics that are open at a given date + time so the
+   * QuickAddDrawer can show only valid choices when the user is
+   * viewing "All Clinics".
+   *
+   * @param date             - "YYYY-MM-DD"
+   * @param time             - "HH:mm"
+   * @param clinicCollectionId - optional complexId to filter clinics
+   */
+  async getAvailableClinics(
+    date: string,
+    time: string,
+    clinicCollectionId?: string,
+    userClinicId?: string,
+    userOrganizationId?: string,
+    userRole?: string,
+  ): Promise<{ _id: string; name: string }[]> {
+    // 1. Build clinic filter with scope enforcement (IDOR protection)
+    const clinicFilter: any = {
+      isActive: true,
+      deletedAt: { $exists: false },
     };
+
+    // Clinic-scoped roles (admin, staff) can only see their own clinic
+    const clinicScopedRoles = ['admin', 'staff', 'doctor'];
+    if (userClinicId && clinicScopedRoles.includes(userRole ?? '')) {
+      clinicFilter._id = new Types.ObjectId(userClinicId);
+    } else if (userOrganizationId && userRole && !['super_admin'].includes(userRole)) {
+      clinicFilter.organizationId = new Types.ObjectId(userOrganizationId);
+    }
+
+    if (clinicCollectionId) {
+      clinicFilter.complexId = new Types.ObjectId(clinicCollectionId);
+    }
+
+    // 2. Fetch matching clinics
+    const clinics = await this.clinicModel
+      .find(clinicFilter)
+      .select('_id name')
+      .lean()
+      .exec();
+
+    if (!clinics.length) return [];
+
+    // 3. Determine day-of-week from date string (avoid timezone shifts)
+    const [year, month, day] = date.split('-').map(Number);
+    const dateObj = new Date(year, month - 1, day);
+    const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const dayOfWeek = dayNames[dateObj.getDay()];
+
+    const [slotH, slotM] = time.split(':').map(Number);
+    const slotMinutes = slotH * 60 + slotM;
+
+    // 4. Filter clinics whose working hours cover the requested slot
+    const available: { _id: string; name: string }[] = [];
+
+    for (const clinic of clinics) {
+      const wh = await this.workingHoursIntegrationService.getClinicWorkingHours(
+        clinic._id.toString(),
+      );
+
+      const dayWh = wh.find(
+        (w: any) => w.dayOfWeek === dayOfWeek && w.isWorkingDay && w.isActive,
+      );
+      if (!dayWh) continue;
+
+      const [oh, om] = (dayWh.openingTime as string).split(':').map(Number);
+      const [ch, cm] = (dayWh.closingTime as string).split(':').map(Number);
+      const openMin = oh * 60 + om;
+      const closeMin = ch * 60 + cm;
+
+      if (slotMinutes < openMin || slotMinutes >= closeMin) continue;
+
+      // Skip if slot falls within break period
+      if (dayWh.breakStartTime && dayWh.breakEndTime) {
+        const [bsh, bsm] = (dayWh.breakStartTime as string).split(':').map(Number);
+        const [beh, bem] = (dayWh.breakEndTime as string).split(':').map(Number);
+        const breakStart = bsh * 60 + bsm;
+        const breakEnd = beh * 60 + bem;
+        if (slotMinutes >= breakStart && slotMinutes < breakEnd) continue;
+      }
+
+      available.push({ _id: (clinic._id as any).toString(), name: clinic.name });
+    }
+
+    return available;
+  }
+
+  /**
+   * Helper: Find the invoiceItemId in the invoice that is linked to a given appointmentId.
+   * Returns the invoiceItemId string or null if not found.
+   */
+  private async _findInvoiceItemId(invoice: any, appointmentId: string): Promise<string | null> {
+    if (!invoice || !invoice.services) return null;
+    for (const svc of invoice.services) {
+      if (!svc.sessions) continue;
+      for (const session of svc.sessions) {
+        if (session.appointmentId && session.appointmentId.toString() === appointmentId) {
+          return session.invoiceItemId ? session.invoiceItemId.toString() : null;
+        }
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Escape special regex characters to prevent ReDoS attacks (S-6).
+   */
+  private escapeRegex(str: string): string {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
 }

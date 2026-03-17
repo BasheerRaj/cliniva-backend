@@ -1,4 +1,4 @@
-import { IsOptional, IsEnum, IsMongoId, IsDate } from 'class-validator';
+import { IsOptional, IsEnum, IsMongoId, IsDate, IsString } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { AppointmentStatus } from '../constants/appointment-status.enum';
@@ -75,4 +75,20 @@ export class CalendarQueryDto {
     message: '{"ar":"حالة الموعد غير صالحة","en":"Invalid appointment status"}',
   })
   status?: AppointmentStatus;
+
+  @ApiPropertyOptional({
+    description: 'Filter by multiple clinic IDs (comma-separated)',
+    example: '507f1f77bcf86cd799439014,507f1f77bcf86cd799439015',
+  })
+  @IsOptional()
+  @IsString()
+  clinicIds?: string;
+
+  @ApiPropertyOptional({
+    description: 'Filter by multiple doctor IDs (comma-separated)',
+    example: '507f1f77bcf86cd799439012,507f1f77bcf86cd799439013',
+  })
+  @IsOptional()
+  @IsString()
+  doctorIds?: string;
 }

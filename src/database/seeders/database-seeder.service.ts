@@ -9,6 +9,7 @@ import {
   SmsTemplate,
 } from '../schemas';
 import { EntitiesSeederService } from './entities.seeder';
+import { ExampleDataSeederService } from './example-data.seeder';
 
 @Injectable()
 export class DatabaseSeederService {
@@ -23,6 +24,7 @@ export class DatabaseSeederService {
     private emailTemplateModel: Model<EmailTemplate>,
     @InjectModel(SmsTemplate.name) private smsTemplateModel: Model<SmsTemplate>,
     private entitiesSeeder: EntitiesSeederService,
+    private exampleDataSeeder: ExampleDataSeederService,
   ) {}
 
   async seedAll(): Promise<void> {
@@ -38,6 +40,9 @@ export class DatabaseSeederService {
 
       // Seed entities (organizations, complexes, clinics)
       await this.entitiesSeeder.seedAll();
+
+      // Seed example relational data (MediCare Healthcare Group + users)
+      await this.exampleDataSeeder.seedAll();
 
       this.logger.log('✅ Database seeding completed successfully');
     } catch (error) {
@@ -330,7 +335,10 @@ export class DatabaseSeederService {
     this.logger.warn('🗑️ Clearing database...');
 
     try {
-      // Clear entities first (due to foreign key relationships)
+      // Clear example data first (users reference clinics/orgs)
+      await this.exampleDataSeeder.clearExampleData();
+
+      // Clear entities (organizations, complexes, clinics, etc.)
       await this.entitiesSeeder.clearEntities();
 
       // Then clear base data

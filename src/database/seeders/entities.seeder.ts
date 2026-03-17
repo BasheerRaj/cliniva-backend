@@ -8,6 +8,9 @@ import {
   User,
   Subscription,
   SubscriptionPlan,
+  Service,
+  ClinicService,
+  EmployeeProfile,
 } from '../schemas';
 import * as bcrypt from 'bcrypt';
 
@@ -28,6 +31,14 @@ export class EntitiesSeederService {
     private subscriptionModel: Model<Subscription>,
     @InjectModel(SubscriptionPlan.name)
     private subscriptionPlanModel: Model<SubscriptionPlan>,
+    @InjectModel(Service.name)
+    private serviceModel: Model<Service>,
+    @InjectModel(ClinicService.name)
+    private clinicServiceModel: Model<ClinicService>,
+    @InjectModel(EmployeeProfile.name)
+    private employeeProfileModel: Model<EmployeeProfile>,
+    @InjectModel('DoctorService')
+    private doctorServiceModel: Model<any>,
   ) {}
 
   async seedAll(): Promise<void> {
@@ -39,12 +50,115 @@ export class EntitiesSeederService {
       await this.seedCompanyPlanEntities(users);
       await this.seedComplexPlanEntities(users);
       await this.seedClinicPlanEntities(users);
+      // Seed services and doctors for all clinics (idempotent)
+      await this.seedServicesForAllClinics();
 
       this.logger.log('✅ Entities seeding completed successfully');
     } catch (error) {
       this.logger.error('❌ Entities seeding failed:', error.message);
       throw error;
     }
+  }
+
+  private async seedServicesForAllClinics(): Promise<void> {
+    this.logger.log('💊 Seeding global services and clinic/doctor authorizations...');
+
+    const hashedPassword = await bcrypt.hash('Password123!', 10);
+    const clinics = await this.clinicModel.find({ isActive: true }).exec();
+
+    // Global service definitions — no clinicId/complexDepartmentId to avoid index conflicts
+    const SERVICE_DEFS = [
+      { name: 'General Consultation', durationMinutes: 30, price: 200 },
+      { name: 'Follow-up Visit', durationMinutes: 15, price: 100 },
+      { name: 'Medical Check-up', durationMinutes: 45, price: 350 },
+    ];
+
+    // Step 1: Ensure global services exist (shared across all clinics)
+    const globalServices: any[] = [];
+    for (const svcDef of SERVICE_DEFS) {
+      let service = await this.serviceModel.findOne({
+        name: svcDef.name,
+        clinicId: { $exists: false },
+        complexDepartmentId: { $exists: false },
+      });
+      if (!service) {
+        service = await this.serviceModel.create({
+          name: svcDef.name,
+          durationMinutes: svcDef.durationMinutes,
+          price: svcDef.price,
+          isActive: true,
+        });
+        this.logger.log(`  ✓ Created global service: ${svcDef.name}`);
+      }
+      globalServices.push(service);
+    }
+
+    // Step 2: For each clinic, create doctor + ClinicService + DoctorService records
+    for (const clinic of clinics) {
+      const clinicId = (clinic._id as any).toString();
+      const doctorEmail = `doctor.${clinicId.slice(-6)}@cliniva.com`;
+
+      // Find or create a doctor user scoped to this clinic
+      let doctor = await this.userModel.findOne({ email: doctorEmail });
+      if (!doctor) {
+        doctor = await this.userModel.create({
+          email: doctorEmail,
+          passwordHash: hashedPassword,
+          firstName: 'Ahmed',
+          lastName: 'Al-Hakim',
+          role: 'doctor',
+          isActive: true,
+          emailVerified: true,
+          onboardingComplete: true,
+          setupComplete: true,
+          clinicId: clinic._id,
+        });
+        // Employee profile makes the doctor appear in /employees?role=doctor
+        await this.employeeProfileModel.create({
+          userId: doctor._id,
+          jobTitle: 'General Practitioner',
+          dateOfHiring: new Date('2020-01-01'),
+          isActive: true,
+        });
+        this.logger.log(`  ✓ Doctor seeded for clinic: ${clinic.name}`);
+      }
+
+      // Step 2a: Link global services to this clinic via ClinicService junction table
+      for (const service of globalServices) {
+        const existing = await this.clinicServiceModel.findOne({
+          clinicId: clinic._id,
+          serviceId: service._id,
+        });
+        if (!existing) {
+          await this.clinicServiceModel.create({
+            clinicId: clinic._id,
+            serviceId: service._id,
+            isActive: true,
+          });
+        }
+      }
+
+      // Step 2b: Authorize the doctor for each service in this clinic
+      for (const service of globalServices) {
+        const existing = await this.doctorServiceModel.findOne({
+          doctorId: doctor._id,
+          serviceId: service._id,
+          clinicId: clinic._id,
+        });
+        if (!existing) {
+          await this.doctorServiceModel.create({
+            doctorId: doctor._id,
+            serviceId: service._id,
+            clinicId: clinic._id,
+            isActive: true,
+          });
+        }
+      }
+    }
+
+    this.logger.log(
+      `✅ Services/clinic-links/doctor-authorizations seeded for ${clinics.length} clinics`,
+    );
   }
 
   private async seedUsers(): Promise<any> {
@@ -571,6 +685,10 @@ export class EntitiesSeederService {
     this.logger.warn('🗑️ Clearing entities...');
 
     try {
+      await this.doctorServiceModel.deleteMany({});
+      await this.clinicServiceModel.deleteMany({});
+      await this.serviceModel.deleteMany({});
+      await this.employeeProfileModel.deleteMany({});
       await this.clinicModel.deleteMany({});
       await this.complexModel.deleteMany({});
       await this.organizationModel.deleteMany({});

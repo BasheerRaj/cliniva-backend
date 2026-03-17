@@ -255,9 +255,188 @@ export class InvoiceController {
   }
 
   /**
+   * Get an invoice suitable for the appointment booking flow.
+   * Returns the first posted, unpaid/partially-paid invoice for a patient+clinic.
+   * MUST be declared before GET ':id' to avoid route conflict.
+   * PART I
+   *
+   * GET /invoices/for-booking?patientId=...&clinicId=...&invoiceId=... (invoiceId optional)
+   */
+  @Get('for-booking')
+  @HttpCode(HttpStatus.OK)
+  @Roles(
+    UserRole.STAFF,
+    UserRole.ADMIN,
+    UserRole.MANAGER,
+    UserRole.OWNER,
+    UserRole.DOCTOR,
+  )
+  @ApiOperation({
+    summary: 'Get invoice for booking',
+    description:
+      'Returns a posted, unpaid or partially-paid invoice for a specific patient and clinic. ' +
+      'Used by the appointment booking flow to link bookings to existing invoices. ' +
+      'Optionally narrows to a specific invoiceId.',
+  })
+  @ApiQuery({ name: 'patientId', required: true, description: 'Patient ID' })
+  @ApiQuery({ name: 'clinicId', required: true, description: 'Clinic ID' })
+  @ApiQuery({ name: 'invoiceId', required: false, description: 'Optional invoice ID to narrow results' })
+  @ApiResponse({ status: 200, description: 'Invoice retrieved successfully' })
+  @ApiResponse({ status: 404, description: 'No matching posted invoice found' })
+  async getInvoiceForBooking(
+    @Query('patientId') patientId: string,
+    @Query('clinicId') clinicId: string,
+    @Query('invoiceId') invoiceId: string | undefined,
+    @Request() req: any,
+  ) {
+    if (!patientId || !clinicId) {
+      throw new BadRequestException({
+        message: { ar: 'معرف المريض والعيادة مطلوبان', en: 'patientId and clinicId are required' },
+        code: 'MISSING_PARAMS',
+      });
+    }
+
+    const invoice = await this.invoiceService.getInvoiceForBooking(
+      patientId,
+      clinicId,
+      invoiceId,
+      req.user?.userId || req.user?.id || req.user?.sub,
+      req.user?.role,
+      req.user?.clinicId,
+    );
+
+    return {
+      success: true,
+      message: SUCCESS_MESSAGES.INVOICE_RETRIEVED,
+      data: invoice,
+    };
+  }
+
+  /**
+   * Get ALL posted, unpaid/partially-paid invoices for a patient+clinic.
+   * Used by the appointment booking flow to display the invoice selection list.
+   * MUST be declared before GET ':id' to avoid route conflict.
+   *
+   * GET /invoices/list-for-booking?patientId=...&clinicId=...
+   */
+  @Get('list-for-booking')
+  @HttpCode(HttpStatus.OK)
+  @Roles(
+    UserRole.STAFF,
+    UserRole.ADMIN,
+    UserRole.MANAGER,
+    UserRole.OWNER,
+    UserRole.DOCTOR,
+  )
+  @ApiOperation({
+    summary: 'List invoices for booking',
+    description:
+      'Returns all posted, unpaid or partially-paid invoices for a specific patient and clinic. ' +
+      'Used by the appointment booking flow to let the user choose which invoice to link.',
+  })
+  @ApiQuery({ name: 'patientId', required: true, description: 'Patient ID' })
+  @ApiQuery({ name: 'clinicId', required: true, description: 'Clinic ID' })
+  @ApiResponse({ status: 200, description: 'Invoices retrieved successfully' })
+  async getInvoicesListForBooking(
+    @Query('patientId') patientId: string,
+    @Query('clinicId') clinicId: string,
+    @Request() req: any,
+  ) {
+    if (!patientId || !clinicId) {
+      throw new BadRequestException({
+        message: { ar: 'معرف المريض والعيادة مطلوبان', en: 'patientId and clinicId are required' },
+        code: 'MISSING_PARAMS',
+      });
+    }
+
+    const invoices = await this.invoiceService.getInvoicesListForBooking(
+      patientId,
+      clinicId,
+      req.user?.role,
+      req.user?.clinicId,
+    );
+
+    return {
+      success: true,
+      message: SUCCESS_MESSAGES.INVOICE_RETRIEVED,
+      data: invoices,
+    };
+  }
+
+  /**
+   * Transition a Draft invoice to Posted status.
+   * PATCH /invoices/:id/post
+   *
+   * Assigns an official INV-xxxx number and makes the invoice available for booking.
+   * Idempotent: calling on an already-posted invoice returns it unchanged.
+   */
+  @Patch(':id/post')
+  @HttpCode(HttpStatus.OK)
+  @Roles(UserRole.STAFF, UserRole.ADMIN, UserRole.MANAGER, UserRole.OWNER)
+  @ApiOperation({
+    summary: 'Post (publish) a draft invoice',
+    description:
+      'Transitions a Draft invoice to Posted status, assigning an official INV-xxxx number. ' +
+      'After posting, the invoice can be linked to appointments for session booking.',
+  })
+  @ApiParam({ name: 'id', description: 'Invoice ID', example: '507f1f77bcf86cd799439014' })
+  @ApiResponse({ status: 200, description: 'Invoice posted successfully' })
+  @ApiResponse({ status: 400, description: 'Invoice is not in Draft status' })
+  @ApiResponse({ status: 404, description: 'Invoice not found' })
+  async postInvoice(@Param('id') id: string) {
+    const invoice = await this.invoiceService.transitionToPosted(id);
+    return {
+      success: true,
+      message: { ar: 'تم نشر الفاتورة بنجاح', en: 'Invoice posted successfully' },
+      data: invoice,
+    };
+  }
+
+  /**
+   * Cancel an invoice.
+   * PATCH /invoices/:id/cancel
+   * PART I
+   *
+   * Only invoices with paidAmount === 0 can be cancelled.
+   * All embedded sessions are also set to 'cancelled'.
+   */
+  @Patch(':id/cancel')
+  @HttpCode(HttpStatus.OK)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.OWNER)
+  @ApiOperation({
+    summary: 'Cancel an invoice',
+    description:
+      'Cancels a draft or posted invoice that has no associated payments. ' +
+      'All embedded invoice sessions are set to cancelled. ' +
+      'Only Admin/Manager/Owner can cancel invoices.',
+  })
+  @ApiParam({ name: 'id', description: 'Invoice ID', example: '507f1f77bcf86cd799439014' })
+  @ApiResponse({ status: 200, description: 'Invoice cancelled successfully' })
+  @ApiResponse({ status: 400, description: 'Invoice has payments and cannot be cancelled' })
+  @ApiResponse({ status: 404, description: 'Invoice not found' })
+  async cancelInvoice(@Param('id') id: string, @Request() req: any) {
+    const userId = req.user?.id || req.user?.userId || req.user?.sub;
+
+    if (!userId) {
+      throw new BadRequestException({
+        message: AUTH_ERRORS.UNAUTHORIZED_ACCESS,
+        code: 'UNAUTHORIZED',
+      });
+    }
+
+    const invoice = await this.invoiceService.cancelInvoice(id, userId);
+
+    return {
+      success: true,
+      message: { ar: 'تم إلغاء الفاتورة بنجاح', en: 'Invoice cancelled successfully' },
+      data: invoice,
+    };
+  }
+
+  /**
    * Get invoice by ID
    * Requirements: 3.1, 11.5
-   * 
+   *
    * Accessible by: All authenticated users
    * Role-based access control enforced
    */
@@ -433,60 +612,19 @@ export class InvoiceController {
     }
 
     const userRole = user.role;
+    const userOrganizationId = user.organizationId;
 
     const invoice = await this.invoiceService.updateInvoice(
       id,
       updateInvoiceDto,
       userId,
       userRole,
+      userOrganizationId,
     );
 
     return {
       success: true,
       message: SUCCESS_MESSAGES.INVOICE_UPDATED,
-      data: invoice,
-    };
-  }
-
-  /**
-   * Cancel an invoice
-   * Requirements: Rule BZR-0e1f2a3b
-   */
-  @Patch(':id/cancel')
-  @HttpCode(HttpStatus.OK)
-  @Roles(UserRole.STAFF, UserRole.ADMIN, UserRole.MANAGER, UserRole.OWNER)
-  @ApiOperation({
-    summary: 'Cancel an invoice',
-    description:
-      'Marks an invoice as Cancelled. Only invoices with no payments can be cancelled. ' +
-      'Requires authentication and Staff/Admin/Manager/Owner role.',
-  })
-  @ApiParam({
-    name: 'id',
-    description: 'Invoice ID (MongoDB ObjectId)',
-    example: '507f1f77bcf86cd799439014',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Invoice cancelled successfully',
-  })
-  async cancelInvoice(@Param('id') id: string, @Request() req: any) {
-    const userId = req.user?.id || req.user?.userId || req.user?.sub;
-    if (!userId) {
-      throw new BadRequestException({
-        message: AUTH_ERRORS.UNAUTHORIZED_ACCESS,
-        code: 'UNAUTHORIZED',
-      });
-    }
-
-    const invoice = await this.invoiceService.cancelInvoice(id, userId);
-
-    return {
-      success: true,
-      message: {
-        ar: 'تم إلغاء الفاتورة بنجاح',
-        en: 'Invoice cancelled successfully',
-      },
       data: invoice,
     };
   }
@@ -554,7 +692,8 @@ export class InvoiceController {
       });
     }
 
-    await this.invoiceService.deleteInvoice(id, userId, userRole);
+    const userOrganizationId = req.user?.organizationId;
+    await this.invoiceService.deleteInvoice(id, userId, userRole, userOrganizationId);
 
     return {
       success: true,

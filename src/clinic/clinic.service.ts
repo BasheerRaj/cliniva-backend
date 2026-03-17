@@ -97,6 +97,7 @@ export class ClinicService {
 
     let targetSubscriptionId = subscriptionId;
     let targetComplexId = complexId;
+    let targetClinicId: string | undefined;
 
     // TENANT ISOLATION: Enforce scope based on user role (ISSUE-010)
     if (requestingUser && requestingUser.role !== 'super_admin') {
@@ -108,17 +109,27 @@ export class ClinicService {
       if (requestingUser.complexId) {
         targetComplexId = requestingUser.complexId;
       }
+
+      // Staff, doctors, and clinic-level admins can only see their assigned clinic
+      if (requestingUser.clinicId) {
+        targetClinicId = requestingUser.clinicId.toString();
+      }
     }
 
     // Build query
     const query: any = {};
 
-    if (targetSubscriptionId) {
-      query.subscriptionId = new Types.ObjectId(targetSubscriptionId);
-    }
+    if (targetClinicId) {
+      // Filtering by exact clinic _id — no need for subscriptionId/complexId on top
+      query._id = new Types.ObjectId(targetClinicId);
+    } else {
+      if (targetSubscriptionId) {
+        query.subscriptionId = new Types.ObjectId(targetSubscriptionId);
+      }
 
-    if (targetComplexId) {
-      query.complexId = new Types.ObjectId(targetComplexId);
+      if (targetComplexId) {
+        query.complexId = new Types.ObjectId(targetComplexId);
+      }
     }
 
     if (status) {

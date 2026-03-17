@@ -31,13 +31,18 @@ import { UpdateServiceWithSessionsDto } from './dto/update-service-with-sessions
 import { ChangeServiceStatusDto } from './dto/change-service-status.dto';
 import { BulkStatusChangeDto } from './dto/bulk-status-change.dto';
 import { UpdateServiceCategoryDto } from './dto/update-service-category.dto';
+import { CreateDoctorAssignmentDto } from './dto/doctor-assignment.dto';
 import { Service } from '../database/schemas/service.schema';
 import { ClinicService } from '../database/schemas/clinic-service.schema';
 import { SERVICE_SWAGGER_EXAMPLES } from './constants/swagger-examples';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../common/guards/roles.guard';
+import { Roles } from '../common/decorators/roles.decorator';
+import { UserRole } from '../common/enums/user-role.enum';
+import { ResponseBuilder } from '../common/utils/response-builder.util';
 @ApiTags('Services')
 @Controller('services')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class ServiceController {
   constructor(private readonly serviceService: ServiceService) {}
 
@@ -80,6 +85,7 @@ export class ServiceController {
   })
   @ApiBearerAuth()
   @ApiBody({ type: CreateServiceWithSessionsDto })
+  @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN, UserRole.MANAGER)
   @Post()
   @HttpCode(HttpStatus.CREATED)
   async createService(
@@ -162,6 +168,7 @@ export class ServiceController {
     },
   })
   @ApiBearerAuth()
+  @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN, UserRole.STAFF, UserRole.DOCTOR, UserRole.MANAGER)
   @ApiParam({
     name: 'id',
     description: 'Service ID',
@@ -245,6 +252,7 @@ export class ServiceController {
     },
   })
   @ApiBody({ type: UpdateServiceWithSessionsDto })
+  @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN, UserRole.MANAGER)
   @Put(':id')
   async updateService(
     @Param('id') id: string,
@@ -336,7 +344,8 @@ export class ServiceController {
    * Delete a service (soft delete)
    */
   @Delete(':id')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN, UserRole.MANAGER)
   @HttpCode(HttpStatus.OK)
   @ApiBearerAuth()
   @ApiOperation({
@@ -452,6 +461,7 @@ export class ServiceController {
       required: ['serviceNames'],
     },
   })
+  @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN, UserRole.MANAGER)
   @Post('validate-names')
   @HttpCode(HttpStatus.OK)
   async validateServiceNames(
@@ -531,6 +541,7 @@ export class ServiceController {
     type: String,
     example: '507f1f77bcf86cd799439020',
   })
+  @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN, UserRole.STAFF, UserRole.DOCTOR, UserRole.MANAGER)
   @Get('complex-departments/:complexDepartmentId')
   async getServicesByComplexDepartment(
     @Param('complexDepartmentId') complexDepartmentId: string,
@@ -585,6 +596,7 @@ export class ServiceController {
     example: '507f1f77bcf86cd799439040',
   })
   @ApiBody({ type: AssignServicesDto })
+  @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN, UserRole.MANAGER)
   @Post('clinics/:clinicId/assign')
   @HttpCode(HttpStatus.CREATED)
   async assignServicesToClinic(
@@ -631,6 +643,7 @@ export class ServiceController {
     type: String,
     example: '507f1f77bcf86cd799439040',
   })
+  @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN, UserRole.STAFF, UserRole.DOCTOR, UserRole.MANAGER)
   @Get('clinics/:clinicId')
   async getServicesByClinic(
     @Param('clinicId') clinicId: string,
@@ -675,6 +688,7 @@ export class ServiceController {
     type: String,
     example: '507f1f77bcf86cd799439040',
   })
+  @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN, UserRole.STAFF, UserRole.DOCTOR, UserRole.MANAGER)
   @Get('clinics/:clinicId/owned')
   async getServicesOwnedByClinic(
     @Param('clinicId') clinicId: string,
@@ -713,6 +727,7 @@ export class ServiceController {
     type: String,
     example: '507f1f77bcf86cd799439020',
   })
+  @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN, UserRole.STAFF, UserRole.DOCTOR, UserRole.MANAGER)
   @Get('clinic')
   async getServicesForClinic(
     @Query('complexDepartmentId') complexDepartmentId?: string,
@@ -759,6 +774,7 @@ export class ServiceController {
     type: String,
     example: '507f1f77bcf86cd799439020',
   })
+  @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN, UserRole.STAFF, UserRole.DOCTOR, UserRole.MANAGER)
   @Get('clinic/:complexDepartmentId')
   async getServicesForClinicWithDepartment(
     @Param('complexDepartmentId') complexDepartmentId: string,
@@ -799,6 +815,7 @@ export class ServiceController {
     type: String,
     example: '507f1f77bcf86cd799439020',
   })
+  @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN, UserRole.STAFF, UserRole.DOCTOR, UserRole.MANAGER)
   @Get()
   async getAllServices(
     @Query('complexDepartmentId') complexDepartmentId?: string,
@@ -878,6 +895,7 @@ export class ServiceController {
     example: '507f1f77bcf86cd799439011',
   })
   @ApiBody({ type: ChangeServiceStatusDto })
+  @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN, UserRole.MANAGER)
   @Patch(':id/status')
   async changeServiceStatus(
     @Param('id') id: string,
@@ -925,6 +943,7 @@ export class ServiceController {
     },
   })
   @ApiBearerAuth()
+  @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN, UserRole.STAFF, UserRole.DOCTOR, UserRole.MANAGER)
   @ApiParam({
     name: 'id',
     description: 'Service ID',
@@ -977,6 +996,7 @@ export class ServiceController {
     type: String,
     example: '507f1f77bcf86cd799439040',
   })
+  @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN, UserRole.STAFF, UserRole.DOCTOR, UserRole.MANAGER)
   @Get('active')
   async getActiveServices(
     @Query('complexDepartmentId') complexDepartmentId?: string,
@@ -1024,6 +1044,7 @@ export class ServiceController {
     },
   })
   @ApiBearerAuth()
+  @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN, UserRole.MANAGER)
   @ApiBody({ type: BulkStatusChangeDto })
   @Patch('bulk-status')
   async bulkStatusChange(
@@ -1033,5 +1054,102 @@ export class ServiceController {
   ): Promise<any> {
     const userId = req?.user?.id || req?.user?.userId;
     return this.serviceService.bulkStatusChange(dto, userId);
+  }
+
+  // ==================== Doctor Assignment Endpoints (PART H) ====================
+
+  /**
+   * Assign a doctor to a service with a custom price.
+   * POST /services/:id/doctor-assignments
+   * PART H
+   */
+  @Post(':id/doctor-assignments')
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth()
+  @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN, UserRole.MANAGER)
+  @ApiOperation({
+    summary: 'Assign a doctor to a service with a custom price',
+    description:
+      'Assigns a doctor to a service with a custom price. ' +
+      'If the doctor is already assigned (even inactive), reactivates the assignment and updates the price.',
+  })
+  @ApiParam({ name: 'id', description: 'Service ID', example: '507f1f77bcf86cd799439013' })
+  @ApiBody({ type: CreateDoctorAssignmentDto })
+  @ApiResponse({ status: 200, description: 'Doctor assigned successfully' })
+  @ApiResponse({ status: 404, description: 'Service or doctor not found' })
+  async addDoctorAssignment(
+    @Param('id') serviceId: string,
+    @Body(new ValidationPipe({ transform: true, whitelist: true }))
+    dto: CreateDoctorAssignmentDto,
+  ): Promise<any> {
+    const service = await this.serviceService.addDoctorAssignment(
+      serviceId,
+      dto.doctorId,
+      dto.price,
+    );
+    return ResponseBuilder.success(service, {
+      ar: 'تم تعيين الطبيب بنجاح',
+      en: 'Doctor assigned successfully',
+    });
+  }
+
+  /**
+   * Deactivate a doctor assignment for a service.
+   * PATCH /services/:id/doctor-assignments/:doctorId/deactivate
+   * PART H
+   */
+  @Patch(':id/doctor-assignments/:doctorId/deactivate')
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth()
+  @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN, UserRole.MANAGER)
+  @ApiOperation({
+    summary: 'Deactivate a doctor assignment for a service',
+    description: 'Soft-deactivates the doctor assignment (sets status to inactive).',
+  })
+  @ApiParam({ name: 'id', description: 'Service ID' })
+  @ApiParam({ name: 'doctorId', description: 'Doctor user ID' })
+  @ApiResponse({ status: 200, description: 'Doctor assignment deactivated' })
+  @ApiResponse({ status: 404, description: 'Service or assignment not found' })
+  async deactivateDoctorAssignment(
+    @Param('id') serviceId: string,
+    @Param('doctorId') doctorId: string,
+  ): Promise<any> {
+    const service = await this.serviceService.deactivateDoctorAssignment(
+      serviceId,
+      doctorId,
+    );
+    return ResponseBuilder.success(service, {
+      ar: 'تم تعطيل تعيين الطبيب بنجاح',
+      en: 'Doctor assignment deactivated successfully',
+    });
+  }
+
+  /**
+   * Get the effective price for a specific doctor on this service.
+   * GET /services/:id/doctor-price/:doctorId
+   * PART H
+   */
+  @Get(':id/doctor-price/:doctorId')
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth()
+  @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN, UserRole.STAFF, UserRole.MANAGER)
+  @ApiOperation({
+    summary: 'Get effective price for a doctor on a service',
+    description:
+      'Returns the doctor\'s custom assignment price if active, or the service base price as fallback.',
+  })
+  @ApiParam({ name: 'id', description: 'Service ID' })
+  @ApiParam({ name: 'doctorId', description: 'Doctor user ID' })
+  @ApiResponse({ status: 200, description: 'Price retrieved successfully' })
+  @ApiResponse({ status: 404, description: 'Service not found' })
+  async getDoctorPrice(
+    @Param('id') serviceId: string,
+    @Param('doctorId') doctorId: string,
+  ): Promise<any> {
+    const result = await this.serviceService.getDoctorPrice(serviceId, doctorId);
+    return ResponseBuilder.success(result, {
+      ar: 'تم استرجاع السعر بنجاح',
+      en: 'Price retrieved successfully',
+    });
   }
 }

@@ -7,6 +7,8 @@ import { InvoiceScopeGuard } from './guards/invoice-scope.guard';
 import { Invoice, InvoiceSchema } from '../database/schemas/invoice.schema';
 import { Patient, PatientSchema } from '../database/schemas/patient.schema';
 import { Service, ServiceSchema } from '../database/schemas/service.schema';
+import { Clinic, ClinicSchema } from '../database/schemas/clinic.schema';
+import { Counter, CounterSchema } from '../database/schemas/counter.schema';
 
 @Module({
   imports: [
@@ -14,6 +16,8 @@ import { Service, ServiceSchema } from '../database/schemas/service.schema';
       { name: Invoice.name, schema: InvoiceSchema },
       { name: Patient.name, schema: PatientSchema },
       { name: Service.name, schema: ServiceSchema },
+      { name: Clinic.name, schema: ClinicSchema },
+      { name: Counter.name, schema: CounterSchema },
     ]),
   ],
   controllers: [InvoiceController],

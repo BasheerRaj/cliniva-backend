@@ -175,4 +175,14 @@ export class CreateAppointmentDto {
     message: '{"ar":"معرف الفاتورة غير صالح","en":"Invalid invoice ID"}',
   })
   invoiceId?: string;
+
+  @ApiPropertyOptional({
+    description: 'Invoice item ID (invoiceItemId of the session) - links appointment to a specific invoice session',
+    example: '507f1f77bcf86cd799439021',
+  })
+  @IsOptional()
+  @IsMongoId({
+    message: '{"ar":"معرف جلسة الفاتورة غير صالح","en":"Invalid invoice item ID"}',
+  })
+  invoiceItemId?: string;
 }

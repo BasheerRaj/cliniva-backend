@@ -1296,6 +1296,137 @@ export class ServiceService {
     };
   }
 
+  // ==================== Doctor Assignment Methods (PART H) ====================
+
+  /**
+   * Assign a doctor to a service with a custom price.
+   * If the doctor is already assigned (even inactive), reactivates and updates the price.
+   * PART H
+   */
+  async addDoctorAssignment(
+    serviceId: string,
+    doctorId: string,
+    price: number,
+  ): Promise<Service> {
+    const service = await this.serviceModel
+      .findOne({ _id: new Types.ObjectId(serviceId), deletedAt: { $exists: false } })
+      .exec();
+    if (!service) {
+      throw new NotFoundException({
+        message: { ar: 'الخدمة غير موجودة', en: 'Service not found' },
+      });
+    }
+
+    // Check if doctor exists
+    const doctor = await this.userModel
+      .findOne({ _id: new Types.ObjectId(doctorId), deletedAt: { $exists: false } })
+      .exec();
+    if (!doctor) {
+      throw new NotFoundException({
+        message: { ar: 'الطبيب غير موجود', en: 'Doctor not found' },
+      });
+    }
+
+    const doctorObjectId = new Types.ObjectId(doctorId);
+    const existing = service.doctorAssignments?.find(
+      (a) => a.doctorId.toString() === doctorId,
+    );
+
+    if (existing) {
+      // Reactivate and update price via arrayFilter
+      await this.serviceModel.updateOne(
+        { _id: service._id },
+        {
+          $set: {
+            'doctorAssignments.$[item].price': price,
+            'doctorAssignments.$[item].status': 'active',
+          },
+        },
+        { arrayFilters: [{ 'item.doctorId': doctorObjectId }] },
+      );
+    } else {
+      // Push new assignment
+      await this.serviceModel.updateOne(
+        { _id: service._id },
+        {
+          $push: {
+            doctorAssignments: { doctorId: doctorObjectId, price, status: 'active' },
+          },
+        },
+      );
+    }
+
+    return this.serviceModel.findById(service._id).exec() as Promise<Service>;
+  }
+
+  /**
+   * Deactivate a doctor assignment for a service (soft-deactivate).
+   * PART H
+   */
+  async deactivateDoctorAssignment(
+    serviceId: string,
+    doctorId: string,
+  ): Promise<Service> {
+    const service = await this.serviceModel
+      .findOne({ _id: new Types.ObjectId(serviceId), deletedAt: { $exists: false } })
+      .exec();
+    if (!service) {
+      throw new NotFoundException({
+        message: { ar: 'الخدمة غير موجودة', en: 'Service not found' },
+      });
+    }
+
+    const doctorObjectId = new Types.ObjectId(doctorId);
+    const existing = service.doctorAssignments?.find(
+      (a) => a.doctorId.toString() === doctorId && a.status === 'active',
+    );
+    if (!existing) {
+      throw new NotFoundException({
+        message: {
+          ar: 'تعيين الطبيب غير موجود أو غير نشط',
+          en: 'Doctor assignment not found or already inactive',
+        },
+      });
+    }
+
+    await this.serviceModel.updateOne(
+      { _id: service._id },
+      { $set: { 'doctorAssignments.$[item].status': 'inactive' } },
+      { arrayFilters: [{ 'item.doctorId': doctorObjectId }] },
+    );
+
+    return this.serviceModel.findById(service._id).exec() as Promise<Service>;
+  }
+
+  /**
+   * Get the effective price for a specific doctor on this service.
+   * Returns the doctor's custom price if active, or the service base price as fallback.
+   * PART H
+   */
+  async getDoctorPrice(
+    serviceId: string,
+    doctorId: string,
+  ): Promise<{ price: number; source: 'doctor_assignment' | 'service_base' }> {
+    const service = await this.serviceModel
+      .findOne({ _id: new Types.ObjectId(serviceId), deletedAt: { $exists: false } })
+      .exec();
+    if (!service) {
+      throw new NotFoundException({
+        message: { ar: 'الخدمة غير موجودة', en: 'Service not found' },
+      });
+    }
+
+    const assignment = service.doctorAssignments?.find(
+      (a) => a.doctorId.toString() === doctorId && a.status === 'active',
+    );
+
+    if (assignment) {
+      return { price: assignment.price, source: 'doctor_assignment' };
+    }
+
+    return { price: service.price ?? 0, source: 'service_base' };
+  }
+
   /**
    * Get service status history
    * Note: This requires a separate StatusHistory schema for full audit trail.

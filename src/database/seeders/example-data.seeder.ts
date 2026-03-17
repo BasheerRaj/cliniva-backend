@@ -268,8 +268,11 @@ export class ExampleDataSeederService {
       await this.createClinicStaff(clinic2A, organization, subscription, '2a', DOCTOR_2A_1_HOURS, DOCTOR_2A_2_HOURS);
       await this.createClinicStaff(clinic2B, organization, subscription, '2b', DOCTOR_2B_1_HOURS, DOCTOR_2B_2_HOURS);
 
-      // Patients for Clinic 1A (Cardiology) — visible to clinic.admin.1a@medicare.example.com
-      await this.seedPatients(clinic1A, complex1, organization);
+      // Patients per clinic
+      await this.seedPatients(clinic1A, complex1, organization, '1A');
+      await this.seedPatients(clinic1B, complex1, organization, '1B');
+      await this.seedPatients(clinic2A, complex2, organization, '2A');
+      await this.seedPatients(clinic2B, complex2, organization, '2B');
 
       this.logger.log('✅ Example relational data seeding completed successfully');
       this.printSummary();
@@ -497,7 +500,8 @@ export class ExampleDataSeederService {
     specialization: string,
     code: string,
   ): Promise<Clinic> {
-    let clinic = await this.clinicModel.findOne({ name, complexId: complex._id });
+    // Use name + organizationId as stable idempotency key (complexId changes on every reset)
+    let clinic = await this.clinicModel.findOne({ name, organizationId: organization._id });
     if (!clinic) {
       const orgOwner = await this.userModel.findOne({ email: 'medicare.owner@example.com' });
       const licSuffix = Math.floor(100000 + Math.random() * 900000);
@@ -536,6 +540,14 @@ export class ExampleDataSeederService {
         status: 'active',
       });
       this.logger.log(`    ✓ Created clinic: ${name}`);
+    } else {
+      // Sync scope refs to current IDs (they change on every db:reset)
+      await this.clinicModel.updateOne(
+        { _id: clinic._id },
+        { complexId: complex._id, subscriptionId: subscription._id, organizationId: organization._id },
+      );
+      clinic = (await this.clinicModel.findById(clinic._id))!;
+      this.logger.log(`    ↺ Updated clinic refs: ${name}`);
     }
     return clinic;
   }
@@ -683,12 +695,18 @@ export class ExampleDataSeederService {
         createdBy:         null,
       });
       this.logger.log(`      ✓ Created ${def.role}: ${def.firstName} ${def.lastName}`);
-    } else if (!(user as any).complexId) {
-      // Patch existing users missing complexId (required for JWT scope resolution)
+    } else {
+      // Always re-sync scope fields in case DB was reset and entities were recreated with new ObjectIds
       await this.userModel.updateOne(
         { _id: user._id },
-        { complexId: (clinic as any).complexId },
+        {
+          clinicId:       clinic._id,
+          complexId:      (clinic as any).complexId,
+          organizationId: organization._id,
+          subscriptionId: subscription._id,
+        },
       );
+      this.logger.log(`      ↺ Updated scope for ${def.role}: ${def.firstName} ${def.lastName}`);
     }
     return user;
   }
@@ -798,67 +816,110 @@ export class ExampleDataSeederService {
     this.logger.log('📊 ═══════════════════════════════════════════════════');
   }
 
-  // ─── Patients for Clinic 1A ───────────────────────────────────────────────
+  // ─── Patient definitions per clinic ─────────────────────────────────────
+
+  private readonly PATIENT_DATA: Record<string, Array<{
+    seq: number; firstName: string; lastName: string; dob: string;
+    gender: string; phone: string; ins?: string; insStatus: string; status: string;
+  }>> = {
+    '1A': [
+      { seq: 1,  firstName: 'Ahmed',    lastName: 'Al-Rashidi',   dob: '1985-03-12', gender: 'male',   phone: '+966501001001', ins: 'Bupa Arabia', insStatus: 'Active',   status: 'Active'   },
+      { seq: 2,  firstName: 'Fatima',   lastName: 'Al-Ahmadi',    dob: '1990-07-25', gender: 'female', phone: '+966501001002',                     insStatus: 'Expired',  status: 'Active'   },
+      { seq: 3,  firstName: 'Mohammed', lastName: 'Al-Mutairi',   dob: '1978-11-05', gender: 'male',   phone: '+966501001003', ins: 'Tawuniya',    insStatus: 'Active',   status: 'Active'   },
+      { seq: 4,  firstName: 'Layla',    lastName: 'Al-Dosari',    dob: '1995-01-18', gender: 'female', phone: '+966501001004',                     insStatus: 'None',     status: 'Active'   },
+      { seq: 5,  firstName: 'Abdullah', lastName: 'Al-Harbi',     dob: '1972-09-30', gender: 'male',   phone: '+966501001005', ins: 'Walaa',       insStatus: 'Pending',  status: 'Active'   },
+      { seq: 6,  firstName: 'Nora',     lastName: 'Al-Shehri',    dob: '1988-04-14', gender: 'female', phone: '+966501001006', ins: 'Bupa Arabia', insStatus: 'Active',   status: 'Active'   },
+      { seq: 7,  firstName: 'Khalid',   lastName: 'Al-Otaibi',    dob: '1965-12-22', gender: 'male',   phone: '+966501001007',                     insStatus: 'Expired',  status: 'Inactive' },
+      { seq: 8,  firstName: 'Sara',     lastName: 'Al-Ghamdi',    dob: '1993-06-09', gender: 'female', phone: '+966501001008', ins: 'MedGulf',     insStatus: 'Active',   status: 'Active'   },
+      { seq: 9,  firstName: 'Omar',     lastName: 'Al-Qahtani',   dob: '1980-02-28', gender: 'male',   phone: '+966501001009',                     insStatus: 'None',     status: 'Active'   },
+      { seq: 10, firstName: 'Dana',     lastName: 'Al-Zahrani',   dob: '1997-08-17', gender: 'female', phone: '+966501001010', ins: 'Tawuniya',    insStatus: 'Active',   status: 'Active'   },
+      { seq: 11, firstName: 'Yousef',   lastName: 'Al-Maliki',    dob: '1975-05-03', gender: 'male',   phone: '+966501001011', ins: 'Bupa Arabia', insStatus: 'Active',   status: 'Active'   },
+      { seq: 12, firstName: 'Maha',     lastName: 'Al-Juhani',    dob: '1983-10-19', gender: 'female', phone: '+966501001012',                     insStatus: 'Expired',  status: 'Inactive' },
+      { seq: 13, firstName: 'Tariq',    lastName: 'Al-Anazi',     dob: '1968-03-07', gender: 'male',   phone: '+966501001013', ins: 'Walaa',       insStatus: 'Active',   status: 'Active'   },
+      { seq: 14, firstName: 'Rania',    lastName: 'Al-Rashid',    dob: '1992-11-24', gender: 'female', phone: '+966501001014',                     insStatus: 'Pending',  status: 'Active'   },
+      { seq: 15, firstName: 'Hassan',   lastName: 'Al-Shammari',  dob: '1970-07-11', gender: 'male',   phone: '+966501001015', ins: 'MedGulf',     insStatus: 'Active',   status: 'Active'   },
+    ],
+    '1B': [
+      { seq: 1,  firstName: 'Sami',     lastName: 'Al-Ghamdi',    dob: '1982-06-15', gender: 'male',   phone: '+966501002001', ins: 'Tawuniya',    insStatus: 'Active',   status: 'Active'   },
+      { seq: 2,  firstName: 'Hessa',    lastName: 'Al-Qahtani',   dob: '1991-02-28', gender: 'female', phone: '+966501002002',                     insStatus: 'None',     status: 'Active'   },
+      { seq: 3,  firstName: 'Badr',     lastName: 'Al-Shammari',  dob: '1976-09-10', gender: 'male',   phone: '+966501002003', ins: 'Bupa Arabia', insStatus: 'Active',   status: 'Active'   },
+      { seq: 4,  firstName: 'Mona',     lastName: 'Al-Harbi',     dob: '1988-04-22', gender: 'female', phone: '+966501002004', ins: 'MedGulf',     insStatus: 'Active',   status: 'Active'   },
+      { seq: 5,  firstName: 'Talal',    lastName: 'Al-Otaibi',    dob: '1964-12-05', gender: 'male',   phone: '+966501002005',                     insStatus: 'Expired',  status: 'Inactive' },
+      { seq: 6,  firstName: 'Reema',    lastName: 'Al-Zahrani',   dob: '1994-07-19', gender: 'female', phone: '+966501002006', ins: 'Walaa',       insStatus: 'Active',   status: 'Active'   },
+      { seq: 7,  firstName: 'Majed',    lastName: 'Al-Dosari',    dob: '1979-03-30', gender: 'male',   phone: '+966501002007', ins: 'Tawuniya',    insStatus: 'Active',   status: 'Active'   },
+      { seq: 8,  firstName: 'Lina',     lastName: 'Al-Mutairi',   dob: '1996-11-14', gender: 'female', phone: '+966501002008',                     insStatus: 'Pending',  status: 'Active'   },
+      { seq: 9,  firstName: 'Nawaf',    lastName: 'Al-Rashidi',   dob: '1970-08-25', gender: 'male',   phone: '+966501002009', ins: 'Bupa Arabia', insStatus: 'Active',   status: 'Active'   },
+      { seq: 10, firstName: 'Abeer',    lastName: 'Al-Ahmadi',    dob: '1986-01-07', gender: 'female', phone: '+966501002010', ins: 'MedGulf',     insStatus: 'Active',   status: 'Active'   },
+      { seq: 11, firstName: 'Faris',    lastName: 'Al-Anazi',     dob: '1973-05-18', gender: 'male',   phone: '+966501002011',                     insStatus: 'Expired',  status: 'Inactive' },
+      { seq: 12, firstName: 'Ghada',    lastName: 'Al-Maliki',    dob: '1998-09-02', gender: 'female', phone: '+966501002012', ins: 'Walaa',       insStatus: 'Active',   status: 'Active'   },
+    ],
+    '2A': [
+      { seq: 1,  firstName: 'Ziad',     lastName: 'Al-Tamimi',    dob: '2010-04-12', gender: 'male',   phone: '+966501003001', ins: 'Bupa Arabia', insStatus: 'Active',   status: 'Active'   },
+      { seq: 2,  firstName: 'Jood',     lastName: 'Al-Sulaiman',  dob: '2015-08-30', gender: 'female', phone: '+966501003002', ins: 'Tawuniya',    insStatus: 'Active',   status: 'Active'   },
+      { seq: 3,  firstName: 'Rakan',    lastName: 'Al-Bishi',     dob: '2008-01-22', gender: 'male',   phone: '+966501003003',                     insStatus: 'None',     status: 'Active'   },
+      { seq: 4,  firstName: 'Lujain',   lastName: 'Al-Harthi',    dob: '2018-06-05', gender: 'female', phone: '+966501003004', ins: 'MedGulf',     insStatus: 'Active',   status: 'Active'   },
+      { seq: 5,  firstName: 'Sultan',   lastName: 'Al-Yami',      dob: '2012-11-17', gender: 'male',   phone: '+966501003005', ins: 'Walaa',       insStatus: 'Pending',  status: 'Active'   },
+      { seq: 6,  firstName: 'Rand',     lastName: 'Al-Juhani',    dob: '2020-03-08', gender: 'female', phone: '+966501003006', ins: 'Bupa Arabia', insStatus: 'Active',   status: 'Active'   },
+      { seq: 7,  firstName: 'Hamad',    lastName: 'Al-Shehri',    dob: '2007-09-25', gender: 'male',   phone: '+966501003007', ins: 'Tawuniya',    insStatus: 'Active',   status: 'Active'   },
+      { seq: 8,  firstName: 'Nada',     lastName: 'Al-Zahrani',   dob: '2016-12-14', gender: 'female', phone: '+966501003008',                     insStatus: 'Expired',  status: 'Inactive' },
+      { seq: 9,  firstName: 'Yazeed',   lastName: 'Al-Qahtani',   dob: '2009-07-03', gender: 'male',   phone: '+966501003009', ins: 'MedGulf',     insStatus: 'Active',   status: 'Active'   },
+      { seq: 10, firstName: 'Arwa',     lastName: 'Al-Harbi',     dob: '2019-02-20', gender: 'female', phone: '+966501003010', ins: 'Walaa',       insStatus: 'Active',   status: 'Active'   },
+    ],
+    '2B': [
+      { seq: 1,  firstName: 'Wafa',     lastName: 'Al-Rashid',    dob: '1987-05-14', gender: 'female', phone: '+966501004001', ins: 'Bupa Arabia', insStatus: 'Active',   status: 'Active'   },
+      { seq: 2,  firstName: 'Meshal',   lastName: 'Al-Ghamdi',    dob: '1993-10-27', gender: 'male',   phone: '+966501004002',                     insStatus: 'None',     status: 'Active'   },
+      { seq: 3,  firstName: 'Asma',     lastName: 'Al-Otaibi',    dob: '1979-02-09', gender: 'female', phone: '+966501004003', ins: 'Tawuniya',    insStatus: 'Active',   status: 'Active'   },
+      { seq: 4,  firstName: 'Raed',     lastName: 'Al-Mutairi',   dob: '1995-08-16', gender: 'male',   phone: '+966501004004', ins: 'MedGulf',     insStatus: 'Active',   status: 'Active'   },
+      { seq: 5,  firstName: 'Hajar',    lastName: 'Al-Shammari',  dob: '1984-04-01', gender: 'female', phone: '+966501004005', ins: 'Walaa',       insStatus: 'Active',   status: 'Active'   },
+      { seq: 6,  firstName: 'Bandar',   lastName: 'Al-Ahmadi',    dob: '1970-12-23', gender: 'male',   phone: '+966501004006',                     insStatus: 'Expired',  status: 'Inactive' },
+      { seq: 7,  firstName: 'Shahad',   lastName: 'Al-Dosari',    dob: '1998-07-11', gender: 'female', phone: '+966501004007', ins: 'Bupa Arabia', insStatus: 'Active',   status: 'Active'   },
+      { seq: 8,  firstName: 'Fhad',     lastName: 'Al-Zahrani',   dob: '1988-03-05', gender: 'male',   phone: '+966501004008', ins: 'Tawuniya',    insStatus: 'Pending',  status: 'Active'   },
+    ],
+  };
+
+  // ─── Seed patients for a clinic ─────────────────────────────────────────
 
   private async seedPatients(
     clinic: Clinic,
     complex: Complex,
     organization: Organization,
+    code: '1A' | '1B' | '2A' | '2B',
   ): Promise<void> {
-    this.logger.log('👥 Seeding patients for Clinic 1A (Cardiology)...');
-
-    const clinicId      = clinic._id as Types.ObjectId;
-    const complexId     = complex._id as Types.ObjectId;
+    const clinicId       = clinic._id as Types.ObjectId;
+    const complexId      = complex._id as Types.ObjectId;
     const organizationId = organization._id as Types.ObjectId;
+    const patients = this.PATIENT_DATA[code];
 
-    const patients = [
-      { seq: 1,  firstName: 'Ahmed',    lastName: 'Al-Rashidi',   dob: '1985-03-12', gender: 'male',   phone: '+966501001001', ins: 'Bupa Arabia',  insStatus: 'Active',   status: 'Active'   },
-      { seq: 2,  firstName: 'Fatima',   lastName: 'Al-Ahmadi',    dob: '1990-07-25', gender: 'female', phone: '+966501001002', ins: undefined,      insStatus: 'Expired',  status: 'Active'   },
-      { seq: 3,  firstName: 'Mohammed', lastName: 'Al-Mutairi',   dob: '1978-11-05', gender: 'male',   phone: '+966501001003', ins: 'Tawuniya',     insStatus: 'Active',   status: 'Active'   },
-      { seq: 4,  firstName: 'Layla',    lastName: 'Al-Dosari',    dob: '1995-01-18', gender: 'female', phone: '+966501001004', ins: undefined,      insStatus: 'None',     status: 'Active'   },
-      { seq: 5,  firstName: 'Abdullah', lastName: 'Al-Harbi',     dob: '1972-09-30', gender: 'male',   phone: '+966501001005', ins: 'Walaa',        insStatus: 'Pending',  status: 'Active'   },
-      { seq: 6,  firstName: 'Nora',     lastName: 'Al-Shehri',    dob: '1988-04-14', gender: 'female', phone: '+966501001006', ins: 'Bupa Arabia',  insStatus: 'Active',   status: 'Active'   },
-      { seq: 7,  firstName: 'Khalid',   lastName: 'Al-Otaibi',    dob: '1965-12-22', gender: 'male',   phone: '+966501001007', ins: undefined,      insStatus: 'Expired',  status: 'Inactive' },
-      { seq: 8,  firstName: 'Sara',     lastName: 'Al-Ghamdi',    dob: '1993-06-09', gender: 'female', phone: '+966501001008', ins: 'MedGulf',      insStatus: 'Active',   status: 'Active'   },
-      { seq: 9,  firstName: 'Omar',     lastName: 'Al-Qahtani',   dob: '1980-02-28', gender: 'male',   phone: '+966501001009', ins: undefined,      insStatus: 'None',     status: 'Active'   },
-      { seq: 10, firstName: 'Dana',     lastName: 'Al-Zahrani',   dob: '1997-08-17', gender: 'female', phone: '+966501001010', ins: 'Tawuniya',     insStatus: 'Active',   status: 'Active'   },
-      { seq: 11, firstName: 'Yousef',   lastName: 'Al-Maliki',    dob: '1975-05-03', gender: 'male',   phone: '+966501001011', ins: 'Bupa Arabia',  insStatus: 'Active',   status: 'Active'   },
-      { seq: 12, firstName: 'Maha',     lastName: 'Al-Juhani',    dob: '1983-10-19', gender: 'female', phone: '+966501001012', ins: undefined,      insStatus: 'Expired',  status: 'Inactive' },
-      { seq: 13, firstName: 'Tariq',    lastName: 'Al-Anazi',     dob: '1968-03-07', gender: 'male',   phone: '+966501001013', ins: 'Walaa',        insStatus: 'Active',   status: 'Active'   },
-      { seq: 14, firstName: 'Rania',    lastName: 'Al-Rashid',    dob: '1992-11-24', gender: 'female', phone: '+966501001014', ins: undefined,      insStatus: 'Pending',  status: 'Active'   },
-      { seq: 15, firstName: 'Hassan',   lastName: 'Al-Shammari',  dob: '1970-07-11', gender: 'male',   phone: '+966501001015', ins: 'MedGulf',      insStatus: 'Active',   status: 'Active'   },
-      { seq: 16, firstName: 'Amira',    lastName: 'Al-Sulaiman',  dob: '1999-01-30', gender: 'female', phone: '+966501001016', ins: undefined,      insStatus: 'None',     status: 'Active'   },
-      { seq: 17, firstName: 'Faisal',   lastName: 'Al-Tamimi',    dob: '1977-09-16', gender: 'male',   phone: '+966501001017', ins: 'Tawuniya',     insStatus: 'Active',   status: 'Active'   },
-      { seq: 18, firstName: 'Reem',     lastName: 'Al-Bishi',     dob: '1986-04-02', gender: 'female', phone: '+966501001018', ins: 'Bupa Arabia',  insStatus: 'Active',   status: 'Active'   },
-      { seq: 19, firstName: 'Walid',    lastName: 'Al-Yami',      dob: '1962-12-08', gender: 'male',   phone: '+966501001019', ins: undefined,      insStatus: 'Expired',  status: 'Inactive' },
-      { seq: 20, firstName: 'Nouf',     lastName: 'Al-Harthi',    dob: '1994-06-21', gender: 'female', phone: '+966501001020', ins: 'MedGulf',      insStatus: 'Active',   status: 'Active'   },
-    ];
-
+    let created = 0;
     for (const p of patients) {
-      const cardNumber = `CARD-1A-${String(p.seq).padStart(3, '0')}`;
-      const existing   = await this.patientModel.findOne({ cardNumber });
-      if (existing) continue;
+      const cardNumber = `CARD-${code}-${String(p.seq).padStart(3, '0')}`;
+      if (await this.patientModel.findOne({ cardNumber })) continue;
 
-      const patientNumber = `PAT2026${String(p.seq).padStart(3, '0')}`;
+      const patientNumber = `PAT${code}${String(p.seq).padStart(3, '0')}`;
       await this.patientModel.create({
         clinicId,
         complexId,
         organizationId,
         patientNumber,
         cardNumber,
-        firstName:        p.firstName,
-        lastName:         p.lastName,
-        dateOfBirth:      new Date(p.dob),
-        gender:           p.gender,
-        status:           p.status,
-        phone:            p.phone,
-        insuranceCompany: p.ins,
-        insuranceStatus:  p.insStatus,
+        firstName:         p.firstName,
+        lastName:          p.lastName,
+        dateOfBirth:       new Date(p.dob),
+        gender:            p.gender,
+        status:            p.status,
+        phone:             p.phone,
+        insuranceCompany:  p.ins,
+        insuranceStatus:   p.insStatus,
         preferredLanguage: 'ar',
       });
+      created++;
     }
 
-    this.logger.log(`  ✓ Seeded 20 patients for Cardiology Clinic (Clinic 1A)`);
+    if (created > 0) {
+      this.logger.log(`  ✓ Seeded ${created} patients for Clinic ${code} (${(clinic as any).name})`);
+    } else {
+      this.logger.log(`  ↺ Patients already exist for Clinic ${code}`);
+    }
   }
 
   // ─── Clear ────────────────────────────────────────────────────────────────
@@ -900,7 +961,7 @@ export class ExampleDataSeederService {
     const clinics = await this.clinicModel.find({ name: { $in: clinicNames } });
     const clinicIds = clinics.map((c) => c._id);
     await this.workingHoursModel.deleteMany({ entityType: 'clinic', entityId: { $in: clinicIds } });
-    await this.patientModel.deleteMany({ cardNumber: /^CARD-1A-/ });
+    await this.patientModel.deleteMany({ cardNumber: /^CARD-(1A|1B|2A|2B)-/ });
     await this.clinicModel.deleteMany({ name: { $in: clinicNames } });
 
     // Remove complexes

@@ -99,6 +99,12 @@ export class Appointment extends Document {
   @Prop({ type: Types.ObjectId, ref: 'User', required: false })
   cancelledBy?: Types.ObjectId;
 
+  @Prop({ type: Types.ObjectId, ref: 'User', required: false })
+  startedBy?: Types.ObjectId;
+
+  @Prop({ type: Types.ObjectId, ref: 'User', required: false })
+  completedBy?: Types.ObjectId;
+
   @Prop({ required: false, default: false })
   rescheduleRequested?: boolean;
 
