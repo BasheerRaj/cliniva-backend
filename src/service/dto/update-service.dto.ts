@@ -56,6 +56,17 @@ export class UpdateServiceDto {
   price?: number;
 
   @ApiPropertyOptional({
+    description: 'Service category label',
+    example: 'Consultation',
+    type: String,
+    maxLength: 100,
+  })
+  @IsString()
+  @IsOptional()
+  @MaxLength(100)
+  serviceCategory?: string;
+
+  @ApiPropertyOptional({
     description: 'Complex department ID that owns this service',
     example: '507f1f77bcf86cd799439020',
     type: String,
