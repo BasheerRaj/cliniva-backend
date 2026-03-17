@@ -18,7 +18,9 @@ import { ValidationUtil } from '../common/utils/validation.util';
 import { TransactionUtil } from '../common/utils/transaction.util';
 import { SubscriptionService } from '../subscription/subscription.service';
 import {
+  AssignedClinicSummary,
   CapacityBreakdown,
+  DoctorStaffSummary,
   DepartmentRestriction,
   PaginatedResponse,
   StatusChangeResponse,
@@ -486,31 +488,33 @@ export class ComplexService {
     // Calculate clinics assigned count
     const clinicsAssignedCount = await this.calculateClinicsAssigned(complexId);
 
-    // Query departments with full details
-    const departments = await this.complexModel.db
-      .collection('complex_departments')
-      .aggregate([
-        {
-          $match: {
-            complexId: new Types.ObjectId(complexId),
-            isActive: true,
-          },
-        },
-        {
-          $lookup: {
-            from: 'departments',
-            localField: 'departmentId',
-            foreignField: '_id',
-            as: 'department',
-          },
-        },
-        { $unwind: '$department' },
-        { $replaceRoot: { newRoot: '$department' } },
-      ])
-      .toArray();
-
-    // Calculate capacity breakdown
-    const capacity = await this.calculateCapacity(complexId);
+    const [departments, capacity, assignedClinics, doctorStaffList] =
+      await Promise.all([
+        this.complexModel.db
+          .collection('complex_departments')
+          .aggregate([
+            {
+              $match: {
+                complexId: new Types.ObjectId(complexId),
+                isActive: true,
+              },
+            },
+            {
+              $lookup: {
+                from: 'departments',
+                localField: 'departmentId',
+                foreignField: '_id',
+                as: 'department',
+              },
+            },
+            { $unwind: '$department' },
+            { $replaceRoot: { newRoot: '$department' } },
+          ])
+          .toArray(),
+        this.calculateCapacity(complexId),
+        this.getAssignedClinicList(complexId),
+        this.getDoctorAndStaffList(complexId),
+      ]);
 
     // Build ComplexDetailsResponse
     return {
@@ -526,6 +530,8 @@ export class ComplexService {
         departmentsCount: departments.length,
         departments,
         capacity,
+        assignedClinics,
+        doctorStaffList,
       },
       message: {
         ar: 'تم استرجاع تفاصيل المجمع بنجاح',
@@ -989,6 +995,163 @@ export class ComplexService {
       });
 
     return count;
+  }
+
+  private async getAssignedClinicList(
+    complexId: string,
+  ): Promise<AssignedClinicSummary[]> {
+    const clinics = await this.complexModel.db
+      .collection('clinics')
+      .find({
+        complexId: new Types.ObjectId(complexId),
+        deletedAt: null,
+      })
+      .sort({ name: 1 })
+      .toArray();
+
+    if (clinics.length === 0) {
+      return [];
+    }
+
+    const clinicIds = clinics.map((clinic) => clinic._id);
+
+    const [appointmentsByClinic, doctorsByClinic, picUsers] =
+      await Promise.all([
+        this.complexModel.db
+          .collection('appointments')
+          .aggregate([
+            {
+              $match: {
+                clinicId: { $in: clinicIds },
+                status: { $in: ['scheduled', 'confirmed'] },
+                deletedAt: null,
+              },
+            },
+            {
+              $group: {
+                _id: '$clinicId',
+                count: { $sum: 1 },
+              },
+            },
+          ])
+          .toArray(),
+        this.complexModel.db
+          .collection('users')
+          .aggregate([
+            {
+              $match: {
+                clinicId: { $in: clinicIds },
+                role: 'doctor',
+                isActive: true,
+              },
+            },
+            {
+              $group: {
+                _id: '$clinicId',
+                count: { $sum: 1 },
+              },
+            },
+          ])
+          .toArray(),
+        this.complexModel.db
+          .collection('users')
+          .find({
+            _id: {
+              $in: clinics
+                .map((clinic) => clinic.personInChargeId)
+                .filter((picId) => !!picId),
+            },
+          })
+          .project({ firstName: 1, lastName: 1 })
+          .toArray(),
+      ]);
+
+    const appointmentCountMap = new Map(
+      appointmentsByClinic.map((item) => [item._id.toString(), item.count]),
+    );
+    const doctorsCountMap = new Map(
+      doctorsByClinic.map((item) => [item._id.toString(), item.count]),
+    );
+    const picMap = new Map(
+      picUsers.map((user) => [
+        user._id.toString(),
+        `${user.firstName || ''} ${user.lastName || ''}`.trim() || null,
+      ]),
+    );
+
+    return clinics.map((clinic, index) => ({
+      no: index + 1,
+      clinicId: clinic._id.toString(),
+      name: clinic.name,
+      pic: clinic.personInChargeId
+        ? picMap.get(clinic.personInChargeId.toString()) || null
+        : null,
+      scheduledAppointmentsCount:
+        appointmentCountMap.get(clinic._id.toString()) || 0,
+      doctors: doctorsCountMap.get(clinic._id.toString()) || 0,
+      status:
+        clinic.status || (clinic.isActive === false ? 'inactive' : 'active'),
+    }));
+  }
+
+  private async getDoctorAndStaffList(
+    complexId: string,
+  ): Promise<DoctorStaffSummary[]> {
+    const users = await this.complexModel.db
+      .collection('users')
+      .find({
+        complexId: new Types.ObjectId(complexId),
+        role: { $in: ['doctor', 'staff'] },
+      })
+      .project({
+        firstName: 1,
+        lastName: 1,
+        role: 1,
+        isActive: 1,
+        clinicId: 1,
+      })
+      .sort({ firstName: 1, lastName: 1 })
+      .toArray();
+
+    if (users.length === 0) {
+      return [];
+    }
+
+    const uniqueClinicIds = [
+      ...new Set(
+        users
+          .map((user) => user.clinicId?.toString())
+          .filter((clinicId): clinicId is string => !!clinicId),
+      ),
+    ];
+
+    const clinics = uniqueClinicIds.length
+      ? await this.complexModel.db
+          .collection('clinics')
+          .find({
+            _id: {
+              $in: uniqueClinicIds.map((clinicId) => new Types.ObjectId(clinicId)),
+            },
+          })
+          .project({ name: 1 })
+          .toArray()
+      : [];
+
+    const clinicNameMap = new Map(
+      clinics.map((clinic) => [clinic._id.toString(), clinic.name]),
+    );
+
+    return users.map((user, index) => {
+      const clinicId = user.clinicId?.toString() || null;
+      return {
+        no: index + 1,
+        clinicId,
+        name: `${user.firstName || ''} ${user.lastName || ''}`.trim(),
+        clinic: clinicId ? clinicNameMap.get(clinicId) || null : null,
+        userType: user.role,
+        status: user.isActive ? 'active' : 'inactive',
+      };
+    });
   }
 
   /**

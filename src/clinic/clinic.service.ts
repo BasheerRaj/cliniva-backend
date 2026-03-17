@@ -8,6 +8,8 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Clinic } from '../database/schemas/clinic.schema';
 import { Complex } from '../database/schemas/complex.schema';
+import { WorkingHours } from '../database/schemas/working-hours.schema';
+import { UserAccess } from '../database/schemas/user-access.schema';
 import {
   CreateClinicDto,
   UpdateClinicDto,
@@ -30,6 +32,10 @@ export class ClinicService {
     @InjectModel('User') private readonly userModel: Model<any>,
     @InjectModel('Appointment')
     private readonly appointmentModel: Model<any>,
+    @InjectModel('WorkingHours')
+    private readonly workingHoursModel: Model<WorkingHours>,
+    @InjectModel('UserAccess')
+    private readonly userAccessModel: Model<UserAccess>,
     private readonly subscriptionService: SubscriptionService,
   ) { }
 
@@ -98,28 +104,82 @@ export class ClinicService {
     let targetSubscriptionId = subscriptionId;
     let targetComplexId = complexId;
     let targetClinicId: string | undefined;
+    let permittedClinicIds: Types.ObjectId[] | null = null; // null = no restriction
 
-    // TENANT ISOLATION: Enforce scope based on user role (ISSUE-010)
+    // PERMISSION-AWARE SCOPING: Resolve all clinics the user has access to
     if (requestingUser && requestingUser.role !== 'super_admin') {
+      // Enforce subscription-level tenant boundary
       if (requestingUser.subscriptionId) {
         targetSubscriptionId = requestingUser.subscriptionId;
       }
 
-      // If user is restricted to a complex, enforce that too
-      if (requestingUser.complexId) {
-        targetComplexId = requestingUser.complexId;
+      // Try to resolve permitted clinics from UserAccess records
+      const userId = requestingUser.userId || requestingUser.id;
+      if (userId) {
+        const now = new Date();
+        const accessRecords = await this.userAccessModel
+          .find({
+            userId: new Types.ObjectId(userId),
+            isActive: true,
+            $or: [
+              { expiresAt: { $gt: now } },
+              { expiresAt: { $exists: false } },
+              { expiresAt: null },
+            ],
+          })
+          .lean()
+          .exec();
+
+        if (accessRecords.length > 0) {
+          // Direct clinic-level grants
+          const directClinicIds = accessRecords
+            .filter((a) => a.scopeType === 'clinic')
+            .map((a) => new Types.ObjectId(a.scopeId));
+
+          // Complex-level grants → expand to all clinics in those complexes
+          const accessComplexIds = accessRecords
+            .filter((a) => a.scopeType === 'complex')
+            .map((a) => new Types.ObjectId(a.scopeId));
+
+          let complexClinicIds: Types.ObjectId[] = [];
+          if (accessComplexIds.length > 0) {
+            const complexClinics = await this.clinicModel
+              .find({ complexId: { $in: accessComplexIds } }, { _id: 1 })
+              .lean()
+              .exec();
+            complexClinicIds = complexClinics.map(
+              (c) => new Types.ObjectId((c._id as any).toString()),
+            );
+          }
+
+          const allPermitted = [...directClinicIds, ...complexClinicIds];
+          if (allPermitted.length > 0) {
+            permittedClinicIds = allPermitted;
+          }
+        }
       }
 
-      // Staff, doctors, and clinic-level admins can only see their assigned clinic
-      if (requestingUser.clinicId) {
-        targetClinicId = requestingUser.clinicId.toString();
+      // Fallback: use single-clinic / complex / subscription from user profile
+      if (permittedClinicIds === null) {
+        if (requestingUser.complexId) {
+          targetComplexId = requestingUser.complexId;
+        }
+        if (requestingUser.clinicId) {
+          targetClinicId = requestingUser.clinicId.toString();
+        }
       }
     }
 
     // Build query
     const query: any = {};
 
-    if (targetClinicId) {
+    if (permittedClinicIds !== null) {
+      // Use the explicit permission set (may be combined with subscription filter below)
+      query._id = { $in: permittedClinicIds };
+      if (targetSubscriptionId) {
+        query.subscriptionId = new Types.ObjectId(targetSubscriptionId);
+      }
+    } else if (targetClinicId) {
       // Filtering by exact clinic _id — no need for subscriptionId/complexId on top
       query._id = new Types.ObjectId(targetClinicId);
     } else {
@@ -536,7 +596,41 @@ export class ClinicService {
         deletedAt: null,
       });
 
-    // 6. Generate recommendations
+    // 6. Get clinic working schedule
+    const dayOrder: Record<string, number> = {
+      monday: 1,
+      tuesday: 2,
+      wednesday: 3,
+      thursday: 4,
+      friday: 5,
+      saturday: 6,
+      sunday: 7,
+    };
+
+    const workingHours = await this.workingHoursModel
+      .find({
+        entityType: 'clinic',
+        entityId: new Types.ObjectId(clinicId),
+        isActive: true,
+      })
+      .lean()
+      .exec();
+
+    const workingSchedule = workingHours
+      .map((item: any) => ({
+        dayOfWeek: item.dayOfWeek,
+        isWorkingDay: item.isWorkingDay,
+        openingTime: item.openingTime,
+        closingTime: item.closingTime,
+        breakStartTime: item.breakStartTime,
+        breakEndTime: item.breakEndTime,
+      }))
+      .sort(
+        (a, b) =>
+          (dayOrder[a.dayOfWeek] || 99) - (dayOrder[b.dayOfWeek] || 99),
+      );
+
+    // 7. Generate recommendations
     const recommendations: string[] = [];
     if (doctorsCapacity.isExceeded) {
       recommendations.push(
@@ -554,10 +648,12 @@ export class ClinicService {
       );
     }
 
-    // 7. Return complete clinic details
+    // 8. Return complete clinic details
     return {
       ...clinic,
       personInCharge: clinic.personInChargeId || null,
+      workingHours: workingSchedule,
+      workingSchedule,
       capacity: {
         doctors: doctorsCapacity,
         staff: staffCapacity,

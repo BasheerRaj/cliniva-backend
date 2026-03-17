@@ -1037,8 +1037,8 @@ export class OnboardingService {
       const updateData = {
         vatNumber: dto.vatNumber,
         crNumber: dto.crNumber,
-        termsConditionsUrl: dto.termsConditionsUrl,
-        privacyPolicyUrl: dto.privacyPolicyUrl,
+        termsConditionsUrl: dto.termsConditionsUrl ?? dto.termsUrl,
+        privacyPolicyUrl: dto.privacyPolicyUrl ?? dto.privacyUrl,
       };
 
       const updatedOrg = await this.organizationService.updateOrganization(
@@ -1530,8 +1530,8 @@ export class OnboardingService {
       const updateData = {
         vatNumber: dto.vatNumber,
         crNumber: dto.crNumber,
-        termsConditionsUrl: dto.termsConditionsUrl,
-        privacyPolicyUrl: dto.privacyPolicyUrl,
+        termsConditionsUrl: dto.termsConditionsUrl ?? dto.termsUrl,
+        privacyPolicyUrl: dto.privacyPolicyUrl ?? dto.privacyUrl,
       };
 
       console.log('📝 Updating complex legal data:', updateData);
@@ -2435,8 +2435,8 @@ export class OnboardingService {
       const updateData = {
         vatNumber: dto.vatNumber,
         crNumber: dto.crNumber,
-        termsConditionsUrl: dto.termsConditionsUrl,
-        privacyPolicyUrl: dto.privacyPolicyUrl,
+        termsConditionsUrl: dto.termsConditionsUrl ?? dto.termsUrl,
+        privacyPolicyUrl: dto.privacyPolicyUrl ?? dto.privacyUrl,
       };
 
       console.log(
