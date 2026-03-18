@@ -16,6 +16,7 @@ import { Service } from '../database/schemas/service.schema';
 import { Invoice } from '../database/schemas/invoice.schema';
 import { MedicalReport } from '../database/schemas/medical-report.schema';
 import { WorkingHoursIntegrationService } from './services/working-hours-integration.service';
+import { AppointmentWorkingHoursService } from './services/appointment-working-hours.service';
 import { AppointmentValidationService } from './services/appointment-validation.service';
 import { AppointmentStatusService } from './services/appointment-status.service';
 import { AppointmentCalendarService } from './services/appointment-calendar.service';
@@ -70,6 +71,7 @@ export class AppointmentService {
     private readonly auditService: AuditService,
     private readonly appointmentSessionService: AppointmentSessionService,
     private readonly invoiceService: InvoiceService,
+    private readonly appointmentWorkingHoursService: AppointmentWorkingHoursService,
   ) { }
 
   /**
@@ -362,6 +364,27 @@ export class AppointmentService {
           service.durationMinutes || 30,
         )
       : service.durationMinutes || 30;
+
+    // 8b. Validate working hours when BOTH clinic and doctor have WH configured
+    // Only enforced when both entities have working hours set up — prevents
+    // blocking appointments for clinics/doctors that haven't configured WH yet.
+    const [clinicWH, doctorWH] = await Promise.all([
+      this.workingHoursIntegrationService.getClinicWorkingHours(
+        createAppointmentDto.clinicId,
+      ),
+      this.workingHoursIntegrationService.getDoctorWorkingHours(
+        createAppointmentDto.doctorId,
+      ),
+    ]);
+    if (clinicWH.length > 0 && doctorWH.length > 0) {
+      await this.appointmentWorkingHoursService.validateWorkingHours(
+        createAppointmentDto.clinicId,
+        createAppointmentDto.doctorId,
+        new Date(createAppointmentDto.appointmentDate),
+        createAppointmentDto.appointmentTime,
+        duration,
+      );
+    }
 
     // 9. Reject past dates (Requirement 1.10)
     const appointmentDateTime = new Date(

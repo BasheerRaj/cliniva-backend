@@ -116,6 +116,24 @@ export class SpecialtyService {
           as: 'clinics',
         },
       },
+      // Count scheduled appointments for this specialty (via its doctors)
+      {
+        $lookup: {
+          from: 'appointments',
+          let: { doctorIds: '$doctorAssignments.doctorId' },
+          pipeline: [
+            {
+              $match: {
+                $expr: { $in: ['$doctorId', '$$doctorIds'] },
+                status: 'scheduled',
+                deletedAt: { $exists: false },
+              },
+            },
+            { $count: 'count' },
+          ],
+          as: '_scheduledApts',
+        },
+      },
       {
         $addFields: {
           doctorAssignments: {
@@ -220,8 +238,12 @@ export class SpecialtyService {
               },
             },
           },
+          scheduledAppointmentsCount: {
+            $ifNull: [{ $arrayElemAt: ['$_scheduledApts.count', 0] }, 0],
+          },
         },
       },
+      { $unset: '_scheduledApts' },
       { $sort: { [sortField]: sortDirection } },
       {
         $facet: {
