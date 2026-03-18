@@ -16,7 +16,6 @@ import {
   ValidateNested,
   IsMongoId,
   Matches,
-  IsUrl,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
@@ -374,15 +373,12 @@ export class CreateEmployeeDto {
     example: 'https://example.com/profiles/john-doe.jpg',
     type: String,
   })
-  @IsUrl(
-    {},
-    {
-      message: JSON.stringify({
-        ar: 'رابط الصورة غير صالح',
-        en: 'Invalid profile picture URL',
-      }),
-    }
-  )
+  @IsString({
+    message: JSON.stringify({
+      ar: 'رابط الصورة يجب أن يكون نصاً',
+      en: 'Profile picture URL must be a string',
+    }),
+  })
   @IsOptional()
   profilePictureUrl?: string;
 
@@ -735,7 +731,7 @@ export class UpdateEmployeeDto {
     example: 'https://example.com/profiles/john-doe.jpg',
     type: String,
   })
-  @IsUrl()
+  @IsString()
   @IsOptional()
   profilePictureUrl?: string;
 

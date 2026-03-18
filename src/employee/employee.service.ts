@@ -395,6 +395,9 @@ export class EmployeeService {
       gender: createEmployeeDto.gender,
       dateOfBirth: new Date(createEmployeeDto.dateOfBirth),
       address: createEmployeeDto.address,
+      organizationId: createEmployeeDto.organizationId,
+      complexId: createEmployeeDto.complexId,
+      clinicId: createEmployeeDto.clinicId,
       isActive: true,
       emailVerified: false, // Will need to verify email
       setupComplete: false,
@@ -573,7 +576,7 @@ export class EmployeeService {
     }
 
     // Aggregate pipeline to join users with employee profiles
-    const pipeline = [
+    const pipeline: any[] = [
       {
         $lookup: {
           from: 'employee_profiles',
@@ -663,7 +666,7 @@ export class EmployeeService {
       throw new BadRequestException('Invalid employee ID format');
     }
 
-    const pipeline = [
+    const pipeline: any[] = [
       {
         $match: { _id: new Types.ObjectId(employeeId) },
       },
@@ -687,6 +690,29 @@ export class EmployeeService {
           localField: '_id',
           foreignField: 'userId',
           as: 'shifts',
+        },
+      },
+      {
+        $lookup: {
+          from: 'working_hours',
+          let: { userId: '$_id' },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ['$entityId', '$$userId'] },
+                    { $eq: ['$entityType', 'user'] },
+                    { $eq: ['$isActive', true] },
+                  ],
+                },
+              },
+            },
+            {
+              $sort: { dayOfWeek: 1 },
+            },
+          ],
+          as: 'workingHours',
         },
       },
       {
