@@ -9,6 +9,7 @@ import {
   IsEnum,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { Transform } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 // Shared phone number DTO
@@ -318,6 +319,9 @@ export class LegalInfoDto {
     example: '300123456789003',
     type: String,
   })
+  @Transform(({ value }) =>
+    typeof value === 'string' && value.trim() === '' ? undefined : value,
+  )
   @IsString()
   @IsOptional()
   vatNumber?: string;
@@ -327,6 +331,9 @@ export class LegalInfoDto {
     example: '1010123456',
     type: String,
   })
+  @Transform(({ value }) =>
+    typeof value === 'string' && value.trim() === '' ? undefined : value,
+  )
   @IsString()
   @IsOptional()
   crNumber?: string; // Commercial registration number
@@ -336,6 +343,9 @@ export class LegalInfoDto {
     example: 'https://cliniva.com/terms',
     type: String,
   })
+  @Transform(({ value }) =>
+    typeof value === 'string' && value.trim() === '' ? undefined : value,
+  )
   @IsUrl()
   @IsOptional()
   termsConditionsUrl?: string;
@@ -345,7 +355,34 @@ export class LegalInfoDto {
     example: 'https://cliniva.com/privacy',
     type: String,
   })
+  @Transform(({ value }) =>
+    typeof value === 'string' && value.trim() === '' ? undefined : value,
+  )
   @IsUrl()
   @IsOptional()
   privacyPolicyUrl?: string;
+
+  @ApiPropertyOptional({
+    description: 'Alias for terms and conditions URL',
+    example: 'https://cliniva.com/terms',
+    type: String,
+  })
+  @Transform(({ value }) =>
+    typeof value === 'string' && value.trim() === '' ? undefined : value,
+  )
+  @IsUrl()
+  @IsOptional()
+  termsUrl?: string;
+
+  @ApiPropertyOptional({
+    description: 'Alias for privacy policy URL',
+    example: 'https://cliniva.com/privacy',
+    type: String,
+  })
+  @Transform(({ value }) =>
+    typeof value === 'string' && value.trim() === '' ? undefined : value,
+  )
+  @IsUrl()
+  @IsOptional()
+  privacyUrl?: string;
 }

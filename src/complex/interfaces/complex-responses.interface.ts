@@ -123,6 +123,25 @@ export interface ComplexWithCounts extends Complex {
   capacity?: CapacityBreakdown;
 }
 
+export interface AssignedClinicSummary {
+  no: number;
+  clinicId: string;
+  name: string;
+  pic?: string | null;
+  scheduledAppointmentsCount: number;
+  doctors: number;
+  status: string;
+}
+
+export interface DoctorStaffSummary {
+  no: number;
+  clinicId?: string | null;
+  name: string;
+  clinic?: string | null;
+  userType: string;
+  status: string;
+}
+
 /**
  * Complex Details Response
  * Complete complex information with all relationships and calculations
@@ -180,6 +199,8 @@ export interface ComplexDetailsResponse extends BaseSuccessResponse {
     clinicsAssignedCount: number;
     departmentsCount: number;
     capacity: CapacityBreakdown;
+    assignedClinics?: AssignedClinicSummary[];
+    doctorStaffList?: DoctorStaffSummary[];
 
     // Timestamps
     createdAt: Date;

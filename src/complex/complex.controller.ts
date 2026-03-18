@@ -589,6 +589,8 @@ export class ComplexController {
       - Populated organization, subscription, owner, personInCharge
       - Scheduled appointments count
       - Active clinics count
+      - Assigned clinic list (PIC, scheduled appointments, doctors, status)
+      - Doctor and staff list for this complex
       - Departments count
       - Capacity calculations with utilization percentages
       - Per-clinic capacity breakdown
@@ -647,6 +649,35 @@ export class ComplexController {
           },
           scheduledAppointmentsCount: 45,
           clinicsAssignedCount: 8,
+          assignedClinics: [
+            {
+              no: 1,
+              clinicId: '507f1f77bcf86cd799439020',
+              name: 'Cardiology Clinic',
+              pic: 'Ahmed Al-Saud',
+              scheduledAppointmentsCount: 12,
+              doctors: 8,
+              status: 'active',
+            },
+          ],
+          doctorStaffList: [
+            {
+              no: 1,
+              clinicId: '507f1f77bcf86cd799439020',
+              name: 'Dr. Ahmed Al-Saud',
+              clinic: 'Cardiology Clinic',
+              userType: 'doctor',
+              status: 'active',
+            },
+            {
+              no: 2,
+              clinicId: '507f1f77bcf86cd799439020',
+              name: 'Mona Al-Harbi',
+              clinic: 'Cardiology Clinic',
+              userType: 'staff',
+              status: 'active',
+            },
+          ],
           departmentsCount: 5,
           capacity: {
             total: {
