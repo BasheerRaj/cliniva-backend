@@ -98,6 +98,39 @@ export class MedicalReportController {
   }
 
   /**
+   * Get medical report by appointment ID
+   * GET /medical-reports/appointment/:appointmentId
+   * MUST be declared BEFORE ':id' so the literal 'appointment' segment is not captured as an ID
+   */
+  @Get('appointment/:appointmentId')
+  async getMedicalReportByAppointment(
+    @Param('appointmentId') appointmentId: string,
+  ) {
+    try {
+      const report =
+        await this.medicalReportService.getReportByAppointmentId(appointmentId);
+      if (!report) {
+        return {
+          success: true,
+          message: 'No medical report found for this appointment',
+          data: null,
+        };
+      }
+      return {
+        success: true,
+        message: 'Medical report retrieved successfully',
+        data: report,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: 'Failed to retrieve medical report',
+        error: error.message,
+      };
+    }
+  }
+
+  /**
    * Get medical report by ID
    * GET /medical-reports/:id
    */
@@ -199,38 +232,6 @@ export class MedicalReportController {
       return {
         success: false,
         message: 'Failed to share medical report',
-        error: error.message,
-      };
-    }
-  }
-
-  /**
-   * Get medical report by appointment ID
-   * GET /medical-reports/appointment/:appointmentId
-   */
-  @Get('appointment/:appointmentId')
-  async getMedicalReportByAppointment(
-    @Param('appointmentId') appointmentId: string,
-  ) {
-    try {
-      const report =
-        await this.medicalReportService.getReportByAppointmentId(appointmentId);
-      if (!report) {
-        return {
-          success: true,
-          message: 'No medical report found for this appointment',
-          data: null,
-        };
-      }
-      return {
-        success: true,
-        message: 'Medical report retrieved successfully',
-        data: report,
-      };
-    } catch (error) {
-      return {
-        success: false,
-        message: 'Failed to retrieve medical report',
         error: error.message,
       };
     }

@@ -61,6 +61,8 @@ export interface TransformedAppointment {
   completionNotes: string | null;
   invoiceId: string | null;
   sessionId: string | null;
+  medicalReportId: string | null;
+  isDocumented: boolean;
   createdAt: string | null;
   updatedAt: string | null;
 }
@@ -187,6 +189,8 @@ export function transformAppointment(doc: any): TransformedAppointment {
           : doc.invoiceId.toString())
       : null,
     sessionId: doc.sessionId ?? null,
+    medicalReportId: doc.medicalReportId ? doc.medicalReportId.toString() : null,
+    isDocumented: doc.isDocumented ?? false,
     createdAt: doc.createdAt ? new Date(doc.createdAt).toISOString() : null,
     updatedAt: doc.updatedAt ? new Date(doc.updatedAt).toISOString() : null,
   };

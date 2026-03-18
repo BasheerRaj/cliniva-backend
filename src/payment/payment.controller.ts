@@ -263,13 +263,15 @@ export class PaymentController {
       // Extract user details for role-based filtering
       const userId = user.id || user.userId || user.sub;
       const userRole = user.role;
-      const userClinicIds = user.clinicId ? [user.clinicId] : [];
+      const userClinicId = user.clinicId || null;
+      const userOrganizationId = user.organizationId || null;
 
       const result = await this.paymentService.getPayments(
         query,
         userId,
         userRole,
-        userClinicIds,
+        userClinicId,
+        userOrganizationId,
       );
 
       return {

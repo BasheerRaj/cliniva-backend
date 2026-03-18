@@ -16,6 +16,20 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { SessionAllocationDto } from './session-allocation.dto';
 
 /**
+ * DTO for allocating a payment amount to a specific invoice (multi-invoice support)
+ */
+export class InvoiceAllocationDto {
+  @ApiProperty({ description: 'Invoice ID', example: '507f1f77bcf86cd799439014' })
+  @IsMongoId({ message: '{"ar":"معرف الفاتورة غير صالح","en":"Invalid invoice ID"}' })
+  invoiceId: string;
+
+  @ApiProperty({ description: 'Amount to allocate to this invoice', example: 100 })
+  @IsNumber({}, { message: '{"ar":"المبلغ يجب أن يكون رقماً","en":"Amount must be a number"}' })
+  @Min(0.01, { message: '{"ar":"المبلغ يجب أن يكون أكبر من صفر","en":"Amount must be greater than zero"}' })
+  amount: number;
+}
+
+/**
  * Payment method enumeration
  * Requirements: 6.2, 13.9
  */
@@ -36,17 +50,15 @@ export enum PaymentMethod {
  * All validation messages are bilingual (Arabic & English)
  */
 export class CreatePaymentDto {
-  @ApiProperty({
-    description: 'Invoice ID (MongoDB ObjectId)',
+  @ApiPropertyOptional({
+    description: 'Invoice ID (MongoDB ObjectId). Required for single-invoice payment. Omit if using invoiceAllocations.',
     example: '507f1f77bcf86cd799439014',
   })
-  @IsNotEmpty({
-    message: '{"ar":"معرف الفاتورة مطلوب","en":"Invoice ID is required"}',
-  })
+  @IsOptional()
   @IsMongoId({
     message: '{"ar":"معرف الفاتورة غير صالح","en":"Invalid invoice ID"}',
   })
-  invoiceId: string;
+  invoiceId?: string;
 
   @ApiProperty({
     description: 'Patient ID (MongoDB ObjectId)',
@@ -134,4 +146,14 @@ export class CreatePaymentDto {
   @ValidateNested({ each: true })
   @Type(() => SessionAllocationDto)
   sessionAllocations?: SessionAllocationDto[];
+
+  @ApiPropertyOptional({
+    description: 'Invoice allocations for multi-invoice payment. If provided, invoiceId is not required.',
+    type: [InvoiceAllocationDto],
+  })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => InvoiceAllocationDto)
+  invoiceAllocations?: InvoiceAllocationDto[];
 }

@@ -45,8 +45,17 @@ export class Invoice extends Document {
         paymentPlan: {
           type: String,
           enum: ['single_payment', 'allocate_by_session'],
-          default: 'single_payment',
+          default: 'allocate_by_session',
         },
+        // Total number of sessions for this service (from service definition)
+        totalSessions: { type: Number, default: 1, min: 1 },
+        // Price per session = totalServicePrice / totalSessions
+        pricePerSession: { type: Number, default: 0, min: 0 },
+        // Discount and tax applied per session
+        discountPercent: { type: Number, default: 0, min: 0, max: 100 },
+        taxRate: { type: Number, default: 0, min: 0, max: 100 },
+        // Total committed price for all sessions of this service
+        totalServicePrice: { type: Number, default: 0, min: 0 },
         sessions: [
           {
             invoiceItemId: {
@@ -85,6 +94,11 @@ export class Invoice extends Document {
     serviceName: string;
     serviceCategory?: string;
     paymentPlan: string;
+    totalSessions: number;
+    pricePerSession: number;
+    discountPercent: number;
+    taxRate: number;
+    totalServicePrice: number;
     sessions: Array<{
       invoiceItemId: Types.ObjectId;
       sessionId?: string;

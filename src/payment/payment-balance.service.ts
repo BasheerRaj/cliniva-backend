@@ -1,6 +1,6 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, ClientSession } from 'mongoose';
+import { Model } from 'mongoose';
 import { Invoice } from '../database/schemas/invoice.schema';
 import { NOT_FOUND_ERRORS } from '../invoice/constants/invoice-messages';
 
@@ -43,14 +43,11 @@ export class PaymentBalanceService {
   async updateInvoiceBalances(
     invoiceId: string,
     paymentAmount: number,
-    session: ClientSession,
   ): Promise<Invoice> {
     this.logger.log(`Updating invoice balances for invoice ${invoiceId}, payment amount: ${paymentAmount}`);
 
-    // Fetch the invoice within the transaction
     const invoice = await this.invoiceModel
       .findById(invoiceId)
-      .session(session)
       .exec();
 
     if (!invoice) {
@@ -103,8 +100,7 @@ export class PaymentBalanceService {
     invoice.paidAmount = newPaidAmount;
     invoice.paymentStatus = newPaymentStatus;
 
-    // Save changes within the transaction
-    const updatedInvoice = await invoice.save({ session });
+    const updatedInvoice = await invoice.save();
 
     this.logger.log(
       `Invoice ${invoiceId} balances updated successfully. ` +
@@ -114,29 +110,14 @@ export class PaymentBalanceService {
     return updatedInvoice;
   }
 
-  /**
-   * Recalculate invoice balances after a payment is updated or deleted
-   * 
-   * This method recalculates the invoice's paidAmount by summing all payments
-   * and updates the payment status accordingly.
-   * 
-   * @param invoiceId - The invoice to recalculate
-   * @param session - MongoDB session for transaction support
-   * @returns Updated invoice document
-   * 
-   * Requirements: 7.1, 7.2, 7.3, 7.4, 7.6
-   */
   async recalculateInvoiceBalances(
     invoiceId: string,
     totalPaidAmount: number,
-    session: ClientSession,
   ): Promise<Invoice> {
     this.logger.log(`Recalculating invoice balances for invoice ${invoiceId}`);
 
-    // Fetch the invoice within the transaction
     const invoice = await this.invoiceModel
       .findById(invoiceId)
-      .session(session)
       .exec();
 
     if (!invoice) {
@@ -183,8 +164,7 @@ export class PaymentBalanceService {
     invoice.paidAmount = totalPaidAmount;
     invoice.paymentStatus = newPaymentStatus;
 
-    // Save changes within the transaction
-    const updatedInvoice = await invoice.save({ session });
+    const updatedInvoice = await invoice.save();
 
     this.logger.log(
       `Invoice ${invoiceId} balances recalculated successfully. ` +

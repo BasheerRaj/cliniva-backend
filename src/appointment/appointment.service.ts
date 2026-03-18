@@ -3,6 +3,7 @@ import {
   NotFoundException,
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Logger,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
@@ -13,6 +14,7 @@ import { User } from '../database/schemas/user.schema';
 import { Clinic } from '../database/schemas/clinic.schema';
 import { Service } from '../database/schemas/service.schema';
 import { Invoice } from '../database/schemas/invoice.schema';
+import { MedicalReport } from '../database/schemas/medical-report.schema';
 import { WorkingHoursIntegrationService } from './services/working-hours-integration.service';
 import { AppointmentValidationService } from './services/appointment-validation.service';
 import { AppointmentStatusService } from './services/appointment-status.service';
@@ -59,6 +61,7 @@ export class AppointmentService {
     @InjectModel('Clinic') private readonly clinicModel: Model<Clinic>,
     @InjectModel('Service') private readonly serviceModel: Model<Service>,
     @InjectModel('Invoice') private readonly invoiceModel: Model<Invoice>,
+    @InjectModel('MedicalReport') private readonly medicalReportModel: Model<MedicalReport>,
     private readonly workingHoursIntegrationService: WorkingHoursIntegrationService,
     private readonly appointmentValidationService: AppointmentValidationService,
     private readonly appointmentStatusService: AppointmentStatusService,
@@ -269,15 +272,47 @@ export class AppointmentService {
         });
       }
       
-      // Validate invoice payment status (Unpaid or Partially Paid)
-      const validPaymentStatuses = ['unpaid', 'partially_paid'];
-      if (!validPaymentStatuses.includes(invoice.paymentStatus)) {
+      // Payment status does NOT block booking — a fully-paid invoice still has
+      // remaining sessions the patient is entitled to use.
+      // Only a cancelled invoice should block booking.
+      // (The session-count check below prevents overbooking regardless of payment.)
+      if ((invoice as any).invoiceStatus === 'cancelled') {
         throw new BadRequestException({
           message: {
-            ar: `حالة دفع الفاتورة يجب أن تكون "غير مدفوعة" أو "مدفوعة جزئياً". الحالة الحالية: ${invoice.paymentStatus}`,
-            en: `Invoice payment status must be "Unpaid" or "Partially Paid". Current status: ${invoice.paymentStatus}`,
+            ar: 'لا يمكن الحجز على فاتورة ملغاة',
+            en: 'Cannot book an appointment on a cancelled invoice',
           },
-          code: 'INVALID_INVOICE_PAYMENT_STATUS',
+          code: 'INVOICE_CANCELLED',
+        });
+      }
+
+      // Check the service in the invoice has remaining sessions
+      const appointmentServiceId = createAppointmentDto.serviceId;
+      const matchingService = invoice.services.find(
+        (s: any) => s.serviceId.toString() === appointmentServiceId,
+      );
+      if (!matchingService) {
+        throw new BadRequestException({
+          message: {
+            ar: 'الخدمة المحددة غير موجودة في هذه الفاتورة',
+            en: 'Selected service is not found in this invoice',
+          },
+          code: 'SERVICE_NOT_IN_INVOICE',
+        });
+      }
+      // Count only active (non-cancelled) sessions toward the total
+      const activeSessions = ((matchingService as any).sessions || []).filter(
+        (s: any) => s.sessionStatus !== 'cancelled',
+      );
+      const bookedSessions = activeSessions.length;
+      const totalSessions = (matchingService as any).totalSessions || 1;
+      if (bookedSessions >= totalSessions) {
+        throw new BadRequestException({
+          message: {
+            ar: 'تم حجز جميع جلسات هذه الخدمة بالفعل',
+            en: 'All sessions for this service have already been booked',
+          },
+          code: 'ALL_SESSIONS_BOOKED',
         });
       }
       
@@ -289,8 +324,10 @@ export class AppointmentService {
 
     const { sessionId } = createAppointmentDto;
 
-    // Enforce sessionId when service has sessions (Requirement 3.1)
-    if (service.sessions && service.sessions.length > 0 && !sessionId) {
+    // Enforce sessionId when service has sessions AND no invoice is used (Requirement 3.1)
+    // When an invoice is provided, sessions are tracked at the invoice level (M7 Integration)
+    const hasInvoice = !!(createAppointmentDto as any).invoiceId;
+    if (!hasInvoice && service.sessions && service.sessions.length > 0 && !sessionId) {
       throw new BadRequestException({
         message: SESSION_ERROR_MESSAGES.SESSION_ID_REQUIRED,
         code: 'SESSION_ID_REQUIRED',
@@ -420,32 +457,53 @@ export class AppointmentService {
       },
     });
 
-    // Link appointment to the specific invoice session when invoiceItemId provided
-    const invoiceItemId = (createAppointmentDto as any).invoiceItemId;
-    if (validatedInvoice && invoiceItemId) {
+    // Auto-create invoice session when appointment is booked (M7 Integration)
+    // Sessions are no longer pre-created; they are auto-pushed here on booking
+    if (validatedInvoice) {
       try {
-        await this.invoiceModel.updateOne(
-          {
-            _id: validatedInvoice._id,
-            deletedAt: { $exists: false },
-          },
-          {
-            $set: {
-              'services.$[].sessions.$[item].sessionStatus': 'booked',
-              'services.$[].sessions.$[item].appointmentId': savedAppointment._id,
+        const services = validatedInvoice.services as any[];
+        const serviceIndex = services.findIndex(
+          (s: any) => s.serviceId.toString() === createAppointmentDto.serviceId,
+        );
+        if (serviceIndex >= 0) {
+          const svcItem = services[serviceIndex];
+          const sessionNumber = (svcItem.sessions?.length || 0) + 1;
+          const unitPrice = +(svcItem.pricePerSession || 0);
+          const discountPercent = svcItem.discountPercent || 0;
+          const discountAmount = +(unitPrice * discountPercent / 100).toFixed(2);
+          const priceAfterDiscount = +(unitPrice - discountAmount).toFixed(2);
+          const taxRate = svcItem.taxRate || 0;
+          const taxAmount = +(priceAfterDiscount * taxRate / 100).toFixed(2);
+          const lineTotal = +(priceAfterDiscount + taxAmount).toFixed(2);
+
+          await this.invoiceModel.updateOne(
+            { _id: validatedInvoice._id, deletedAt: { $exists: false } },
+            {
+              $push: {
+                [`services.${serviceIndex}.sessions`]: {
+                  invoiceItemId: new Types.ObjectId(),
+                  sessionStatus: 'booked',
+                  sessionOrder: sessionNumber,
+                  sessionName: `Session ${sessionNumber}`,
+                  doctorId: new Types.ObjectId(createAppointmentDto.doctorId),
+                  unitPrice,
+                  discountPercent,
+                  discountAmount,
+                  taxRate,
+                  taxAmount,
+                  lineTotal,
+                  paidAmount: 0,
+                  appointmentId: savedAppointment._id,
+                },
+              },
             },
-          },
-          {
-            arrayFilters: [{ 'item.invoiceItemId': new Types.ObjectId(invoiceItemId) }],
-          },
-        );
-        this.logger.log(
-          `Invoice session ${invoiceItemId} marked as booked for appointment ${savedAppointment._id}`,
-        );
+          );
+          this.logger.log(
+            `Auto-created session ${sessionNumber} on invoice ${validatedInvoice._id} for appointment ${savedAppointment._id}`,
+          );
+        }
       } catch (err) {
-        this.logger.error(
-          `Failed to mark invoice session ${invoiceItemId} as booked: ${err.message}`,
-        );
+        this.logger.error(`Failed to auto-create invoice session: ${err.message}`);
       }
     }
 
@@ -774,6 +832,7 @@ export class AppointmentService {
     appointmentId: string,
     updateAppointmentDto: UpdateAppointmentDto,
     updatedByUserId?: string,
+    userRole?: string,
   ): Promise<Appointment> {
     if (!Types.ObjectId.isValid(appointmentId)) {
       throw new BadRequestException({
@@ -801,6 +860,19 @@ export class AppointmentService {
         },
         code: 'APPOINTMENT_NOT_FOUND',
       });
+    }
+
+    // BZR-perm75: Doctor can only edit their own assigned appointments
+    if (userRole === 'doctor' && updatedByUserId && existingAppointment.doctorId) {
+      if (existingAppointment.doctorId.toString() !== updatedByUserId.toString()) {
+        throw new ForbiddenException({
+          message: {
+            ar: 'يمكن للطبيب تعديل مواعيده المخصصة له فقط',
+            en: 'Doctor can only edit their own assigned appointments',
+          },
+          code: 'DOCTOR_NOT_ASSIGNED',
+        });
+      }
     }
 
     // UC-b6d5c4e Precondition: Cannot edit completed appointments
@@ -1878,12 +1950,86 @@ export class AppointmentService {
     );
 
     this.logger.log(`Appointment ${appointmentId} status changed to ${statusDto.status} by user ${userId}`);
-    
-    // UC-6b5a4c9 Note: Invoice status update is handled by invoice module
-    // when appointment is completed. The invoice service listens for
-    // appointment completion events or is called directly by the frontend.
-    
+
+    // M7 Integration: When appointment is completed, update invoice session paidAmount
+    if (statusDto.status === 'completed' && (updatedAppointment as any).invoiceId) {
+      try {
+        await this.updateInvoiceOnAppointmentCompletion(
+          (updatedAppointment as any).invoiceId.toString(),
+          appointmentId,
+        );
+      } catch (err) {
+        this.logger.error(`Failed to update invoice on appointment completion: ${err.message}`);
+      }
+    }
+
     return updatedAppointment;
+  }
+
+  /**
+   * M7 Integration: Mark invoice session as completed and update paidAmount.
+   * Called when an appointment transitions to 'completed'.
+   */
+  private async updateInvoiceOnAppointmentCompletion(
+    invoiceId: string,
+    appointmentId: string,
+  ): Promise<void> {
+    const invoice = await this.invoiceModel.findOne({
+      _id: new Types.ObjectId(invoiceId),
+      deletedAt: { $exists: false },
+    });
+    if (!invoice) {
+      this.logger.warn(`Invoice ${invoiceId} not found for completion update`);
+      return;
+    }
+
+    // Find the session that was linked to this appointment
+    let sessionLineTotal = 0;
+    let serviceIndex = -1;
+    let sessionIndex = -1;
+    const services = invoice.services as any[];
+    for (let si = 0; si < services.length; si++) {
+      const sessions = services[si].sessions || [];
+      for (let idx = 0; idx < sessions.length; idx++) {
+        if (sessions[idx].appointmentId?.toString() === appointmentId) {
+          serviceIndex = si;
+          sessionIndex = idx;
+          sessionLineTotal = sessions[idx].lineTotal || 0;
+          break;
+        }
+      }
+      if (serviceIndex >= 0) break;
+    }
+
+    if (serviceIndex < 0) {
+      this.logger.warn(`No invoice session found for appointment ${appointmentId} in invoice ${invoiceId}`);
+      return;
+    }
+
+    const newPaidAmount = +((invoice.paidAmount || 0) + sessionLineTotal).toFixed(2);
+    let newPaymentStatus = invoice.paymentStatus;
+    if (newPaidAmount >= invoice.totalAmount) {
+      newPaymentStatus = 'paid';
+    } else if (newPaidAmount > 0) {
+      newPaymentStatus = 'partially_paid';
+    }
+
+    await this.invoiceModel.updateOne(
+      { _id: invoice._id },
+      {
+        $set: {
+          [`services.${serviceIndex}.sessions.${sessionIndex}.sessionStatus`]: 'completed',
+          [`services.${serviceIndex}.sessions.${sessionIndex}.paidAmount`]: sessionLineTotal,
+          paidAmount: newPaidAmount,
+          paymentStatus: newPaymentStatus,
+          lastPaymentDate: new Date(),
+        },
+      },
+    );
+
+    this.logger.log(
+      `Invoice ${invoiceId}: session completed, paidAmount=${newPaidAmount}, paymentStatus=${newPaymentStatus}`,
+    );
   }
 
   // =========================================================================
@@ -2109,6 +2255,7 @@ export class AppointmentService {
       followUp?: { required?: boolean; recommendedDuration?: string; doctorNotes?: string };
     },
     userId?: string,
+    userRole?: string,
   ): Promise<Appointment> {
     if (!Types.ObjectId.isValid(appointmentId)) {
       throw new BadRequestException('Invalid appointment ID format');
@@ -2127,13 +2274,29 @@ export class AppointmentService {
 
     const appointment = await this.getAppointmentById(appointmentId);
 
-    if (appointment.status !== 'in_progress') {
+    // BZR-perm75: Doctor can only conclude their own assigned appointments
+    if (
+      userRole === 'doctor' &&
+      userId &&
+      appointment.doctor?._id &&
+      appointment.doctor._id.toString() !== userId.toString()
+    ) {
+      throw new ForbiddenException({
+        message: {
+          ar: 'يمكن للطبيب إتمام مواعيده المخصصة له فقط',
+          en: 'Doctor can only conclude their own assigned appointments',
+        },
+        code: 'DOCTOR_NOT_ASSIGNED',
+      });
+    }
+
+    if (appointment.status !== 'in_progress' && appointment.status !== 'confirmed') {
       throw new BadRequestException({
         message: {
-          ar: 'يمكن إتمام المواعيد قيد التقدم فقط',
-          en: 'Can only conclude appointments that are in progress',
+          ar: 'يمكن إتمام المواعيد المؤكدة أو قيد التقدم فقط',
+          en: 'Can only conclude appointments that are confirmed or in progress',
         },
-        code: 'APPOINTMENT_NOT_IN_PROGRESS',
+        code: 'APPOINTMENT_NOT_CONCLUDABLE',
         currentStatus: appointment.status,
       });
     }
@@ -2151,6 +2314,40 @@ export class AppointmentService {
       concludedAt: now,
     };
 
+    // Build prescriptions/medications string from structured data
+    const medicationsText = conclusionData.prescriptions?.length
+      ? conclusionData.prescriptions
+          .map((p) => [p.medication, p.dosage, p.frequency, p.duration].filter(Boolean).join(' - '))
+          .join('\n')
+      : undefined;
+
+    // Create MedicalReport document
+    // NOTE: getAppointmentById uses transformAppointment() which maps
+    //   doc.patientId → appointment.patient (string _id)
+    //   doc.doctorId  → appointment.doctor  (string _id)
+    const patientObjId = appointment.patient?._id ? new Types.ObjectId(appointment.patient._id) : undefined;
+    const doctorObjId  = appointment.doctor?._id  ? new Types.ObjectId(appointment.doctor._id)  : undefined;
+    let medicalReportId: Types.ObjectId | undefined;
+    try {
+      const report = await this.medicalReportModel.create({
+        appointmentId: new Types.ObjectId(appointmentId),
+        patientId: patientObjId,
+        doctorId: doctorObjId,
+        createdBy: userId ? new Types.ObjectId(userId) : doctorObjId,
+        diagnosis: conclusionData.sessionNotes?.diagnosis,
+        symptoms: conclusionData.sessionNotes?.symptoms,
+        treatmentPlan: conclusionData.treatmentPlan?.steps,
+        medications: medicationsText,
+        followUpInstructions: conclusionData.followUp?.doctorNotes,
+        nextAppointmentRecommended: conclusionData.followUp?.required ?? false,
+        isVisibleToPatient: true,
+      });
+      medicalReportId = report._id as Types.ObjectId;
+      this.logger.log(`MedicalReport ${medicalReportId} created for appointment ${appointmentId}`);
+    } catch (err) {
+      this.logger.error(`Failed to create MedicalReport for appointment ${appointmentId}: ${err.message}`);
+    }
+
     const updated = await this.appointmentModel
       .findByIdAndUpdate(
         appointmentId,
@@ -2159,8 +2356,8 @@ export class AppointmentService {
           actualEndTime: now,
           completedBy: userId ? new Types.ObjectId(userId) : undefined,
           updatedBy: userId ? new Types.ObjectId(userId) : undefined,
-          // BUG-013: use completionNotes instead of notes
           completionNotes: typeof conclusionPayload === 'string' ? conclusionPayload : JSON.stringify(conclusionPayload),
+          ...(medicalReportId && { medicalReportId, isDocumented: true }),
           $push: { statusHistory: historyEntry },
         },
         { new: true },
@@ -2191,18 +2388,25 @@ export class AppointmentService {
       }
     }
 
-    // Schedule follow-up reminder if needed (BUG-001: use appointment.doctor._id)
+    // Schedule follow-up reminder if needed
     if (conclusionData.followUp?.required) {
-      await this.notificationService.create({
-        recipientId: appointment.doctor._id.toString(),
-        title: 'Follow-up Required',
-        message: `Follow-up needed for appointment ${appointmentId}. Recommended duration: ${conclusionData.followUp.recommendedDuration || 'Not specified'}`,
-        notificationType: 'follow_up_reminder',
-        priority: 'normal',
-        relatedEntityType: 'appointment',
-        relatedEntityId: appointmentId,
-        deliveryMethod: 'in_app',
-      });
+      try {
+        const doctorRecipientId = appointment.doctor?._id;
+        if (doctorRecipientId) {
+          await this.notificationService.create({
+            recipientId: doctorRecipientId,
+            title: 'Follow-up Required',
+            message: `Follow-up needed for appointment ${appointmentId}. Recommended duration: ${conclusionData.followUp.recommendedDuration || 'Not specified'}`,
+            notificationType: 'general',
+            priority: 'normal',
+            relatedEntityType: 'appointment',
+            relatedEntityId: appointmentId,
+            deliveryMethod: 'in_app',
+          });
+        }
+      } catch (err) {
+        this.logger.error(`Failed to create follow-up notification for appointment ${appointmentId}: ${err.message}`);
+      }
     }
 
     if (userId) {

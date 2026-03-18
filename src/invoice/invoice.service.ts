@@ -82,15 +82,17 @@ export class InvoiceService {
       throw new NotFoundException(NOT_FOUND_ERRORS.PATIENT);
     }
 
-    // 4. Validate issue date is not in the future
+    // 4. Validate issue date is not in the future (compare date-only, not datetime)
     const issueDate = new Date(createInvoiceDto.issueDate);
+    issueDate.setHours(0, 0, 0, 0); // Normalize to midnight local time
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     if (issueDate > today) {
       throw new BadRequestException(INVOICE_ERRORS.ISSUE_DATE_FUTURE);
     }
 
-    // 5. For each serviceDto in dto.services: validate service, build embedded sessions
+    // 5. For each serviceDto: validate service, compute per-session pricing.
+    //    Sessions start EMPTY — they are auto-created when appointments are booked.
     const builtServices: Invoice['services'] = [];
     let subtotal = 0;
     let totalDiscount = 0;
@@ -109,54 +111,54 @@ export class InvoiceService {
         throw new BadRequestException(INVOICE_ERRORS.SERVICE_NOT_ACTIVE);
       }
 
-      // Build sessions for this service
-      const builtSessions: Invoice['services'][0]['sessions'] = [];
-      for (const sessionDto of serviceDto.sessions) {
-        const unitPrice = sessionDto.unitPrice;
-        const discountPercent = sessionDto.discountPercent ?? 0;
-        const taxRate = sessionDto.taxRate ?? 0;
-
-        const discountAmount = +(unitPrice * discountPercent / 100).toFixed(2);
-        const priceAfterDiscount = unitPrice - discountAmount;
-        const taxAmount = +(priceAfterDiscount * taxRate / 100).toFixed(2);
-        const lineTotal = +(priceAfterDiscount + taxAmount).toFixed(2);
-
-        subtotal += unitPrice;
-        totalDiscount += discountAmount;
-        totalTax += taxAmount;
-
-        builtSessions.push({
-          invoiceItemId: new Types.ObjectId(),
-          sessionId: sessionDto.sessionId,
-          sessionName: sessionDto.sessionName,
-          sessionOrder: sessionDto.sessionOrder,
-          doctorId: sessionDto.doctorId
-            ? new Types.ObjectId(sessionDto.doctorId)
-            : undefined,
-          unitPrice,
-          discountPercent,
-          discountAmount,
-          taxRate,
-          taxAmount,
-          lineTotal,
-          paidAmount: 0,
-          sessionStatus: 'pending',
+      // Price comes directly from the service definition — no manual entry required
+      const totalSessions = (service as any).sessions?.length || 1;
+      const totalPrice = service.price ?? 0;
+      if (totalPrice <= 0) {
+        throw new BadRequestException({
+          message: {
+            ar: `الخدمة "${service.name}" لا تحتوي على سعر محدد. يرجى تحديث سعر الخدمة أولاً.`,
+            en: `Service "${service.name}" has no price defined. Please update the service price first.`,
+          },
+          code: 'SERVICE_PRICE_NOT_DEFINED',
         });
       }
+
+      const discountPercent = serviceDto.discountPercent ?? 0;
+      const taxRate = serviceDto.taxRate ?? 0;
+
+      // Price per session (before discount/tax) = service.price / totalSessions
+      const pricePerSession = +(totalPrice / totalSessions).toFixed(2);
+
+      // Per-session financials (for totals calculation)
+      const discountAmountPerSession = +(pricePerSession * discountPercent / 100).toFixed(2);
+      const priceAfterDiscount = pricePerSession - discountAmountPerSession;
+      const taxAmountPerSession = +(priceAfterDiscount * taxRate / 100).toFixed(2);
+      const lineTotalPerSession = +(priceAfterDiscount + taxAmountPerSession).toFixed(2);
+
+      // Accumulate invoice-level totals
+      subtotal += totalPrice;
+      totalDiscount += +(discountAmountPerSession * totalSessions).toFixed(2);
+      totalTax += +(taxAmountPerSession * totalSessions).toFixed(2);
 
       builtServices.push({
         serviceId: new Types.ObjectId(serviceDto.serviceId),
         serviceName: service.name,
         serviceCategory: service.description,
-        paymentPlan: service.paymentPlan || 'single_payment',
-        sessions: builtSessions,
-      });
+        paymentPlan: 'allocate_by_session',
+        totalSessions,
+        pricePerSession,
+        discountPercent,
+        taxRate,
+        totalServicePrice: +(lineTotalPerSession * totalSessions).toFixed(2),
+        sessions: [], // Auto-populated when appointments are booked
+      } as any);
     }
 
     subtotal = +subtotal.toFixed(2);
-    totalDiscount = +totalDiscount.toFixed(2);
+    totalDiscount = +Math.min(totalDiscount, subtotal).toFixed(2); // Cap to prevent negative totalAmount from rounding
     totalTax = +totalTax.toFixed(2);
-    const totalAmount = +(subtotal - totalDiscount + totalTax).toFixed(2);
+    const totalAmount = Math.max(0, +(subtotal - totalDiscount + totalTax).toFixed(2));
 
     // 6. Generate draft number via counterModel (atomic)
     const invoiceNumber = await this.invoiceNumberService.generateDraftNumber(
@@ -460,6 +462,7 @@ export class InvoiceService {
     }
     if (updateInvoiceDto.issueDate) {
       const issueDate = new Date(updateInvoiceDto.issueDate);
+      issueDate.setHours(0, 0, 0, 0); // Normalize to midnight local time
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       if (issueDate > today) {
@@ -490,54 +493,41 @@ export class InvoiceService {
           throw new BadRequestException(INVOICE_ERRORS.SERVICE_NOT_ACTIVE);
         }
 
-        const builtSessions: Invoice['services'][0]['sessions'] = [];
-        for (const sessionDto of serviceDto.sessions) {
-          const unitPrice = sessionDto.unitPrice;
-          const discountPercent = sessionDto.discountPercent ?? 0;
-          const taxRate = sessionDto.taxRate ?? 0;
+        // Price comes from the service definition — no manual entry required
+        const totalSessions = (service as any).sessions?.length || 1;
+        const totalPrice = service.price ?? 0;
+        const discountPercent = serviceDto.discountPercent ?? 0;
+        const taxRate = serviceDto.taxRate ?? 0;
 
-          const discountAmount = +(unitPrice * discountPercent / 100).toFixed(2);
-          const priceAfterDiscount = unitPrice - discountAmount;
-          const taxAmount = +(priceAfterDiscount * taxRate / 100).toFixed(2);
-          const lineTotal = +(priceAfterDiscount + taxAmount).toFixed(2);
+        const pricePerSession = +(totalPrice / totalSessions).toFixed(2);
+        const discountAmountPerSession = +(pricePerSession * discountPercent / 100).toFixed(2);
+        const priceAfterDiscount = pricePerSession - discountAmountPerSession;
+        const taxAmountPerSession = +(priceAfterDiscount * taxRate / 100).toFixed(2);
+        const lineTotalPerSession = +(priceAfterDiscount + taxAmountPerSession).toFixed(2);
 
-          subtotal += unitPrice;
-          totalDiscount += discountAmount;
-          totalTax += taxAmount;
-
-          builtSessions.push({
-            invoiceItemId: new Types.ObjectId(),
-            sessionId: sessionDto.sessionId,
-            sessionName: sessionDto.sessionName,
-            sessionOrder: sessionDto.sessionOrder,
-            doctorId: sessionDto.doctorId
-              ? new Types.ObjectId(sessionDto.doctorId)
-              : undefined,
-            unitPrice,
-            discountPercent,
-            discountAmount,
-            taxRate,
-            taxAmount,
-            lineTotal,
-            paidAmount: 0,
-            sessionStatus: 'pending',
-          });
-        }
+        subtotal += totalPrice;
+        totalDiscount += +(discountAmountPerSession * totalSessions).toFixed(2);
+        totalTax += +(taxAmountPerSession * totalSessions).toFixed(2);
 
         builtServices.push({
           serviceId: new Types.ObjectId(serviceDto.serviceId),
           serviceName: service.name,
           serviceCategory: service.description,
-          paymentPlan: service.paymentPlan || 'single_payment',
-          sessions: builtSessions,
-        });
+          paymentPlan: 'allocate_by_session',
+          totalSessions,
+          pricePerSession,
+          discountPercent,
+          taxRate,
+          totalServicePrice: +(lineTotalPerSession * totalSessions).toFixed(2),
+          sessions: [], // Auto-populated when appointments are booked
+        } as any);
       }
 
       invoice.services = builtServices;
       invoice.subtotal = +subtotal.toFixed(2);
-      invoice.discountAmount = +totalDiscount.toFixed(2);
+      invoice.discountAmount = +Math.min(totalDiscount, subtotal).toFixed(2);
       invoice.taxAmount = +totalTax.toFixed(2);
-      invoice.totalAmount = +(subtotal - totalDiscount + totalTax).toFixed(2);
+      invoice.totalAmount = Math.max(0, +(subtotal - totalDiscount + totalTax).toFixed(2));
     }
 
     invoice.updatedBy = new Types.ObjectId(userId);
@@ -757,10 +747,12 @@ export class InvoiceService {
         ? userClinicId
         : clinicId;
 
+    // Include 'draft' invoices so first-time booking auto-posts them;
+    // exclude fully paid and cancelled invoices
     const filter: any = {
       patientId: new Types.ObjectId(patientId),
       clinicId: new Types.ObjectId(effectiveClinicId),
-      invoiceStatus: 'posted',
+      invoiceStatus: { $in: ['draft', 'posted'] },
       paymentStatus: { $ne: 'paid' },
       deletedAt: { $exists: false },
     };

@@ -702,36 +702,26 @@ export class AppointmentController {
   @ApiBody({ type: UpdateAppointmentDto })
   @UseGuards(RoleScopeGuard) // UC-b6d5c4e: Apply role-based filtering
   @Put(':id')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.MANAGER, UserRole.DOCTOR)
   async updateAppointment(
     @Param('id') id: string,
     @Body(new ValidationPipe()) updateAppointmentDto: UpdateAppointmentDto,
     @Request() req: any, // UC-b6d5c4e: Get user for role-based access
   ) {
-    try {
-      const appointment = await this.appointmentService.updateAppointment(
-        id,
-        updateAppointmentDto,
-        req.user?.userId,
-      );
-      return {
-        success: true,
-        message: {
-          ar: 'تم تحديث الموعد بنجاح',
-          en: 'Appointment updated successfully',
-        },
-        data: appointment,
-      };
-    } catch (error) {
-      return {
-        success: false,
-        message: {
-          ar: 'فشل تحديث الموعد',
-          en: 'Failed to update appointment',
-        },
-        error: error.message,
-      };
-    }
+    const appointment = await this.appointmentService.updateAppointment(
+      id,
+      updateAppointmentDto,
+      req.user?.userId,
+      req.user?.role,
+    );
+    return {
+      success: true,
+      message: {
+        ar: 'تم تحديث الموعد بنجاح',
+        en: 'Appointment updated successfully',
+      },
+      data: appointment,
+    };
   }
 
   /**
@@ -1020,7 +1010,7 @@ export class AppointmentController {
   })
   @ApiBody({ type: CancelAppointmentDto })
   @Post(':id/cancel')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.MANAGER, UserRole.DOCTOR, UserRole.STAFF)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   async cancelAppointment(
     @Param('id') id: string,
     @Body(new ValidationPipe()) cancelDto: CancelAppointmentDto,
@@ -1150,30 +1140,19 @@ export class AppointmentController {
     @Body(new ValidationPipe()) changeStatusDto: ChangeAppointmentStatusDto,
     @Request() req: any, // UC-6b5a4c3 & UC-6b5a4c9: Get user for role-based access
   ) {
-    try {
-      const appointment = await this.appointmentService.changeAppointmentStatus(
-        id,
-        changeStatusDto,
-        req.user?.userId,
-      );
-      return {
-        success: true,
-        message: {
-          ar: 'تم تحديث حالة الموعد بنجاح',
-          en: 'Appointment status updated successfully',
-        },
-        data: appointment,
-      };
-    } catch (error) {
-      return {
-        success: false,
-        message: {
-          ar: 'فشل تحديث حالة الموعد',
-          en: 'Failed to update appointment status',
-        },
-        error: error.message,
-      };
-    }
+    const appointment = await this.appointmentService.changeAppointmentStatus(
+      id,
+      changeStatusDto,
+      req.user?.userId,
+    );
+    return {
+      success: true,
+      message: {
+        ar: 'تم تحديث حالة الموعد بنجاح',
+        en: 'Appointment status updated successfully',
+      },
+      data: appointment,
+    };
   }
 
   // =========================================================================
@@ -1253,15 +1232,22 @@ export class AppointmentController {
   @ApiResponse({ status: 200, description: 'Appointment concluded – status set to completed' })
   @ApiResponse({ status: 400, description: 'doctorNotes missing or appointment not in_progress' })
   @ApiResponse({ status: 404, description: 'Appointment not found' })
+  @UseGuards(RoleScopeGuard)
   @Post(':id/conclude')
   @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.MANAGER, UserRole.DOCTOR)
   async concludeAppointment(
     @Param('id') id: string,
-    @Body(new ValidationPipe()) concludeDto: ConcludeAppointmentDto,
+    @Body(new ValidationPipe({ transform: true, whitelist: true, transformOptions: { enableImplicitConversion: true } })) concludeDto: ConcludeAppointmentDto,
     @Request() req: any,
   ) {
     try {
-      const appointment = await this.appointmentService.concludeAppointment(id, concludeDto, req.user?.userId);
+      const userId = req.user?.id || req.user?.userId || req.user?.sub;
+      const appointment = await this.appointmentService.concludeAppointment(
+        id,
+        concludeDto,
+        userId,
+        req.user?.role,
+      );
       return {
         success: true,
         message: {
@@ -1271,14 +1257,7 @@ export class AppointmentController {
         data: appointment,
       };
     } catch (error) {
-      return {
-        success: false,
-        message: {
-          ar: 'فشل إتمام الموعد',
-          en: 'Failed to conclude appointment',
-        },
-        error: error.message,
-      };
+      throw error;
     }
   }
 

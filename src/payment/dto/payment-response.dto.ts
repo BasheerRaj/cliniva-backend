@@ -79,6 +79,9 @@ export class PaymentResponseDto {
   @ApiPropertyOptional({ type: InvoiceReference })
   invoice?: InvoiceReference;
 
+  @ApiPropertyOptional({ type: [InvoiceReference] })
+  invoices?: InvoiceReference[];
+
   @ApiPropertyOptional({ type: PatientReference })
   patient?: PatientReference;
 

@@ -5,8 +5,8 @@ import {
   ForbiddenException,
   Logger,
 } from '@nestjs/common';
-import { InjectModel, InjectConnection } from '@nestjs/mongoose';
-import { Model, Types, Connection } from 'mongoose';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model, Types } from 'mongoose';
 import { Payment } from '../database/schemas/payment.schema';
 import { Invoice } from '../database/schemas/invoice.schema';
 import { Patient } from '../database/schemas/patient.schema';
@@ -26,7 +26,8 @@ import {
 
 /**
  * Payment Service - M7 Billing & Payments MVP
- * Handles payment recording, balance updates, and payment management
+ * Handles payment recording, balance updates, and payment management.
+ * Supports both single-invoice and multi-invoice payment modes.
  */
 @Injectable()
 export class PaymentService {
@@ -38,23 +39,206 @@ export class PaymentService {
     @InjectModel(Patient.name) private patientModel: Model<Patient>,
     @InjectModel(Clinic.name) private clinicModel: Model<Clinic>,
     @InjectModel(Counter.name) private counterModel: Model<Counter>,
-    @InjectConnection() private connection: Connection,
     private paymentBalanceService: PaymentBalanceService,
   ) {}
 
   /**
-   * Create a new payment
+   * Create a new payment (single-invoice or multi-invoice)
    * Requirements: 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 6.8, 6.9, 6.10, 6.11, 6.12, 7.7, 7.8, 13.7, 13.8
-   * PART G: session allocation support via createPaymentDto.sessionAllocations
    */
   async createPayment(
     createPaymentDto: CreatePaymentDto,
     userId: string,
   ): Promise<PaymentResponseDto> {
-    // Validate invoice exists and is Posted
-    const invoice = await this.invoiceModel.findById(
-      createPaymentDto.invoiceId,
+    const isMultiInvoice =
+      createPaymentDto.invoiceAllocations &&
+      createPaymentDto.invoiceAllocations.length > 0;
+
+    if (isMultiInvoice) {
+      return this.createMultiInvoicePayment(createPaymentDto, userId);
+    }
+    return this.createSingleInvoicePayment(createPaymentDto, userId);
+  }
+
+  /**
+   * Multi-invoice payment: payment spans multiple invoices.
+   * Each allocation specifies how much goes to each invoice.
+   */
+  private async createMultiInvoicePayment(
+    createPaymentDto: CreatePaymentDto,
+    userId: string,
+  ): Promise<PaymentResponseDto> {
+    const allocations = createPaymentDto.invoiceAllocations!;
+
+    // Validate patient exists
+    const patient = await this.patientModel.findById(createPaymentDto.patientId);
+    if (!patient || patient.deletedAt) {
+      throw new NotFoundException(NOT_FOUND_ERRORS.PATIENT);
+    }
+
+    // Validate each invoice allocation
+    const invoiceDocs: any[] = [];
+    for (const alloc of allocations) {
+      const invoice = await this.invoiceModel.findById(alloc.invoiceId);
+      if (!invoice || invoice.deletedAt) {
+        throw new NotFoundException(NOT_FOUND_ERRORS.INVOICE);
+      }
+      if (invoice.invoiceStatus !== 'posted') {
+        throw new BadRequestException(PAYMENT_ERRORS.INVOICE_NOT_POSTED);
+      }
+      if (invoice.paymentStatus === 'paid') {
+        throw new BadRequestException(PAYMENT_ERRORS.INVOICE_ALREADY_PAID);
+      }
+      if (invoice.patientId.toString() !== createPaymentDto.patientId) {
+        throw new BadRequestException(PAYMENT_ERRORS.PATIENT_MISMATCH);
+      }
+      const outstanding = Math.max(0, invoice.totalAmount - invoice.paidAmount);
+      if (alloc.amount > outstanding + 0.001) {
+        throw new BadRequestException(PAYMENT_ERRORS.AMOUNT_EXCEEDS_BALANCE);
+      }
+      invoiceDocs.push(invoice);
+    }
+
+    // Validate total matches
+    const allocTotal = allocations.reduce((s, a) => s + a.amount, 0);
+    if (Math.abs(allocTotal - createPaymentDto.amount) > 0.01) {
+      throw new BadRequestException({
+        message: {
+          ar: 'مجموع مبالغ الفواتير لا يساوي المبلغ الإجمالي للدفعة',
+          en: 'Invoice allocations total must equal the payment amount',
+        },
+        code: 'ALLOCATION_SUM_MISMATCH',
+      });
+    }
+
+    // Validate payment date not in future
+    const paymentDate = new Date(createPaymentDto.paymentDate);
+    const today = new Date();
+    today.setHours(23, 59, 59, 999);
+    if (paymentDate > today) {
+      throw new BadRequestException(PAYMENT_ERRORS.DATE_FUTURE);
+    }
+
+    const firstInvoice = invoiceDocs[0];
+    const organizationId = (firstInvoice as any).organizationId?.toString();
+    const paymentId = await this.generatePaymentId(organizationId);
+
+    const payment = new this.paymentModel({
+      paymentId,
+      invoiceId: new Types.ObjectId(allocations[0].invoiceId),
+      invoiceIds: allocations.map((a) => new Types.ObjectId(a.invoiceId)),
+      invoiceAllocations: allocations.map((a) => ({
+        invoiceId: new Types.ObjectId(a.invoiceId),
+        amount: a.amount,
+      })),
+      patientId: new Types.ObjectId(createPaymentDto.patientId),
+      clinicId: firstInvoice.clinicId,
+      organizationId: (firstInvoice as any).organizationId,
+      amount: createPaymentDto.amount,
+      paymentMethod: createPaymentDto.paymentMethod,
+      paymentDate,
+      notes: createPaymentDto.notes,
+      addedBy: new Types.ObjectId(userId),
+    });
+
+    await payment.save();
+
+    // Apply per-session allocations if provided (cross-invoice allowed)
+    if (
+      createPaymentDto.sessionAllocations &&
+      createPaymentDto.sessionAllocations.length > 0
+    ) {
+      const allocTotal = createPaymentDto.sessionAllocations.reduce(
+        (sum, a) => sum + a.amount,
+        0,
+      );
+      if (Math.abs(allocTotal - createPaymentDto.amount) > 0.01) {
+        throw new BadRequestException({
+          message: {
+            ar: 'مجموع التوزيعات يجب أن يساوي المبلغ الإجمالي للدفعة',
+            en: 'Session allocations total must equal the payment amount',
+          },
+          code: 'ALLOCATION_SUM_MISMATCH',
+        });
+      }
+
+      for (const alloc of createPaymentDto.sessionAllocations) {
+        if (alloc.amount <= 0) continue;
+        await this.invoiceModel.updateOne(
+          {
+            _id: new Types.ObjectId(alloc.invoiceId),
+            deletedAt: { $exists: false },
+          },
+          {
+            $inc: {
+              'services.$[].sessions.$[item].paidAmount': alloc.amount,
+            },
+          },
+          {
+            arrayFilters: [
+              { 'item.invoiceItemId': new Types.ObjectId(alloc.invoiceItemId) },
+            ],
+          },
+        );
+      }
+    }
+
+    // Update balance per invoice allocation
+    for (const alloc of allocations) {
+      await this.paymentBalanceService.updateInvoiceBalances(
+        alloc.invoiceId,
+        alloc.amount,
+      );
+      // Update lastPaymentDate
+      const inv = await this.invoiceModel.findById(alloc.invoiceId);
+      if (inv) {
+        inv.lastPaymentDate = paymentDate;
+        await inv.save();
+      }
+    }
+
+    this.logger.log(
+      `Multi-invoice payment created: ${paymentId} by user ${userId}, invoices: ${allocations.map((a) => a.invoiceId).join(', ')}, total: ${createPaymentDto.amount}`,
     );
+
+    const populatedPayment = await this.paymentModel
+      .findById(payment._id)
+      .populate([
+        { path: 'patientId', select: 'firstName lastName patientNumber' },
+        {
+          path: 'invoiceId',
+          select: 'invoiceNumber invoiceTitle totalAmount paidAmount paymentStatus',
+        },
+        {
+          path: 'invoiceIds',
+          select: 'invoiceNumber invoiceTitle totalAmount paidAmount paymentStatus',
+        },
+        { path: 'clinicId', select: 'name' },
+        { path: 'addedBy', select: 'firstName lastName email' },
+      ]);
+
+    return this.mapToResponseDto(populatedPayment);
+  }
+
+  /**
+   * Single-invoice payment (original logic, backward-compatible)
+   */
+  private async createSingleInvoicePayment(
+    createPaymentDto: CreatePaymentDto,
+    userId: string,
+  ): Promise<PaymentResponseDto> {
+    if (!createPaymentDto.invoiceId) {
+      throw new BadRequestException({
+        message: {
+          ar: 'معرف الفاتورة مطلوب لدفعة فاتورة واحدة',
+          en: 'Invoice ID is required for single-invoice payment',
+        },
+        code: 'INVOICE_ID_REQUIRED',
+      });
+    }
+
+    // Validate invoice exists and is Posted
+    const invoice = await this.invoiceModel.findById(createPaymentDto.invoiceId);
     if (!invoice || invoice.deletedAt) {
       throw new NotFoundException(NOT_FOUND_ERRORS.INVOICE);
     }
@@ -81,7 +265,7 @@ export class PaymentService {
     // Validate payment date is not in future
     const paymentDate = new Date(createPaymentDto.paymentDate);
     const today = new Date();
-    today.setHours(23, 59, 59, 999); // End of today
+    today.setHours(23, 59, 59, 999);
     if (paymentDate > today) {
       throw new BadRequestException(PAYMENT_ERRORS.DATE_FUTURE);
     }
@@ -92,9 +276,7 @@ export class PaymentService {
     }
 
     // Validate patient exists
-    const patient = await this.patientModel.findById(
-      createPaymentDto.patientId,
-    );
+    const patient = await this.patientModel.findById(createPaymentDto.patientId);
     if (!patient || patient.deletedAt) {
       throw new NotFoundException(NOT_FOUND_ERRORS.PATIENT);
     }
@@ -113,7 +295,6 @@ export class PaymentService {
         (sum, a) => sum + a.amount,
         0,
       );
-      // Allow a small floating-point tolerance
       if (Math.abs(allocTotal - createPaymentDto.amount) > 0.01) {
         throw new BadRequestException({
           message: {
@@ -129,42 +310,33 @@ export class PaymentService {
     const organizationId = (invoice as any).organizationId?.toString();
     const paymentId = await this.generatePaymentId(organizationId);
 
-    // Start database transaction
-    const session = await this.connection.startSession();
-    session.startTransaction();
+    // Create payment record
+    const payment = new this.paymentModel({
+      paymentId,
+      invoiceId: new Types.ObjectId(createPaymentDto.invoiceId),
+      invoiceIds: [new Types.ObjectId(createPaymentDto.invoiceId)],
+      invoiceAllocations: [
+        { invoiceId: new Types.ObjectId(createPaymentDto.invoiceId), amount: createPaymentDto.amount },
+      ],
+      patientId: new Types.ObjectId(createPaymentDto.patientId),
+      clinicId: invoice.clinicId,
+      organizationId: (invoice as any).organizationId,
+      amount: createPaymentDto.amount,
+      paymentMethod: createPaymentDto.paymentMethod,
+      paymentDate,
+      notes: createPaymentDto.notes,
+      addedBy: new Types.ObjectId(userId),
+    });
+
+    await payment.save();
 
     try {
-      // Create payment record with addedBy and timestamps
-      const payment = new this.paymentModel({
-        paymentId,
-        invoiceId: new Types.ObjectId(createPaymentDto.invoiceId),
-        patientId: new Types.ObjectId(createPaymentDto.patientId),
-        clinicId: invoice.clinicId,
-        amount: createPaymentDto.amount,
-        paymentMethod: createPaymentDto.paymentMethod,
-        paymentDate,
-        notes: createPaymentDto.notes,
-        addedBy: new Types.ObjectId(userId),
-      });
 
-      await payment.save({ session });
-
-      // Apply per-session payment allocations if provided (PART G)
+      // Apply per-session payment allocations if provided
       if (
         createPaymentDto.sessionAllocations &&
         createPaymentDto.sessionAllocations.length > 0
       ) {
-        // S-2: Cross-invoice IDOR protection — all allocations must reference the payment's invoice
-        const invalidAllocations = createPaymentDto.sessionAllocations.filter(
-          alloc => alloc.invoiceId !== createPaymentDto.invoiceId
-        );
-        if (invalidAllocations.length > 0) {
-          throw new BadRequestException({
-            message: { ar: 'معرف الفاتورة في التخصيص لا يطابق الفاتورة المحددة', en: 'Session allocation invoiceId does not match the payment invoiceId' },
-            code: 'PAYMENT_ALLOCATION_INVOICE_MISMATCH',
-          });
-        }
-
         // S-4: Load invoice for per-session balance validation
         const invoiceForValidation = await this.invoiceModel
           .findOne({ _id: new Types.ObjectId(createPaymentDto.invoiceId), deletedAt: { $exists: false } })
@@ -176,12 +348,12 @@ export class PaymentService {
           // Find the session to validate balance
           let sessionFound = false;
           for (const svc of (invoiceForValidation as any).services || []) {
-            const session = (svc.sessions || []).find(
+            const sess = (svc.sessions || []).find(
               (s: any) => s.invoiceItemId?.toString() === alloc.invoiceItemId
             );
-            if (session) {
+            if (sess) {
               sessionFound = true;
-              const remaining = session.lineTotal - (session.paidAmount || 0);
+              const remaining = sess.lineTotal - (sess.paidAmount || 0);
               if (alloc.amount > remaining + 0.001) {
                 throw new BadRequestException({
                   message: { ar: 'مبلغ التخصيص يتجاوز الرصيد المتبقي للجلسة', en: 'Allocation amount exceeds remaining session balance' },
@@ -220,7 +392,6 @@ export class PaymentService {
                   'item.invoiceItemId': new Types.ObjectId(alloc.invoiceItemId),
                 },
               ],
-              session,
             },
           );
         }
@@ -230,47 +401,39 @@ export class PaymentService {
       await this.paymentBalanceService.updateInvoiceBalances(
         createPaymentDto.invoiceId,
         createPaymentDto.amount,
-        session,
       );
 
       // Update lastPaymentDate on invoice
       invoice.lastPaymentDate = paymentDate;
-      await invoice.save({ session });
+      await invoice.save();
 
-      // Commit transaction
-      await session.commitTransaction();
-
-      // Log audit event
       this.logger.log(
         `Payment created: ${paymentId} for invoice ${invoice.invoiceNumber} by user ${userId}, amount: ${createPaymentDto.amount}`,
       );
 
-      // Return payment with populated references
       const populatedPayment = await this.paymentModel
         .findById(payment._id)
         .populate([
           { path: 'patientId', select: 'firstName lastName patientNumber' },
           {
             path: 'invoiceId',
-            select:
-              'invoiceNumber invoiceTitle totalAmount paidAmount paymentStatus',
+            select: 'invoiceNumber invoiceTitle totalAmount paidAmount paymentStatus',
+          },
+          {
+            path: 'invoiceIds',
+            select: 'invoiceNumber invoiceTitle totalAmount paidAmount paymentStatus',
           },
           { path: 'clinicId', select: 'name' },
           { path: 'addedBy', select: 'firstName lastName email' },
-        ])
-        .session(null);
+        ]);
 
       return this.mapToResponseDto(populatedPayment);
     } catch (error) {
-      // Rollback on any error
-      await session.abortTransaction();
       this.logger.error(
         `Payment creation failed for invoice ${createPaymentDto.invoiceId}: ${error.message}`,
         error.stack,
       );
       throw error;
-    } finally {
-      session.endSession();
     }
   }
 
@@ -282,79 +445,61 @@ export class PaymentService {
     queryDto: PaymentQueryDto,
     userId: string,
     userRole: string,
-    userClinicIds: string[],
+    userClinicId: string | null,
+    userOrganizationId: string | null,
   ): Promise<{ data: PaymentResponseDto[]; meta: any }> {
-    // Build query filter
     const filter: any = {};
 
-    // Apply role-based clinic filtering
     if (userRole === 'staff' || userRole === 'doctor') {
-      // Staff sees only their clinic
-      filter.clinicId = {
-        $in: userClinicIds.map((id) => new Types.ObjectId(id)),
-      };
+      // Clinic-level scope
+      if (userClinicId) {
+        filter.clinicId = new Types.ObjectId(userClinicId);
+      }
     } else if (userRole === 'admin' || userRole === 'manager') {
-      // Admin sees clinics they have access to
-      if (userClinicIds.length > 0) {
-        filter.clinicId = {
-          $in: userClinicIds.map((id) => new Types.ObjectId(id)),
-        };
+      // Org-level scope — see all payments in their organization
+      if (userOrganizationId) {
+        filter.organizationId = new Types.ObjectId(userOrganizationId);
       }
     }
-    // Super admin and owner see all
+    // owner / super_admin → no scope filter
 
-    // Support filtering by paymentMethod
     if (queryDto.paymentMethod) {
       filter.paymentMethod = queryDto.paymentMethod;
     }
 
-    // Support filtering by date range
     if (queryDto.dateFrom || queryDto.dateTo) {
       filter.paymentDate = {};
-      if (queryDto.dateFrom) {
-        filter.paymentDate.$gte = new Date(queryDto.dateFrom);
-      }
-      if (queryDto.dateTo) {
-        filter.paymentDate.$lte = new Date(queryDto.dateTo);
-      }
+      if (queryDto.dateFrom) filter.paymentDate.$gte = new Date(queryDto.dateFrom);
+      if (queryDto.dateTo) filter.paymentDate.$lte = new Date(queryDto.dateTo);
     }
 
-    // Support filtering by invoiceId
     if (queryDto.invoiceId) {
       filter.invoiceId = new Types.ObjectId(queryDto.invoiceId);
     }
 
-    // Support filtering by patientId
     if (queryDto.patientId) {
       filter.patientId = new Types.ObjectId(queryDto.patientId);
     }
 
-    // Support filtering by clinicId (additional filter)
     if (queryDto.clinicId) {
       filter.clinicId = new Types.ObjectId(queryDto.clinicId);
     }
 
-    // Support search by paymentId, patientName, invoiceNumber
     if (queryDto.search) {
       if (queryDto.search.length > 100) {
         throw new BadRequestException({ message: { ar: 'النص المدخل طويل جداً', en: 'Search term too long' } });
       }
       const searchRegex = new RegExp(this.escapeRegex(queryDto.search), 'i');
       filter.$or = [{ paymentId: searchRegex }];
-      // Note: Patient name and invoice number search requires aggregation pipeline
     }
 
-    // Pagination
     const page = queryDto.page || 1;
     const limit = queryDto.limit || 10;
     const skip = (page - 1) * limit;
-
-    // Sorting
     const sortBy = queryDto.sortBy || 'paymentDate';
     const sortOrder = queryDto.sortOrder === 'asc' ? 1 : -1;
     const sort: any = { [sortBy]: sortOrder };
 
-    // Execute query
     const [payments, total] = await Promise.all([
       this.paymentModel
         .find(filter)
@@ -365,8 +510,11 @@ export class PaymentService {
           { path: 'patientId', select: 'firstName lastName patientNumber' },
           {
             path: 'invoiceId',
-            select:
-              'invoiceNumber invoiceTitle totalAmount paidAmount paymentStatus',
+            select: 'invoiceNumber invoiceTitle totalAmount paidAmount paymentStatus',
+          },
+          {
+            path: 'invoiceIds',
+            select: 'invoiceNumber invoiceTitle totalAmount paidAmount paymentStatus',
           },
           { path: 'clinicId', select: 'name' },
           { path: 'addedBy', select: 'firstName lastName email' },
@@ -396,15 +544,17 @@ export class PaymentService {
     userRole: string,
     userClinicIds: string[],
   ): Promise<PaymentResponseDto> {
-    // Find payment by ID
     const payment = await this.paymentModel
       .findById(id)
       .populate([
         { path: 'patientId', select: 'firstName lastName patientNumber' },
         {
           path: 'invoiceId',
-          select:
-            'invoiceNumber invoiceTitle totalAmount paidAmount paymentStatus',
+          select: 'invoiceNumber invoiceTitle totalAmount paidAmount paymentStatus',
+        },
+        {
+          path: 'invoiceIds',
+          select: 'invoiceNumber invoiceTitle totalAmount paidAmount paymentStatus',
         },
         { path: 'clinicId', select: 'name' },
         { path: 'addedBy', select: 'firstName lastName email' },
@@ -412,12 +562,10 @@ export class PaymentService {
       ])
       .exec();
 
-    // Return 404 if not found
     if (!payment) {
       throw new NotFoundException(NOT_FOUND_ERRORS.PAYMENT);
     }
 
-    // Check role-based access permissions
     if (userRole === 'staff' || userRole === 'doctor') {
       const hasAccess = userClinicIds.some(
         (clinicId) => clinicId === payment.clinicId.toString(),
@@ -440,49 +588,34 @@ export class PaymentService {
     userId: string,
     userRole: string,
   ): Promise<PaymentResponseDto> {
-    // Find payment by ID
     const payment = await this.paymentModel.findById(id);
 
     if (!payment) {
       throw new NotFoundException(NOT_FOUND_ERRORS.PAYMENT);
     }
 
-    // Check edit permissions
     if (userRole === 'staff' || userRole === 'doctor') {
-      // Staff can only edit own payments
       if (payment.addedBy.toString() !== userId) {
         throw new ForbiddenException(AUTH_ERRORS.INSUFFICIENT_PERMISSIONS);
       }
     }
-    // Admin can edit any payment
 
-    // Get the invoice for validation
     const invoice = await this.invoiceModel.findById(payment.invoiceId);
     if (!invoice || invoice.deletedAt) {
       throw new NotFoundException(NOT_FOUND_ERRORS.INVOICE);
     }
 
-    // Validate new amount if provided
     if (updatePaymentDto.amount !== undefined) {
-      // Validate new amount > 0
       if (updatePaymentDto.amount <= 0) {
         throw new BadRequestException(PAYMENT_ERRORS.AMOUNT_ZERO);
       }
-
-      // Calculate outstanding balance considering the current payment
-      const currentOutstanding = Math.max(
-        0,
-        invoice.totalAmount - invoice.paidAmount,
-      );
+      const currentOutstanding = Math.max(0, invoice.totalAmount - invoice.paidAmount);
       const maxAllowedAmount = currentOutstanding + payment.amount;
-
-      // Validate new amount <= outstanding balance + current payment amount
       if (updatePaymentDto.amount > maxAllowedAmount) {
         throw new BadRequestException(PAYMENT_ERRORS.AMOUNT_EXCEEDS_BALANCE);
       }
     }
 
-    // Validate new date if provided
     if (updatePaymentDto.paymentDate) {
       const newPaymentDate = new Date(updatePaymentDto.paymentDate);
       const today = new Date();
@@ -492,95 +625,58 @@ export class PaymentService {
       }
     }
 
-    // Start database transaction
-    const session = await this.connection.startSession();
-    session.startTransaction();
+    const oldAmount = payment.amount;
+    const newAmount = updatePaymentDto.amount ?? oldAmount;
+    const amountDifference = newAmount - oldAmount;
 
-    try {
-      // Calculate difference in payment amount
-      const oldAmount = payment.amount;
-      const newAmount = updatePaymentDto.amount ?? oldAmount;
-      const amountDifference = newAmount - oldAmount;
+    if (updatePaymentDto.amount !== undefined) payment.amount = updatePaymentDto.amount;
+    if (updatePaymentDto.paymentMethod) payment.paymentMethod = updatePaymentDto.paymentMethod;
+    if (updatePaymentDto.paymentDate) payment.paymentDate = new Date(updatePaymentDto.paymentDate);
+    if (updatePaymentDto.notes !== undefined) payment.notes = updatePaymentDto.notes;
 
-      // Update payment record
-      if (updatePaymentDto.amount !== undefined) {
-        payment.amount = updatePaymentDto.amount;
-      }
-      if (updatePaymentDto.paymentMethod) {
-        payment.paymentMethod = updatePaymentDto.paymentMethod;
-      }
-      if (updatePaymentDto.paymentDate) {
-        payment.paymentDate = new Date(updatePaymentDto.paymentDate);
-      }
-      if (updatePaymentDto.notes !== undefined) {
-        payment.notes = updatePaymentDto.notes;
-      }
+    payment.updatedBy = new Types.ObjectId(userId);
+    await payment.save();
 
-      payment.updatedBy = new Types.ObjectId(userId);
-
-      await payment.save({ session });
-
-      // Recalculate invoice balances if amount changed
-      if (amountDifference !== 0) {
-        // Calculate total paid amount for the invoice
-        const totalPaid = invoice.paidAmount + amountDifference;
-        await this.paymentBalanceService.recalculateInvoiceBalances(
-          payment.invoiceId.toString(),
-          totalPaid,
-          session,
-        );
-      }
-
-      // Update lastPaymentDate if date changed
-      if (updatePaymentDto.paymentDate) {
-        // Find the most recent payment date for this invoice
-        const latestPayment = await this.paymentModel
-          .findOne({ invoiceId: payment.invoiceId })
-          .sort({ paymentDate: -1 })
-          .session(session);
-
-        if (latestPayment) {
-          invoice.lastPaymentDate = latestPayment.paymentDate;
-          await invoice.save({ session });
-        }
-      }
-
-      // Commit transaction
-      await session.commitTransaction();
-
-      // Log audit event
-      this.logger.log(
-        `Payment updated: ${payment.paymentId} by user ${userId}, amount changed from ${oldAmount} to ${newAmount}`,
+    if (amountDifference !== 0) {
+      const totalPaid = invoice.paidAmount + amountDifference;
+      await this.paymentBalanceService.recalculateInvoiceBalances(
+        payment.invoiceId.toString(),
+        totalPaid,
       );
-
-      // Return updated payment
-      const populatedPayment = await this.paymentModel
-        .findById(payment._id)
-        .populate([
-          { path: 'patientId', select: 'firstName lastName patientNumber' },
-          {
-            path: 'invoiceId',
-            select:
-              'invoiceNumber invoiceTitle totalAmount paidAmount paymentStatus',
-          },
-          { path: 'clinicId', select: 'name' },
-          { path: 'addedBy', select: 'firstName lastName email' },
-          { path: 'updatedBy', select: 'firstName lastName email' },
-        ])
-        .session(null);
-
-      return this.mapToResponseDto(populatedPayment);
-    } catch (error) {
-      // Rollback on error
-      await session.abortTransaction();
-      this.logger.error(
-        `Payment update failed for ${payment.paymentId}: ${error.message}`,
-        error.stack,
-      );
-      throw error;
-    } finally {
-      session.endSession();
     }
+
+    if (updatePaymentDto.paymentDate) {
+      const latestPayment = await this.paymentModel
+        .findOne({ invoiceId: payment.invoiceId })
+        .sort({ paymentDate: -1 });
+      if (latestPayment) {
+        invoice.lastPaymentDate = latestPayment.paymentDate;
+        await invoice.save();
+      }
+    }
+
+    this.logger.log(
+      `Payment updated: ${payment.paymentId} by user ${userId}, amount changed from ${oldAmount} to ${newAmount}`,
+    );
+
+    const populatedPayment = await this.paymentModel
+      .findById(payment._id)
+      .populate([
+        { path: 'patientId', select: 'firstName lastName patientNumber' },
+        {
+          path: 'invoiceId',
+          select: 'invoiceNumber invoiceTitle totalAmount paidAmount paymentStatus',
+        },
+        {
+          path: 'invoiceIds',
+          select: 'invoiceNumber invoiceTitle totalAmount paidAmount paymentStatus',
+        },
+        { path: 'clinicId', select: 'name' },
+        { path: 'addedBy', select: 'firstName lastName email' },
+        { path: 'updatedBy', select: 'firstName lastName email' },
+      ]);
+
+    return this.mapToResponseDto(populatedPayment);
   }
 
   /**
@@ -597,44 +693,42 @@ export class PaymentService {
       throw new NotFoundException(NOT_FOUND_ERRORS.PAYMENT);
     }
 
-    // Only admin and above can delete
     if (userRole === 'staff' || userRole === 'doctor') {
       throw new ForbiddenException(AUTH_ERRORS.INSUFFICIENT_PERMISSIONS);
     }
 
-    // Start transaction to recalculate invoice balances
-    const session = await this.connection.startSession();
-    session.startTransaction();
+    await this.paymentModel.findByIdAndDelete(id);
 
-    try {
-      // Get invoice to calculate new total
-      const invoice = await this.invoiceModel.findById(payment.invoiceId).session(session);
-      if (!invoice) {
-        throw new NotFoundException(NOT_FOUND_ERRORS.INVOICE);
+    // Recalculate balances for each affected invoice.
+    // Use stored invoiceAllocations for multi-invoice payments (precise per-invoice amounts).
+    // Fall back to treating the whole amount against the primary invoice for legacy payments.
+    const hasAllocations =
+      payment.invoiceAllocations && payment.invoiceAllocations.length > 0;
+
+    if (hasAllocations) {
+      for (const alloc of payment.invoiceAllocations!) {
+        const inv = await this.invoiceModel.findById(alloc.invoiceId);
+        if (inv) {
+          const newPaid = Math.max(0, inv.paidAmount - alloc.amount);
+          await this.paymentBalanceService.recalculateInvoiceBalances(
+            alloc.invoiceId.toString(),
+            newPaid,
+          );
+        }
       }
-
-      // Remove payment
-      await this.paymentModel.findByIdAndDelete(id).session(session);
-
-      // Recalculate invoice balances
-      const newTotalPaid = Math.max(0, invoice.paidAmount - payment.amount);
-      await this.paymentBalanceService.recalculateInvoiceBalances(
-        payment.invoiceId.toString(),
-        newTotalPaid,
-        session,
-      );
-
-      await session.commitTransaction();
-
-      this.logger.log(
-        `Payment deleted: ${payment.paymentId} by user ${userId}`,
-      );
-    } catch (error) {
-      await session.abortTransaction();
-      throw error;
-    } finally {
-      session.endSession();
+    } else {
+      // Legacy single-invoice path
+      const invoice = await this.invoiceModel.findById(payment.invoiceId);
+      if (invoice) {
+        const newTotalPaid = Math.max(0, invoice.paidAmount - payment.amount);
+        await this.paymentBalanceService.recalculateInvoiceBalances(
+          payment.invoiceId.toString(),
+          newTotalPaid,
+        );
+      }
     }
+
+    this.logger.log(`Payment deleted: ${payment.paymentId} by user ${userId}`);
   }
 
   /**
@@ -662,11 +756,23 @@ export class PaymentService {
    */
   private mapToResponseDto(payment: any): PaymentResponseDto {
     const outstandingBalance = payment.invoiceId
-      ? Math.max(
-          0,
-          payment.invoiceId.totalAmount - payment.invoiceId.paidAmount,
-        )
+      ? Math.max(0, payment.invoiceId.totalAmount - payment.invoiceId.paidAmount)
       : 0;
+
+    const invoicesArray = (payment.invoiceIds || [])
+      .map((inv: any) => {
+        if (!inv || !inv._id) return null;
+        return {
+          _id: inv._id.toString(),
+          invoiceNumber: inv.invoiceNumber,
+          invoiceTitle: inv.invoiceTitle,
+          totalAmount: inv.totalAmount,
+          paidAmount: inv.paidAmount,
+          outstandingBalance: Math.max(0, (inv.totalAmount || 0) - (inv.paidAmount || 0)),
+          paymentStatus: inv.paymentStatus,
+        };
+      })
+      .filter(Boolean);
 
     return {
       _id: payment._id.toString(),
@@ -690,6 +796,7 @@ export class PaymentService {
             paymentStatus: payment.invoiceId.paymentStatus,
           }
         : undefined,
+      invoices: invoicesArray.length > 0 ? invoicesArray : undefined,
       clinic: payment.clinicId
         ? {
             _id: payment.clinicId._id.toString(),
@@ -702,9 +809,7 @@ export class PaymentService {
       notes: payment.notes,
       addedBy: payment.addedBy && payment.addedBy._id
         ? {
-            _id:
-              payment.addedBy._id?.toString() ||
-              payment.addedBy.toString(),
+            _id: payment.addedBy._id?.toString() || payment.addedBy.toString(),
             firstName: payment.addedBy.firstName,
             lastName: payment.addedBy.lastName,
             email: payment.addedBy.email,
@@ -717,9 +822,7 @@ export class PaymentService {
           },
       updatedBy: payment.updatedBy
         ? {
-            _id:
-              payment.updatedBy._id?.toString() ||
-              payment.updatedBy.toString(),
+            _id: payment.updatedBy._id?.toString() || payment.updatedBy.toString(),
             firstName: payment.updatedBy.firstName,
             lastName: payment.updatedBy.lastName,
             email: payment.updatedBy.email,

@@ -19,8 +19,11 @@ export class Payment extends Document {
 
   // ==================== References ====================
   
-  @Prop({ type: Types.ObjectId, ref: 'Invoice', required: true, index: true })
+  @Prop({ type: Types.ObjectId, ref: 'Invoice', required: false, index: true })
   invoiceId: Types.ObjectId;
+
+  @Prop({ type: [{ type: Types.ObjectId, ref: 'Invoice' }], default: [] })
+  invoiceIds: Types.ObjectId[];
 
   @Prop({ type: Types.ObjectId, ref: 'Patient', required: true, index: true })
   patientId: Types.ObjectId;
@@ -70,6 +73,25 @@ export class Payment extends Document {
     amount: number;
   }>;
 
+  /**
+   * Per-invoice allocation amounts for multi-invoice payments.
+   * Stores how much of the total payment amount was applied to each invoice.
+   */
+  @Prop({
+    type: [
+      {
+        invoiceId: { type: Types.ObjectId, ref: 'Invoice', required: true },
+        amount: { type: Number, required: true, min: 0 },
+      },
+    ],
+    default: [],
+    required: false,
+  })
+  invoiceAllocations?: Array<{
+    invoiceId: Types.ObjectId;
+    amount: number;
+  }>;
+
   // ==================== Audit Fields ====================
   
   @Prop({ type: Types.ObjectId, ref: 'User', required: true })
@@ -105,3 +127,6 @@ PaymentSchema.index({ paymentDate: 1 });
 
 // List queries with default sort
 PaymentSchema.index({ createdAt: -1 });
+
+// Multi-invoice queries
+PaymentSchema.index({ invoiceIds: 1 });
