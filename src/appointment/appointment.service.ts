@@ -2528,8 +2528,9 @@ export class AppointmentService {
       deletedAt: { $exists: false },
     };
 
-    // Clinic-scoped roles (admin, staff) can only see their own clinic
-    const clinicScopedRoles = ['admin', 'staff', 'doctor'];
+    // Only staff and doctors are scoped to their assigned clinic.
+    // Admins, managers, and owners can see all clinics in their organization.
+    const clinicScopedRoles = ['staff', 'doctor'];
     if (userClinicId && clinicScopedRoles.includes(userRole ?? '')) {
       clinicFilter._id = new Types.ObjectId(userClinicId);
     } else if (userOrganizationId && userRole && !['super_admin'].includes(userRole)) {

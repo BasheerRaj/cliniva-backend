@@ -594,7 +594,11 @@ export class EmployeeService {
       {
         $match: {
           ...userFilter,
-          'employeeProfile.isActive': true,
+          // Include users with an active profile OR users with no profile yet
+          $or: [
+            { 'employeeProfile.isActive': true },
+            { 'employeeProfile._id': { $exists: false } },
+          ],
           ...(Object.keys(profileFilter).length > 1 && {
             $and: Object.entries(profileFilter).map(([key, value]) => ({
               [`employeeProfile.${key}`]: value,
