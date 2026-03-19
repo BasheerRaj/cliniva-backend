@@ -558,6 +558,37 @@ export class ComplexService {
     return complex;
   }
 
+  async getComplexesForDropdown(requestingUser?: any): Promise<any> {
+    const filter: any = { deletedAt: null };
+
+    // TENANT ISOLATION (ISSUE-009)
+    if (requestingUser && requestingUser.role !== 'super_admin') {
+      if (requestingUser.subscriptionId) {
+        filter.subscriptionId = new Types.ObjectId(requestingUser.subscriptionId);
+      }
+
+      if (requestingUser.organizationId) {
+        filter.organizationId = new Types.ObjectId(requestingUser.organizationId);
+      }
+    }
+
+    const complexes = await this.complexModel
+      .find(filter)
+      .select('_id name')
+      .sort({ name: 1 })
+      .lean()
+      .exec();
+
+    return {
+      success: true,
+      data: complexes,
+      message: {
+        ar: 'تم استرجاع قائمة المجمعات بنجاح',
+        en: 'Complexes retrieved successfully',
+      },
+    };
+  }
+
   async getComplexesByOrganization(organizationId: string, requestingUser?: any): Promise<Complex[]> {
     let targetOrganizationId = organizationId;
 
