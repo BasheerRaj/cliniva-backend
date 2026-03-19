@@ -458,7 +458,7 @@ export class EmployeeService {
   /**
    * Get employees with filtering and pagination
    */
-  async getEmployees(query: EmployeeSearchQueryDto): Promise<{
+  async getEmployees(query: EmployeeSearchQueryDto, requestingUser?: any): Promise<{
     employees: any[];
     total: number;
     page: number;
@@ -526,6 +526,21 @@ export class EmployeeService {
       }
     }
 
+    // TENANT ISOLATION: enforce scope based on requesting user (same pattern as user.service.ts)
+    let effectiveClinicId = clinicId;
+    let effectiveComplexId = complexId;
+    let effectiveOrgId = organizationId;
+
+    if (requestingUser && requestingUser.role !== 'super_admin') {
+      if (requestingUser.clinicId) {
+        effectiveClinicId = requestingUser.clinicId.toString();
+      } else if (requestingUser.complexId) {
+        if (!effectiveClinicId) effectiveComplexId = requestingUser.complexId.toString();
+      } else if (requestingUser.subscriptionId) {
+        if (!effectiveClinicId && !effectiveComplexId) effectiveOrgId = requestingUser.subscriptionId.toString();
+      }
+    }
+
     // Build user filter
     const userFilter: any = {};
 
@@ -534,7 +549,9 @@ export class EmployeeService {
     if (email) userFilter.email = { $regex: email, $options: 'i' };
     if (role) userFilter.role = role;
     if (isActive !== undefined) userFilter.isActive = isActive;
-    if (clinicId) userFilter.clinicId = new Types.ObjectId(clinicId);
+    if (effectiveClinicId) userFilter.clinicId = new Types.ObjectId(effectiveClinicId);
+    if (!effectiveClinicId && effectiveComplexId) userFilter.complexId = new Types.ObjectId(effectiveComplexId);
+    if (!effectiveClinicId && !effectiveComplexId && effectiveOrgId) userFilter.subscriptionId = new Types.ObjectId(effectiveOrgId);
 
     // Search across multiple fields
     if (search) {
