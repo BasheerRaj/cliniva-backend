@@ -176,4 +176,16 @@ export class CreateAppointmentDto {
   })
   invoiceId?: string;
 
+  @ApiPropertyOptional({
+    description: 'Initial appointment status',
+    enum: AppointmentStatus,
+    example: AppointmentStatus.SCHEDULED,
+    default: AppointmentStatus.SCHEDULED,
+  })
+  @IsOptional()
+  @IsEnum(AppointmentStatus, {
+    message: '{"ar":"حالة الموعد غير صالحة","en":"Invalid appointment status"}',
+  })
+  status?: AppointmentStatus;
+
 }

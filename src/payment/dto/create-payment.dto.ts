@@ -31,15 +31,24 @@ export class InvoiceAllocationDto {
 
 /**
  * Payment method enumeration
- * Requirements: 6.2, 13.9
+ * Requirements: 6.2, 13.9 — aligned with UC-9g0h1i2j spec values
+ *
+ * Backward-compatible additions: CARD and DIGITAL_WALLET kept as legacy aliases.
  */
 export enum PaymentMethod {
   CASH = 'cash',
-  CARD = 'card',
+  // Spec-aligned specific card types (UC-9g0h1i2j)
+  CREDIT_CARD = 'credit_card',
+  DEBIT_CARD = 'debit_card',
   BANK_TRANSFER = 'bank_transfer',
+  // Spec-aligned digital methods (UC-9g0h1i2j)
+  MOBILE_WALLET = 'mobile_wallet',
+  PAYPAL = 'paypal',
   INSURANCE = 'insurance',
-  CHECK = 'check',
+  // Legacy aliases kept for backward compatibility
+  CARD = 'card',
   DIGITAL_WALLET = 'digital_wallet',
+  CHECK = 'check',
 }
 
 /**

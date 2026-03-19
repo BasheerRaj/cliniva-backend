@@ -9,12 +9,14 @@ import {
   Param,
   Query,
   Request,
+  Res,
   UseGuards,
   HttpCode,
   HttpStatus,
   BadRequestException,
   NotFoundException,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import {
   ApiTags,
   ApiOperation,
@@ -24,6 +26,7 @@ import {
   ApiQuery,
 } from '@nestjs/swagger';
 import { InvoiceService } from './invoice.service';
+import { InvoicePdfService } from './invoice-pdf.service';
 import { CreateInvoiceDto } from './dto/create-invoice.dto';
 import { UpdateInvoiceDto } from './dto/update-invoice.dto';
 import { InvoiceQueryDto } from './dto/invoice-query.dto';
@@ -49,7 +52,10 @@ import { INVOICE_ERRORS, SUCCESS_MESSAGES, NOT_FOUND_ERRORS, AUTH_ERRORS } from 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @ApiBearerAuth()
 export class InvoiceController {
-  constructor(private readonly invoiceService: InvoiceService) {}
+  constructor(
+    private readonly invoiceService: InvoiceService,
+    private readonly invoicePdfService: InvoicePdfService,
+  ) {}
 
   /**
    * Create a new invoice
@@ -431,6 +437,41 @@ export class InvoiceController {
       message: { ar: 'تم إلغاء الفاتورة بنجاح', en: 'Invoice cancelled successfully' },
       data: invoice,
     };
+  }
+
+  /**
+   * Export invoice as PDF
+   * UC-7y8z9a0b: Print/Export Invoice
+   * Requirements: 7.1, 7.2, 7.3, 7.4, 7.5
+   *
+   * IMPORTANT: Must be declared before GET ':id' to avoid route conflict.
+   * Accessible by: Staff, Admin, Manager, Owner, Doctor
+   */
+  @Get(':id/export')
+  @HttpCode(HttpStatus.OK)
+  @Roles(
+    UserRole.STAFF,
+    UserRole.ADMIN,
+    UserRole.MANAGER,
+    UserRole.OWNER,
+    UserRole.DOCTOR,
+  )
+  @ApiOperation({
+    summary: 'Export invoice as PDF',
+    description: 'Generates and downloads a printable PDF for the specified invoice. UC-7y8z9a0b.',
+  })
+  @ApiParam({ name: 'id', description: 'Invoice ID (MongoDB ObjectId)', example: '507f1f77bcf86cd799439014' })
+  @ApiResponse({ status: 200, description: 'PDF file returned as binary stream' })
+  @ApiResponse({ status: 404, description: 'Invoice not found' })
+  async exportInvoicePdf(@Param('id') id: string, @Res() res: Response): Promise<void> {
+    const { buffer, filename } = await this.invoicePdfService.generateInvoicePdf(id);
+
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="${filename}"`,
+      'Content-Length': buffer.length,
+    });
+    res.end(buffer);
   }
 
   /**

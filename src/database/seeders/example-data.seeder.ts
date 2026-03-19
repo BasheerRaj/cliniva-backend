@@ -12,6 +12,8 @@ import {
   UserAccess,
   WorkingHours,
   Patient,
+  ClinicService,
+  DoctorService,
 } from '../schemas';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -227,6 +229,8 @@ export class ExampleDataSeederService {
     @InjectModel(UserAccess.name) private userAccessModel: Model<UserAccess>,
     @InjectModel(WorkingHours.name) private workingHoursModel: Model<WorkingHours>,
     @InjectModel(Patient.name) private patientModel: Model<Patient>,
+    @InjectModel(ClinicService.name) private clinicServiceModel: Model<ClinicService>,
+    @InjectModel('DoctorService') private doctorServiceModel: Model<DoctorService>,
   ) {}
 
   // ─── Public Entry Point ────────────────────────────────────────────────────
@@ -607,6 +611,53 @@ export class ExampleDataSeederService {
         clinic._id as Types.ObjectId,
       );
     }
+
+    // Authorize clinic doctors for all services linked to this clinic
+    const doctors = [createdUsers['doctor1'], createdUsers['doctor2']].filter(Boolean);
+    if (doctors.length > 0) {
+      await this.authorizeDoctorsForClinicServices(clinic, doctors);
+    }
+  }
+
+  /**
+   * Authorize doctors for all services available at their clinic.
+   * Ensures ClinicService and DoctorService junction records exist so that
+   * the appointment booking validation passes.
+   */
+  private async authorizeDoctorsForClinicServices(
+    clinic: Clinic,
+    doctors: any[],
+  ): Promise<void> {
+    // Fetch all services linked to this clinic
+    const clinicServices = await this.clinicServiceModel.find({
+      clinicId: clinic._id,
+      isActive: true,
+    });
+
+    if (clinicServices.length === 0) {
+      this.logger.debug(`  ↺ No services linked to clinic ${(clinic as any).name} – skipping doctor authorization`);
+      return;
+    }
+
+    for (const doctor of doctors) {
+      for (const cs of clinicServices) {
+        const existing = await this.doctorServiceModel.findOne({
+          doctorId: doctor._id,
+          serviceId: cs.serviceId,
+          clinicId: clinic._id,
+        });
+        if (!existing) {
+          await this.doctorServiceModel.create({
+            doctorId: doctor._id,
+            serviceId: cs.serviceId,
+            clinicId: clinic._id,
+            isActive: true,
+          });
+        }
+      }
+    }
+
+    this.logger.log(`  ✓ Authorized ${doctors.length} doctor(s) for ${clinicServices.length} service(s) at ${(clinic as any).name}`);
   }
 
   // ─── Staff Definitions per Clinic ────────────────────────────────────────
@@ -980,6 +1031,9 @@ export class ExampleDataSeederService {
 
     // Remove user access
     await this.userAccessModel.deleteMany({ userId: { $in: userIds } });
+
+    // Remove DoctorService records for example doctors
+    await this.doctorServiceModel.deleteMany({ doctorId: { $in: userIds } });
 
     // Remove users
     await this.userModel.deleteMany({ email: { $in: emails } });

@@ -41,7 +41,8 @@ export class Payment extends Document {
 
   @Prop({
     required: true,
-    enum: ['cash', 'card', 'bank_transfer', 'insurance', 'check', 'digital_wallet'],
+    // UC-9g0h1i2j spec values + legacy aliases for backward compatibility
+    enum: ['cash', 'credit_card', 'debit_card', 'bank_transfer', 'mobile_wallet', 'paypal', 'insurance', 'card', 'digital_wallet', 'check'],
     index: true,
   })
   paymentMethod: string;

@@ -88,6 +88,16 @@ export class CreateInvoiceDto {
   @Type(() => InvoiceServiceDto)
   services: InvoiceServiceDto[];
 
+  @ApiPropertyOptional({
+    description: 'Extra info shown on invoice printout (UC-3h4i5j6k)',
+    example: 'Referred by Dr. Smith',
+    maxLength: 500,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  extraInfo?: string;
+
   @ApiPropertyOptional({ description: 'Invoice notes', example: 'First visit', maxLength: 1000 })
   @IsOptional()
   @IsString()
