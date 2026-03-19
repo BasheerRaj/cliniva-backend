@@ -176,7 +176,7 @@ export class DataTransformerUtil {
         entities.push({
           type: 'service',
           data: service,
-          dependencies: ['complexDepartment'],
+          dependencies: ['complex'],
           order: order++,
         });
       });
@@ -395,7 +395,7 @@ export class DataTransformerUtil {
       complex: ['organizationId', 'subscriptionId'],
       clinic: ['complexDepartmentId', 'subscriptionId'],
       complexDepartment: ['complexId', 'departmentId'],
-      service: ['complexDepartmentId'],
+      service: ['complexId'],
       clinicService: ['clinicId', 'serviceId'],
       workingHours: ['entityId'],
       contact: ['entityId'],

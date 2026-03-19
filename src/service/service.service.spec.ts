@@ -23,7 +23,7 @@ function buildMockServiceDoc(overrides: Record<string, any> = {}) {
     durationMinutes: 30,
     price: 100,
     sessions: [],
-    complexDepartmentId: undefined,
+    complexId: undefined,
     clinicId: undefined,
     isActive: true,
     ...overrides,

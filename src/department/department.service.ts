@@ -381,9 +381,8 @@ export class DepartmentService {
   /**
    * Get count of services linked to ComplexDepartment IDs
    *
-   * Counts services that are using the specified ComplexDepartment IDs.
-   * Uses `countDocuments()` for optimal performance instead of fetching
-   * all documents.
+    * Services are now scoped by complex (`complexId`) and no longer linked
+    * directly to complex departments.
    *
    * Handles edge cases:
    * - Returns 0 if no ComplexDepartment IDs provided
@@ -401,26 +400,8 @@ export class DepartmentService {
   private async getLinkedServicesCount(
     complexDeptIds: Types.ObjectId[],
   ): Promise<number> {
-    if (complexDeptIds.length === 0) {
-      return 0;
-    }
-
-    // Check if service model exists (optional dependency)
-    if (!this.serviceModel) {
-      return 0;
-    }
-
-    try {
-      return await this.serviceModel.countDocuments({
-        complexDepartmentId: { $in: complexDeptIds },
-      });
-    } catch (error) {
-      // Service collection might not exist yet - log and return 0
-      this.logger.warn(
-        `Unable to count services for department: ${error.message}`,
-      );
-      return 0;
-    }
+    void complexDeptIds;
+    return 0;
   }
 
   /**

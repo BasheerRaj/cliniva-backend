@@ -52,7 +52,7 @@ export class ServiceController {
   @ApiOperation({
     summary: 'Create new service',
     description:
-      'Creates a new medical service with pricing and duration. Services can be created at the complex department level or clinic level. Service names must be unique within their scope (department or clinic).',
+      'Creates a new medical service with pricing and duration. Services can be created at the complex level or clinic level. Service names must be unique within their scope (complex or clinic).',
   })
   @ApiResponse({
     status: 201,
@@ -192,7 +192,7 @@ export class ServiceController {
   @ApiOperation({
     summary: 'Update service',
     description:
-      'Updates an existing medical service. If changes affect active appointments (e.g., department/clinic change, duration change), confirmation is required to proceed with rescheduling.',
+      'Updates an existing medical service. If changes affect active appointments (e.g., complex/clinic change, duration change), confirmation is required to proceed with rescheduling.',
   })
   @ApiResponse({
     status: 200,
@@ -420,7 +420,7 @@ export class ServiceController {
   @ApiOperation({
     summary: 'Validate service names',
     description:
-      'Validates service names to prevent duplicates during clinic onboarding. Checks for conflicts within the same complex department or clinic scope and provides suggestions for alternative names if conflicts are found.',
+      'Validates service names to prevent duplicates during clinic onboarding. Checks for conflicts within the same complex or clinic scope and provides suggestions for alternative names if conflicts are found.',
   })
   @ApiResponse({
     status: 200,
@@ -455,7 +455,7 @@ export class ServiceController {
           items: { type: 'string' },
           example: ['General Consultation', 'Blood Test', 'X-Ray'],
         },
-        complexDepartmentId: {
+        complexId: {
           type: 'string',
           example: '507f1f77bcf86cd799439020',
         },
@@ -470,7 +470,7 @@ export class ServiceController {
     @Body(new ValidationPipe({ transform: true, whitelist: true }))
     body: {
       serviceNames: string[];
-      complexDepartmentId?: string;
+      complexId?: string;
     },
   ): Promise<{
     isValid: boolean;
@@ -478,7 +478,7 @@ export class ServiceController {
     suggestions: string[];
     message: string;
   }> {
-    const { serviceNames, complexDepartmentId } = body;
+    const { serviceNames, complexId } = body;
 
     if (!serviceNames || serviceNames.length === 0) {
       return {
@@ -491,7 +491,7 @@ export class ServiceController {
 
     const validation = await this.serviceService.validateServiceNamesForClinic(
       serviceNames,
-      complexDepartmentId,
+      complexId,
     );
 
     let message = '';
@@ -508,12 +508,12 @@ export class ServiceController {
   }
 
   /**
-   * Get services by complex department
+   * Get services by complex
    */
   @ApiOperation({
-    summary: 'Get services by complex department',
+    summary: 'Get services by complex',
     description:
-      'Retrieves all medical services associated with a specific complex department. Returns services that are available at the department level.',
+      'Retrieves all medical services associated with a specific complex.',
   })
   @ApiResponse({
     status: 200,
@@ -531,25 +531,25 @@ export class ServiceController {
   })
   @ApiResponse({
     status: 404,
-    description: 'Complex department not found',
+    description: 'Complex not found',
     schema: {
       example: SERVICE_SWAGGER_EXAMPLES.NOT_FOUND,
     },
   })
   @ApiBearerAuth()
   @ApiParam({
-    name: 'complexDepartmentId',
-    description: 'Complex department ID',
+    name: 'complexId',
+    description: 'Complex ID',
     type: String,
     example: '507f1f77bcf86cd799439020',
   })
   @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN, UserRole.STAFF, UserRole.DOCTOR, UserRole.MANAGER)
-  @Get('complex-departments/:complexDepartmentId')
-  async getServicesByComplexDepartment(
-    @Param('complexDepartmentId') complexDepartmentId: string,
+  @Get('complexes/:complexId')
+  async getServicesByComplex(
+    @Param('complexId') complexId: string,
   ): Promise<any[]> {
-    const services = await this.serviceService.getServicesByComplexDepartment(
-      complexDepartmentId,
+    const services = await this.serviceService.getServicesByComplex(
+      complexId,
     );
     return Promise.all(
       services.map((service) => this.enrichServiceResponse(service)),
@@ -664,7 +664,7 @@ export class ServiceController {
   @ApiOperation({
     summary: 'Get services owned by clinic',
     description:
-      'Retrieves services that are directly owned and created by a specific clinic (not inherited from complex department). These are clinic-specific services.',
+      'Retrieves services that are directly owned and created by a specific clinic (not inherited from complex). These are clinic-specific services.',
   })
   @ApiResponse({
     status: 200,
@@ -711,7 +711,7 @@ export class ServiceController {
   @ApiOperation({
     summary: 'Get services for clinic context',
     description:
-      'Retrieves all services available in a clinic context. If complexDepartmentId is provided, returns services for that department. Otherwise returns services without department association.',
+      'Retrieves all services available in a clinic context. If complexId is provided, returns services for that complex. Otherwise returns services without complex association.',
   })
   @ApiResponse({
     status: 200,
@@ -729,19 +729,19 @@ export class ServiceController {
   })
   @ApiBearerAuth()
   @ApiQuery({
-    name: 'complexDepartmentId',
+    name: 'complexId',
     required: false,
-    description: 'Complex department ID to filter services',
+    description: 'Complex ID to filter services',
     type: String,
     example: '507f1f77bcf86cd799439020',
   })
   @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN, UserRole.STAFF, UserRole.DOCTOR, UserRole.MANAGER)
   @Get('clinic')
   async getServicesForClinic(
-    @Query('complexDepartmentId') complexDepartmentId?: string,
+    @Query('complexId') complexId?: string,
   ): Promise<any[]> {
     const services = await this.serviceService.getServicesForClinic(
-      complexDepartmentId,
+      complexId,
     );
     return Promise.all(
       services.map((service) => this.enrichServiceResponse(service)),
@@ -749,12 +749,12 @@ export class ServiceController {
   }
 
   /**
-   * Get all services for a clinic context with complex department
+   * Get all services for a clinic context with complex
    */
   @ApiOperation({
-    summary: 'Get services for clinic with department',
+    summary: 'Get services for clinic with complex',
     description:
-      'Retrieves all services available for a clinic within a specific complex department context.',
+      'Retrieves all services available for a clinic within a specific complex context.',
   })
   @ApiResponse({
     status: 200,
@@ -772,25 +772,25 @@ export class ServiceController {
   })
   @ApiResponse({
     status: 404,
-    description: 'Complex department not found',
+    description: 'Complex not found',
     schema: {
       example: SERVICE_SWAGGER_EXAMPLES.NOT_FOUND,
     },
   })
   @ApiBearerAuth()
   @ApiParam({
-    name: 'complexDepartmentId',
-    description: 'Complex department ID',
+    name: 'complexId',
+    description: 'Complex ID',
     type: String,
     example: '507f1f77bcf86cd799439020',
   })
   @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN, UserRole.STAFF, UserRole.DOCTOR, UserRole.MANAGER)
-  @Get('clinic/:complexDepartmentId')
-  async getServicesForClinicWithDepartment(
-    @Param('complexDepartmentId') complexDepartmentId: string,
+  @Get('clinic/:complexId')
+  async getServicesForClinicWithComplex(
+    @Param('complexId') complexId: string,
   ): Promise<any[]> {
     const services = await this.serviceService.getServicesForClinic(
-      complexDepartmentId,
+      complexId,
     );
     return Promise.all(
       services.map((service) => this.enrichServiceResponse(service)),
@@ -803,7 +803,7 @@ export class ServiceController {
   @ApiOperation({
     summary: 'Get all services',
     description:
-      'Retrieves all medical services with optional filtering by complex department. Returns a list of services with their details including pricing, duration, and descriptions.',
+      'Retrieves all medical services with optional filtering by complex. Returns a list of services with their details including pricing, duration, and descriptions.',
   })
   @ApiResponse({
     status: 200,
@@ -821,18 +821,18 @@ export class ServiceController {
   })
   @ApiBearerAuth()
   @ApiQuery({
-    name: 'complexDepartmentId',
+    name: 'complexId',
     required: false,
-    description: 'Filter services by complex department ID',
+    description: 'Filter services by complex ID',
     type: String,
     example: '507f1f77bcf86cd799439020',
   })
   @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN, UserRole.STAFF, UserRole.DOCTOR, UserRole.MANAGER)
   @Get()
   async getAllServices(
-    @Query('complexDepartmentId') complexDepartmentId?: string,
+    @Query('complexId') complexId?: string,
   ): Promise<any[]> {
-    const services = await this.serviceService.getAllServices(complexDepartmentId);
+    const services = await this.serviceService.getAllServices(complexId);
     return Promise.all(
       services.map((service) => this.enrichServiceResponse(service)),
     );
@@ -975,7 +975,7 @@ export class ServiceController {
   @ApiOperation({
     summary: 'Get active services',
     description:
-      'Returns only active services. Used for appointment booking dropdowns. Can be filtered by complex department or clinic.',
+      'Returns only active services. Used for appointment booking dropdowns. Can be filtered by complex or clinic.',
   })
   @ApiResponse({
     status: 200,
@@ -997,9 +997,9 @@ export class ServiceController {
   })
   @ApiBearerAuth()
   @ApiQuery({
-    name: 'complexDepartmentId',
+    name: 'complexId',
     required: false,
-    description: 'Filter by complex department ID',
+    description: 'Filter by complex ID',
     type: String,
     example: '507f1f77bcf86cd799439020',
   })
@@ -1013,11 +1013,11 @@ export class ServiceController {
   @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN, UserRole.STAFF, UserRole.DOCTOR, UserRole.MANAGER)
   @Get('active')
   async getActiveServices(
-    @Query('complexDepartmentId') complexDepartmentId?: string,
+    @Query('complexId') complexId?: string,
     @Query('clinicId') clinicId?: string,
   ): Promise<any[]> {
     const services = await this.serviceService.getActiveServices(
-      complexDepartmentId,
+      complexId,
       clinicId,
     );
     return Promise.all(

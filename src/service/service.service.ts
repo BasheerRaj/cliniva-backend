@@ -13,7 +13,6 @@ import { Notification } from '../database/schemas/notification.schema';
 import { User } from '../database/schemas/user.schema';
 import { DoctorService } from '../database/schemas/doctor-service.schema';
 import { Clinic } from '../database/schemas/clinic.schema';
-import { ComplexDepartment } from '../database/schemas/complex-department.schema';
 import { Complex } from '../database/schemas/complex.schema';
 import { EmployeeShift } from '../database/schemas/employee-shift.schema';
 import { CreateServiceDto, AssignServicesDto } from './dto/create-service.dto';
@@ -46,8 +45,6 @@ export class ServiceService {
     @InjectModel('DoctorService')
     private readonly doctorServiceModel: Model<DoctorService>,
     @InjectModel('Clinic') private readonly clinicModel: Model<Clinic>,
-    @InjectModel('ComplexDepartment')
-    private readonly complexDepartmentModel: Model<ComplexDepartment>,
     @InjectModel('Complex') private readonly complexModel: Model<Complex>,
     @InjectModel('EmployeeShift')
     private readonly employeeShiftModel: Model<EmployeeShift>,
@@ -69,26 +66,26 @@ export class ServiceService {
       );
     }
 
-    // Check for duplicates only within the same clinic or complex department
+    // Check for duplicates only within the same clinic or complex
     const duplicateValidationQuery: any = {
       name: { $regex: new RegExp(`^${createDto.name.trim()}$`, 'i') }, // Case-insensitive exact match
       deletedAt: { $exists: false },
     };
 
-    // If this is for a specific complex department, check within that department only
-    if (createDto.complexDepartmentId) {
-      duplicateValidationQuery.complexDepartmentId = new Types.ObjectId(
-        createDto.complexDepartmentId,
+    // If this is for a specific complex, check within that complex only
+    if (createDto.complexId) {
+      duplicateValidationQuery.complexId = new Types.ObjectId(
+        createDto.complexId,
       );
       duplicateValidationQuery.clinicId = { $exists: false }; // Ensure it's not a clinic-specific service
 
-      // Check if service already exists in this complex department
+      // Check if service already exists in this complex
       const existing = await this.serviceModel.findOne(
         duplicateValidationQuery,
       );
       if (existing) {
         throw new BadRequestException(
-          `Service "${createDto.name}" already exists in this department. Please choose a different name.`,
+          `Service "${createDto.name}" already exists in this complex. Please choose a different name.`,
         );
       }
     }
@@ -98,7 +95,7 @@ export class ServiceService {
       duplicateValidationQuery.clinicId = new Types.ObjectId(
         createDto.clinicId,
       );
-      duplicateValidationQuery.complexDepartmentId = { $exists: false }; // Ensure it's not a department service
+      duplicateValidationQuery.complexId = { $exists: false }; // Ensure it's not a complex service
 
       // Check if service already exists for this clinic
       const existing = await this.serviceModel.findOne(
@@ -121,10 +118,10 @@ export class ServiceService {
       requiredEquipment: createDto.requiredEquipment?.trim() || undefined,
     };
 
-    // Add complex department ID only if provided
-    if (createDto.complexDepartmentId) {
-      serviceData.complexDepartmentId = new Types.ObjectId(
-        createDto.complexDepartmentId,
+    // Add complex ID only if provided
+    if (createDto.complexId) {
+      serviceData.complexId = new Types.ObjectId(
+        createDto.complexId,
       );
     }
 
@@ -362,24 +359,24 @@ export class ServiceService {
     };
   }
 
-  async getServicesByComplexDepartment(
-    complexDepartmentId: string,
+  async getServicesByComplex(
+    complexId: string,
   ): Promise<Service[]> {
     return this.serviceModel
       .find({
-        complexDepartmentId: new Types.ObjectId(complexDepartmentId),
+        complexId: new Types.ObjectId(complexId),
         deletedAt: { $exists: false },
       })
       .exec();
   }
 
-  async getAllServices(complexDepartmentId?: string): Promise<Service[]> {
+  async getAllServices(complexId?: string): Promise<Service[]> {
     const query: any = {
       deletedAt: { $exists: false },
     };
 
-    if (complexDepartmentId) {
-      query.complexDepartmentId = new Types.ObjectId(complexDepartmentId);
+    if (complexId) {
+      query.complexId = new Types.ObjectId(complexId);
     }
 
     return this.serviceModel.find(query).exec();
@@ -388,7 +385,7 @@ export class ServiceService {
   // New method: Validate service names for clinic onboarding to prevent duplicates across forms
   async validateServiceNamesForClinic(
     serviceNames: string[],
-    complexDepartmentId?: string,
+    complexId?: string,
   ): Promise<{ isValid: boolean; conflicts: string[]; suggestions: string[] }> {
     try {
       if (!serviceNames || serviceNames.length === 0) {
@@ -420,10 +417,10 @@ export class ServiceService {
         deletedAt: { $exists: false },
       };
 
-      if (complexDepartmentId) {
-        query.complexDepartmentId = new Types.ObjectId(complexDepartmentId);
+      if (complexId) {
+        query.complexId = new Types.ObjectId(complexId);
       } else {
-        query.complexDepartmentId = { $exists: false };
+        query.complexId = { $exists: false };
       }
 
       // Find existing services that conflict
@@ -451,15 +448,15 @@ export class ServiceService {
     }
   }
 
-  // New method: Get all services for a clinic (including complex department services)
-  async getServicesForClinic(complexDepartmentId?: string): Promise<Service[]> {
+  // New method: Get all services for a clinic (including complex services)
+  async getServicesForClinic(complexId?: string): Promise<Service[]> {
     try {
       const query: any = {};
 
-      if (complexDepartmentId) {
-        query.complexDepartmentId = new Types.ObjectId(complexDepartmentId);
+      if (complexId) {
+        query.complexId = new Types.ObjectId(complexId);
       } else {
-        query.complexDepartmentId = { $exists: false };
+        query.complexId = { $exists: false };
       }
 
       return await this.serviceModel.find(query).exec();
@@ -575,7 +572,7 @@ export class ServiceService {
     }
 
     const [complexName, clinicsNames, doctorsNames] = await Promise.all([
-      this.getComplexNameByDepartmentId(plain?.complexDepartmentId),
+      this.getComplexNameById(plain?.complexId),
       this.getClinicNamesByIds([...clinicIdSet]),
       this.getDoctorNamesByServiceId(plain?._id),
     ]);
@@ -590,24 +587,15 @@ export class ServiceService {
     };
   }
 
-  private async getComplexNameByDepartmentId(
-    complexDepartmentId?: Types.ObjectId | string,
+  private async getComplexNameById(
+    complexId?: Types.ObjectId | string,
   ): Promise<string | null> {
-    if (!complexDepartmentId) {
-      return null;
-    }
-
-    const relation = await this.complexDepartmentModel
-      .findById(complexDepartmentId)
-      .select('complexId')
-      .lean();
-
-    if (!relation?.complexId) {
+    if (!complexId) {
       return null;
     }
 
     const complex = await this.complexModel
-      .findById(relation.complexId)
+      .findById(complexId)
       .select('name')
       .lean();
 
@@ -725,13 +713,13 @@ export class ServiceService {
         deletedAt: { $exists: false },
       };
 
-      if (service.complexDepartmentId) {
-        duplicateValidationQuery.complexDepartmentId =
-          service.complexDepartmentId;
+      if (service.complexId) {
+        duplicateValidationQuery.complexId =
+          service.complexId;
         duplicateValidationQuery.clinicId = { $exists: false };
       } else if (service.clinicId) {
         duplicateValidationQuery.clinicId = service.clinicId;
-        duplicateValidationQuery.complexDepartmentId = { $exists: false };
+        duplicateValidationQuery.complexId = { $exists: false };
       }
 
       const existing = await this.serviceModel.findOne(
@@ -775,15 +763,15 @@ export class ServiceService {
       service.clinicIds = clinicIds.map((id) => new Types.ObjectId(id));
     }
 
-    // Handle complexDepartmentId change
-    if (updateDto.complexDepartmentId !== undefined) {
-      if (updateDto.complexDepartmentId) {
-        service.complexDepartmentId = new Types.ObjectId(
-          updateDto.complexDepartmentId,
+    // Handle complexId change
+    if (updateDto.complexId !== undefined) {
+      if (updateDto.complexId) {
+        service.complexId = new Types.ObjectId(
+          updateDto.complexId,
         );
-        service.clinicId = undefined; // Clear clinicId if setting complexDepartmentId
+        service.clinicId = undefined; // Clear clinicId if setting complexId
       } else {
-        service.complexDepartmentId = undefined;
+        service.complexId = undefined;
       }
     }
 
@@ -791,7 +779,7 @@ export class ServiceService {
     if (updateDto.clinicId !== undefined) {
       if (updateDto.clinicId) {
         service.clinicId = new Types.ObjectId(updateDto.clinicId);
-        service.complexDepartmentId = undefined; // Clear complexDepartmentId if setting clinicId
+        service.complexId = undefined; // Clear complexId if setting clinicId
 
         const clinicIds = this.buildEffectiveClinicIds(
           updateDto.clinicId,
@@ -1077,10 +1065,10 @@ export class ServiceService {
     const changes: string[] = [];
 
     if (
-      updateDto.complexDepartmentId !== undefined &&
-      updateDto.complexDepartmentId !== service.complexDepartmentId?.toString()
+      updateDto.complexId !== undefined &&
+      updateDto.complexId !== service.complexId?.toString()
     ) {
-      changes.push('complexDepartmentId');
+      changes.push('complexId');
     }
 
     if (
@@ -1303,7 +1291,7 @@ export class ServiceService {
    * Used for appointment booking dropdowns
    */
   async getActiveServices(
-    complexDepartmentId?: string,
+    complexId?: string,
     clinicId?: string,
   ): Promise<Service[]> {
     const query: any = {
@@ -1311,8 +1299,8 @@ export class ServiceService {
       deletedAt: { $exists: false },
     };
 
-    if (complexDepartmentId) {
-      query.complexDepartmentId = new Types.ObjectId(complexDepartmentId);
+    if (complexId) {
+      query.complexId = new Types.ObjectId(complexId);
     }
 
     if (clinicId) {

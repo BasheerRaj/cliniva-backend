@@ -2329,8 +2329,8 @@ export class OnboardingService {
                 durationMinutes: serviceData.durationMinutes || 30,
                 price: serviceData.price || 0,
                 clinicId: (userClinic._id as any).toString(), // Link service directly to this clinic
-                complexDepartmentId: userClinic.complexDepartmentId
-                  ? (userClinic.complexDepartmentId as any).toString()
+                complexId: userClinic.complexId
+                  ? (userClinic.complexId as any).toString()
                   : undefined,
               });
 

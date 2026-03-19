@@ -6,8 +6,8 @@ import { Document, Types } from 'mongoose';
   collection: 'services',
 })
 export class Service extends Document {
-  @Prop({ type: Types.ObjectId, ref: 'ComplexDepartment', required: false })
-  complexDepartmentId?: Types.ObjectId; // Optional for clinic-only services
+  @Prop({ type: Types.ObjectId, ref: 'Complex', required: false })
+  complexId?: Types.ObjectId; // Optional for clinic-only services
 
   @Prop({ type: Types.ObjectId, ref: 'Clinic', required: false })
   clinicId?: Types.ObjectId; // For direct clinic services
@@ -120,7 +120,7 @@ export class Service extends Document {
 export const ServiceSchema = SchemaFactory.createForClass(Service);
 
 // Indexes
-ServiceSchema.index({ complexDepartmentId: 1 });
+ServiceSchema.index({ complexId: 1 });
 ServiceSchema.index({ clinicId: 1 });
 ServiceSchema.index({ name: 1 });
 ServiceSchema.index({ serviceCategory: 1 });
@@ -130,11 +130,11 @@ ServiceSchema.index({ deletedAt: 1 });
 // Using partialFilterExpression instead of sparse: sparse treats null as a value
 // causing false uniqueness conflicts for global (unscoped) services
 ServiceSchema.index(
-  { complexDepartmentId: 1, name: 1 },
+  { complexId: 1, name: 1 },
   {
     unique: true,
     partialFilterExpression: {
-      complexDepartmentId: { $exists: true, $ne: null },
+      complexId: { $exists: true, $ne: null },
     },
   },
 );

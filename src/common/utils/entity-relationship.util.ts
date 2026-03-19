@@ -94,7 +94,7 @@ export class EntityRelationshipUtil {
       clinic: ['subscription'], // Can optionally depend on complex-department
       department: [], // No dependencies
       complexDepartment: ['complex', 'department'],
-      service: ['complexDepartment'],
+      service: ['complex'],
       clinicService: ['clinic', 'service'],
       workingHours: ['entity'], // Depends on any entity (organization, complex, clinic)
       contact: ['entity'], // Depends on any entity

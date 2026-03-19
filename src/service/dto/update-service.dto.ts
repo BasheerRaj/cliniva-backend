@@ -68,14 +68,14 @@ export class UpdateServiceDto {
   serviceCategory?: string;
 
   @ApiPropertyOptional({
-    description: 'Complex department ID that owns this service',
+    description: 'Complex ID that owns this service',
     example: '507f1f77bcf86cd799439020',
     type: String,
   })
   @IsString()
   @IsOptional()
   @IsMongoId()
-  complexDepartmentId?: string;
+  complexId?: string;
 
   @ApiPropertyOptional({
     description:
