@@ -29,6 +29,23 @@ import { CalculateServicePriceDto } from '../service-offer/dto/calculate-service
 import { PriceCalculation } from '../service-offer/interfaces/price-calculation.interface';
 import { SessionManagerService } from './services/session-manager.service';
 
+type PaginationOptions = {
+  page?: number;
+  limit?: number;
+};
+
+type PaginationMeta = {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+};
+
+type PaginatedResult<T> = {
+  data: T[];
+  pagination: PaginationMeta;
+};
+
 @Injectable()
 export class ServiceService {
   constructor(
@@ -359,6 +376,56 @@ export class ServiceService {
     };
   }
 
+  private normalizePaginationOptions(options?: PaginationOptions): {
+    page: number;
+    limit: number;
+    skip: number;
+  } {
+    const page = Math.max(1, Number(options?.page) || 1);
+    const limit = Math.max(1, Math.min(100, Number(options?.limit) || 10));
+
+    return {
+      page,
+      limit,
+      skip: (page - 1) * limit,
+    };
+  }
+
+  private buildPaginationMeta(
+    total: number,
+    page: number,
+    limit: number,
+  ): PaginationMeta {
+    return {
+      page,
+      limit,
+      total,
+      totalPages: total === 0 ? 0 : Math.ceil(total / limit),
+    };
+  }
+
+  private async getPaginatedServicesByQuery(
+    query: any,
+    options?: PaginationOptions,
+  ): Promise<PaginatedResult<Service>> {
+    const { page, limit, skip } = this.normalizePaginationOptions(options);
+
+    const [data, total] = await Promise.all([
+      this.serviceModel
+        .find(query)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .exec(),
+      this.serviceModel.countDocuments(query),
+    ]);
+
+    return {
+      data,
+      pagination: this.buildPaginationMeta(total, page, limit),
+    };
+  }
+
   async getServicesByComplex(
     complexId: string,
   ): Promise<Service[]> {
@@ -368,6 +435,19 @@ export class ServiceService {
         deletedAt: { $exists: false },
       })
       .exec();
+  }
+
+  async getServicesByComplexPaginated(
+    complexId: string,
+    options?: PaginationOptions,
+  ): Promise<PaginatedResult<Service>> {
+    return this.getPaginatedServicesByQuery(
+      {
+        complexId: new Types.ObjectId(complexId),
+        deletedAt: { $exists: false },
+      },
+      options,
+    );
   }
 
   async getAllServices(complexId?: string): Promise<Service[]> {
@@ -380,6 +460,21 @@ export class ServiceService {
     }
 
     return this.serviceModel.find(query).exec();
+  }
+
+  async getAllServicesPaginated(
+    complexId?: string,
+    options?: PaginationOptions,
+  ): Promise<PaginatedResult<Service>> {
+    const query: any = {
+      deletedAt: { $exists: false },
+    };
+
+    if (complexId) {
+      query.complexId = new Types.ObjectId(complexId);
+    }
+
+    return this.getPaginatedServicesByQuery(query, options);
   }
 
   // New method: Validate service names for clinic onboarding to prevent duplicates across forms
@@ -466,6 +561,30 @@ export class ServiceService {
     }
   }
 
+  async getServicesForClinicPaginated(
+    complexId?: string,
+    options?: PaginationOptions,
+  ): Promise<PaginatedResult<Service>> {
+    try {
+      const query: any = {};
+
+      if (complexId) {
+        query.complexId = new Types.ObjectId(complexId);
+      } else {
+        query.complexId = { $exists: false };
+      }
+
+      return this.getPaginatedServicesByQuery(query, options);
+    } catch (error) {
+      console.error('Error getting paginated services for clinic:', error);
+      const { page, limit } = this.normalizePaginationOptions(options);
+      return {
+        data: [],
+        pagination: this.buildPaginationMeta(0, page, limit),
+      };
+    }
+  }
+
   async assignServicesToClinic(
     clinicId: string,
     assignDto: AssignServicesDto,
@@ -512,6 +631,36 @@ export class ServiceService {
     return clinicServices.map((cs) => cs.serviceId as unknown as Service);
   }
 
+  async getServicesByClinicPaginated(
+    clinicId: string,
+    options?: PaginationOptions,
+  ): Promise<PaginatedResult<Service>> {
+    const { page, limit, skip } = this.normalizePaginationOptions(options);
+
+    const clinicQuery = {
+      clinicId: new Types.ObjectId(clinicId),
+      isActive: true,
+    };
+
+    const [clinicServices, total] = await Promise.all([
+      this.clinicServiceModel
+        .find(clinicQuery)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .populate('serviceId')
+        .exec(),
+      this.clinicServiceModel.countDocuments(clinicQuery),
+    ]);
+
+    const data = clinicServices.map((cs) => cs.serviceId as unknown as Service);
+
+    return {
+      data,
+      pagination: this.buildPaginationMeta(total, page, limit),
+    };
+  }
+
   async getServicesOwnedByClinic(clinicId: string): Promise<Service[]> {
     // Get services that are directly owned by this clinic
     return this.serviceModel
@@ -519,6 +668,18 @@ export class ServiceService {
         clinicId: new Types.ObjectId(clinicId),
       })
       .exec();
+  }
+
+  async getServicesOwnedByClinicPaginated(
+    clinicId: string,
+    options?: PaginationOptions,
+  ): Promise<PaginatedResult<Service>> {
+    return this.getPaginatedServicesByQuery(
+      {
+        clinicId: new Types.ObjectId(clinicId),
+      },
+      options,
+    );
   }
 
   async getService(serviceId: string): Promise<Service> {
@@ -1334,6 +1495,65 @@ export class ServiceService {
     );
 
     return servicesWithCounts as any;
+  }
+
+  async getActiveServicesPaginated(
+    complexId?: string,
+    clinicId?: string,
+    options?: PaginationOptions,
+  ): Promise<PaginatedResult<any>> {
+    const query: any = {
+      isActive: true,
+      deletedAt: { $exists: false },
+    };
+
+    if (complexId) {
+      query.complexId = new Types.ObjectId(complexId);
+    }
+
+    if (clinicId) {
+      query.clinicId = new Types.ObjectId(clinicId);
+    }
+
+    const { page, limit, skip } = this.normalizePaginationOptions(options);
+
+    const [services, total] = await Promise.all([
+      this.serviceModel
+        .find(query)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .exec(),
+      this.serviceModel.countDocuments(query),
+    ]);
+
+    const servicesWithCounts = await Promise.all(
+      services.map(async (service) => {
+        const [activeCount, totalCount] = await Promise.all([
+          this.appointmentModel.countDocuments({
+            serviceId: service._id,
+            status: { $in: ['scheduled', 'confirmed'] },
+            appointmentDate: { $gte: new Date() },
+            deletedAt: { $exists: false },
+          }),
+          this.appointmentModel.countDocuments({
+            serviceId: service._id,
+            deletedAt: { $exists: false },
+          }),
+        ]);
+
+        return {
+          ...service.toObject(),
+          activeAppointmentsCount: activeCount,
+          totalAppointmentsCount: totalCount,
+        };
+      }),
+    );
+
+    return {
+      data: servicesWithCounts,
+      pagination: this.buildPaginationMeta(total, page, limit),
+    };
   }
 
   /**
