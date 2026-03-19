@@ -5,6 +5,7 @@ import {
   IsNumber,
   IsArray,
   IsBoolean,
+  IsMongoId,
   Min,
   MaxLength,
   MinLength,
@@ -88,6 +89,28 @@ export class CreateServiceDto {
   @IsOptional()
   @MaxLength(100)
   serviceCategory?: string;
+
+  @ApiPropertyOptional({
+    description: 'Required medical equipment for this service',
+    example: 'ECG machine',
+    type: String,
+    maxLength: 300,
+  })
+  @IsString()
+  @IsOptional()
+  @MaxLength(300)
+  requiredEquipment?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Multiple clinics where this service can be assigned/used for doctor assignments',
+    type: [String],
+    example: ['507f1f77bcf86cd799439040', '507f1f77bcf86cd799439041'],
+  })
+  @IsOptional()
+  @IsArray()
+  @IsMongoId({ each: true })
+  clinicIds?: string[];
 }
 
 export class ServiceAssignmentDto {

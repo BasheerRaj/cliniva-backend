@@ -27,6 +27,9 @@ export class Service extends Document {
   @Prop({ type: String, trim: true })
   serviceCategory?: string;
 
+  @Prop({ type: String, trim: true })
+  requiredEquipment?: string;
+
   @Prop({ default: true })
   isActive?: boolean;
 
@@ -82,6 +85,7 @@ export class Service extends Document {
         duration: { type: Number, required: false },
         order: { type: Number, required: true },
         description: { type: String, required: false },
+        appointmentRequired: { type: Boolean, default: true },
         apptRequired: { type: Boolean, default: true },
         nextSessionId: { type: String, required: false },
       },
@@ -95,6 +99,7 @@ export class Service extends Document {
     duration?: number;
     order: number;
     description?: string;
+    appointmentRequired: boolean;
     apptRequired: boolean;
     nextSessionId?: string;
   }>;

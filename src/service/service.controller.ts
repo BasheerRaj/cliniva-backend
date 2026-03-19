@@ -91,8 +91,9 @@ export class ServiceController {
   async createService(
     @Body(new ValidationPipe({ transform: true, whitelist: true }))
     createServiceDto: CreateServiceWithSessionsDto,
-  ): Promise<Service> {
-    return this.serviceService.createService(createServiceDto);
+  ): Promise<any> {
+    const service = await this.serviceService.createService(createServiceDto);
+    return this.enrichServiceResponse(service);
   }
 
   /**
@@ -180,7 +181,7 @@ export class ServiceController {
     const service = await this.serviceService.getService(id);
     const assignedDoctors = await this.serviceService.getAssignedDoctors(id);
     return {
-      ...this.enrichServiceResponse(service),
+      ...(await this.enrichServiceResponse(service)),
       assignedDoctors,
     };
   }
@@ -258,8 +259,9 @@ export class ServiceController {
     @Param('id') id: string,
     @Body(new ValidationPipe({ transform: true, whitelist: true }))
     updateServiceDto: UpdateServiceWithSessionsDto,
-  ): Promise<Service> {
-    return this.serviceService.updateService(id, updateServiceDto);
+  ): Promise<any> {
+    const service = await this.serviceService.updateService(id, updateServiceDto);
+    return this.enrichServiceResponse(service);
   }
 
   /**
@@ -549,7 +551,9 @@ export class ServiceController {
     const services = await this.serviceService.getServicesByComplexDepartment(
       complexDepartmentId,
     );
-    return services.map((service) => this.enrichServiceResponse(service));
+    return Promise.all(
+      services.map((service) => this.enrichServiceResponse(service)),
+    );
   }
 
   /**
@@ -649,7 +653,9 @@ export class ServiceController {
     @Param('clinicId') clinicId: string,
   ): Promise<any[]> {
     const services = await this.serviceService.getServicesByClinic(clinicId);
-    return services.map((service) => this.enrichServiceResponse(service));
+    return Promise.all(
+      services.map((service) => this.enrichServiceResponse(service)),
+    );
   }
 
   /**
@@ -694,7 +700,9 @@ export class ServiceController {
     @Param('clinicId') clinicId: string,
   ): Promise<any[]> {
     const services = await this.serviceService.getServicesOwnedByClinic(clinicId);
-    return services.map((service) => this.enrichServiceResponse(service));
+    return Promise.all(
+      services.map((service) => this.enrichServiceResponse(service)),
+    );
   }
 
   /**
@@ -735,7 +743,9 @@ export class ServiceController {
     const services = await this.serviceService.getServicesForClinic(
       complexDepartmentId,
     );
-    return services.map((service) => this.enrichServiceResponse(service));
+    return Promise.all(
+      services.map((service) => this.enrichServiceResponse(service)),
+    );
   }
 
   /**
@@ -782,7 +792,9 @@ export class ServiceController {
     const services = await this.serviceService.getServicesForClinic(
       complexDepartmentId,
     );
-    return services.map((service) => this.enrichServiceResponse(service));
+    return Promise.all(
+      services.map((service) => this.enrichServiceResponse(service)),
+    );
   }
 
   /**
@@ -821,20 +833,22 @@ export class ServiceController {
     @Query('complexDepartmentId') complexDepartmentId?: string,
   ): Promise<any[]> {
     const services = await this.serviceService.getAllServices(complexDepartmentId);
-    return services.map((service) => this.enrichServiceResponse(service));
+    return Promise.all(
+      services.map((service) => this.enrichServiceResponse(service)),
+    );
   }
 
-  private enrichServiceResponse(service: any): any {
-    const plain = service?.toObject ? service.toObject() : { ...service };
-    const sessions = Array.isArray(plain.sessions)
-      ? [...plain.sessions].sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+  private async enrichServiceResponse(service: any): Promise<any> {
+    const enriched = await this.serviceService.buildEnrichedServiceResponse(service);
+    const sessions = Array.isArray(enriched.sessions)
+      ? [...enriched.sessions].sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
       : [];
 
     return {
-      ...plain,
+      ...enriched,
       sessions,
       sessionCount: sessions.length,
-      categoryName: plain.serviceCategory ?? null,
+      categoryName: enriched.serviceCategory ?? null,
     };
   }
 
@@ -1006,7 +1020,9 @@ export class ServiceController {
       complexDepartmentId,
       clinicId,
     );
-    return services.map((service) => this.enrichServiceResponse(service));
+    return Promise.all(
+      services.map((service) => this.enrichServiceResponse(service)),
+    );
   }
 
   /**

@@ -1,8 +1,32 @@
-import { IsArray, IsOptional, IsMongoId, ValidateNested, ArrayMaxSize } from 'class-validator';
+import {
+  IsArray,
+  IsOptional,
+  IsMongoId,
+  ValidateNested,
+  ArrayMaxSize,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { CreateServiceDto } from './create-service.dto';
 import { ServiceSessionDto } from './service-session.dto';
+
+export class DoctorClinicAssignmentDto {
+  @ApiPropertyOptional({
+    description: 'Doctor ID to assign',
+    type: String,
+    example: '507f1f77bcf86cd799439012',
+  })
+  @IsMongoId()
+  doctorId: string;
+
+  @ApiPropertyOptional({
+    description: 'Clinic ID where doctor is assigned for this service',
+    type: String,
+    example: '507f1f77bcf86cd799439040',
+  })
+  @IsMongoId()
+  clinicId: string;
+}
 
 /**
  * DTO for creating a service with optional sessions
@@ -49,4 +73,25 @@ export class CreateServiceWithSessionsDto extends CreateServiceDto {
   @IsArray()
   @IsMongoId({ each: true })
   doctorIds?: string[];
+
+  @ApiPropertyOptional({
+    description:
+      'Explicit doctor-clinic assignments. Use this for multi-clinic assignment during service creation.',
+    type: [DoctorClinicAssignmentDto],
+    example: [
+      {
+        doctorId: '507f1f77bcf86cd799439012',
+        clinicId: '507f1f77bcf86cd799439040',
+      },
+      {
+        doctorId: '507f1f77bcf86cd799439016',
+        clinicId: '507f1f77bcf86cd799439041',
+      },
+    ],
+  })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => DoctorClinicAssignmentDto)
+  doctorAssignments?: DoctorClinicAssignmentDto[];
 }

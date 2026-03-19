@@ -14,4 +14,6 @@ export interface ProcessedSession {
   name: string;
   duration: number;
   order: number;
+  description?: string;
+  appointmentRequired: boolean;
 }
