@@ -558,6 +558,37 @@ export class ComplexService {
     return complex;
   }
 
+  async getComplexesForDropdown(requestingUser?: any): Promise<any> {
+    const filter: any = { deletedAt: null };
+
+    // TENANT ISOLATION (ISSUE-009)
+    if (requestingUser && requestingUser.role !== 'super_admin') {
+      if (requestingUser.subscriptionId) {
+        filter.subscriptionId = new Types.ObjectId(requestingUser.subscriptionId);
+      }
+
+      if (requestingUser.organizationId) {
+        filter.organizationId = new Types.ObjectId(requestingUser.organizationId);
+      }
+    }
+
+    const complexes = await this.complexModel
+      .find(filter)
+      .select('_id name')
+      .sort({ name: 1 })
+      .lean()
+      .exec();
+
+    return {
+      success: true,
+      data: complexes,
+      message: {
+        ar: 'تم استرجاع قائمة المجمعات بنجاح',
+        en: 'Complexes retrieved successfully',
+      },
+    };
+  }
+
   async getComplexesByOrganization(organizationId: string, requestingUser?: any): Promise<Complex[]> {
     let targetOrganizationId = organizationId;
 
@@ -1693,7 +1724,7 @@ export class ComplexService {
 
   /**
    * Deactivate all services linked to a complex
-   * Updates isActive to false for all services linked via complexDepartmentId or clinicId
+    * Updates isActive to false for all services linked via complexId or clinicId
    *
    * @param complexId - The complex ID
    * @param session - MongoDB session for transaction support
@@ -1719,25 +1750,12 @@ export class ComplexService {
 
     const clinicIds = clinics.map((c) => c._id);
 
-    // Get all complex_departments for this complex
-    const complexDepartments = await this.complexModel.db
-      .collection('complex_departments')
-      .find(
-        {
-          complexId: new Types.ObjectId(complexId),
-        },
-        sessionOpts,
-      )
-      .toArray();
-
-    const complexDepartmentIds = complexDepartments.map((cd) => cd._id);
-
-    // Update all services linked to these clinics or complex departments
+    // Update all services linked to this complex or its clinics
     const result = await this.complexModel.db.collection('services').updateMany(
       {
         $or: [
           { clinicId: { $in: clinicIds } },
-          { complexDepartmentId: { $in: complexDepartmentIds } },
+          { complexId: new Types.ObjectId(complexId) },
         ],
       },
       {

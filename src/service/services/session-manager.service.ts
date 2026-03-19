@@ -110,6 +110,8 @@ export class SessionManagerService {
         name: session.name!,
         duration: session.duration ?? serviceDefaultDuration,
         order: session.order,
+        description: session.description?.trim() || undefined,
+        appointmentRequired: session.appointmentRequired ?? true,
       }))
       .sort((a, b) => a.order - b.order);
   }

@@ -19,7 +19,7 @@ export const departmentServiceData = {
   description: 'Cardiology consultation service',
   durationMinutes: 45,
   price: 250,
-  complexDepartmentId: '', // Will be set in tests
+  complexId: '', // Will be set in tests
 };
 
 // Service for clinic

@@ -141,13 +141,13 @@ describe('Service Management (e2e)', () => {
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
           ...departmentServiceData,
-          complexDepartmentId: testDepartmentId,
+          complexId: testComplexId,
         })
         .expect(201);
 
       expect(response.body).toBeDefined();
       expect(response.body.name).toBe(departmentServiceData.name);
-      expect(response.body.complexDepartmentId).toBe(testDepartmentId);
+      expect(response.body.complexId).toBe(testComplexId);
       expect(response.body._id).toBeDefined();
     });
 
@@ -175,7 +175,7 @@ describe('Service Management (e2e)', () => {
         .send({
           ...validServiceData,
           name: 'Duplicate Service',
-          complexDepartmentId: testDepartmentId,
+          complexId: testComplexId,
         })
         .expect(201);
 
@@ -186,7 +186,7 @@ describe('Service Management (e2e)', () => {
         .send({
           ...validServiceData,
           name: 'Duplicate Service',
-          complexDepartmentId: testDepartmentId,
+          complexId: testComplexId,
         })
         .expect(400);
 
@@ -199,7 +199,7 @@ describe('Service Management (e2e)', () => {
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
           name: 'A',
-          complexDepartmentId: testDepartmentId,
+          complexId: testComplexId,
         })
         .expect(400);
 
@@ -220,7 +220,7 @@ describe('Service Management (e2e)', () => {
     beforeEach(async () => {
       const service = await serviceModel.create({
         ...validServiceData,
-        complexDepartmentId: testDepartmentId,
+        complexId: testComplexId,
       });
       testServiceId = service._id.toString();
     });
@@ -263,7 +263,7 @@ describe('Service Management (e2e)', () => {
     beforeEach(async () => {
       const service = await serviceModel.create({
         ...validServiceData,
-        complexDepartmentId: testDepartmentId,
+        complexId: testComplexId,
       });
       testServiceId = service._id.toString();
     });
@@ -299,7 +299,7 @@ describe('Service Management (e2e)', () => {
       // Create another service
       const anotherService = await serviceModel.create({
         name: 'Another Service',
-        complexDepartmentId: testDepartmentId,
+        complexId: testComplexId,
         durationMinutes: 30,
         price: 100,
       });
@@ -326,7 +326,7 @@ describe('Service Management (e2e)', () => {
     beforeEach(async () => {
       const service = await serviceModel.create({
         ...validServiceData,
-        complexDepartmentId: testDepartmentId,
+        complexId: testComplexId,
       });
       testServiceId = service._id.toString();
     });
@@ -403,7 +403,7 @@ describe('Service Management (e2e)', () => {
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
           serviceNames: ['New Service 1', 'New Service 2'],
-          complexDepartmentId: testDepartmentId,
+          complexId: testComplexId,
         })
         .expect(200);
 
@@ -415,7 +415,7 @@ describe('Service Management (e2e)', () => {
       // Create a service
       await serviceModel.create({
         name: 'Existing Service',
-        complexDepartmentId: testDepartmentId,
+        complexId: testComplexId,
         durationMinutes: 30,
         price: 100,
       });
@@ -425,7 +425,7 @@ describe('Service Management (e2e)', () => {
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
           serviceNames: ['Existing Service', 'New Service'],
-          complexDepartmentId: testDepartmentId,
+          complexId: testComplexId,
         })
         .expect(200);
 
@@ -434,30 +434,30 @@ describe('Service Management (e2e)', () => {
     });
   });
 
-  describe('GET /services/complex-departments/:complexDepartmentId - Get Services by Department', () => {
+  describe('GET /services/complexes/:complexId - Get Services by Complex', () => {
     beforeEach(async () => {
       // Create test services
       await serviceModel.create({
         name: 'Service 1',
-        complexDepartmentId: testDepartmentId,
+        complexId: testComplexId,
         durationMinutes: 30,
         price: 100,
       });
       await serviceModel.create({
         name: 'Service 2',
-        complexDepartmentId: testDepartmentId,
+        complexId: testComplexId,
         durationMinutes: 45,
         price: 150,
       });
     });
 
     afterEach(async () => {
-      await serviceModel.deleteMany({ complexDepartmentId: testDepartmentId });
+      await serviceModel.deleteMany({ complexId: testComplexId });
     });
 
     it('should return services for department', async () => {
       const response = await request(app.getHttpServer())
-        .get(`/services/complex-departments/${testDepartmentId}`)
+        .get(`/services/complexes/${testComplexId}`)
         .set('Authorization', `Bearer ${adminToken}`)
         .expect(200);
 
@@ -473,7 +473,7 @@ describe('Service Management (e2e)', () => {
     beforeEach(async () => {
       const service1 = await serviceModel.create({
         name: 'Service to Assign 1',
-        complexDepartmentId: testDepartmentId,
+        complexId: testComplexId,
         durationMinutes: 30,
         price: 100,
       });
@@ -481,7 +481,7 @@ describe('Service Management (e2e)', () => {
 
       const service2 = await serviceModel.create({
         name: 'Service to Assign 2',
-        complexDepartmentId: testDepartmentId,
+        complexId: testComplexId,
         durationMinutes: 45,
         price: 150,
       });
@@ -524,7 +524,7 @@ describe('Service Management (e2e)', () => {
     beforeEach(async () => {
       const service = await serviceModel.create({
         name: 'Clinic Service',
-        complexDepartmentId: testDepartmentId,
+        complexId: testComplexId,
         durationMinutes: 30,
         price: 100,
       });
@@ -559,7 +559,7 @@ describe('Service Management (e2e)', () => {
     beforeEach(async () => {
       const service = await serviceModel.create({
         ...validServiceData,
-        complexDepartmentId: testDepartmentId,
+        complexId: testComplexId,
         isActive: true,
       });
       testServiceId = service._id.toString();
@@ -638,7 +638,7 @@ describe('Service Management (e2e)', () => {
     beforeEach(async () => {
       const service1 = await serviceModel.create({
         name: 'Bulk Service 1',
-        complexDepartmentId: testDepartmentId,
+        complexId: testComplexId,
         durationMinutes: 30,
         price: 100,
         isActive: true,
@@ -647,7 +647,7 @@ describe('Service Management (e2e)', () => {
 
       const service2 = await serviceModel.create({
         name: 'Bulk Service 2',
-        complexDepartmentId: testDepartmentId,
+        complexId: testComplexId,
         durationMinutes: 45,
         price: 150,
         isActive: true,
@@ -680,14 +680,14 @@ describe('Service Management (e2e)', () => {
     beforeEach(async () => {
       await serviceModel.create({
         name: 'Active Service 1',
-        complexDepartmentId: testDepartmentId,
+        complexId: testComplexId,
         durationMinutes: 30,
         price: 100,
         isActive: true,
       });
       await serviceModel.create({
         name: 'Inactive Service',
-        complexDepartmentId: testDepartmentId,
+        complexId: testComplexId,
         durationMinutes: 30,
         price: 100,
         isActive: false,
@@ -695,13 +695,13 @@ describe('Service Management (e2e)', () => {
     });
 
     afterEach(async () => {
-      await serviceModel.deleteMany({ complexDepartmentId: testDepartmentId });
+      await serviceModel.deleteMany({ complexId: testComplexId });
     });
 
     it('should return only active services', async () => {
       const response = await request(app.getHttpServer())
         .get('/services/active')
-        .query({ complexDepartmentId: testDepartmentId })
+        .query({ complexId: testComplexId })
         .set('Authorization', `Bearer ${adminToken}`)
         .expect(200);
 

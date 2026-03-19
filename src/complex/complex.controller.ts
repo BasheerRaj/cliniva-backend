@@ -465,6 +465,67 @@ export class ComplexController {
     }
   }
 
+  @Get('dropdown')
+  @ApiOperation({
+    summary: 'Get complexes for dropdown',
+    description: 'Returns lightweight complex list for dropdown selection',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Complexes retrieved successfully',
+    schema: {
+      example: {
+        success: true,
+        data: [
+          {
+            _id: '507f1f77bcf86cd799439011',
+            name: 'Central Medical Complex',
+          },
+        ],
+        message: {
+          ar: 'تم استرجاع قائمة المجمعات بنجاح',
+          en: 'Complexes retrieved successfully',
+        },
+      },
+    },
+  })
+  async getComplexesForDropdown(@Request() req: any) {
+    try {
+      return await this.complexService.getComplexesForDropdown(req.user);
+    } catch (error) {
+      if (
+        error instanceof BadRequestException ||
+        error instanceof NotFoundException ||
+        error instanceof ForbiddenException
+      ) {
+        const errorResponse = error.getResponse() as any;
+        return {
+          success: false,
+          error: {
+            code: errorResponse.code || 'COMPLEX_999',
+            message: errorResponse.message || {
+              ar: 'فشل استرجاع قائمة المجمعات',
+              en: 'Failed to retrieve complexes list',
+            },
+            details: errorResponse.details,
+          },
+        };
+      }
+
+      return {
+        success: false,
+        error: {
+          code: 'COMPLEX_999',
+          message: {
+            ar: 'حدث خطأ غير متوقع أثناء استرجاع قائمة المجمعات',
+            en: 'An unexpected error occurred while retrieving complexes list',
+          },
+          details: error.message,
+        },
+      };
+    }
+  }
+
   @Get('subscription/:subscriptionId')
   async getComplexBySubscription(
     @Param('subscriptionId') subscriptionId: string,

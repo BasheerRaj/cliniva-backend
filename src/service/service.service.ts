@@ -13,9 +13,13 @@ import { Notification } from '../database/schemas/notification.schema';
 import { User } from '../database/schemas/user.schema';
 import { DoctorService } from '../database/schemas/doctor-service.schema';
 import { Clinic } from '../database/schemas/clinic.schema';
+import { Complex } from '../database/schemas/complex.schema';
 import { EmployeeShift } from '../database/schemas/employee-shift.schema';
 import { CreateServiceDto, AssignServicesDto } from './dto/create-service.dto';
-import { CreateServiceWithSessionsDto } from './dto/create-service-with-sessions.dto';
+import {
+  CreateServiceWithSessionsDto,
+  DoctorClinicAssignmentDto,
+} from './dto/create-service-with-sessions.dto';
 import { UpdateServiceDto } from './dto/update-service.dto';
 import { UpdateServiceWithSessionsDto } from './dto/update-service-with-sessions.dto';
 import { ChangeServiceStatusDto } from './dto/change-service-status.dto';
@@ -41,6 +45,7 @@ export class ServiceService {
     @InjectModel('DoctorService')
     private readonly doctorServiceModel: Model<DoctorService>,
     @InjectModel('Clinic') private readonly clinicModel: Model<Clinic>,
+    @InjectModel('Complex') private readonly complexModel: Model<Complex>,
     @InjectModel('EmployeeShift')
     private readonly employeeShiftModel: Model<EmployeeShift>,
     private readonly serviceOfferService: ServiceOfferService,
@@ -61,26 +66,26 @@ export class ServiceService {
       );
     }
 
-    // Check for duplicates only within the same clinic or complex department
+    // Check for duplicates only within the same clinic or complex
     const duplicateValidationQuery: any = {
       name: { $regex: new RegExp(`^${createDto.name.trim()}$`, 'i') }, // Case-insensitive exact match
       deletedAt: { $exists: false },
     };
 
-    // If this is for a specific complex department, check within that department only
-    if (createDto.complexDepartmentId) {
-      duplicateValidationQuery.complexDepartmentId = new Types.ObjectId(
-        createDto.complexDepartmentId,
+    // If this is for a specific complex, check within that complex only
+    if (createDto.complexId) {
+      duplicateValidationQuery.complexId = new Types.ObjectId(
+        createDto.complexId,
       );
       duplicateValidationQuery.clinicId = { $exists: false }; // Ensure it's not a clinic-specific service
 
-      // Check if service already exists in this complex department
+      // Check if service already exists in this complex
       const existing = await this.serviceModel.findOne(
         duplicateValidationQuery,
       );
       if (existing) {
         throw new BadRequestException(
-          `Service "${createDto.name}" already exists in this department. Please choose a different name.`,
+          `Service "${createDto.name}" already exists in this complex. Please choose a different name.`,
         );
       }
     }
@@ -90,7 +95,7 @@ export class ServiceService {
       duplicateValidationQuery.clinicId = new Types.ObjectId(
         createDto.clinicId,
       );
-      duplicateValidationQuery.complexDepartmentId = { $exists: false }; // Ensure it's not a department service
+      duplicateValidationQuery.complexId = { $exists: false }; // Ensure it's not a complex service
 
       // Check if service already exists for this clinic
       const existing = await this.serviceModel.findOne(
@@ -110,12 +115,13 @@ export class ServiceService {
       durationMinutes: createDto.durationMinutes || 30,
       price: createDto.price || 0,
       serviceCategory: createDto.serviceCategory?.trim() || undefined,
+      requiredEquipment: createDto.requiredEquipment?.trim() || undefined,
     };
 
-    // Add complex department ID only if provided
-    if (createDto.complexDepartmentId) {
-      serviceData.complexDepartmentId = new Types.ObjectId(
-        createDto.complexDepartmentId,
+    // Add complex ID only if provided
+    if (createDto.complexId) {
+      serviceData.complexId = new Types.ObjectId(
+        createDto.complexId,
       );
     }
 
@@ -124,29 +130,31 @@ export class ServiceService {
       serviceData.clinicId = new Types.ObjectId(createDto.clinicId);
     }
 
+    const effectiveClinicIds = this.buildEffectiveClinicIds(
+      createDto.clinicId,
+      createDto.clinicIds,
+    );
+    if (effectiveClinicIds.length > 0) {
+      serviceData.clinicIds = effectiveClinicIds.map(
+        (clinicId) => new Types.ObjectId(clinicId),
+      );
+    }
+
     // Process sessions if provided (Requirements: 1.1-1.7)
     if (createDto.sessions && createDto.sessions.length > 0) {
-      serviceData.sessions = this.sessionManagerService.validateAndProcessSessions(
-        createDto.sessions,
-        serviceData.durationMinutes,
-      );
+      serviceData.sessions = this.sessionManagerService
+        .validateAndProcessSessions(createDto.sessions, serviceData.durationMinutes)
+        .map((session) => this.withLegacySessionAppointmentRequired(session));
     }
 
     if (serviceData.serviceCategory) {
       await this.ensureServiceCategoryExists(serviceData.serviceCategory);
     }
 
-    // doctorIds requires clinicId — reject early before any DB writes
-    if (createDto.doctorIds && createDto.doctorIds.length > 0) {
-      if (!createDto.clinicId) {
-        throw new BadRequestException({
-          message: {
-            ar: 'يجب تحديد معرّف العيادة (clinicId) عند إرسال قائمة الأطباء',
-            en: 'clinicId is required when doctorIds are provided',
-          },
-        });
-      }
-      await this.validateDoctorAssignments(createDto.doctorIds, createDto.clinicId);
+    const doctorAssignmentEntries =
+      this.resolveDoctorAssignmentEntries(createDto);
+    if (doctorAssignmentEntries.length > 0) {
+      await this.validateDoctorAssignments(doctorAssignmentEntries);
     }
 
     const service = new this.serviceModel(serviceData);
@@ -159,11 +167,10 @@ export class ServiceService {
     }
 
     // Create doctor assignments after service is persisted
-    if (createDto.doctorIds && createDto.doctorIds.length > 0) {
+    if (doctorAssignmentEntries.length > 0) {
       const assignmentResults = await this.processDoctorAssignments(
         (savedService._id as Types.ObjectId).toString(),
-        createDto.doctorIds,
-        createDto.clinicId!,
+        doctorAssignmentEntries,
       );
       return {
         ...savedService.toObject(),
@@ -175,26 +182,32 @@ export class ServiceService {
   }
 
   /**
-   * Validates all doctor IDs upfront (before any DB write) using the
-   * service-level clinicId as the scope for every assignment.
+   * Validates all doctor assignments upfront (before any DB write).
    */
   private async validateDoctorAssignments(
-    doctorIds: string[],
-    clinicId: string,
+    assignments: Array<{ doctorId: string; clinicId: string }>,
   ): Promise<void> {
-    // --- Clinic must exist ---
-    const clinic = await this.clinicModel.findById(clinicId);
-    if (!clinic) {
-      throw new BadRequestException({
-        message: {
-          ar: `العيادة ${clinicId} غير موجودة`,
-          en: `Clinic ${clinicId} not found`,
-        },
-        clinicId,
-      });
+    const clinicIds = [...new Set(assignments.map((a) => a.clinicId))];
+
+    const clinics = await this.clinicModel
+      .find({ _id: { $in: clinicIds.map((id) => new Types.ObjectId(id)) } })
+      .select('_id')
+      .lean();
+    const existingClinicIds = new Set(clinics.map((clinic) => clinic._id.toString()));
+
+    for (const clinicId of clinicIds) {
+      if (!existingClinicIds.has(clinicId)) {
+        throw new BadRequestException({
+          message: {
+            ar: `العيادة ${clinicId} غير موجودة`,
+            en: `Clinic ${clinicId} not found`,
+          },
+          clinicId,
+        });
+      }
     }
 
-    for (const doctorId of doctorIds) {
+    for (const { doctorId, clinicId } of assignments) {
       // --- Doctor must exist and be active with role 'doctor' ---
       const doctor = await this.userModel.findOne({
         _id: new Types.ObjectId(doctorId),
@@ -235,32 +248,33 @@ export class ServiceService {
   }
 
   /**
-   * Ensures the ClinicService junction record exists and creates a
-   * DoctorService assignment for each doctor ID under the same clinicId.
+   * Ensures ClinicService junction records exist and creates DoctorService
+   * assignments for each doctor/clinic pair.
    */
   private async processDoctorAssignments(
     serviceId: string,
-    doctorIds: string[],
-    clinicId: string,
+    assignments: Array<{ doctorId: string; clinicId: string }>,
   ): Promise<any[]> {
-    // Ensure ClinicService junction record exists once for this clinic
-    const existing = await this.clinicServiceModel.findOne({
-      clinicId: new Types.ObjectId(clinicId),
-      serviceId: new Types.ObjectId(serviceId),
-    });
-    if (!existing) {
-      await this.clinicServiceModel.create({
+    const clinicIds = [...new Set(assignments.map((assignment) => assignment.clinicId))];
+    for (const clinicId of clinicIds) {
+      const existing = await this.clinicServiceModel.findOne({
         clinicId: new Types.ObjectId(clinicId),
         serviceId: new Types.ObjectId(serviceId),
-        isActive: true,
       });
-    } else if (!existing.isActive) {
-      existing.isActive = true;
-      await existing.save();
+      if (!existing) {
+        await this.clinicServiceModel.create({
+          clinicId: new Types.ObjectId(clinicId),
+          serviceId: new Types.ObjectId(serviceId),
+          isActive: true,
+        });
+      } else if (!existing.isActive) {
+        existing.isActive = true;
+        await existing.save();
+      }
     }
 
     const results: any[] = [];
-    for (const doctorId of doctorIds) {
+    for (const { doctorId, clinicId } of assignments) {
       const doctorService = new this.doctorServiceModel({
         doctorId: new Types.ObjectId(doctorId),
         serviceId: new Types.ObjectId(serviceId),
@@ -273,24 +287,96 @@ export class ServiceService {
     return results;
   }
 
-  async getServicesByComplexDepartment(
-    complexDepartmentId: string,
+  private resolveDoctorAssignmentEntries(
+    createDto: CreateServiceWithSessionsDto,
+  ): Array<{ doctorId: string; clinicId: string }> {
+    const normalizedEntries: Array<{ doctorId: string; clinicId: string }> = [];
+
+    const explicitAssignments = (createDto.doctorAssignments || []).filter(
+      (assignment): assignment is DoctorClinicAssignmentDto =>
+        !!assignment?.doctorId && !!assignment?.clinicId,
+    );
+
+    for (const assignment of explicitAssignments) {
+      normalizedEntries.push({
+        doctorId: assignment.doctorId,
+        clinicId: assignment.clinicId,
+      });
+    }
+
+    if (createDto.doctorIds && createDto.doctorIds.length > 0) {
+      const effectiveClinicIds = this.buildEffectiveClinicIds(
+        createDto.clinicId,
+        createDto.clinicIds,
+      );
+      const fallbackClinicId =
+        createDto.clinicId ||
+        (effectiveClinicIds.length === 1 ? effectiveClinicIds[0] : undefined);
+
+      if (!fallbackClinicId) {
+        throw new BadRequestException({
+          message: {
+            ar: 'يجب تحديد معرّف عيادة واحد (clinicId) عند إرسال doctorIds أو استخدام doctorAssignments مع clinicId لكل طبيب',
+            en: 'A single clinicId is required when doctorIds are provided, or use doctorAssignments with clinicId per doctor',
+          },
+        });
+      }
+
+      for (const doctorId of createDto.doctorIds) {
+        normalizedEntries.push({
+          doctorId,
+          clinicId: fallbackClinicId,
+        });
+      }
+    }
+
+    const uniqueEntries = new Map<string, { doctorId: string; clinicId: string }>();
+    for (const entry of normalizedEntries) {
+      uniqueEntries.set(`${entry.doctorId}:${entry.clinicId}`, entry);
+    }
+
+    return [...uniqueEntries.values()];
+  }
+
+  private buildEffectiveClinicIds(
+    clinicId?: string,
+    clinicIds?: string[],
+  ): string[] {
+    const allClinicIds = [clinicId, ...(clinicIds || [])].filter(
+      (value): value is string => !!value,
+    );
+    return [...new Set(allClinicIds)];
+  }
+
+  private withLegacySessionAppointmentRequired<T extends { appointmentRequired?: boolean }>(
+    session: T,
+  ): T & { apptRequired: boolean } {
+    const appointmentRequired = session.appointmentRequired ?? true;
+    return {
+      ...session,
+      appointmentRequired,
+      apptRequired: appointmentRequired,
+    };
+  }
+
+  async getServicesByComplex(
+    complexId: string,
   ): Promise<Service[]> {
     return this.serviceModel
       .find({
-        complexDepartmentId: new Types.ObjectId(complexDepartmentId),
+        complexId: new Types.ObjectId(complexId),
         deletedAt: { $exists: false },
       })
       .exec();
   }
 
-  async getAllServices(complexDepartmentId?: string): Promise<Service[]> {
+  async getAllServices(complexId?: string): Promise<Service[]> {
     const query: any = {
       deletedAt: { $exists: false },
     };
 
-    if (complexDepartmentId) {
-      query.complexDepartmentId = new Types.ObjectId(complexDepartmentId);
+    if (complexId) {
+      query.complexId = new Types.ObjectId(complexId);
     }
 
     return this.serviceModel.find(query).exec();
@@ -299,7 +385,7 @@ export class ServiceService {
   // New method: Validate service names for clinic onboarding to prevent duplicates across forms
   async validateServiceNamesForClinic(
     serviceNames: string[],
-    complexDepartmentId?: string,
+    complexId?: string,
   ): Promise<{ isValid: boolean; conflicts: string[]; suggestions: string[] }> {
     try {
       if (!serviceNames || serviceNames.length === 0) {
@@ -331,10 +417,10 @@ export class ServiceService {
         deletedAt: { $exists: false },
       };
 
-      if (complexDepartmentId) {
-        query.complexDepartmentId = new Types.ObjectId(complexDepartmentId);
+      if (complexId) {
+        query.complexId = new Types.ObjectId(complexId);
       } else {
-        query.complexDepartmentId = { $exists: false };
+        query.complexId = { $exists: false };
       }
 
       // Find existing services that conflict
@@ -362,15 +448,15 @@ export class ServiceService {
     }
   }
 
-  // New method: Get all services for a clinic (including complex department services)
-  async getServicesForClinic(complexDepartmentId?: string): Promise<Service[]> {
+  // New method: Get all services for a clinic (including complex services)
+  async getServicesForClinic(complexId?: string): Promise<Service[]> {
     try {
       const query: any = {};
 
-      if (complexDepartmentId) {
-        query.complexDepartmentId = new Types.ObjectId(complexDepartmentId);
+      if (complexId) {
+        query.complexId = new Types.ObjectId(complexId);
       } else {
-        query.complexDepartmentId = { $exists: false };
+        query.complexId = { $exists: false };
       }
 
       return await this.serviceModel.find(query).exec();
@@ -470,6 +556,97 @@ export class ServiceService {
     });
   }
 
+  async buildEnrichedServiceResponse(service: any): Promise<any> {
+    const plain = service?.toObject ? service.toObject() : { ...service };
+
+    const clinicIdSet = new Set<string>();
+    if (plain?.clinicId) {
+      clinicIdSet.add(plain.clinicId.toString());
+    }
+    if (Array.isArray(plain?.clinicIds)) {
+      for (const clinicId of plain.clinicIds) {
+        if (clinicId) {
+          clinicIdSet.add(clinicId.toString());
+        }
+      }
+    }
+
+    const [complexName, clinicsNames, doctorsNames] = await Promise.all([
+      this.getComplexNameById(plain?.complexId),
+      this.getClinicNamesByIds([...clinicIdSet]),
+      this.getDoctorNamesByServiceId(plain?._id),
+    ]);
+
+    return {
+      ...plain,
+      requiredEquipment: plain?.requiredEquipment ?? null,
+      complexName,
+      clinicsNames,
+      doctorsNames,
+      category: plain?.serviceCategory ?? null,
+    };
+  }
+
+  private async getComplexNameById(
+    complexId?: Types.ObjectId | string,
+  ): Promise<string | null> {
+    if (!complexId) {
+      return null;
+    }
+
+    const complex = await this.complexModel
+      .findById(complexId)
+      .select('name')
+      .lean();
+
+    return complex?.name ?? null;
+  }
+
+  private async getClinicNamesByIds(clinicIds: string[]): Promise<string[]> {
+    if (!clinicIds.length) {
+      return [];
+    }
+
+    const clinics = await this.clinicModel
+      .find({ _id: { $in: clinicIds.map((id) => new Types.ObjectId(id)) } })
+      .select('name')
+      .lean();
+
+    return clinics
+      .map((clinic) => clinic?.name)
+      .filter((name): name is string => !!name);
+  }
+
+  private async getDoctorNamesByServiceId(
+    serviceId?: Types.ObjectId | string,
+  ): Promise<string[]> {
+    if (!serviceId || !Types.ObjectId.isValid(serviceId.toString())) {
+      return [];
+    }
+
+    const assignments = await this.doctorServiceModel
+      .find({
+        serviceId: new Types.ObjectId(serviceId.toString()),
+        isActive: true,
+      })
+      .populate('doctorId', 'firstName lastName')
+      .lean();
+
+    const names = new Set<string>();
+    for (const assignment of assignments as any[]) {
+      const doctor = assignment?.doctorId;
+      const fullName = [doctor?.firstName, doctor?.lastName]
+        .filter(Boolean)
+        .join(' ')
+        .trim();
+      if (fullName) {
+        names.add(fullName);
+      }
+    }
+
+    return [...names];
+  }
+
   async updateService(
     serviceId: string,
     updateDto: UpdateServiceWithSessionsDto,
@@ -536,13 +713,13 @@ export class ServiceService {
         deletedAt: { $exists: false },
       };
 
-      if (service.complexDepartmentId) {
-        duplicateValidationQuery.complexDepartmentId =
-          service.complexDepartmentId;
+      if (service.complexId) {
+        duplicateValidationQuery.complexId =
+          service.complexId;
         duplicateValidationQuery.clinicId = { $exists: false };
       } else if (service.clinicId) {
         duplicateValidationQuery.clinicId = service.clinicId;
-        duplicateValidationQuery.complexDepartmentId = { $exists: false };
+        duplicateValidationQuery.complexId = { $exists: false };
       }
 
       const existing = await this.serviceModel.findOne(
@@ -574,16 +751,27 @@ export class ServiceService {
         await this.ensureServiceCategoryExists(service.serviceCategory);
       }
     }
+    if (updateDto.requiredEquipment !== undefined) {
+      service.requiredEquipment = updateDto.requiredEquipment?.trim() || undefined;
+    }
 
-    // Handle complexDepartmentId change
-    if (updateDto.complexDepartmentId !== undefined) {
-      if (updateDto.complexDepartmentId) {
-        service.complexDepartmentId = new Types.ObjectId(
-          updateDto.complexDepartmentId,
+    if (updateDto.clinicIds !== undefined) {
+      const clinicIds = this.buildEffectiveClinicIds(
+        service.clinicId?.toString(),
+        updateDto.clinicIds,
+      );
+      service.clinicIds = clinicIds.map((id) => new Types.ObjectId(id));
+    }
+
+    // Handle complexId change
+    if (updateDto.complexId !== undefined) {
+      if (updateDto.complexId) {
+        service.complexId = new Types.ObjectId(
+          updateDto.complexId,
         );
-        service.clinicId = undefined; // Clear clinicId if setting complexDepartmentId
+        service.clinicId = undefined; // Clear clinicId if setting complexId
       } else {
-        service.complexDepartmentId = undefined;
+        service.complexId = undefined;
       }
     }
 
@@ -591,7 +779,13 @@ export class ServiceService {
     if (updateDto.clinicId !== undefined) {
       if (updateDto.clinicId) {
         service.clinicId = new Types.ObjectId(updateDto.clinicId);
-        service.complexDepartmentId = undefined; // Clear complexDepartmentId if setting clinicId
+        service.complexId = undefined; // Clear complexId if setting clinicId
+
+        const clinicIds = this.buildEffectiveClinicIds(
+          updateDto.clinicId,
+          updateDto.clinicIds ?? service.clinicIds?.map((id) => id.toString()),
+        );
+        service.clinicIds = clinicIds.map((id) => new Types.ObjectId(id));
       } else {
         service.clinicId = undefined;
       }
@@ -612,10 +806,9 @@ export class ServiceService {
 
       // Replace sessions array (empty array = clear all sessions)
       if (updateDto.sessions.length > 0) {
-        service.sessions = this.sessionManagerService.validateAndProcessSessions(
-          updateDto.sessions,
-          effectiveDuration,
-        ) as any;
+        service.sessions = this.sessionManagerService
+          .validateAndProcessSessions(updateDto.sessions, effectiveDuration)
+          .map((session) => this.withLegacySessionAppointmentRequired(session)) as any;
       } else {
         service.sessions = [];
       }
@@ -872,10 +1065,10 @@ export class ServiceService {
     const changes: string[] = [];
 
     if (
-      updateDto.complexDepartmentId !== undefined &&
-      updateDto.complexDepartmentId !== service.complexDepartmentId?.toString()
+      updateDto.complexId !== undefined &&
+      updateDto.complexId !== service.complexId?.toString()
     ) {
-      changes.push('complexDepartmentId');
+      changes.push('complexId');
     }
 
     if (
@@ -1098,7 +1291,7 @@ export class ServiceService {
    * Used for appointment booking dropdowns
    */
   async getActiveServices(
-    complexDepartmentId?: string,
+    complexId?: string,
     clinicId?: string,
   ): Promise<Service[]> {
     const query: any = {
@@ -1106,8 +1299,8 @@ export class ServiceService {
       deletedAt: { $exists: false },
     };
 
-    if (complexDepartmentId) {
-      query.complexDepartmentId = new Types.ObjectId(complexDepartmentId);
+    if (complexId) {
+      query.complexId = new Types.ObjectId(complexId);
     }
 
     if (clinicId) {

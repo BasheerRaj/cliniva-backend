@@ -66,7 +66,7 @@ export class EntitiesSeederService {
     const hashedPassword = await bcrypt.hash('Password123!', 10);
     const clinics = await this.clinicModel.find({ isActive: true }).exec();
 
-    // Global service definitions — no clinicId/complexDepartmentId to avoid index conflicts
+    // Global service definitions — no clinicId/complexId to avoid index conflicts
     const SERVICE_DEFS = [
       { name: 'General Consultation', durationMinutes: 30, price: 200 },
       { name: 'Follow-up Visit', durationMinutes: 15, price: 100 },
@@ -79,7 +79,7 @@ export class EntitiesSeederService {
       let service = await this.serviceModel.findOne({
         name: svcDef.name,
         clinicId: { $exists: false },
-        complexDepartmentId: { $exists: false },
+        complexId: { $exists: false },
       });
       if (!service) {
         service = await this.serviceModel.create({

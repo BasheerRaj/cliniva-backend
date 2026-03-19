@@ -1,4 +1,12 @@
-import { IsString, IsNumber, IsOptional, Min, Max } from 'class-validator';
+import {
+  IsString,
+  IsNumber,
+  IsOptional,
+  IsBoolean,
+  Min,
+  Max,
+  MaxLength,
+} from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 /**
@@ -56,4 +64,32 @@ export class ServiceSessionDto {
     message: '{"ar":"ترتيب الجلسة يجب أن يكون رقماً موجباً","en":"Session order must be a positive number"}',
   })
   order: number;
+
+  @ApiPropertyOptional({
+    description: 'Optional session description',
+    example: 'Patient evaluation and symptom history collection',
+    maxLength: 500,
+  })
+  @IsOptional()
+  @IsString({
+    message:
+      '{"ar":"وصف الجلسة يجب أن يكون نصاً","en":"Session description must be a string"}',
+  })
+  @MaxLength(500, {
+    message:
+      '{"ar":"وصف الجلسة يجب ألا يتجاوز 500 حرف","en":"Session description must not exceed 500 characters"}',
+  })
+  description?: string;
+
+  @ApiPropertyOptional({
+    description: 'Whether appointment is required for this session',
+    example: true,
+    default: true,
+  })
+  @IsOptional()
+  @IsBoolean({
+    message:
+      '{"ar":"حقل طلب الموعد يجب أن يكون true أو false","en":"Appointment required must be a boolean"}',
+  })
+  appointmentRequired?: boolean;
 }
