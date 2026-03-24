@@ -222,6 +222,45 @@ Scope is enforced by the caller's role:
   }
 
   /**
+   * Get all patients for dropdown/select — no pagination
+   * GET /patients/dropdown?search=...
+   */
+  @Get('dropdown')
+  @UseGuards(RolesGuard)
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.OWNER,
+    UserRole.ADMIN,
+    UserRole.MANAGER,
+    UserRole.DOCTOR,
+    UserRole.STAFF,
+  )
+  @ApiOperation({
+    summary: 'Get all patients for dropdown (no pagination)',
+    description: 'Returns a lightweight list of all patients in scope. Use for select/autocomplete components.',
+  })
+  @ApiQuery({ name: 'search', required: false, type: String, description: 'Filter by name or patient number' })
+  @ApiResponse({ status: 200, description: 'Patient dropdown list retrieved successfully' })
+  async getPatientsDropdown(
+    @Query('search') search: string | undefined,
+    @Request() req: any,
+  ) {
+    const user = req.user;
+    const scope: PatientScopeContext = {
+      requestingUserId: user.userId,
+      role:             user.role as UserRole,
+      complexId:        user.complexId  ?? null,
+      clinicId:         user.clinicId   ?? null,
+      organizationId:   user.organizationId ?? null,
+    };
+    const patients = await this.patientService.getPatientsForDropdown(scope, search);
+    return ResponseBuilder.success(patients, {
+      ar: 'تم جلب قائمة المرضى بنجاح',
+      en: 'Patient dropdown list retrieved successfully',
+    });
+  }
+
+  /**
    * Get patient by ID
    * GET /patients/:id
    */

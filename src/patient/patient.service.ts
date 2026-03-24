@@ -433,6 +433,66 @@ export class PatientService {
   }
 
   /**
+   * Get a lightweight list of all patients for dropdown/select components.
+   * No pagination — returns every non-deleted patient in the caller's scope.
+   * Only returns minimal fields needed for display.
+   */
+  async getPatientsForDropdown(
+    scope: PatientScopeContext,
+    search?: string,
+  ): Promise<{ _id: string; patientNumber: string; firstName: string; lastName: string; phone?: string; profilePicture?: string }[]> {
+    const filter: FilterQuery<Patient> = { deletedAt: { $exists: false } };
+
+    // Scope resolution (reuse same logic as getPatients)
+    const { role, complexId: jwtComplexId, organizationId, clinicId } = scope;
+
+    if (role === UserRole.SUPER_ADMIN) {
+      // super_admin without a complexId → return empty to avoid unbounded scan
+    } else if (role === UserRole.OWNER) {
+      if (organizationId) filter.organizationId = new Types.ObjectId(organizationId);
+    } else {
+      // admin / manager / doctor / staff — scoped to JWT complexId
+      if (jwtComplexId) filter.complexId = new Types.ObjectId(jwtComplexId);
+      if ((role === UserRole.STAFF || role === UserRole.DOCTOR || role === UserRole.MANAGER) && clinicId) {
+        filter.clinicId = new Types.ObjectId(clinicId);
+      }
+    }
+
+    if (search && search.trim().length > 0) {
+      const s = search.trim();
+      filter.$or = [
+        { firstName:     { $regex: s, $options: 'i' } },
+        { lastName:      { $regex: s, $options: 'i' } },
+        { patientNumber: { $regex: s, $options: 'i' } },
+        {
+          $expr: {
+            $regexMatch: {
+              input: { $concat: ['$firstName', ' ', '$lastName'] },
+              regex: s,
+              options: 'i',
+            },
+          },
+        },
+      ];
+    }
+
+    const raw = await this.patientModel
+      .find(filter, { patientNumber: 1, firstName: 1, lastName: 1, phone: 1, profilePicture: 1 })
+      .sort({ firstName: 1, lastName: 1 })
+      .lean()
+      .exec();
+
+    return raw.map((p: any) => ({
+      _id: p._id.toString(),
+      patientNumber: p.patientNumber ?? '',
+      firstName: p.firstName ?? '',
+      lastName: p.lastName ?? '',
+      phone: p.phone,
+      profilePicture: p.profilePicture,
+    }));
+  }
+
+  /**
    * Legacy getPatients — backward-compatible wrapper preserving the original
    * unscoped behavior. Used when no PatientScopeContext is provided.
    * Remove once all callers pass a scope.
