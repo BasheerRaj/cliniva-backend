@@ -12,6 +12,7 @@ import { Appointment } from '../database/schemas/appointment.schema';
 import { Patient } from '../database/schemas/patient.schema';
 import { User } from '../database/schemas/user.schema';
 import { Clinic } from '../database/schemas/clinic.schema';
+import { Complex } from '../database/schemas/complex.schema';
 import { Service } from '../database/schemas/service.schema';
 import { Invoice } from '../database/schemas/invoice.schema';
 import { MedicalReport } from '../database/schemas/medical-report.schema';
@@ -39,6 +40,8 @@ import {
   EndAppointmentDto,
   ConcludeAppointmentDto,
   CalendarQueryDto,
+  UnifiedAvailabilityQueryDto,
+  AppointmentPageContextResponseDto,
 } from './dto';
 import { CreateAppointmentWithSessionDto } from './dto/create-appointment-with-session.dto';
 import { AppointmentSessionService } from './services/appointment-session.service';
@@ -60,6 +63,7 @@ export class AppointmentService {
     @InjectModel('Patient') private readonly patientModel: Model<Patient>,
     @InjectModel('User') private readonly userModel: Model<User>,
     @InjectModel('Clinic') private readonly clinicModel: Model<Clinic>,
+    @InjectModel('Complex') private readonly complexModel: Model<Complex>,
     @InjectModel('Service') private readonly serviceModel: Model<Service>,
     @InjectModel('Invoice') private readonly invoiceModel: Model<Invoice>,
     @InjectModel('MedicalReport') private readonly medicalReportModel: Model<MedicalReport>,
@@ -2618,6 +2622,82 @@ export class AppointmentService {
   }
 
   /**
+   * M6 UC – GET /appointments/available-doctors
+   *
+   * Returns doctors at a given clinic who are NOT busy (have no overlapping
+   * appointments) at the requested date + time + duration slot.
+   *
+   * @param clinicId - clinic to scope doctors to
+   * @param date     - "YYYY-MM-DD"
+   * @param time     - "HH:mm"
+   * @param duration - appointment duration in minutes (default 30)
+   */
+  async getAvailableDoctors(
+    clinicId: string,
+    date: string,
+    time: string,
+    duration: number,
+  ): Promise<{ _id: string; name: string }[]> {
+    // 1. Get all active doctors assigned to this clinic
+    const doctors = await this.userModel
+      .find({
+        clinicId: new Types.ObjectId(clinicId),
+        role: 'doctor',
+        isActive: true,
+        deletedAt: { $exists: false },
+      })
+      .select('_id firstName lastName name')
+      .lean()
+      .exec();
+
+    if (!doctors.length) return [];
+
+    // 2. Fetch all non-cancelled appointments for these doctors on this date
+    const [year, month, day] = date.split('-').map(Number);
+    const dayStart = new Date(year, month - 1, day, 0, 0, 0);
+    const dayEnd = new Date(year, month - 1, day, 23, 59, 59);
+
+    const todayAppts = await this.appointmentModel
+      .find({
+        doctorId: { $in: doctors.map((d) => new Types.ObjectId(d._id.toString())) },
+        appointmentDate: { $gte: dayStart, $lte: dayEnd },
+        status: { $nin: ['cancelled', 'no_show'] },
+        deletedAt: { $exists: false },
+      })
+      .select('doctorId appointmentTime durationMinutes')
+      .lean()
+      .exec();
+
+    // 3. Compute slot window in minutes-since-midnight
+    const [slotH, slotM] = time.split(':').map(Number);
+    const slotStart = slotH * 60 + slotM;
+    const slotEnd = slotStart + duration;
+
+    // 4. Identify doctors with any overlapping appointment
+    const busyDoctorIds = new Set<string>();
+    for (const appt of todayAppts) {
+      const [aH, aM] = ((appt as any).appointmentTime as string).split(':').map(Number);
+      const aStart = aH * 60 + aM;
+      const aEnd = aStart + ((appt as any).durationMinutes || 30);
+      // Overlap when: slotStart < aEnd AND slotEnd > aStart
+      if (slotStart < aEnd && slotEnd > aStart) {
+        busyDoctorIds.add((appt as any).doctorId.toString());
+      }
+    }
+
+    // 5. Return only doctors that are NOT busy
+    return doctors
+      .filter((dr) => !busyDoctorIds.has(dr._id.toString()))
+      .map((dr) => ({
+        _id: dr._id.toString(),
+        name:
+          (dr as any).name ||
+          `${(dr as any).firstName || ''} ${(dr as any).lastName || ''}`.trim() ||
+          dr._id.toString(),
+      }));
+  }
+
+  /**
    * Helper: Find the invoiceItemId in the invoice that is linked to a given appointmentId.
    * Returns the invoiceItemId string or null if not found.
    */
@@ -2639,5 +2719,231 @@ export class AppointmentService {
    */
   private escapeRegex(str: string): string {
     return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  /**
+   * Returns the context needed for the appointments page filters based on the user's plan type.
+   */
+  async getAppointmentPageContext(
+    requestingUser: any,
+  ): Promise<AppointmentPageContextResponseDto> {
+    const planType = requestingUser.planType || 'clinic';
+    const context: AppointmentPageContextResponseDto = {
+      planType,
+      clinics: [],
+      doctors: [],
+    };
+
+    const organizationId = requestingUser.organizationId;
+    const complexId = requestingUser.complexId;
+    const clinicId = requestingUser.clinicId;
+
+    if (planType === 'company' && organizationId) {
+      const orgObjId = new Types.ObjectId(organizationId);
+      
+      const complexes = await this.complexModel
+        .find({ organizationId: orgObjId, deletedAt: null })
+        .select('_id name')
+        .lean()
+        .exec();
+      context.complexes = complexes.map((c: any) => ({ _id: c._id.toString(), name: c.name }));
+
+      const clinics = await this.clinicModel
+        .find({ organizationId: orgObjId, deletedAt: null })
+        .select('_id name complexId')
+        .lean()
+        .exec();
+      context.clinics = clinics.map((c: any) => ({
+        _id: c._id.toString(),
+        name: c.name,
+        complexId: c.complexId?.toString(),
+      }));
+
+      const doctors = await this.userModel
+        .find({ organizationId: orgObjId, role: 'doctor', isActive: true })
+        .select('_id firstName lastName clinicId')
+        .lean()
+        .exec();
+      context.doctors = doctors.map((d: any) => ({
+        _id: d._id.toString(),
+        firstName: d.firstName,
+        lastName: d.lastName,
+        clinicId: d.clinicId?.toString(),
+      }));
+    } else if (planType === 'complex' && complexId) {
+      const compObjId = new Types.ObjectId(complexId);
+      
+      const clinics = await this.clinicModel
+        .find({ complexId: compObjId, deletedAt: null })
+        .select('_id name')
+        .lean()
+        .exec();
+      context.clinics = clinics.map((c: any) => ({ _id: c._id.toString(), name: c.name }));
+
+      const doctors = await this.userModel
+        .find({ complexId: compObjId, role: 'doctor', isActive: true })
+        .select('_id firstName lastName clinicId')
+        .lean()
+        .exec();
+      context.doctors = doctors.map((d: any) => ({
+        _id: d._id.toString(),
+        firstName: d.firstName,
+        lastName: d.lastName,
+        clinicId: d.clinicId?.toString(),
+      }));
+    } else if (clinicId) {
+      const clObjId = new Types.ObjectId(clinicId);
+      
+      const clinic = await this.clinicModel
+        .findById(clObjId)
+        .select('_id name')
+        .lean()
+        .exec();
+      if (clinic) {
+        context.clinics = [{ _id: clinic._id.toString(), name: clinic.name }];
+      }
+
+      const doctors = await this.userModel
+        .find({ clinicId: clObjId, role: 'doctor', isActive: true })
+        .select('_id firstName lastName')
+        .lean()
+        .exec();
+      context.doctors = doctors.map((d: any) => ({
+        _id: d._id.toString(),
+        firstName: d.firstName,
+        lastName: d.lastName,
+      }));
+    }
+
+    return context;
+  }
+
+  /**
+   * Returns availability across multiple clinics and optionally multiple doctors.
+   */
+  async getUnifiedAvailability(
+    query: UnifiedAvailabilityQueryDto,
+  ): Promise<any> {
+    const { clinicIds, doctorIds, date, duration = 30 } = query;
+    const bookingDate = new Date(date);
+    
+    // 1. Fetch clinics and their working hours
+    const clinics = await this.clinicModel
+      .find({ _id: { $in: clinicIds.map(id => new Types.ObjectId(id)) }, isActive: true, deletedAt: null })
+      .select('_id name')
+      .lean()
+      .exec();
+
+    if (!clinics.length) return { date, slots: [] };
+
+    // 2. Resolve doctors
+    let targetDoctorIds = doctorIds;
+    if (!targetDoctorIds || targetDoctorIds.length === 0) {
+      const doctors = await this.userModel
+        .find({ clinicId: { $in: clinics.map(c => c._id) }, role: 'doctor', isActive: true })
+        .select('_id')
+        .lean()
+        .exec();
+      targetDoctorIds = doctors.map(d => d._id.toString());
+    }
+
+    if (!targetDoctorIds.length) return { date, slots: [] };
+
+    // 3. Fetch all effective working hours for all clinic-doctor combinations
+    const allEffectiveHours: any[] = [];
+    for (const cId of clinicIds) {
+      for (const dId of targetDoctorIds) {
+        const wh = await this.workingHoursIntegrationService.getEffectiveWorkingHours(dId, cId, bookingDate);
+        if (wh) {
+          allEffectiveHours.push({ clinicId: cId, doctorId: dId, ...wh });
+        }
+      }
+    }
+
+    if (!allEffectiveHours.length) return { date, slots: [] };
+
+    // 4. Determine overall start and end time (union of all working hours)
+    let minStart = '23:59';
+    let maxEnd = '00:00';
+    for (const wh of allEffectiveHours) {
+      if (wh.openingTime < minStart) minStart = wh.openingTime;
+      if (wh.closingTime > maxEnd) maxEnd = wh.closingTime;
+    }
+
+    // 5. Fetch all appointments for these doctors on this date
+    const appointments = await this.appointmentModel
+      .find({
+        doctorId: { $in: targetDoctorIds.map(id => new Types.ObjectId(id)) },
+        appointmentDate: {
+          $gte: new Date(new Date(bookingDate).setHours(0, 0, 0, 0)),
+          $lte: new Date(new Date(bookingDate).setHours(23, 59, 59, 999)),
+        },
+        status: { $nin: ['cancelled', 'no_show'] },
+        deletedAt: { $exists: false },
+      })
+      .select('doctorId clinicId appointmentTime durationMinutes')
+      .lean()
+      .exec();
+
+    // 6. Generate slots
+    const slots: any[] = [];
+    const [startH, startM] = minStart.split(':').map(Number);
+    const [endH, endM] = maxEnd.split(':').map(Number);
+
+    let currentH = startH;
+    let currentM = startM;
+
+    const now = new Date();
+
+    while (currentH < endH || (currentH === endH && currentM < endM)) {
+      const timeStr = `${currentH.toString().padStart(2, '0')}:${currentM.toString().padStart(2, '0')}`;
+      const slotEndTime = this.addMinutesToTime(timeStr, duration);
+      
+      // Check if slot is in the past
+      const slotDateTime = new Date(date);
+      const [h, m] = timeStr.split(':').map(Number);
+      slotDateTime.setHours(h, m, 0, 0);
+      const isPast = slotDateTime < now;
+
+      const availablePairs: any[] = [];
+
+      for (const wh of allEffectiveHours) {
+        // Is clinic/doctor open at this time?
+        if (timeStr < wh.openingTime || slotEndTime > wh.closingTime) continue;
+
+        // Is it break time?
+        if (wh.breakStartTime && wh.breakEndTime && timeStr >= wh.breakStartTime && timeStr < wh.breakEndTime) continue;
+
+        // Is doctor busy?
+        const isBusy = appointments.some(apt => {
+          if (apt.doctorId.toString() !== wh.doctorId) return false;
+          const aptEnd = this.addMinutesToTime(apt.appointmentTime, apt.durationMinutes);
+          return timeStr < aptEnd && slotEndTime > apt.appointmentTime;
+        });
+
+        if (!isBusy) {
+          availablePairs.push({ clinicId: wh.clinicId, doctorId: wh.doctorId });
+        }
+      }
+
+      slots.push({
+        time: timeStr,
+        available: !isPast && availablePairs.length > 0,
+        isPast,
+        availablePairs,
+      });
+
+      // Increment
+      currentM += duration;
+      while (currentM >= 60) {
+        currentM -= 60;
+        currentH += 1;
+      }
+    }
+
+    return {
+      date,
+      slots,
+    };
   }
 }

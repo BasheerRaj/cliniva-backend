@@ -44,6 +44,8 @@ import {
   EndAppointmentDto,
   ConcludeAppointmentDto,
   CalendarQueryDto,
+  UnifiedAvailabilityQueryDto,
+  AppointmentPageContextResponseDto,
 } from './dto';
 import { CreateAppointmentWithSessionDto } from './dto/create-appointment-with-session.dto';
 import { BatchBookSessionsDto } from './dto/batch-book-sessions.dto';
@@ -527,6 +529,58 @@ export class AppointmentController {
   }
 
   // =========================================================================
+  // M6 – GET /appointments/available-doctors (UC-d2e3f4c QuickAdd drawer)
+  // MUST be declared BEFORE ':id' route so the literal path is not captured as ID
+  // =========================================================================
+  @ApiOperation({
+    summary: 'Get doctors available at a specific date and time',
+    description:
+      'Returns doctors at the given clinic who are NOT busy at the requested date/time slot. Used by the QuickAddDrawer to show only bookable doctors.',
+  })
+  @ApiQuery({ name: 'date', required: true, type: String, description: 'Date in YYYY-MM-DD format' })
+  @ApiQuery({ name: 'time', required: true, type: String, description: 'Time in HH:mm (24-hour)' })
+  @ApiQuery({ name: 'clinicId', required: true, type: String, description: 'Clinic ID to scope doctors' })
+  @ApiQuery({ name: 'duration', required: false, type: Number, description: 'Appointment duration in minutes (default 30)' })
+  @ApiResponse({ status: 200, description: 'Available doctors returned successfully' })
+  @Get('available-doctors')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.MANAGER, UserRole.DOCTOR, UserRole.STAFF)
+  async getAvailableDoctors(
+    @Query('date') date: string,
+    @Query('time') time: string,
+    @Query('clinicId') clinicId: string,
+    @Query('duration') duration?: string,
+  ) {
+    if (!date || !time || !clinicId) {
+      throw new BadRequestException('date, time, and clinicId query parameters are required');
+    }
+    try {
+      const doctors = await this.appointmentService.getAvailableDoctors(
+        clinicId,
+        date,
+        time,
+        duration ? parseInt(duration, 10) : 30,
+      );
+      return {
+        success: true,
+        message: {
+          ar: 'تم استرجاع الأطباء المتاحين بنجاح',
+          en: 'Available doctors retrieved successfully',
+        },
+        data: doctors,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: {
+          ar: 'فشل استرجاع الأطباء المتاحين',
+          en: 'Failed to retrieve available doctors',
+        },
+        error: error.message,
+      };
+    }
+  }
+
+  // =========================================================================
   // M6 – GET /appointments/calendar  (UC-d2e3f4c)
   // MUST be declared BEFORE ':id' route so "calendar" is not captured as an ID
   // =========================================================================
@@ -568,6 +622,78 @@ export class AppointmentController {
         message: {
           ar: 'فشل استرجاع التقويم',
           en: 'Failed to retrieve calendar',
+        },
+        error: error.message,
+      };
+    }
+  }
+
+  /**
+   * Get appointment page context (filters based on plan)
+   * GET /appointments/context
+   */
+  @ApiOperation({
+    summary: 'Get appointment page context',
+    description: 'Returns available complexes, clinics, and doctors based on the organization plan type for the appointments page filters.',
+  })
+  @ApiResponse({ status: 200, type: AppointmentPageContextResponseDto })
+  @Get('context')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.MANAGER, UserRole.DOCTOR, UserRole.STAFF)
+  async getAppointmentPageContext(@Request() req: any) {
+    try {
+      const result = await this.appointmentService.getAppointmentPageContext(req.user);
+      return {
+        success: true,
+        message: {
+          ar: 'تم استرجاع سياق الصفحة بنجاح',
+          en: 'Page context retrieved successfully',
+        },
+        data: result,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: {
+          ar: 'فشل استرجاع سياق الصفحة',
+          en: 'Failed to retrieve page context',
+        },
+        error: error.message,
+      };
+    }
+  }
+
+  /**
+   * Get unified availability across multiple clinics/doctors
+   * POST /appointments/unified-availability
+   */
+  @ApiOperation({
+    summary: 'Get unified availability',
+    description: 'Returns combined availability slots across multiple selected clinics and doctors.',
+  })
+  @ApiResponse({ status: 200, description: 'Unified availability retrieved successfully' })
+  @ApiBody({ type: UnifiedAvailabilityQueryDto })
+  @Post('unified-availability')
+  @HttpCode(HttpStatus.OK)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.MANAGER, UserRole.DOCTOR, UserRole.STAFF)
+  async getUnifiedAvailability(
+    @Body(new ValidationPipe({ transform: true })) query: UnifiedAvailabilityQueryDto,
+  ) {
+    try {
+      const result = await this.appointmentService.getUnifiedAvailability(query);
+      return {
+        success: true,
+        message: {
+          ar: 'تم استرجاع التوفر الموحد بنجاح',
+          en: 'Unified availability retrieved successfully',
+        },
+        data: result,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: {
+          ar: 'فشل استرجاع التوفر الموحد',
+          en: 'Failed to retrieve unified availability',
         },
         error: error.message,
       };

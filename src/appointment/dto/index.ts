@@ -11,6 +11,8 @@ export * from './update-appointment.dto';
 export * from './appointment-filter.dto';
 export * from './calendar-query.dto';
 export * from './availability-query.dto';
+export * from './unified-availability-query.dto';
+export * from './appointment-page-context-response.dto';
 
 // Status Management DTOs
 export * from './status-update.dto';

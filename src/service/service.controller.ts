@@ -196,11 +196,33 @@ export class ServiceController {
   })
   @Get(':id')
   async getServiceById(@Param('id') id: string): Promise<any> {
-    const service = await this.serviceService.getService(id);
-    const assignedDoctors = await this.serviceService.getAssignedDoctors(id);
+    const [service, assignedDoctors, { bySession, byDoctor }] = await Promise.all([
+      this.serviceService.getService(id),
+      this.serviceService.getAssignedDoctors(id),
+      this.serviceService.getActiveAppointmentMaps(id),
+    ]);
+
+    const enriched = await this.enrichServiceResponse(service);
+
+    // Attach activeAppointments to each session
+    const sessionsWithAppts = (enriched.sessions ?? []).map((session: any) => ({
+      ...session,
+      activeAppointments: bySession.get(session._id?.toString() ?? '') ?? [],
+    }));
+
+    // Attach activeAppointments to each assigned doctor
+    const doctorsWithAppts = assignedDoctors.map((entry: any) => {
+      const doctorId = entry.doctor?._id?.toString() ?? '';
+      return {
+        ...entry,
+        activeAppointments: byDoctor.get(doctorId) ?? [],
+      };
+    });
+
     return {
-      ...(await this.enrichServiceResponse(service)),
-      assignedDoctors,
+      ...enriched,
+      sessions: sessionsWithAppts,
+      assignedDoctors: doctorsWithAppts,
     };
   }
 

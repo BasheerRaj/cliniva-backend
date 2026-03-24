@@ -717,6 +717,83 @@ export class ServiceService {
     });
   }
 
+  /**
+   * Fetch all active (scheduled/confirmed/in_progress) appointments for a service.
+   * Returns two Maps for O(1) lookup when enriching sessions and doctors:
+   *   - bySession: sessionId → appointment[]
+   *   - byDoctor:  doctorId  → appointment[]
+   */
+  async getActiveAppointmentMaps(serviceId: string): Promise<{
+    bySession: Map<string, any[]>;
+    byDoctor: Map<string, any[]>;
+  }> {
+    const appointments = await this.appointmentModel
+      .find({
+        serviceId: new Types.ObjectId(serviceId),
+        status: { $in: ['scheduled', 'confirmed', 'in_progress'] },
+      })
+      .populate('patientId', 'firstName lastName patientNumber phone')
+      .populate('doctorId', 'firstName lastName')
+      .select(
+        '_id sessionId doctorId patientId appointmentDate appointmentTime durationMinutes status urgency clinicId',
+      )
+      .lean()
+      .exec();
+
+    const bySession = new Map<string, any[]>();
+    const byDoctor = new Map<string, any[]>();
+
+    for (const appt of appointments) {
+      const shape = this.shapeActiveAppointment(appt);
+
+      // Group by sessionId
+      if (appt.sessionId) {
+        const list = bySession.get(appt.sessionId) ?? [];
+        list.push(shape);
+        bySession.set(appt.sessionId, list);
+      }
+
+      // Group by doctorId
+      const doctorKey = appt.doctorId?._id?.toString() ?? appt.doctorId?.toString();
+      if (doctorKey) {
+        const list = byDoctor.get(doctorKey) ?? [];
+        list.push(shape);
+        byDoctor.set(doctorKey, list);
+      }
+    }
+
+    return { bySession, byDoctor };
+  }
+
+  private shapeActiveAppointment(appt: any): any {
+    const patient = appt.patientId as any;
+    const doctor = appt.doctorId as any;
+    return {
+      _id: appt._id,
+      status: appt.status,
+      urgency: appt.urgency ?? null,
+      appointmentDate: appt.appointmentDate,
+      appointmentTime: appt.appointmentTime,
+      durationMinutes: appt.durationMinutes,
+      clinicId: appt.clinicId,
+      sessionId: appt.sessionId ?? null,
+      patient: patient
+        ? {
+            _id: patient._id,
+            name: `${patient.firstName ?? ''} ${patient.lastName ?? ''}`.trim(),
+            patientNumber: patient.patientNumber ?? null,
+            phone: patient.phone ?? null,
+          }
+        : null,
+      doctor: doctor
+        ? {
+            _id: doctor._id,
+            name: `${doctor.firstName ?? ''} ${doctor.lastName ?? ''}`.trim(),
+          }
+        : null,
+    };
+  }
+
   async buildEnrichedServiceResponse(service: any): Promise<any> {
     const plain = service?.toObject ? service.toObject() : { ...service };
 
