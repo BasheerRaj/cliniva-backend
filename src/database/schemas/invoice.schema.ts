@@ -165,6 +165,9 @@ export class Invoice extends Document {
 
   // ==================== Additional Fields ====================
 
+  @Prop({ required: false, maxlength: 500 })
+  extraInfo?: string; // UC-3h4i5j6k: free-form extra info shown on invoice printout
+
   @Prop({ required: false, maxlength: 1000 })
   notes?: string;
 

@@ -585,7 +585,9 @@ export class InvoiceService {
       await this.invoiceNumberService.generatePostedNumber(organizationId);
 
     invoice.invoiceStatus = 'posted';
-    invoice.paymentStatus = 'unpaid';
+    // BZR-b3c4d5e6: Payment is "not_due" at booking time; transitions to "unpaid"
+    // only after the first appointment is concluded (see concludeAppointment hook).
+    invoice.paymentStatus = 'not_due';
     invoice.postedAt = new Date();
 
     await invoice.save();

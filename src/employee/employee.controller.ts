@@ -282,9 +282,10 @@ export class EmployeeController {
   @Get()
   async getEmployees(
     @Query(new ValidationPipe()) query: EmployeeSearchQueryDto,
+    @Request() req: any,
   ) {
     try {
-      const result = await this.employeeService.getEmployees(query);
+      const result = await this.employeeService.getEmployees(query, req.user);
       return {
         success: true,
         message: 'Employees retrieved successfully',

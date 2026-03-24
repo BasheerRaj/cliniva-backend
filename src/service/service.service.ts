@@ -1669,4 +1669,184 @@ export class ServiceService {
 
     return history;
   }
+
+  /**
+   * Get comprehensive statistics for a specific service based on appointment history
+   * Requirements: Utilization metrics, Operational details
+   */
+  async getServiceStats(serviceId: string): Promise<any> {
+    const service = await this.serviceModel.findById(serviceId);
+    if (!service) {
+      throw new NotFoundException({
+        message: {
+          ar: 'الخدمة غير موجودة',
+          en: 'Service not found',
+        },
+      });
+    }
+
+    const serviceObjectId = new Types.ObjectId(serviceId);
+
+    const statsResult = await this.appointmentModel.aggregate([
+      {
+        $match: {
+          serviceId: serviceObjectId,
+          isDeleted: { $ne: true },
+        },
+      },
+      {
+        $facet: {
+          utilization: [
+            {
+              $group: {
+                _id: null,
+                totalCount: { $sum: 1 },
+                noShowCount: {
+                  $sum: { $cond: [{ $eq: ['$status', 'no_show'] }, 1, 0] },
+                },
+                completedCount: {
+                  $sum: { $cond: [{ $eq: ['$status', 'completed'] }, 1, 0] },
+                },
+                totalDuration: {
+                  $sum: {
+                    $cond: [
+                      { $eq: ['$status', 'completed'] },
+                      '$durationMinutes',
+                      0,
+                    ],
+                  },
+                },
+                lastPerformedDate: {
+                  $max: {
+                    $cond: [
+                      { $eq: ['$status', 'completed'] },
+                      '$appointmentDate',
+                      null,
+                    ],
+                  },
+                },
+                completedPatients: {
+                  $addToSet: {
+                    $cond: [
+                      { $eq: ['$status', 'completed'] },
+                      '$patientId',
+                      '$$REMOVE',
+                    ],
+                  },
+                },
+              },
+            },
+          ],
+          patientGroups: [
+            {
+              $group: {
+                _id: '$patientId',
+                appointmentCount: { $sum: 1 },
+              },
+            },
+            {
+              $group: {
+                _id: null,
+                totalDistinctPatients: { $sum: 1 },
+                rebookedPatientsCount: {
+                  $sum: { $cond: [{ $gt: ['$appointmentCount', 1] }, 1, 0] },
+                },
+              },
+            },
+          ],
+          frequentDoctor: [
+            { $group: { _id: '$doctorId', count: { $sum: 1 } } },
+            { $sort: { count: -1 } },
+            { $limit: 1 },
+            {
+              $lookup: {
+                from: 'users',
+                localField: '_id',
+                foreignField: '_id',
+                as: 'doctor',
+              },
+            },
+            { $unwind: { path: '$doctor', preserveNullAndEmptyArrays: true } },
+            {
+              $project: {
+                doctor_id: '$_id',
+                doctor_name: {
+                  $concat: ['$doctor.firstName', ' ', '$doctor.lastName'],
+                },
+              },
+            },
+          ],
+          frequentClinic: [
+            { $group: { _id: '$clinicId', count: { $sum: 1 } } },
+            { $sort: { count: -1 } },
+            { $limit: 1 },
+            {
+              $lookup: {
+                from: 'clinics',
+                localField: '_id',
+                foreignField: '_id',
+                as: 'clinic',
+              },
+            },
+            { $unwind: { path: '$clinic', preserveNullAndEmptyArrays: true } },
+            {
+              $project: {
+                clinic_id: '$_id',
+                clinic_name: '$clinic.name',
+              },
+            },
+          ],
+        },
+      },
+    ]);
+
+    const data = statsResult[0];
+    const utilization = data.utilization[0] || {};
+    const patientStats = data.patientGroups[0] || {};
+    const frequentDoctor = data.frequentDoctor[0] || null;
+    const frequentClinic = data.frequentClinic[0] || null;
+
+    const totalPatientsServed = utilization.completedPatients?.length || 0;
+    const completedSessions = utilization.completedCount || 0;
+    const avgDuration =
+      completedSessions > 0
+        ? Math.round(utilization.totalDuration / completedSessions)
+        : 0;
+
+    const noShowRate =
+      utilization.totalCount > 0
+        ? parseFloat(
+            ((utilization.noShowCount / utilization.totalCount) * 100).toFixed(
+              1,
+            ),
+          )
+        : 0;
+
+    const rebookingRate =
+      patientStats.totalDistinctPatients > 0
+        ? parseFloat(
+            (
+              (patientStats.rebookedPatientsCount /
+                patientStats.totalDistinctPatients) *
+              100
+            ).toFixed(1),
+          )
+        : 0;
+
+    return {
+      service_id: serviceId,
+      utilization_metrics: {
+        total_patients_served: totalPatientsServed,
+        completed_sessions: completedSessions,
+        average_duration_mins: avgDuration,
+        no_show_rate: noShowRate,
+        rebooking_rate: rebookingRate,
+      },
+      operational_details: {
+        last_performed_date: utilization.lastPerformedDate || null,
+        most_frequent_doctor: frequentDoctor,
+        most_frequent_clinic: frequentClinic,
+      },
+    };
+  }
 }

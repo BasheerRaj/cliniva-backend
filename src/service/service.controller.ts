@@ -1168,4 +1168,41 @@ export class ServiceController {
       en: 'Price retrieved successfully',
     });
   }
+
+  /**
+   * Get statistics for a specific service
+   * GET /services/:id/stats
+   */
+  @Get(':id/stats')
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth()
+  @Roles(
+    UserRole.ADMIN,
+    UserRole.OWNER,
+    UserRole.SUPER_ADMIN,
+    UserRole.MANAGER,
+    UserRole.STAFF,
+  )
+  @ApiOperation({
+    summary: 'Get statistics for a specific service',
+    description:
+      'Calculates and returns utilization metrics and operational details for a service based on appointment history.',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'Service ID',
+    example: '507f1f77bcf86cd799439013',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Statistics retrieved successfully',
+  })
+  @ApiResponse({ status: 404, description: 'Service not found' })
+  async getServiceStats(@Param('id') serviceId: string): Promise<any> {
+    const stats = await this.serviceService.getServiceStats(serviceId);
+    return ResponseBuilder.success(stats, {
+      ar: 'تم استرجاع إحصائيات الخدمة بنجاح',
+      en: 'Service statistics retrieved successfully',
+    });
+  }
 }
