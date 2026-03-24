@@ -40,6 +40,24 @@ import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { UserRole } from '../common/enums/user-role.enum';
 import { ResponseBuilder } from '../common/utils/response-builder.util';
+
+type ServicePaginationQuery = {
+  page?: string;
+  limit?: string;
+};
+
+type ServicePaginationMeta = {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+};
+
+type PaginatedServiceResponse<T = any> = {
+  data: T[];
+  pagination: ServicePaginationMeta;
+};
+
 @ApiTags('Services')
 @Controller('services')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -543,17 +561,33 @@ export class ServiceController {
     type: String,
     example: '507f1f77bcf86cd799439020',
   })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    description: 'Page number (default: 1)',
+    type: Number,
+    example: 1,
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Items per page (default: 10, max: 100)',
+    type: Number,
+    example: 10,
+  })
   @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN, UserRole.STAFF, UserRole.DOCTOR, UserRole.MANAGER)
   @Get('complexes/:complexId')
   async getServicesByComplex(
     @Param('complexId') complexId: string,
-  ): Promise<any[]> {
-    const services = await this.serviceService.getServicesByComplex(
+    @Query() paginationQuery: ServicePaginationQuery,
+  ): Promise<PaginatedServiceResponse> {
+    const pagination = this.parsePaginationQuery(paginationQuery);
+    const services = await this.serviceService.getServicesByComplexPaginated(
       complexId,
+      pagination,
     );
-    return Promise.all(
-      services.map((service) => this.enrichServiceResponse(service)),
-    );
+
+    return this.enrichPaginatedServiceResponse(services);
   }
 
   /**
@@ -647,15 +681,33 @@ export class ServiceController {
     type: String,
     example: '507f1f77bcf86cd799439040',
   })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    description: 'Page number (default: 1)',
+    type: Number,
+    example: 1,
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Items per page (default: 10, max: 100)',
+    type: Number,
+    example: 10,
+  })
   @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN, UserRole.STAFF, UserRole.DOCTOR, UserRole.MANAGER)
   @Get('clinics/:clinicId')
   async getServicesByClinic(
     @Param('clinicId') clinicId: string,
-  ): Promise<any[]> {
-    const services = await this.serviceService.getServicesByClinic(clinicId);
-    return Promise.all(
-      services.map((service) => this.enrichServiceResponse(service)),
+    @Query() paginationQuery: ServicePaginationQuery,
+  ): Promise<PaginatedServiceResponse> {
+    const pagination = this.parsePaginationQuery(paginationQuery);
+    const services = await this.serviceService.getServicesByClinicPaginated(
+      clinicId,
+      pagination,
     );
+
+    return this.enrichPaginatedServiceResponse(services);
   }
 
   /**
@@ -694,15 +746,33 @@ export class ServiceController {
     type: String,
     example: '507f1f77bcf86cd799439040',
   })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    description: 'Page number (default: 1)',
+    type: Number,
+    example: 1,
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Items per page (default: 10, max: 100)',
+    type: Number,
+    example: 10,
+  })
   @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN, UserRole.STAFF, UserRole.DOCTOR, UserRole.MANAGER)
   @Get('clinics/:clinicId/owned')
   async getServicesOwnedByClinic(
     @Param('clinicId') clinicId: string,
-  ): Promise<any[]> {
-    const services = await this.serviceService.getServicesOwnedByClinic(clinicId);
-    return Promise.all(
-      services.map((service) => this.enrichServiceResponse(service)),
+    @Query() paginationQuery: ServicePaginationQuery,
+  ): Promise<PaginatedServiceResponse> {
+    const pagination = this.parsePaginationQuery(paginationQuery);
+    const services = await this.serviceService.getServicesOwnedByClinicPaginated(
+      clinicId,
+      pagination,
     );
+
+    return this.enrichPaginatedServiceResponse(services);
   }
 
   /**
@@ -735,17 +805,33 @@ export class ServiceController {
     type: String,
     example: '507f1f77bcf86cd799439020',
   })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    description: 'Page number (default: 1)',
+    type: Number,
+    example: 1,
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Items per page (default: 10, max: 100)',
+    type: Number,
+    example: 10,
+  })
   @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN, UserRole.STAFF, UserRole.DOCTOR, UserRole.MANAGER)
   @Get('clinic')
   async getServicesForClinic(
     @Query('complexId') complexId?: string,
-  ): Promise<any[]> {
-    const services = await this.serviceService.getServicesForClinic(
+    @Query() paginationQuery?: ServicePaginationQuery,
+  ): Promise<PaginatedServiceResponse> {
+    const pagination = this.parsePaginationQuery(paginationQuery);
+    const services = await this.serviceService.getServicesForClinicPaginated(
       complexId,
+      pagination,
     );
-    return Promise.all(
-      services.map((service) => this.enrichServiceResponse(service)),
-    );
+
+    return this.enrichPaginatedServiceResponse(services);
   }
 
   /**
@@ -784,17 +870,33 @@ export class ServiceController {
     type: String,
     example: '507f1f77bcf86cd799439020',
   })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    description: 'Page number (default: 1)',
+    type: Number,
+    example: 1,
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Items per page (default: 10, max: 100)',
+    type: Number,
+    example: 10,
+  })
   @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN, UserRole.STAFF, UserRole.DOCTOR, UserRole.MANAGER)
   @Get('clinic/:complexId')
   async getServicesForClinicWithComplex(
     @Param('complexId') complexId: string,
-  ): Promise<any[]> {
-    const services = await this.serviceService.getServicesForClinic(
+    @Query() paginationQuery: ServicePaginationQuery,
+  ): Promise<PaginatedServiceResponse> {
+    const pagination = this.parsePaginationQuery(paginationQuery);
+    const services = await this.serviceService.getServicesForClinicPaginated(
       complexId,
+      pagination,
     );
-    return Promise.all(
-      services.map((service) => this.enrichServiceResponse(service)),
-    );
+
+    return this.enrichPaginatedServiceResponse(services);
   }
 
   /**
@@ -827,15 +929,61 @@ export class ServiceController {
     type: String,
     example: '507f1f77bcf86cd799439020',
   })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    description: 'Page number (default: 1)',
+    type: Number,
+    example: 1,
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Items per page (default: 10, max: 100)',
+    type: Number,
+    example: 10,
+  })
   @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN, UserRole.STAFF, UserRole.DOCTOR, UserRole.MANAGER)
   @Get()
   async getAllServices(
     @Query('complexId') complexId?: string,
-  ): Promise<any[]> {
-    const services = await this.serviceService.getAllServices(complexId);
-    return Promise.all(
-      services.map((service) => this.enrichServiceResponse(service)),
+    @Query() paginationQuery?: ServicePaginationQuery,
+  ): Promise<PaginatedServiceResponse> {
+    const pagination = this.parsePaginationQuery(paginationQuery);
+    const services = await this.serviceService.getAllServicesPaginated(
+      complexId,
+      pagination,
     );
+
+    return this.enrichPaginatedServiceResponse(services);
+  }
+
+  private parsePaginationQuery(query?: ServicePaginationQuery): {
+    page: number;
+    limit: number;
+  } {
+    const pageValue = Number(query?.page);
+    const limitValue = Number(query?.limit);
+
+    const page = Number.isFinite(pageValue)
+      ? Math.max(1, Math.floor(pageValue))
+      : 1;
+    const limit = Number.isFinite(limitValue)
+      ? Math.max(1, Math.min(100, Math.floor(limitValue)))
+      : 10;
+
+    return { page, limit };
+  }
+
+  private async enrichPaginatedServiceResponse(
+    result: { data: any[]; pagination: ServicePaginationMeta },
+  ): Promise<PaginatedServiceResponse> {
+    return {
+      data: await Promise.all(
+        result.data.map((service) => this.enrichServiceResponse(service)),
+      ),
+      pagination: result.pagination,
+    };
   }
 
   private async enrichServiceResponse(service: any): Promise<any> {
@@ -1010,19 +1158,35 @@ export class ServiceController {
     type: String,
     example: '507f1f77bcf86cd799439040',
   })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    description: 'Page number (default: 1)',
+    type: Number,
+    example: 1,
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Items per page (default: 10, max: 100)',
+    type: Number,
+    example: 10,
+  })
   @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN, UserRole.STAFF, UserRole.DOCTOR, UserRole.MANAGER)
   @Get('active')
   async getActiveServices(
     @Query('complexId') complexId?: string,
     @Query('clinicId') clinicId?: string,
-  ): Promise<any[]> {
-    const services = await this.serviceService.getActiveServices(
+    @Query() paginationQuery?: ServicePaginationQuery,
+  ): Promise<PaginatedServiceResponse> {
+    const pagination = this.parsePaginationQuery(paginationQuery);
+    const services = await this.serviceService.getActiveServicesPaginated(
       complexId,
       clinicId,
+      pagination,
     );
-    return Promise.all(
-      services.map((service) => this.enrichServiceResponse(service)),
-    );
+
+    return this.enrichPaginatedServiceResponse(services);
   }
 
   /**
