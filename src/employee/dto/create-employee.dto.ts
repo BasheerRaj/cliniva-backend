@@ -16,6 +16,7 @@ import {
   ValidateNested,
   IsMongoId,
   Matches,
+  ValidateIf,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
@@ -182,6 +183,7 @@ export class CreateEmployeeDto {
     example: 'doctor',
     enum: ['super_admin', 'owner', 'admin', 'doctor', 'staff', 'patient'],
   })
+  @ValidateIf((o) => !o.userType)
   @IsEnum(['super_admin', 'owner', 'admin', 'doctor', 'staff', 'patient'], {
     message: JSON.stringify({
       ar: 'الدور غير صالح',
@@ -194,7 +196,27 @@ export class CreateEmployeeDto {
       en: 'Role is required',
     }),
   })
-  role: string;
+  role?: string;
+
+  @ApiPropertyOptional({
+    description: 'Simplified user type for employee creation',
+    example: 'doctor',
+    enum: ['doctor', 'staff'],
+  })
+  @ValidateIf((o) => !o.role)
+  @IsEnum(['doctor', 'staff'], {
+    message: JSON.stringify({
+      ar: 'نوع المستخدم غير صالح',
+      en: 'Invalid user type',
+    }),
+  })
+  @IsNotEmpty({
+    message: JSON.stringify({
+      ar: 'نوع المستخدم مطلوب',
+      en: 'User type is required',
+    }),
+  })
+  userType?: 'doctor' | 'staff';
 
   @ApiPropertyOptional({
     description: 'Employee nationality',
@@ -630,6 +652,15 @@ export class UpdateEmployeeDto {
   @IsEnum(['super_admin', 'owner', 'admin', 'doctor', 'staff', 'patient'])
   @IsOptional()
   role?: string;
+
+  @ApiPropertyOptional({
+    description: 'Simplified user type for employee updates',
+    example: 'staff',
+    enum: ['doctor', 'staff'],
+  })
+  @IsEnum(['doctor', 'staff'])
+  @IsOptional()
+  userType?: 'doctor' | 'staff';
 
   @ApiPropertyOptional({
     description: 'Employee first name',

@@ -15,6 +15,8 @@ import { EmployeeShift } from '../database/schemas/employee-shift.schema';
 import { Organization } from '../database/schemas/organization.schema';
 import { Complex } from '../database/schemas/complex.schema';
 import { Clinic } from '../database/schemas/clinic.schema';
+import { DoctorSpecialty } from '../database/schemas/doctor-specialty.schema';
+import { Specialty } from '../database/schemas/specialty.schema';
 import {
   CreateEmployeeDto,
   UpdateEmployeeDto,
@@ -37,6 +39,54 @@ import { EmailService } from '../auth/email.service';
 export class EmployeeService {
   private readonly logger = new Logger(EmployeeService.name);
 
+  private toObjectIdString(value: any): string | null {
+    if (!value) {
+      return null;
+    }
+
+    if (value instanceof Types.ObjectId) {
+      return value.toString();
+    }
+
+    if (typeof value === 'object' && value._id) {
+      return this.toObjectIdString(value._id);
+    }
+
+    return String(value);
+  }
+
+  private toLinkedEntity(
+    entity: any,
+    fallbackId?: any,
+  ): { id: string | null; name: string | null } | null {
+    const id = this.toObjectIdString(entity?._id ?? fallbackId);
+    const name = entity?.name ?? null;
+
+    if (!id && !name) {
+      return null;
+    }
+
+    return {
+      id,
+      name,
+    };
+  }
+
+  private enrichEmployeeResponse(employee: any): any {
+    if (!employee) {
+      return employee;
+    }
+
+    const { clinic, complex, ...employeeWithoutLinkedEntities } = employee;
+
+    return {
+      ...employeeWithoutLinkedEntities,
+      userType: employee.role,
+      linkedComplex: this.toLinkedEntity(employee.complex, employee.complexId),
+      linkedClinic: this.toLinkedEntity(employee.clinic, employee.clinicId),
+    };
+  }
+
   constructor(
     @InjectModel('User') private readonly userModel: Model<User>,
     @InjectModel('EmployeeProfile')
@@ -49,6 +99,10 @@ export class EmployeeService {
     private readonly organizationModel: Model<Organization>,
     @InjectModel('Complex') private readonly complexModel: Model<Complex>,
     @InjectModel('Clinic') private readonly clinicModel: Model<Clinic>,
+    @InjectModel('DoctorSpecialty')
+    private readonly doctorSpecialtyModel: Model<DoctorSpecialty>,
+    @InjectModel('Specialty')
+    private readonly specialtyModel: Model<Specialty>,
     private readonly auditService: AuditService,
     private readonly sessionService: SessionService,
     private readonly emailService: EmailService,
@@ -372,6 +426,51 @@ export class EmployeeService {
       await this.validatePlanBasedAssignment(createEmployeeDto, subscription);
     }
 
+    const normalizedRole = createEmployeeDto.userType || createEmployeeDto.role;
+
+    const specialties = Array.isArray(createEmployeeDto.specialties)
+      ? createEmployeeDto.specialties.filter(Boolean)
+      : [];
+
+    if (specialties.length > 0 && normalizedRole !== 'doctor') {
+      throw new BadRequestException(
+        'Specialties can only be assigned to users with doctor role',
+      );
+    }
+
+    const uniqueSpecialtyIds = Array.from(new Set(specialties));
+    const specialtyObjectIds = uniqueSpecialtyIds.map((specialtyId) => {
+      if (!Types.ObjectId.isValid(specialtyId)) {
+        throw new BadRequestException(`Invalid specialty ID format: ${specialtyId}`);
+      }
+
+      return new Types.ObjectId(specialtyId);
+    });
+
+    if (specialtyObjectIds.length > 0) {
+      const existingSpecialties = await this.specialtyModel
+        .find(
+          {
+            _id: { $in: specialtyObjectIds },
+            isActive: true,
+          },
+          { _id: 1 },
+        )
+        .lean()
+        .exec();
+
+      const existingIdSet = new Set(existingSpecialties.map((item: any) => item._id.toString()));
+      const missingSpecialtyIds = uniqueSpecialtyIds.filter(
+        (specialtyId) => !existingIdSet.has(specialtyId),
+      );
+
+      if (missingSpecialtyIds.length > 0) {
+        throw new BadRequestException(
+          `Invalid or inactive specialty IDs: ${missingSpecialtyIds.join(', ')}`,
+        );
+      }
+    }
+
     // Hash the password
     const saltRounds = 10;
     const hashedPassword = await bcrypt.hash(
@@ -390,7 +489,7 @@ export class EmployeeService {
       firstName: createEmployeeDto.firstName,
       lastName: createEmployeeDto.lastName,
       phone: createEmployeeDto.phone,
-      role: createEmployeeDto.role,
+      role: normalizedRole,
       nationality: createEmployeeDto.nationality,
       gender: createEmployeeDto.gender,
       dateOfBirth: new Date(createEmployeeDto.dateOfBirth),
@@ -426,7 +525,19 @@ export class EmployeeService {
     };
 
     const employeeProfile = new this.employeeProfileModel(profileData);
-    const savedProfile = await employeeProfile.save();
+    await employeeProfile.save();
+
+    if (specialtyObjectIds.length > 0) {
+      const doctorSpecialtyAssignments = specialtyObjectIds.map((specialtyId) => ({
+        doctorId: savedUser._id,
+        specialtyId,
+        isActive: true,
+      }));
+
+      await this.doctorSpecialtyModel.insertMany(doctorSpecialtyAssignments, {
+        ordered: true,
+      });
+    }
 
     // Audit log for employee creation
     if (createdByUserId) {
@@ -448,11 +559,8 @@ export class EmployeeService {
       `Employee created successfully: ${savedUser.email} (ID: ${savedUser._id})`,
     );
 
-    // Return combined user and profile data
-    return {
-      ...savedUser.toObject(),
-      employeeProfile: savedProfile.toObject(),
-    };
+    // Return complete employee details with linked entity names and ids
+    return await this.getEmployeeById((savedUser._id as Types.ObjectId).toString());
   }
 
   /**
@@ -655,7 +763,9 @@ export class EmployeeService {
     const totalPages = Math.ceil(total / pageSize);
 
     return {
-      employees,
+      employees: employees.map((employee: any) =>
+        this.enrichEmployeeResponse(employee),
+      ),
       total,
       page: pageNum,
       totalPages,
@@ -738,17 +848,93 @@ export class EmployeeService {
       {
         $lookup: {
           from: 'complexes',
-          localField: 'complexId',
-          foreignField: '_id',
+          let: {
+            complexId: {
+              $convert: {
+                input: '$complexId',
+                to: 'objectId',
+                onError: null,
+                onNull: null,
+              },
+            },
+          },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $eq: ['$_id', '$$complexId'],
+                },
+              },
+            },
+          ],
           as: 'complex',
         },
       },
       {
         $lookup: {
           from: 'clinics',
-          localField: 'clinicId',
-          foreignField: '_id',
+          let: {
+            clinicId: {
+              $convert: {
+                input: '$clinicId',
+                to: 'objectId',
+                onError: null,
+                onNull: null,
+              },
+            },
+          },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $eq: ['$_id', '$$clinicId'],
+                },
+              },
+            },
+          ],
           as: 'clinic',
+        },
+      },
+      {
+        $lookup: {
+          from: 'doctor_specialties',
+          let: { doctorId: '$_id' },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ['$doctorId', '$$doctorId'] },
+                    { $eq: ['$isActive', true] },
+                  ],
+                },
+              },
+            },
+            {
+              $lookup: {
+                from: 'specialties',
+                localField: 'specialtyId',
+                foreignField: '_id',
+                as: 'specialty',
+              },
+            },
+            {
+              $unwind: {
+                path: '$specialty',
+                preserveNullAndEmptyArrays: true,
+              },
+            },
+            {
+              $project: {
+                _id: { $ifNull: ['$specialty._id', '$specialtyId'] },
+                name: '$specialty.name',
+                description: '$specialty.description',
+                isActive: '$specialty.isActive',
+                assignmentId: '$_id',
+              },
+            },
+          ],
+          as: 'specialties',
         },
       },
       {
@@ -766,7 +952,7 @@ export class EmployeeService {
       throw new NotFoundException('Employee not found');
     }
 
-    return result[0];
+    return this.enrichEmployeeResponse(result[0]);
   }
 
   /**
@@ -817,8 +1003,9 @@ export class EmployeeService {
     // Track changes for session invalidation
     const emailChanged =
       updateEmployeeDto.email && updateEmployeeDto.email !== employee.email;
+    const normalizedRole = updateEmployeeDto.userType || updateEmployeeDto.role;
     const roleChanged =
-      updateEmployeeDto.role && updateEmployeeDto.role !== employee.role;
+      normalizedRole && normalizedRole !== employee.role;
     const oldEmail = employee.email;
     const oldRole = employee.role;
 
@@ -835,6 +1022,7 @@ export class EmployeeService {
       userUpdates.address = updateEmployeeDto.address;
     if (updateEmployeeDto.isActive !== undefined)
       userUpdates.isActive = updateEmployeeDto.isActive;
+    if (normalizedRole) userUpdates.role = normalizedRole;
 
     // Profile fields
     if (updateEmployeeDto.cardNumber)
@@ -895,7 +1083,7 @@ export class EmployeeService {
           employee.email,
           employee.firstName,
           oldRole,
-          updateEmployeeDto.role!,
+          normalizedRole!,
           language,
         );
       }
@@ -1166,6 +1354,28 @@ export class EmployeeService {
         $limit: Math.min(limit, 50),
       },
       {
+        $lookup: {
+          from: 'complexes',
+          localField: 'complexId',
+          foreignField: '_id',
+          as: 'complex',
+        },
+      },
+      {
+        $lookup: {
+          from: 'clinics',
+          localField: 'clinicId',
+          foreignField: '_id',
+          as: 'clinic',
+        },
+      },
+      {
+        $addFields: {
+          complex: { $arrayElemAt: ['$complex', 0] },
+          clinic: { $arrayElemAt: ['$clinic', 0] },
+        },
+      },
+      {
         $project: {
           _id: 1,
           firstName: 1,
@@ -1173,8 +1383,17 @@ export class EmployeeService {
           email: 1,
           phone: 1,
           role: 1,
+          userType: '$role',
           employeeNumber: '$employeeProfile.employeeNumber',
           jobTitle: '$employeeProfile.jobTitle',
+          linkedComplex: {
+            id: '$complex._id',
+            name: '$complex.name',
+          },
+          linkedClinic: {
+            id: '$clinic._id',
+            name: '$clinic.name',
+          },
         },
       },
     ];

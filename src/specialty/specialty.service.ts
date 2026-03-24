@@ -54,6 +54,35 @@ export class SpecialtyService {
     return await specialty.save();
   }
 
+  async getSpecialtiesForDropdown(filters?: {
+    complexId?: string;
+    search?: string;
+    includeInactive?: boolean;
+  }): Promise<any[]> {
+    const query: any = {};
+
+    if (!filters?.includeInactive) {
+      query.isActive = true;
+    }
+
+    if (filters?.complexId) {
+      if (!Types.ObjectId.isValid(filters.complexId)) {
+        throw new BadRequestException('Invalid complex ID format');
+      }
+      query.complexId = new Types.ObjectId(filters.complexId);
+    }
+
+    if (filters?.search?.trim()) {
+      query.name = { $regex: filters.search.trim(), $options: 'i' };
+    }
+
+    return await this.specialtyModel
+      .find(query)
+      .select('_id name isActive complexId')
+      .sort({ name: 1 })
+      .lean();
+  }
+
   async getAllSpecialties(query: SpecialtySearchDto): Promise<{
     specialties: any[];
     total: number;
@@ -308,8 +337,24 @@ export class SpecialtyService {
       {
         $lookup: {
           from: 'clinics',
-          localField: 'doctor.clinicId',
-          foreignField: '_id',
+          let: {
+            clinicIdStr: {
+              $cond: [
+                { $ifNull: ['$doctor.clinicId', false] },
+                { $toString: '$doctor.clinicId' },
+                null,
+              ],
+            },
+          },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $eq: [{ $toString: '$_id' }, '$$clinicIdStr'],
+                },
+              },
+            },
+          ],
           as: 'clinic',
         },
       },
@@ -334,6 +379,7 @@ export class SpecialtyService {
           _id: 1,
           specialtyId: '$specialtyId',
           doctorId: '$doctor._id',
+          clinicId: '$doctor.clinicId',
           doctorName: {
             $concat: [
               { $ifNull: ['$doctor.firstName', ''] },
@@ -341,7 +387,9 @@ export class SpecialtyService {
               { $ifNull: ['$doctor.lastName', ''] },
             ],
           },
-          clinicName: { $arrayElemAt: ['$clinic.name', 0] },
+          clinicName: {
+            $ifNull: [{ $arrayElemAt: ['$clinic.name', 0] }, ''],
+          },
           yearsOfExperience: 1,
           certificationNumber: 1,
           createdAt: 1,

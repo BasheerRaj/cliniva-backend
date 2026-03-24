@@ -26,6 +26,7 @@ import {
 import { SpecialtyService } from './specialty.service';
 import {
   CreateSpecialtyDto,
+  SpecialtyDropdownQueryDto,
   UpdateSpecialtyDto,
   ToggleSpecialtyStatusDto,
   SpecialtySearchDto,
@@ -136,6 +137,65 @@ export class SpecialtyController {
         en: 'Specialties list retrieved successfully',
       },
     );
+  }
+
+  /**
+   * Get specialties for dropdown
+   */
+  @Get('dropdown')
+  @ApiOperation({
+    summary: 'Get specialties for dropdown',
+    description:
+      'Get specialties for dropdown selection with optional complex and search filters. Returns active specialties by default.',
+  })
+  @ApiQuery({
+    name: 'complexId',
+    required: false,
+    description: 'Filter by complex ID',
+    example: '507f1f77bcf86cd799439014',
+  })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    description: 'Search by specialty name',
+    example: 'cardio',
+  })
+  @ApiQuery({
+    name: 'includeInactive',
+    required: false,
+    description: 'Include inactive specialties in dropdown result',
+    example: false,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Specialties retrieved successfully',
+    schema: {
+      example: {
+        success: true,
+        data: [
+          {
+            _id: '507f1f77bcf86cd799439028',
+            name: 'Cardiology',
+            isActive: true,
+            complexId: '507f1f77bcf86cd799439014',
+          },
+        ],
+        message: {
+          ar: 'تم جلب قائمة التخصصات بنجاح',
+          en: 'Specialties retrieved successfully',
+        },
+      },
+    },
+  })
+  async getSpecialtiesForDropdown(
+    @Query(new ValidationPipe({ transform: true, whitelist: true }))
+    query: SpecialtyDropdownQueryDto,
+  ) {
+    const specialties = await this.specialtyService.getSpecialtiesForDropdown(query);
+    return ResponseBuilder.success(specialties, {
+      ar: 'تم جلب قائمة التخصصات بنجاح',
+      en: 'Specialties retrieved successfully',
+    });
   }
 
   /**

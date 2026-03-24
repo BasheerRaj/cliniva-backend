@@ -9,6 +9,8 @@ import { EmployeeShiftSchema } from '../database/schemas/employee-shift.schema';
 import { OrganizationSchema } from '../database/schemas/organization.schema';
 import { ComplexSchema } from '../database/schemas/complex.schema';
 import { ClinicSchema } from '../database/schemas/clinic.schema';
+import { DoctorSpecialtySchema } from '../database/schemas/doctor-specialty.schema';
+import { SpecialtySchema } from '../database/schemas/specialty.schema';
 import { SubscriptionSchema } from '../database/schemas/subscription.schema';
 import { SubscriptionPlanSchema } from '../database/schemas/subscription-plan.schema';
 import { SubscriptionModule } from '../subscription/subscription.module';
@@ -24,6 +26,8 @@ import { AuthModule } from '../auth/auth.module';
       { name: 'Organization', schema: OrganizationSchema },
       { name: 'Complex', schema: ComplexSchema },
       { name: 'Clinic', schema: ClinicSchema },
+      { name: 'DoctorSpecialty', schema: DoctorSpecialtySchema },
+      { name: 'Specialty', schema: SpecialtySchema },
       { name: 'Subscription', schema: SubscriptionSchema },
       { name: 'SubscriptionPlan', schema: SubscriptionPlanSchema },
     ]),
