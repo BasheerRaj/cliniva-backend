@@ -487,6 +487,7 @@ export class AppointmentController {
   @ApiQuery({ name: 'date', required: true, type: String, description: 'Date in YYYY-MM-DD format' })
   @ApiQuery({ name: 'time', required: true, type: String, description: 'Time in HH:mm (24-hour)' })
   @ApiQuery({ name: 'clinicCollectionId', required: false, type: String, description: 'Optional complex ID filter' })
+  @ApiQuery({ name: 'serviceId', required: false, type: String, description: 'Filter clinics by service offered (ClinicService junction)' })
   @ApiResponse({ status: 200, description: 'Available clinics returned successfully' })
   @Get('available-clinics')
   @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.MANAGER, UserRole.DOCTOR, UserRole.STAFF)
@@ -495,6 +496,7 @@ export class AppointmentController {
     @Query('date') date: string,
     @Query('time') time: string,
     @Query('clinicCollectionId') clinicCollectionId?: string,
+    @Query('serviceId') serviceId?: string,
   ) {
     if (!date || !time) {
       throw new BadRequestException('date and time query parameters are required');
@@ -507,6 +509,7 @@ export class AppointmentController {
         req.user?.clinicId,
         req.user?.organizationId,
         req.user?.role,
+        serviceId,
       );
       return {
         success: true,
@@ -541,6 +544,7 @@ export class AppointmentController {
   @ApiQuery({ name: 'time', required: true, type: String, description: 'Time in HH:mm (24-hour)' })
   @ApiQuery({ name: 'clinicId', required: true, type: String, description: 'Clinic ID to scope doctors' })
   @ApiQuery({ name: 'duration', required: false, type: Number, description: 'Appointment duration in minutes (default 30)' })
+  @ApiQuery({ name: 'serviceId', required: false, type: String, description: 'Filter doctors by service authorization (DoctorService junction)' })
   @ApiResponse({ status: 200, description: 'Available doctors returned successfully' })
   @Get('available-doctors')
   @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.MANAGER, UserRole.DOCTOR, UserRole.STAFF)
@@ -549,6 +553,7 @@ export class AppointmentController {
     @Query('time') time: string,
     @Query('clinicId') clinicId: string,
     @Query('duration') duration?: string,
+    @Query('serviceId') serviceId?: string,
   ) {
     if (!date || !time || !clinicId) {
       throw new BadRequestException('date, time, and clinicId query parameters are required');
@@ -559,6 +564,7 @@ export class AppointmentController {
         date,
         time,
         duration ? parseInt(duration, 10) : 30,
+        serviceId,
       );
       return {
         success: true,

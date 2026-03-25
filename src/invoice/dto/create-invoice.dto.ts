@@ -75,10 +75,10 @@ export class CreateInvoiceDto {
   @IsMongoId()
   patientId: string;
 
-  @ApiProperty({ description: 'Clinic ID (MongoDB ObjectId)', example: '507f1f77bcf86cd799439012' })
-  @IsNotEmpty({ message: '{"ar":"معرف العيادة مطلوب","en":"Clinic ID is required"}' })
-  @IsMongoId()
-  clinicId: string;
+  @ApiPropertyOptional({ description: 'Clinic ID (MongoDB ObjectId) - Optional for admin/manager roles. Auto-injected for staff/doctor by InvoiceScopeGuard.', example: '507f1f77bcf86cd799439012' })
+  @IsOptional()
+  @IsMongoId({ message: '{"ar":"معرف العيادة غير صالح","en":"Invalid clinic ID"}' })
+  clinicId?: string;
 
   @ApiProperty({ description: 'The single service included in this invoice', type: [InvoiceServiceDto] })
   @IsArray()

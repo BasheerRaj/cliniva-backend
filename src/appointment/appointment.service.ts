@@ -47,6 +47,8 @@ import { CreateAppointmentWithSessionDto } from './dto/create-appointment-with-s
 import { AppointmentSessionService } from './services/appointment-session.service';
 import { SESSION_ERROR_MESSAGES } from './constants/session-error-messages.constant';
 import { InvoiceService } from '../invoice/invoice.service';
+import { ClinicService } from '../database/schemas/clinic-service.schema';
+import { DoctorService } from '../database/schemas/doctor-service.schema';
 import {
   transformAppointment,
   transformAppointmentList,
@@ -67,6 +69,8 @@ export class AppointmentService {
     @InjectModel('Service') private readonly serviceModel: Model<Service>,
     @InjectModel('Invoice') private readonly invoiceModel: Model<Invoice>,
     @InjectModel('MedicalReport') private readonly medicalReportModel: Model<MedicalReport>,
+    @InjectModel('ClinicService') private readonly clinicServiceModel: Model<ClinicService>,
+    @InjectModel('DoctorService') private readonly doctorServiceModel: Model<DoctorService>,
     private readonly workingHoursIntegrationService: WorkingHoursIntegrationService,
     private readonly appointmentValidationService: AppointmentValidationService,
     private readonly appointmentStatusService: AppointmentStatusService,
@@ -359,15 +363,17 @@ export class AppointmentService {
     }
 
     // 8. Get session-specific or service duration (Requirements 2.1, 2.2)
+    // When dto.durationMinutes is provided, it overrides the service/session default.
     const session = sessionId
       ? service.sessions?.find((s) => (s as any)._id === sessionId)
       : undefined;
-    const duration = session
+    const computedDuration = session
       ? this.appointmentSessionService.getSessionDuration(
           session as any,
           service.durationMinutes || 30,
         )
       : service.durationMinutes || 30;
+    const duration = (createAppointmentDto as any).durationMinutes ?? computedDuration;
 
     // 8b. Validate working hours when BOTH clinic and doctor have WH configured
     // Only enforced when both entities have working hours set up — prevents
@@ -2385,16 +2391,16 @@ export class AppointmentService {
       });
     }
 
-    if (appointment.status !== 'in_progress' && appointment.status !== 'confirmed') {
-      throw new BadRequestException({
-        message: {
-          ar: 'يمكن إتمام المواعيد المؤكدة أو قيد التقدم فقط',
-          en: 'Can only conclude appointments that are confirmed or in progress',
-        },
-        code: 'APPOINTMENT_NOT_CONCLUDABLE',
-        currentStatus: appointment.status,
-      });
-    }
+    // if (appointment.status !== 'in_progress' && appointment.status !== 'confirmed') {
+    //   throw new BadRequestException({
+    //     message: {
+    //       ar: 'يمكن إتمام المواعيد المؤكدة أو قيد التقدم فقط',
+    //       en: 'Can only conclude appointments that are confirmed or in progress',
+    //     },
+    //     code: 'APPOINTMENT_NOT_CONCLUDABLE',
+    //     currentStatus: appointment.status,
+    //   });
+    // }
 
     const now = new Date();
     const historyEntry = {
@@ -2616,6 +2622,7 @@ export class AppointmentService {
     userClinicId?: string,
     userOrganizationId?: string,
     userRole?: string,
+    serviceId?: string,
   ): Promise<{ _id: string; name: string }[]> {
     // 1. Build clinic filter with scope enforcement (IDOR protection)
     const clinicFilter: any = {
@@ -2634,6 +2641,21 @@ export class AppointmentService {
 
     if (clinicCollectionId) {
       clinicFilter.complexId = new Types.ObjectId(clinicCollectionId);
+    }
+
+    // Filter by service if serviceId provided (ClinicService junction table)
+    if (serviceId) {
+      const validClinicIds = await this.clinicServiceModel
+        .find({ serviceId: new Types.ObjectId(serviceId), isActive: true })
+        .distinct('clinicId');
+      if (validClinicIds.length === 0) return [];
+      if (clinicFilter._id) {
+        // Intersect with existing clinic ID filter
+        const existingId = clinicFilter._id.toString();
+        if (!validClinicIds.some((id: any) => id.toString() === existingId)) return [];
+      } else {
+        clinicFilter._id = { $in: validClinicIds };
+      }
     }
 
     // 2. Fetch matching clinics
@@ -2705,15 +2727,34 @@ export class AppointmentService {
     date: string,
     time: string,
     duration: number,
+    serviceId?: string,
   ): Promise<{ _id: string; name: string }[]> {
+    // 0. If serviceId provided, get authorized doctor IDs from DoctorService junction
+    let authorizedDoctorIds: Types.ObjectId[] | null = null;
+    if (serviceId) {
+      const doctorServiceEntries = await this.doctorServiceModel
+        .find({
+          serviceId: new Types.ObjectId(serviceId),
+          clinicId: new Types.ObjectId(clinicId),
+          isActive: true,
+        })
+        .distinct('doctorId');
+      authorizedDoctorIds = doctorServiceEntries;
+    }
+
     // 1. Get all active doctors assigned to this clinic
+    const doctorQuery: any = {
+      clinicId: new Types.ObjectId(clinicId),
+      role: 'doctor',
+      isActive: true,
+      deletedAt: { $exists: false },
+    };
+    if (authorizedDoctorIds !== null) {
+      if (authorizedDoctorIds.length === 0) return [];
+      doctorQuery._id = { $in: authorizedDoctorIds };
+    }
     const doctors = await this.userModel
-      .find({
-        clinicId: new Types.ObjectId(clinicId),
-        role: 'doctor',
-        isActive: true,
-        deletedAt: { $exists: false },
-      })
+      .find(doctorQuery)
       .select('_id firstName lastName name')
       .lean()
       .exec();

@@ -50,7 +50,7 @@ export class InvoiceService {
   ): Promise<InvoiceResponseDto> {
     // Validate clinic access for Staff/Doctor roles
     if (userRole === 'staff' || userRole === 'doctor') {
-      if (!userClinicId || userClinicId !== createInvoiceDto.clinicId) {
+      if (!userClinicId || (createInvoiceDto.clinicId && userClinicId !== createInvoiceDto.clinicId)) {
         throw new ForbiddenException({
           message: {
             ar: 'لا يمكنك إنشاء فاتورة لعيادة غير مخصصة لك',
@@ -61,17 +61,20 @@ export class InvoiceService {
       }
     }
 
-    // 1. Find clinic by dto.clinicId (validate exists, not deleted)
-    const clinic = await this.clinicModel.findOne({
-      _id: new Types.ObjectId(createInvoiceDto.clinicId),
-      deletedAt: { $exists: false },
-    });
-    if (!clinic) {
-      throw new NotFoundException(NOT_FOUND_ERRORS.CLINIC);
+    // 1. Find clinic by dto.clinicId when provided (validate exists, not deleted)
+    let clinic: any = null;
+    let organizationId: any = undefined;
+    if (createInvoiceDto.clinicId) {
+      clinic = await this.clinicModel.findOne({
+        _id: new Types.ObjectId(createInvoiceDto.clinicId),
+        deletedAt: { $exists: false },
+      });
+      if (!clinic) {
+        throw new NotFoundException(NOT_FOUND_ERRORS.CLINIC);
+      }
+      // 2. Derive organizationId from clinic
+      organizationId = clinic.organizationId;
     }
-
-    // 2. Derive organizationId from clinic
-    const organizationId = clinic.organizationId;
 
     // 3. Find patient by dto.patientId (validate exists, not deleted)
     const patient = await this.patientModel.findOne({
@@ -170,7 +173,7 @@ export class InvoiceService {
       invoiceNumber,
       invoiceTitle: createInvoiceDto.invoiceTitle,
       patientId: new Types.ObjectId(createInvoiceDto.patientId),
-      clinicId: new Types.ObjectId(createInvoiceDto.clinicId),
+      clinicId: createInvoiceDto.clinicId ? new Types.ObjectId(createInvoiceDto.clinicId) : undefined,
       organizationId: organizationId ? organizationId : undefined,
       services: builtServices,
       subtotal,

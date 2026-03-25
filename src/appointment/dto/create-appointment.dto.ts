@@ -5,7 +5,10 @@ import {
   IsOptional,
   IsEnum,
   IsMongoId,
+  IsNumber,
   Matches,
+  Min,
+  Max,
   ValidateIf,
 } from 'class-validator';
 import { Type } from 'class-transformer';
@@ -187,5 +190,17 @@ export class CreateAppointmentDto {
     message: '{"ar":"حالة الموعد غير صالحة","en":"Invalid appointment status"}',
   })
   status?: AppointmentStatus;
+
+  @ApiPropertyOptional({
+    description: 'Override appointment duration in minutes. When provided, overrides the service/session default duration.',
+    example: 45,
+    minimum: 5,
+    maximum: 480,
+  })
+  @IsOptional()
+  @IsNumber({}, { message: '{"ar":"مدة الموعد يجب أن تكون رقماً","en":"Duration must be a number"}' })
+  @Min(5, { message: '{"ar":"مدة الموعد يجب أن تكون على الأقل 5 دقائق","en":"Duration must be at least 5 minutes"}' })
+  @Max(480, { message: '{"ar":"مدة الموعد لا يمكن أن تتجاوز 480 دقيقة","en":"Duration cannot exceed 480 minutes"}' })
+  durationMinutes?: number;
 
 }
