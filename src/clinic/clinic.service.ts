@@ -114,7 +114,10 @@ export class ClinicService {
       }
 
       // Try to resolve permitted clinics from UserAccess records
-      const userId = requestingUser.userId || requestingUser.id;
+      // Owners have subscription-level access — skip UserAccess scoping for them
+      const userId = requestingUser.role !== 'owner'
+        ? (requestingUser.userId || requestingUser.id)
+        : null;
       if (userId) {
         const now = new Date();
         const accessRecords = await this.userAccessModel
@@ -160,7 +163,8 @@ export class ClinicService {
       }
 
       // Fallback: use single-clinic / complex / subscription from user profile
-      if (permittedClinicIds === null) {
+      // Owners see all clinics in their subscription regardless of complexId on their profile
+      if (permittedClinicIds === null && requestingUser.role !== 'owner') {
         if (requestingUser.complexId) {
           targetComplexId = requestingUser.complexId;
         }

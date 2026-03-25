@@ -270,6 +270,14 @@ export class UserProfileDto {
   })
   onboardingProgress?: string[];
 
+  @ApiPropertyOptional({
+    description: 'Plan type (company, complex, or clinic)',
+    example: 'company',
+    enum: ['company', 'complex', 'clinic'],
+    nullable: true,
+  })
+  planType?: string | null;
+
   @ApiProperty({
     description: 'Whether the user is an owner',
     example: true,
@@ -313,6 +321,7 @@ export class UserProfileDto {
     this.clinicId = user.clinicId ? (user.clinicId as any).toString() : null;
     this.onboardingComplete = user.onboardingComplete;
     this.onboardingProgress = user.onboardingProgress;
+    this.planType = user.planType ?? null;
     this.isOwner = user.role === 'owner';
   }
 }

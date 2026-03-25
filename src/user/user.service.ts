@@ -89,11 +89,14 @@ export class UserService {
         if (requestingUser.subscriptionId) {
           targetSubscriptionId = requestingUser.subscriptionId;
         }
-        if (requestingUser.complexId) {
-          targetComplexId = requestingUser.complexId;
-        }
-        if (requestingUser.clinicId) {
-          targetClinicId = requestingUser.clinicId;
+        // Owners have subscription-level access — skip complex/clinic scoping from their profile
+        if (requestingUser.role !== 'owner') {
+          if (requestingUser.complexId) {
+            targetComplexId = requestingUser.complexId;
+          }
+          if (requestingUser.clinicId) {
+            targetClinicId = requestingUser.clinicId;
+          }
         }
       }
 

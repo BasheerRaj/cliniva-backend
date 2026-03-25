@@ -650,7 +650,12 @@ export class EmployeeService {
     let effectiveOrgId = organizationId;
 
     if (requestingUser && requestingUser.role !== 'super_admin') {
-      if (requestingUser.clinicId) {
+      if (requestingUser.role === 'owner') {
+        // Owners have subscription-level access — scope only by subscriptionId
+        if (!effectiveClinicId && !effectiveComplexId && requestingUser.subscriptionId) {
+          effectiveOrgId = requestingUser.subscriptionId.toString();
+        }
+      } else if (requestingUser.clinicId) {
         effectiveClinicId = requestingUser.clinicId.toString();
       } else if (requestingUser.complexId) {
         if (!effectiveClinicId) effectiveComplexId = requestingUser.complexId.toString();
