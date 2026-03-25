@@ -25,6 +25,32 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 export class CreateEmployeeDto {
   // User Information (for User schema)
   @ApiProperty({
+    description: 'Employee username (must be unique)',
+    example: 'john.doe',
+    type: String,
+  })
+  @Transform(({ value }) => value?.toLowerCase().trim())
+  @IsString({
+    message: JSON.stringify({
+      ar: 'اسم المستخدم يجب أن يكون نصاً',
+      en: 'Username must be a string',
+    }),
+  })
+  @IsNotEmpty({
+    message: JSON.stringify({
+      ar: 'اسم المستخدم مطلوب',
+      en: 'Username is required',
+    }),
+  })
+  @Matches(/^[a-zA-Z0-9._-]{3,30}$/, {
+    message: JSON.stringify({
+      ar: 'اسم المستخدم يجب أن يكون من 3 إلى 30 حرفاً ويمكن أن يحتوي على أحرف وأرقام و . _ - فقط',
+      en: 'Username must be 3-30 characters and can contain only letters, numbers, ., _, and -',
+    }),
+  })
+  username: string;
+
+  @ApiProperty({
     description: 'Employee email address (must be unique)',
     example: 'john.doe@cliniva.com',
     type: String,

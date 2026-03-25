@@ -169,6 +169,7 @@ describe('AuthService', () => {
 
   describe('register', () => {
     const registerDto: RegisterDto = {
+      username: 'test.user',
       email: 'test@example.com',
       password: 'SecurePass123!',
       firstName: 'John',
@@ -184,10 +185,11 @@ describe('AuthService', () => {
       const result = await service.register(registerDto);
 
       expect(mockUserModel.findOne).toHaveBeenCalledWith({
-        email: registerDto.email.toLowerCase(),
+        username: registerDto.username.toLowerCase(),
       });
       expect(result).toHaveProperty('access_token');
       expect(result).toHaveProperty('user');
+      expect(result.user.username).toBe(registerDto.username);
       expect(result.user.email).toBe(registerDto.email);
     });
 
@@ -215,7 +217,7 @@ describe('AuthService', () => {
 
   describe('login', () => {
     const loginDto: LoginDto = {
-      email: 'test@example.com',
+      username: 'test.user',
       password: 'SecurePass123!',
     };
     const ipAddress = '192.168.1.1';
@@ -235,10 +237,11 @@ describe('AuthService', () => {
       const result = await service.login(loginDto, ipAddress, userAgent);
 
       expect(mockUserModel.findOne).toHaveBeenCalledWith({
-        email: loginDto.email.toLowerCase(),
+        username: loginDto.username.toLowerCase(),
       });
       expect(result).toHaveProperty('access_token');
       expect(result).toHaveProperty('user');
+      expect(result.user.username).toBe(mockUser.username);
       expect(result.user.email).toBe(mockUser.email);
 
       // Verify audit logging for successful login
@@ -261,7 +264,7 @@ describe('AuthService', () => {
       expect(result.user.passwordChangeRequired).toBe(true);
     });
 
-    it('should throw UnauthorizedException for invalid email', async () => {
+    it('should throw UnauthorizedException for invalid username', async () => {
       mockUserModel.findOne.mockResolvedValue(null);
 
       await expect(
@@ -270,7 +273,7 @@ describe('AuthService', () => {
 
       // Verify audit logging for failed login
       expect(mockAuditService.logLoginFailure).toHaveBeenCalledWith(
-        loginDto.email,
+        loginDto.username,
         ipAddress,
         'invalid_credentials',
       );
@@ -286,7 +289,7 @@ describe('AuthService', () => {
 
       // Verify audit logging for failed login
       expect(mockAuditService.logLoginFailure).toHaveBeenCalledWith(
-        loginDto.email,
+        loginDto.username,
         ipAddress,
         'invalid_credentials',
       );
@@ -302,7 +305,7 @@ describe('AuthService', () => {
 
       // Verify audit logging for failed login
       expect(mockAuditService.logLoginFailure).toHaveBeenCalledWith(
-        loginDto.email,
+        loginDto.username,
         ipAddress,
         'account_inactive',
       );

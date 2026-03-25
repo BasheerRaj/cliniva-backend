@@ -27,6 +27,7 @@ export class AuthResponseDto {
     description: 'User information',
     example: {
       id: '507f1f77bcf86cd799439011',
+      username: 'john.doe',
       email: 'john.doe@example.com',
       firstName: 'John',
       lastName: 'Doe',
@@ -49,6 +50,7 @@ export class AuthResponseDto {
   })
   user: {
     id: string;
+    username: string;
     email: string;
     firstName: string;
     lastName: string;
@@ -79,6 +81,13 @@ export class UserProfileDto {
     type: String,
   })
   id: string;
+
+  @ApiProperty({
+    description: 'Unique username used for login',
+    example: 'john.doe',
+    type: String,
+  })
+  username: string;
 
   @ApiProperty({
     description: 'User email address',
@@ -270,6 +279,7 @@ export class UserProfileDto {
 
   constructor(user: User) {
     this.id = (user._id as any).toString();
+    this.username = user.username;
     this.email = user.email;
     this.firstName = user.firstName;
     this.lastName = user.lastName;

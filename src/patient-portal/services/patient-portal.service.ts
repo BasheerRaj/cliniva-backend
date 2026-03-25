@@ -51,6 +51,7 @@ export class PatientPortalService {
 
     // 3. Create User
     const user = new this.userModel({
+      username: registerDto.email.toLowerCase(),
       email: registerDto.email,
       passwordHash,
       firstName: registerDto.firstName,

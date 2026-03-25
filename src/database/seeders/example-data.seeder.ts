@@ -307,6 +307,7 @@ export class ExampleDataSeederService {
     let orgOwner = await this.userModel.findOne({ email: 'medicare.owner@example.com' });
     if (!orgOwner) {
       orgOwner = await this.userModel.create({
+        username: 'medicare.owner@example.com',
         email: 'medicare.owner@example.com',
         passwordHash: this.hashedPassword,
         firstName: 'Abdullah',
@@ -725,6 +726,7 @@ export class ExampleDataSeederService {
     let user = await this.userModel.findOne({ email: def.email });
     if (!user) {
       user = await this.userModel.create({
+        username: def.email.toLowerCase(),
         email: def.email,
         passwordHash: this.hashedPassword,
         firstName:    def.firstName,

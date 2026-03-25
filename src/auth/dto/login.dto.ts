@@ -1,5 +1,4 @@
 import {
-  IsEmail,
   IsNotEmpty,
   IsString,
   MinLength,
@@ -11,28 +10,24 @@ import { Transform } from 'class-transformer';
 
 export class LoginDto {
   @ApiProperty({
-    description: 'User email address',
-    example: 'john.doe@example.com',
+    description: 'Unique username',
+    example: 'john.doe',
     type: String,
-    format: 'email',
   })
   @Transform(({ value }) => value?.toLowerCase().trim())
-  @IsEmail(
-    {},
-    {
-      message: JSON.stringify({
-        ar: 'البريد الإلكتروني غير صالح',
-        en: 'Invalid email address',
-      }),
-    },
-  )
-  @IsNotEmpty({
+  @IsString({
     message: JSON.stringify({
-      ar: 'البريد الإلكتروني مطلوب',
-      en: 'Email is required',
+      ar: 'اسم المستخدم يجب أن يكون نصاً',
+      en: 'Username must be a string',
     }),
   })
-  email: string;
+  @IsNotEmpty({
+    message: JSON.stringify({
+      ar: 'اسم المستخدم مطلوب',
+      en: 'Username is required',
+    }),
+  })
+  username: string;
 
   @ApiProperty({
     description: 'User password',
