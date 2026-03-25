@@ -921,6 +921,30 @@ export class AppointmentService {
       });
     }
 
+    // N1: Reject past dates when updating appointment date/time
+    if (updateAppointmentDto.appointmentDate) {
+      const newDate = new Date(updateAppointmentDto.appointmentDate);
+      const newDateStr = newDate.toISOString().split('T')[0];
+      const timeStr =
+        updateAppointmentDto.appointmentTime ||
+        (existingAppointment.appointmentTime as string) ||
+        '00:00';
+      const [h, m] = timeStr.split(':').map(Number);
+      const appointmentDateTime = new Date(
+        `${newDateStr}T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00`,
+      );
+      const now = new Date();
+      if (appointmentDateTime < now) {
+        throw new BadRequestException({
+          message: {
+            ar: 'لا يمكن تحديث موعد إلى تاريخ أو وقت في الماضي',
+            en: 'Cannot update appointment to a past date or time',
+          },
+          code: 'PAST_DATE_NOT_ALLOWED',
+        });
+      }
+    }
+
     // Task 6.9: Re-validate entities and relationships when they change
     const doctorChanged =
       updateAppointmentDto.doctorId &&
