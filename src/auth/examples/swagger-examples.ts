@@ -10,6 +10,7 @@
 // ============================================================================
 
 export const REGISTER_REQUEST_EXAMPLE = {
+  username: 'john.doe',
   email: 'john.doe@example.com',
   password: 'SecurePass123!',
   firstName: 'John',
@@ -26,6 +27,7 @@ export const REGISTER_RESPONSE_EXAMPLE = {
   expires_in: 86400,
   user: {
     id: '507f1f77bcf86cd799439011',
+    username: 'john.doe',
     email: 'john.doe@example.com',
     firstName: 'John',
     lastName: 'Doe',
@@ -44,7 +46,7 @@ export const REGISTER_RESPONSE_EXAMPLE = {
 // ============================================================================
 
 export const LOGIN_REQUEST_EXAMPLE = {
-  email: 'john.doe@example.com',
+  username: 'john.doe',
   password: 'SecurePass123!',
 };
 
@@ -54,6 +56,7 @@ export const LOGIN_RESPONSE_EXAMPLE = {
   expires_in: 86400,
   user: {
     id: '507f1f77bcf86cd799439011',
+    username: 'john.doe',
     email: 'john.doe@example.com',
     firstName: 'John',
     lastName: 'Doe',
@@ -81,6 +84,7 @@ export const LOGIN_FIRST_TIME_RESPONSE_EXAMPLE = {
   expires_in: 86400,
   user: {
     id: '507f1f77bcf86cd799439011',
+    username: 'john.doe',
     email: 'john.doe@example.com',
     firstName: 'John',
     lastName: 'Doe',
@@ -110,6 +114,7 @@ export const FIRST_LOGIN_PASSWORD_CHANGE_RESPONSE_EXAMPLE = {
   expires_in: 86400,
   user: {
     id: '507f1f77bcf86cd799439011',
+    username: 'john.doe',
     email: 'john.doe@example.com',
     firstName: 'John',
     lastName: 'Doe',
@@ -189,6 +194,7 @@ export const REFRESH_TOKEN_RESPONSE_EXAMPLE = {
   expires_in: 86400,
   user: {
     id: '507f1f77bcf86cd799439011',
+    username: 'john.doe',
     email: 'john.doe@example.com',
     firstName: 'John',
     lastName: 'Doe',
@@ -205,6 +211,7 @@ export const REFRESH_TOKEN_RESPONSE_EXAMPLE = {
 
 export const GET_PROFILE_RESPONSE_EXAMPLE = {
   id: '507f1f77bcf86cd799439011',
+  username: 'john.doe',
   email: 'john.doe@example.com',
   firstName: 'John',
   lastName: 'Doe',

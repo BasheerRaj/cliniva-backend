@@ -4,6 +4,7 @@ import { AuthResponseDto, UserProfileDto } from '../../../src/auth/dto';
 // Mock User Document
 export const mockUser = {
   _id: '507f1f77bcf86cd799439011' as any,
+  username: 'test.user',
   email: 'test@example.com',
   passwordHash: '$2b$12$hashedPassword',
   firstName: 'John',
@@ -37,6 +38,7 @@ export const mockAuthResponse: AuthResponseDto = {
   expires_in: 86400,
   user: {
     id: '507f1f77bcf86cd799439011',
+    username: 'test.user',
     email: 'test@example.com',
     firstName: 'John',
     lastName: 'Doe',
@@ -49,6 +51,7 @@ export const mockAuthResponse: AuthResponseDto = {
 // Mock User Profile
 export const mockUserProfile: UserProfileDto = {
   id: '507f1f77bcf86cd799439011',
+  username: 'test.user',
   email: 'test@example.com',
   firstName: 'John',
   lastName: 'Doe',
@@ -95,6 +98,13 @@ export const mockJwtService = {
 // Mock Auth Service
 export const mockAuthService = {
   register: jest.fn().mockResolvedValue(mockAuthResponse),
+  checkUsernameAvailability: jest.fn().mockResolvedValue({
+    available: true,
+    message: {
+      ar: 'اسم المستخدم متاح',
+      en: 'Username is available',
+    },
+  }),
   login: jest.fn().mockResolvedValue(mockAuthResponse),
   refreshToken: jest.fn().mockResolvedValue(mockAuthResponse),
   getProfile: jest.fn().mockResolvedValue(mockUserProfile),
@@ -111,6 +121,7 @@ export const mockAuthService = {
 // Mock JWT Strategy User
 export const mockJwtUser = {
   id: '507f1f77bcf86cd799439011',
+  username: 'test.user',
   email: 'test@example.com',
   firstName: 'John',
   lastName: 'Doe',

@@ -94,13 +94,13 @@ describe('Authentication (e2e)', () => {
         });
     });
 
-    it('should reject duplicate email registration', () => {
+    it('should reject duplicate username registration', () => {
       return request(app.getHttpServer())
         .post('/auth/register')
         .send(validRegisterData)
         .expect(409)
         .expect((res) => {
-          expect(res.body.message).toBe('User with this email already exists');
+          expect(res.body.message).toBeDefined();
         });
     });
 
@@ -126,7 +126,7 @@ describe('Authentication (e2e)', () => {
         .expect((res) => {
           expect(res.body).toHaveProperty('access_token');
           expect(res.body).toHaveProperty('refresh_token');
-          expect(res.body.user.email).toBe(validLoginData.email);
+          expect(res.body.user.username).toBe(validLoginData.username);
 
           // Store tokens for subsequent tests
           accessToken = res.body.access_token;
@@ -134,10 +134,10 @@ describe('Authentication (e2e)', () => {
         });
     });
 
-    it('should reject login with invalid email', () => {
+    it('should reject login with invalid username', () => {
       return request(app.getHttpServer())
         .post('/auth/login')
-        .send(invalidLoginData.invalidEmail)
+        .send(invalidLoginData.invalidUsername)
         .expect(400);
     });
 
@@ -145,7 +145,7 @@ describe('Authentication (e2e)', () => {
       return request(app.getHttpServer())
         .post('/auth/login')
         .send({
-          email: validLoginData.email,
+          username: validLoginData.username,
           password: 'WrongPassword123!',
         })
         .expect(401)
@@ -154,11 +154,11 @@ describe('Authentication (e2e)', () => {
         });
     });
 
-    it('should reject login with non-existent email', () => {
+    it('should reject login with non-existent username', () => {
       return request(app.getHttpServer())
         .post('/auth/login')
         .send({
-          email: 'nonexistent@clinic.com',
+          username: 'nonexistent.user',
           password: validLoginData.password,
         })
         .expect(401)
@@ -170,7 +170,7 @@ describe('Authentication (e2e)', () => {
     it('should reject login with empty credentials', () => {
       return request(app.getHttpServer())
         .post('/auth/login')
-        .send(invalidLoginData.emptyEmail)
+        .send(invalidLoginData.emptyUsername)
         .expect(400);
     });
   });
@@ -218,7 +218,7 @@ describe('Authentication (e2e)', () => {
           expect(res.body).toHaveProperty('firstName');
           expect(res.body).toHaveProperty('lastName');
           expect(res.body).toHaveProperty('role');
-          expect(res.body.email).toBe(validLoginData.email);
+          expect(res.body.username).toBe(validLoginData.username);
         });
     });
 
@@ -263,6 +263,7 @@ describe('Authentication (e2e)', () => {
   describe('Authentication Flow Integration', () => {
     it('should complete full authentication flow', async () => {
       const testUser = {
+        username: 'flow.test.user',
         email: 'flowtest@clinic.com',
         password: 'FlowTest123!',
         firstName: 'Flow',

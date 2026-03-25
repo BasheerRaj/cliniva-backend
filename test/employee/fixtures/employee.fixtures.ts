@@ -7,6 +7,7 @@ import { UserRole } from '../../../src/common/enums/user-role.enum';
 
 // Admin user for testing
 export const adminUserData = {
+  username: 'admin.user',
   email: 'admin@clinic.com',
   password: 'AdminPass123!',
   firstName: 'Admin',
@@ -22,6 +23,7 @@ export const adminUserData = {
 
 // Employee user for testing
 export const employeeUserData = {
+  username: 'employee.user',
   email: 'employee@clinic.com',
   password: 'EmployeePass123!',
   firstName: 'Employee',

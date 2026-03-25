@@ -7,8 +7,11 @@ import { UserRole } from '../../common/enums/user-role.enum';
   collection: 'users',
 })
 export class User extends Document {
-  @Prop({ required: true, unique: true })
+  @Prop({ required: true, unique: true, lowercase: true, trim: true })
   email: string;
+
+  @Prop({ required: true, lowercase: true, trim: true })
+  username: string;
 
   @Prop({ required: true })
   passwordHash: string;
@@ -180,10 +183,19 @@ export class User extends Document {
 
 export const UserSchema = SchemaFactory.createForClass(User);
 
+// Backfill username for legacy accounts that only have email.
+UserSchema.pre('save', function (next) {
+  if (!this.username && this.email) {
+    this.username = this.email.toLowerCase().trim();
+  }
+  next();
+});
+
 // Indexes
 UserSchema.index({ role: 1 });
 UserSchema.index({ isActive: 1 });
 UserSchema.index({ emailVerified: 1 });
+UserSchema.index({ username: 1 }, { unique: true, sparse: true });
 UserSchema.index({ phone: 1 });
 UserSchema.index({ isActive: 1, role: 1 }); // Composite index for user management queries
 UserSchema.index({ clinicId: 1, role: 1, isActive: 1 }); // Composite index for clinic capacity queries

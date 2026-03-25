@@ -135,18 +135,38 @@ export class AuthService {
       // ==========================================
 
       // Check if user already exists
-      const existingUser = await this.userModel.findOne({
-        email: registerDto.email.toLowerCase(),
+      const normalizedUsername = registerDto.username.toLowerCase().trim();
+      const existingUserByUsername = await this.userModel.findOne({
+        username: normalizedUsername,
       });
 
-      if (existingUser) {
+      if (existingUserByUsername) {
         throw new ConflictException({
           message: {
-            ar: 'مستخدم بهذا البريد الإلكتروني موجود بالفعل',
-            en: 'User with this email already exists',
+            ar: 'اسم المستخدم مستخدم بالفعل',
+            en: 'Username is already taken',
           },
-          code: 'EMAIL_ALREADY_EXISTS',
+          code: 'USERNAME_ALREADY_EXISTS',
         });
+      }
+
+      const normalizedEmail = registerDto.email?.toLowerCase().trim();
+      const emailToStore = normalizedEmail || `${normalizedUsername}@cliniva.local`;
+
+      if (normalizedEmail) {
+        const existingUserByEmail = await this.userModel.findOne({
+          email: normalizedEmail,
+        });
+
+        if (existingUserByEmail) {
+          throw new ConflictException({
+            message: {
+              ar: 'مستخدم بهذا البريد الإلكتروني موجود بالفعل',
+              en: 'User with this email already exists',
+            },
+            code: 'EMAIL_ALREADY_EXISTS',
+          });
+        }
       }
 
       // Validate clinicId if provided
@@ -201,7 +221,8 @@ export class AuthService {
       // Create new user
       const newUser = new this.userModel({
         ...registerDto,
-        email: registerDto.email.toLowerCase(),
+        username: normalizedUsername,
+        email: emailToStore,
         passwordHash: hashedPassword,
         isActive: true,
         emailVerified: false,
@@ -258,6 +279,7 @@ export class AuthService {
         ...tokens,
         user: {
           id: (savedUser._id as any).toString(),
+          username: savedUser.username,
           email: savedUser.email,
           firstName: savedUser.firstName,
           lastName: savedUser.lastName,
@@ -322,6 +344,7 @@ export class AuthService {
         // Create new user if not found
         // Default role for OAuth users is 'patient' unless otherwise specified
         const newUser = new this.userModel({
+          username: providerData.email.toLowerCase(),
           email: providerData.email.toLowerCase(),
           firstName: providerData.firstName,
           lastName: providerData.lastName,
@@ -386,6 +409,7 @@ export class AuthService {
         ...tokens,
         user: {
           id: userId,
+          username: user.username,
           email: user.email,
           firstName: user.firstName,
           lastName: user.lastName,
@@ -425,16 +449,21 @@ export class AuthService {
     userAgent?: string,
   ): Promise<AuthResponseDto> {
     try {
-      // Find user by email
-      const user = await this.userModel.findOne({
-        email: loginDto.email.toLowerCase(),
-      });
+      const attemptedIdentifier = loginDto.username.toLowerCase().trim();
+
+      // Primary path: login by username
+      let user = await this.userModel.findOne({ username: attemptedIdentifier });
+
+      // Backward compatibility for older accounts without username
+      if (!user && attemptedIdentifier.includes('@')) {
+        user = await this.userModel.findOne({ email: attemptedIdentifier });
+      }
 
       if (!user) {
         // Log failed login attempt - Requirement 5.1
         if (ipAddress) {
           await this.auditService.logLoginFailure(
-            loginDto.email,
+            attemptedIdentifier,
             ipAddress,
             'invalid_credentials',
           );
@@ -453,7 +482,7 @@ export class AuthService {
         // Log failed login attempt - Requirement 5.1
         if (ipAddress) {
           await this.auditService.logLoginFailure(
-            loginDto.email,
+            attemptedIdentifier,
             ipAddress,
             'account_inactive',
           );
@@ -477,7 +506,7 @@ export class AuthService {
         // Log failed login attempt - Requirement 5.1
         if (ipAddress) {
           await this.auditService.logLoginFailure(
-            loginDto.email,
+            attemptedIdentifier,
             ipAddress,
             'invalid_credentials',
           );
@@ -563,6 +592,7 @@ export class AuthService {
         ...tokens,
         user: {
           id: userId,
+          username: user.username,
           email: user.email,
           firstName: user.firstName,
           lastName: user.lastName,
@@ -672,6 +702,7 @@ export class AuthService {
         ...tokens,
         user: {
           id: (user._id as any).toString(),
+          username: user.username,
           email: user.email,
           firstName: user.firstName,
           lastName: user.lastName,
@@ -788,6 +819,7 @@ export class AuthService {
     const payload = {
       sub: (user._id as any).toString(),
       id: (user._id as any).toString(),
+      username: user.username,
       email: user.email,
       role: user.role,
       // Include scope for tenant isolation
@@ -882,6 +914,7 @@ export class AuthService {
 
       return {
         userId: (user._id as any).toString(),
+        username: user.username,
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
@@ -910,6 +943,34 @@ export class AuthService {
         code: 'DEBUG_INFO_FAILED',
       });
     }
+  }
+
+  async checkUsernameAvailability(
+    username: string,
+  ): Promise<{ available: boolean; message: { ar: string; en: string } }> {
+    const normalizedUsername = username.toLowerCase().trim();
+
+    const existingUser = await this.userModel.findOne({
+      username: normalizedUsername,
+    });
+
+    if (existingUser) {
+      return {
+        available: false,
+        message: {
+          ar: 'اسم المستخدم مستخدم بالفعل',
+          en: 'Username is already taken',
+        },
+      };
+    }
+
+    return {
+      available: true,
+      message: {
+        ar: 'اسم المستخدم متاح',
+        en: 'Username is available',
+      },
+    };
   }
 
   /**
@@ -1056,6 +1117,7 @@ export class AuthService {
         ...tokens,
         user: {
           id: userId,
+          username: user.username,
           email: user.email,
           firstName: user.firstName,
           lastName: user.lastName,

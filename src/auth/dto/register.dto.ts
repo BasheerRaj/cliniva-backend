@@ -15,12 +15,39 @@ import { IsPhoneNumberWithCountryCode } from '../../common/decorators/phone-vali
 
 export class RegisterDto {
   @ApiProperty({
-    description: 'User email address',
+    description: 'Unique username used for login',
+    example: 'john.doe',
+    type: String,
+  })
+  @Transform(({ value }) => value?.toLowerCase().trim())
+  @IsString({
+    message: JSON.stringify({
+      ar: 'اسم المستخدم يجب أن يكون نصاً',
+      en: 'Username must be a string',
+    }),
+  })
+  @IsNotEmpty({
+    message: JSON.stringify({
+      ar: 'اسم المستخدم مطلوب',
+      en: 'Username is required',
+    }),
+  })
+  @Matches(/^[a-zA-Z0-9._-]{3,30}$/, {
+    message: JSON.stringify({
+      ar: 'اسم المستخدم يجب أن يكون من 3 إلى 30 حرفاً ويمكن أن يحتوي على أحرف وأرقام و . _ - فقط',
+      en: 'Username must be 3-30 characters and can contain only letters, numbers, ., _, and -',
+    }),
+  })
+  username: string;
+
+  @ApiPropertyOptional({
+    description: 'User email address (optional)',
     example: 'john.doe@example.com',
     type: String,
     format: 'email',
   })
   @Transform(({ value }) => value?.toLowerCase().trim())
+  @IsOptional()
   @IsEmail(
     {},
     {
@@ -30,13 +57,7 @@ export class RegisterDto {
       }),
     },
   )
-  @IsNotEmpty({
-    message: JSON.stringify({
-      ar: 'البريد الإلكتروني مطلوب',
-      en: 'Email is required',
-    }),
-  })
-  email: string;
+  email?: string;
 
   @ApiProperty({
     description:

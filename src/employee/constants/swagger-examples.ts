@@ -20,6 +20,7 @@ export const EMPLOYEE_SUCCESS_EXAMPLES = {
     success: true,
     data: {
       _id: '507f1f77bcf86cd799439011',
+      username: 'john.doe',
       email: 'john.doe@cliniva.com',
       firstName: 'John',
       lastName: 'Doe',
@@ -68,6 +69,7 @@ export const EMPLOYEE_SUCCESS_EXAMPLES = {
     success: true,
     data: {
       _id: '507f1f77bcf86cd799439011',
+      username: 'john.doe',
       email: 'john.doe@cliniva.com',
       firstName: 'John',
       lastName: 'Doe',
@@ -151,6 +153,7 @@ export const EMPLOYEE_SUCCESS_EXAMPLES = {
     success: true,
     data: {
       _id: '507f1f77bcf86cd799439011',
+      username: 'john.doe',
       email: 'john.doe@cliniva.com',
       firstName: 'John',
       lastName: 'Doe',
@@ -185,6 +188,7 @@ export const EMPLOYEE_SUCCESS_EXAMPLES = {
     data: [
       {
         _id: '507f1f77bcf86cd799439011',
+        username: 'john.doe',
         email: 'john.doe@cliniva.com',
         firstName: 'John',
         lastName: 'Doe',
@@ -199,6 +203,7 @@ export const EMPLOYEE_SUCCESS_EXAMPLES = {
       },
       {
         _id: '507f1f77bcf86cd799439015',
+        username: 'jane.smith',
         email: 'jane.smith@cliniva.com',
         firstName: 'Jane',
         lastName: 'Smith',
@@ -354,6 +359,24 @@ export const EMPLOYEE_ERROR_EXAMPLES = {
       details: {
         field: 'email',
         value: 'john.doe@cliniva.com',
+      },
+    },
+  },
+
+  /**
+   * Username already exists (409)
+   */
+  USERNAME_EXISTS: {
+    success: false,
+    error: {
+      code: ErrorCode.DUPLICATE_ENTRY,
+      message: {
+        ar: 'اسم المستخدم موجود بالفعل',
+        en: 'Username already exists',
+      },
+      details: {
+        field: 'username',
+        value: 'john.doe',
       },
     },
   },

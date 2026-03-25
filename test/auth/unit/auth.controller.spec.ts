@@ -46,6 +46,7 @@ describe('AuthController', () => {
 
   describe('register', () => {
     const registerDto: RegisterDto = {
+      username: 'test.user',
       email: 'test@example.com',
       password: 'SecurePass123!',
       firstName: 'John',
@@ -54,9 +55,9 @@ describe('AuthController', () => {
     };
 
     it('should register a new user', async () => {
-      const result = await controller.register(registerDto);
+      const result = await controller.register(registerDto, { user: null });
 
-      expect(authService.register).toHaveBeenCalledWith(registerDto);
+      expect(authService.register).toHaveBeenCalledWith(registerDto, null);
       expect(result).toEqual(mockAuthResponse);
     });
 
@@ -68,7 +69,7 @@ describe('AuthController', () => {
 
   describe('login', () => {
     const loginDto: LoginDto = {
-      email: 'test@example.com',
+      username: 'test.user',
       password: 'SecurePass123!',
     };
 
@@ -103,6 +104,23 @@ describe('AuthController', () => {
         'unknown',
       );
       expect(result).toEqual(mockAuthResponse);
+    });
+  });
+
+  describe('checkUsernameAvailability', () => {
+    it('should return username availability result', async () => {
+      const result = await controller.checkUsernameAvailability('test.user');
+
+      expect(authService.checkUsernameAvailability).toHaveBeenCalledWith(
+        'test.user',
+      );
+      expect(result).toEqual({
+        available: true,
+        message: {
+          ar: 'اسم المستخدم متاح',
+          en: 'Username is available',
+        },
+      });
     });
   });
 

@@ -3,6 +3,7 @@ import { UserRole } from '../../../src/common/enums/user-role.enum';
 
 // Valid test data
 export const validRegisterData: RegisterDto = {
+  username: 'doctor.user',
   email: 'doctor@clinic.com',
   password: 'SecurePass123!',
   firstName: 'John',
@@ -14,7 +15,7 @@ export const validRegisterData: RegisterDto = {
 };
 
 export const validLoginData: LoginDto = {
-  email: 'doctor@clinic.com',
+  username: 'doctor.user',
   password: 'SecurePass123!',
 };
 
@@ -47,17 +48,17 @@ export const invalidRegisterData = {
 };
 
 export const invalidLoginData = {
-  invalidEmail: {
+  invalidUsername: {
     ...validLoginData,
-    email: 'invalid-email',
+    username: 'a',
   },
   shortPassword: {
     ...validLoginData,
     password: '123',
   },
-  emptyEmail: {
+  emptyUsername: {
     ...validLoginData,
-    email: '',
+    username: '',
   },
   emptyPassword: {
     ...validLoginData,
@@ -69,31 +70,37 @@ export const invalidLoginData = {
 export const userRoleFixtures = {
   superAdmin: {
     ...validRegisterData,
+    username: 'superadmin.user',
     email: 'superadmin@clinic.com',
     role: UserRole.SUPER_ADMIN,
   },
   owner: {
     ...validRegisterData,
+    username: 'owner.user',
     email: 'owner@clinic.com',
     role: UserRole.OWNER,
   },
   admin: {
     ...validRegisterData,
+    username: 'admin.user',
     email: 'admin@clinic.com',
     role: UserRole.ADMIN,
   },
   doctor: {
     ...validRegisterData,
+    username: 'doctor.user',
     email: 'doctor@clinic.com',
     role: UserRole.DOCTOR,
   },
   staff: {
     ...validRegisterData,
+    username: 'staff.user',
     email: 'staff@clinic.com',
     role: UserRole.STAFF,
   },
   patient: {
     ...validRegisterData,
+    username: 'patient.user',
     email: 'patient@clinic.com',
     role: UserRole.PATIENT,
   },
@@ -117,6 +124,7 @@ export const tokenFixtures = {
 export const userDatabaseFixtures = {
   activeUser: {
     _id: '507f1f77bcf86cd799439011',
+    username: 'active.user',
     email: 'active@clinic.com',
     passwordHash: '$2b$12$validHashedPassword',
     firstName: 'Active',
@@ -131,6 +139,7 @@ export const userDatabaseFixtures = {
   },
   inactiveUser: {
     _id: '507f1f77bcf86cd799439012',
+    username: 'inactive.user',
     email: 'inactive@clinic.com',
     passwordHash: '$2b$12$validHashedPassword',
     firstName: 'Inactive',
@@ -144,6 +153,7 @@ export const userDatabaseFixtures = {
   },
   unverifiedUser: {
     _id: '507f1f77bcf86cd799439013',
+    username: 'unverified.user',
     email: 'unverified@clinic.com',
     passwordHash: '$2b$12$validHashedPassword',
     firstName: 'Unverified',
