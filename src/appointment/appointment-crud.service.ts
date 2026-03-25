@@ -11,6 +11,7 @@ import { Patient } from '../database/schemas/patient.schema';
 import { User } from '../database/schemas/user.schema';
 import { Clinic } from '../database/schemas/clinic.schema';
 import { Service } from '../database/schemas/service.schema';
+import { DoctorService } from '../database/schemas/doctor-service.schema';
 import { NotificationService } from '../notification/notification.service';
 import { AuditService } from '../auth/audit.service';
 import { AppointmentConflictService } from './appointment-conflict.service';
@@ -36,6 +37,8 @@ export class AppointmentCrudService {
     @InjectModel('User') private readonly userModel: Model<User>,
     @InjectModel('Clinic') private readonly clinicModel: Model<Clinic>,
     @InjectModel('Service') private readonly serviceModel: Model<Service>,
+    @InjectModel('DoctorService')
+    private readonly doctorServiceModel: Model<DoctorService>,
     private readonly conflictService: AppointmentConflictService,
     private readonly workingHoursService: AppointmentWorkingHoursService,
     private readonly notificationService: NotificationService,
@@ -131,9 +134,20 @@ export class AppointmentCrudService {
     // Note: This would require a service-clinic relationship check
     // For now, we assume the relationship is valid if both exist
 
-    // 7. Verify doctor is authorized for service (Requirement 1.7)
-    // Note: This would require a doctor-service authorization check
-    // For now, we assume the doctor is authorized if they are active
+    // 7. Verify doctor is authorized for service and not deactivated (Requirement 1.7)
+    const doctorAssignment = await this.doctorServiceModel.findOne({
+      doctorId: new Types.ObjectId(createAppointmentDto.doctorId),
+      serviceId: new Types.ObjectId(createAppointmentDto.serviceId),
+      clinicId: new Types.ObjectId(createAppointmentDto.clinicId),
+    });
+    if (doctorAssignment && !doctorAssignment.isActive) {
+      throw new BadRequestException({
+        message: {
+          ar: 'لا يمكن حجز موعد — الطبيب غير نشط لهذه الخدمة',
+          en: 'Cannot schedule appointment — doctor is deactivated for this service',
+        },
+      });
+    }
 
     // 8. Get service duration and set appointment duration (Requirement 1.8)
     const duration = service.durationMinutes || 30;

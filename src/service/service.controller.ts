@@ -199,23 +199,28 @@ export class ServiceController {
     const [service, assignedDoctors, { bySession, byDoctor }] = await Promise.all([
       this.serviceService.getService(id),
       this.serviceService.getAssignedDoctors(id),
-      this.serviceService.getActiveAppointmentMaps(id),
+      this.serviceService.getAppointmentMaps(id),
     ]);
 
     const enriched = await this.enrichServiceResponse(service);
 
-    // Attach activeAppointments to each session
-    const sessionsWithAppts = (enriched.sessions ?? []).map((session: any) => ({
-      ...session,
-      activeAppointments: bySession.get(session._id?.toString() ?? '') ?? [],
-    }));
+    // Attach activeAppointments + completedAppointments to each session
+    const sessionsWithAppts = (enriched.sessions ?? []).map((session: any) => {
+      const key = session._id?.toString() ?? '';
+      return {
+        ...session,
+        activeAppointments: bySession.active.get(key) ?? [],
+        completedAppointments: bySession.completed.get(key) ?? [],
+      };
+    });
 
-    // Attach activeAppointments to each assigned doctor
+    // Attach activeAppointments + completedAppointments to each assigned doctor
     const doctorsWithAppts = assignedDoctors.map((entry: any) => {
       const doctorId = entry.doctor?._id?.toString() ?? '';
       return {
         ...entry,
-        activeAppointments: byDoctor.get(doctorId) ?? [],
+        activeAppointments: byDoctor.active.get(doctorId) ?? [],
+        completedAppointments: byDoctor.completed.get(doctorId) ?? [],
       };
     });
 
@@ -224,6 +229,36 @@ export class ServiceController {
       sessions: sessionsWithAppts,
       assignedDoctors: doctorsWithAppts,
     };
+  }
+
+  /**
+   * Delete a single session from a service
+   */
+  @ApiOperation({
+    summary: 'Delete a session from a service',
+    description: 'Deletes a session. Blocked if any appointment (any status) references this session.',
+  })
+  @ApiParam({ name: 'id', description: 'Service ID', type: String })
+  @ApiParam({ name: 'sessionId', description: 'Session ID', type: String })
+  @ApiResponse({ status: 200, description: 'Session deleted successfully' })
+  @ApiResponse({ status: 409, description: 'Session has existing appointments' })
+  @ApiResponse({ status: 404, description: 'Service or session not found' })
+  @Roles(
+    UserRole.ADMIN,
+    UserRole.OWNER,
+    UserRole.SUPER_ADMIN,
+  )
+  @Delete(':id/sessions/:sessionId')
+  @HttpCode(HttpStatus.OK)
+  async deleteSession(
+    @Param('id') id: string,
+    @Param('sessionId') sessionId: string,
+  ): Promise<any> {
+    await this.serviceService.deleteSession(id, sessionId);
+    return ResponseBuilder.success(null, {
+      ar: 'تم حذف الجلسة بنجاح',
+      en: 'Session deleted successfully',
+    });
   }
 
   /**

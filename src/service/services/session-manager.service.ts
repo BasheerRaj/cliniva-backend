@@ -9,7 +9,6 @@ import { Appointment } from '../../database/schemas/appointment.schema';
 import { ServiceSessionDto } from '../dto/service-session.dto';
 import { ProcessedSession } from '../interfaces/processed-session.interface';
 import { SessionValidationService } from '../../appointment/services/session-validation.service';
-import { SESSION_ERROR_MESSAGES } from '../../appointment/constants/session-error-messages.constant';
 
 /**
  * SessionManagerService
@@ -121,13 +120,10 @@ export class SessionManagerService {
   // =========================================================================
 
   /**
-   * Prevents removal of sessions that still have active appointments.
+   * Prevents removal of sessions that have ANY appointment record (any status).
    *
-   * Active is defined as status IN ['scheduled', 'confirmed'].
-   * Completed, cancelled, and no-show appointments do NOT block removal.
-   *
-   * Throws ConflictException with bilingual error if any active appointment
-   * references one of the sessions being removed.
+   * Throws ConflictException with bilingual error if any appointment
+   * (regardless of status) references one of the sessions being removed.
    *
    * Requirements: 13.1, 13.2, 13.3, 13.4
    */
@@ -143,26 +139,28 @@ export class SessionManagerService {
       `Checking removal eligibility for ${sessionsToRemove.length} session(s) in service ${serviceId}`,
     );
 
-    const activeAppointment = await this.appointmentModel.findOne({
+    const existingAppointment = await this.appointmentModel.findOne({
       serviceId: new Types.ObjectId(serviceId),
       sessionId: { $in: sessionsToRemove },
-      status: { $in: ['scheduled', 'confirmed'] },
       isDeleted: { $ne: true },
     });
 
-    if (activeAppointment) {
+    if (existingAppointment) {
       throw new ConflictException({
-        message: SESSION_ERROR_MESSAGES.CANNOT_REMOVE_SESSION_WITH_ACTIVE_APPOINTMENTS,
-        code: 'CANNOT_REMOVE_SESSION_WITH_ACTIVE_APPOINTMENTS',
+        message: {
+          ar: 'لا يمكن إزالة الجلسة — توجد سجلات مواعيد مرتبطة بها',
+          en: 'Cannot remove session — it has existing appointment records',
+        },
+        code: 'CANNOT_REMOVE_SESSION_WITH_APPOINTMENTS',
         details: {
-          sessionId: activeAppointment.sessionId,
-          existingAppointmentId: (activeAppointment._id as Types.ObjectId).toString(),
-          existingAppointmentStatus: activeAppointment.status,
+          sessionId: existingAppointment.sessionId,
+          existingAppointmentId: (existingAppointment._id as Types.ObjectId).toString(),
+          existingAppointmentStatus: existingAppointment.status,
         },
       });
     }
 
-    this.logger.debug('Session removal validation passed — no active appointments found');
+    this.logger.debug('Session removal validation passed — no appointments found');
   }
 
   // =========================================================================

@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ConflictException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -698,7 +699,6 @@ export class ServiceService {
     const doctorServices = await this.doctorServiceModel
       .find({
         serviceId: new Types.ObjectId(serviceId),
-        isActive: true,
       })
       .populate('doctorId', 'firstName lastName email role profilePicture')
       .populate('clinicId', 'name')
@@ -713,59 +713,87 @@ export class ServiceService {
         clinic: plain.clinicId,
         isActive: plain.isActive,
         assignedAt: plain.createdAt,
+        deactivatedAt: plain.deactivatedAt ?? null,
       };
     });
   }
 
   /**
-   * Fetch all active (scheduled/confirmed/in_progress) appointments for a service.
-   * Returns two Maps for O(1) lookup when enriching sessions and doctors:
-   *   - bySession: sessionId → appointment[]
-   *   - byDoctor:  doctorId  → appointment[]
+   * Fetch active (scheduled/confirmed/in_progress) and completed appointments for a service.
+   * Returns separate Maps for O(1) lookup when enriching sessions and doctors:
+   *   - bySession: { active: Map<sessionId, appt[]>, completed: Map<sessionId, appt[]> }
+   *   - byDoctor:  { active: Map<doctorId, appt[]>, completed: Map<doctorId, appt[]> }
    */
-  async getActiveAppointmentMaps(serviceId: string): Promise<{
-    bySession: Map<string, any[]>;
-    byDoctor: Map<string, any[]>;
+  async getAppointmentMaps(serviceId: string): Promise<{
+    bySession: { active: Map<string, any[]>; completed: Map<string, any[]> };
+    byDoctor: { active: Map<string, any[]>; completed: Map<string, any[]> };
   }> {
     const appointments = await this.appointmentModel
       .find({
         serviceId: new Types.ObjectId(serviceId),
-        status: { $in: ['scheduled', 'confirmed', 'in_progress'] },
+        status: { $in: ['scheduled', 'confirmed', 'in_progress', 'completed'] },
       })
       .populate('patientId', 'firstName lastName patientNumber phone')
       .populate('doctorId', 'firstName lastName')
       .select(
-        '_id sessionId doctorId patientId appointmentDate appointmentTime durationMinutes status urgency clinicId',
+        '_id sessionId doctorId patientId appointmentDate appointmentTime durationMinutes status urgency clinicId updatedAt',
       )
       .lean()
       .exec();
 
-    const bySession = new Map<string, any[]>();
-    const byDoctor = new Map<string, any[]>();
+    const bySessionActive = new Map<string, any[]>();
+    const bySessionCompleted = new Map<string, any[]>();
+    const byDoctorActive = new Map<string, any[]>();
+    const byDoctorCompleted = new Map<string, any[]>();
 
     for (const appt of appointments) {
-      const shape = this.shapeActiveAppointment(appt);
+      const shape = this.shapeAppointment(appt);
+      const isCompleted = appt.status === 'completed';
 
       // Group by sessionId
       if (appt.sessionId) {
-        const list = bySession.get(appt.sessionId) ?? [];
-        list.push(shape);
-        bySession.set(appt.sessionId, list);
+        const key = appt.sessionId.toString();
+        if (isCompleted) {
+          const list = bySessionCompleted.get(key) ?? [];
+          list.push(shape);
+          bySessionCompleted.set(key, list);
+        } else {
+          const list = bySessionActive.get(key) ?? [];
+          list.push(shape);
+          bySessionActive.set(key, list);
+        }
       }
 
       // Group by doctorId
       const doctorKey = appt.doctorId?._id?.toString() ?? appt.doctorId?.toString();
       if (doctorKey) {
-        const list = byDoctor.get(doctorKey) ?? [];
-        list.push(shape);
-        byDoctor.set(doctorKey, list);
+        if (isCompleted) {
+          const list = byDoctorCompleted.get(doctorKey) ?? [];
+          list.push(shape);
+          byDoctorCompleted.set(doctorKey, list);
+        } else {
+          const list = byDoctorActive.get(doctorKey) ?? [];
+          list.push(shape);
+          byDoctorActive.set(doctorKey, list);
+        }
       }
     }
 
-    return { bySession, byDoctor };
+    // Limit completed to last 10 per session/doctor (sorted by date desc)
+    for (const [key, list] of bySessionCompleted) {
+      bySessionCompleted.set(key, list.slice(0, 10));
+    }
+    for (const [key, list] of byDoctorCompleted) {
+      byDoctorCompleted.set(key, list.slice(0, 10));
+    }
+
+    return {
+      bySession: { active: bySessionActive, completed: bySessionCompleted },
+      byDoctor: { active: byDoctorActive, completed: byDoctorCompleted },
+    };
   }
 
-  private shapeActiveAppointment(appt: any): any {
+  private shapeAppointment(appt: any): any {
     const patient = appt.patientId as any;
     const doctor = appt.doctorId as any;
     return {
@@ -1253,6 +1281,62 @@ export class ServiceService {
         // Ignore duplicate key races.
       }
     }
+  }
+
+  /**
+   * Delete a single session from a service.
+   * Blocks deletion if ANY appointment (any status) references this session.
+   */
+  async deleteSession(serviceId: string, sessionId: string): Promise<void> {
+    const service = await this.serviceModel.findOne({
+      _id: new Types.ObjectId(serviceId),
+      deletedAt: { $exists: false },
+    });
+    if (!service) {
+      throw new NotFoundException({
+        message: { ar: 'الخدمة غير موجودة', en: 'Service not found' },
+      });
+    }
+
+    const sessionExists = (service as any).sessions?.some(
+      (s: any) => s._id?.toString() === sessionId,
+    );
+    if (!sessionExists) {
+      throw new NotFoundException({
+        message: { ar: 'الجلسة غير موجودة', en: 'Session not found' },
+      });
+    }
+
+    const appointmentCount = await this.appointmentModel.countDocuments({
+      serviceId: new Types.ObjectId(serviceId),
+      sessionId: new Types.ObjectId(sessionId),
+      isDeleted: { $ne: true },
+    });
+
+    if (appointmentCount > 0) {
+      throw new ConflictException({
+        message: {
+          ar: 'لا يمكن حذف الجلسة — توجد سجلات مواعيد مرتبطة بها',
+          en: 'Cannot delete session — it has existing appointment records',
+        },
+        code: 'CANNOT_DELETE_SESSION_WITH_APPOINTMENTS',
+      });
+    }
+
+    // Remove the session and unset any nextSessionId references pointing to it
+    await this.serviceModel.updateOne(
+      { _id: new Types.ObjectId(serviceId) },
+      {
+        $pull: { sessions: { _id: new Types.ObjectId(sessionId) } } as any,
+      },
+    );
+
+    // Clear nextSessionId references pointing to deleted session
+    await this.serviceModel.updateOne(
+      { _id: new Types.ObjectId(serviceId), 'sessions.nextSessionId': sessionId },
+      { $unset: { 'sessions.$[elem].nextSessionId': '' } } as any,
+      { arrayFilters: [{ 'elem.nextSessionId': sessionId }] },
+    );
   }
 
   async deleteService(serviceId: string, userId?: string): Promise<void> {
