@@ -9,6 +9,7 @@ import {
   HttpStatus,
   ValidationPipe,
   Param,
+  Query,
   BadRequestException,
   UnauthorizedException,
   Logger,
@@ -122,6 +123,7 @@ export class AuthController {
       admin_creation: {
         summary: 'Create admin (requires owner/super_admin auth)',
         value: {
+          username: 'admin.user',
           email: 'admin@example.com',
           password: 'Admin123!',
           firstName: 'Admin',
@@ -155,7 +157,7 @@ export class AuthController {
   })
   @ApiResponse({
     status: 409,
-    description: 'Email already exists',
+    description: 'Username or email already exists',
     schema: {
       example: ERROR_EMAIL_EXISTS_EXAMPLE,
     },
@@ -184,6 +186,57 @@ export class AuthController {
     return this.authService.register(registerDto, creatorUser);
   }
 
+  @Get('check-username')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Check username availability',
+    description:
+      'Validate whether a username is available before registration.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Username availability checked successfully',
+    schema: {
+      example: {
+        available: true,
+        message: {
+          ar: 'اسم المستخدم متاح',
+          en: 'Username is available',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid username',
+  })
+  async checkUsernameAvailability(
+    @Query('username') username: string,
+  ): Promise<{ available: boolean; message: { ar: string; en: string } }> {
+    if (!username || typeof username !== 'string' || !username.trim()) {
+      throw new BadRequestException({
+        message: {
+          ar: 'اسم المستخدم مطلوب',
+          en: 'Username is required',
+        },
+        code: 'INVALID_USERNAME',
+      });
+    }
+
+    const normalizedUsername = username.trim();
+    if (!/^[a-zA-Z0-9._-]{3,30}$/.test(normalizedUsername)) {
+      throw new BadRequestException({
+        message: {
+          ar: 'صيغة اسم المستخدم غير صالحة',
+          en: 'Invalid username format',
+        },
+        code: 'INVALID_USERNAME_FORMAT',
+      });
+    }
+
+    return this.authService.checkUsernameAvailability(normalizedUsername);
+  }
+
   /**
    * Login user
    *
@@ -199,7 +252,7 @@ export class AuthController {
   @ApiOperation({
     summary: 'Login user',
     description:
-      'Authenticate user with email and password. Returns access and refresh tokens. Rate limited to 10 attempts per 15 minutes per IP address.',
+      'Authenticate user with username and password. Returns access and refresh tokens. Rate limited to 10 attempts per 15 minutes per IP address.',
   })
   @ApiBody({
     type: LoginDto,

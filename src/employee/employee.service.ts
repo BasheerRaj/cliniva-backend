@@ -146,6 +146,15 @@ export class EmployeeService {
 
     // For creation, validate required fields and uniqueness
     if (!isUpdate) {
+      // Check username uniqueness
+      const existingUserByUsername = await this.userModel.findOne({
+        username: createDto.username.toLowerCase().trim(),
+      });
+
+      if (existingUserByUsername) {
+        throw new ConflictException('Username already exists');
+      }
+
       // Check email uniqueness
       const existingUserByEmail = await this.userModel.findOne({
         email: createDto.email,
@@ -409,7 +418,7 @@ export class EmployeeService {
     createdByUserId?: string,
     subscription?: any,
   ): Promise<any> {
-    this.logger.log(`Creating employee: ${createEmployeeDto.email}`);
+    this.logger.log(`Creating employee: ${createEmployeeDto.username}`);
 
     // Validate employee data (existing validation)
     await this.validateEmployeeData(createEmployeeDto);
@@ -484,6 +493,7 @@ export class EmployeeService {
 
     // Create user account
     const userData = {
+      username: createEmployeeDto.username.toLowerCase().trim(),
       email: createEmployeeDto.email,
       passwordHash: hashedPassword,
       firstName: createEmployeeDto.firstName,

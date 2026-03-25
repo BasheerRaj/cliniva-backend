@@ -138,6 +138,7 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
       request.user = {
         ...user,
         // Core user data
+        username: userDoc.username,
         email: userDoc.email,
         firstName: userDoc.firstName,
         lastName: userDoc.lastName,

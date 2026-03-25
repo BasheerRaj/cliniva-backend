@@ -102,6 +102,7 @@ export class EntitiesSeederService {
       let doctor = await this.userModel.findOne({ email: doctorEmail });
       if (!doctor) {
         doctor = await this.userModel.create({
+          username: doctorEmail,
           email: doctorEmail,
           passwordHash: hashedPassword,
           firstName: 'Ahmed',
@@ -182,6 +183,7 @@ export class EntitiesSeederService {
     });
     if (!companyOwner) {
       users.companyOwner = await this.userModel.create({
+        username: 'company.owner@cliniva.com',
         email: 'company.owner@cliniva.com',
         passwordHash: hashedPassword,
         firstName: 'Ahmed',
@@ -203,6 +205,7 @@ export class EntitiesSeederService {
     });
     if (!complexOwner) {
       users.complexOwner = await this.userModel.create({
+        username: 'complex.owner@cliniva.com',
         email: 'complex.owner@cliniva.com',
         passwordHash: hashedPassword,
         firstName: 'Fatima',
@@ -224,6 +227,7 @@ export class EntitiesSeederService {
     });
     if (!clinicOwner) {
       users.clinicOwner = await this.userModel.create({
+        username: 'clinic.owner@cliniva.com',
         email: 'clinic.owner@cliniva.com',
         passwordHash: hashedPassword,
         firstName: 'Mohammed',
