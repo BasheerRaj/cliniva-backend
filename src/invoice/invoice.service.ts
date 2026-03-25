@@ -734,6 +734,125 @@ export class InvoiceService {
   }
 
   /**
+   * Get active patients who have at least one bookable invoice session for a clinic.
+   * Used by the appointment booking form to populate the patient dropdown.
+   * A session is "bookable" when activeSessionCount (booked/in_progress/completed) < totalSessions.
+   */
+  async getPatientsWithBookableInvoices(
+    clinicId: string,
+    search?: string,
+  ): Promise<{ _id: string; patientNumber: string; firstName: string; lastName: string; phone?: string; profilePicture?: string }[]> {
+    const invoices = await this.invoiceModel
+      .find({
+        clinicId: new Types.ObjectId(clinicId),
+        invoiceStatus: { $in: ['draft', 'posted'] },
+        paymentStatus: { $ne: 'paid' },
+        deletedAt: { $exists: false },
+      })
+      .populate('patientId', 'firstName lastName patientNumber phone profilePicture status')
+      .lean()
+      .exec();
+
+    // Keep only invoices that have at least one service with remaining capacity
+    const bookable = invoices.filter((inv: any) =>
+      (inv.services ?? []).some((svc: any) => {
+        const active = (svc.sessions ?? []).filter((s: any) =>
+          ['booked', 'in_progress', 'completed'].includes(s.sessionStatus),
+        ).length;
+        return active < (svc.totalSessions ?? 0);
+      }),
+    );
+
+    // Deduplicate patients; skip inactive or unpopulated patients
+    const patientMap = new Map<string, any>();
+    for (const inv of bookable) {
+      const p = inv.patientId as any;
+      if (!p?._id) continue;
+      if (p.status !== 'Active') continue;
+      const pid = p._id.toString();
+      if (!patientMap.has(pid)) {
+        patientMap.set(pid, {
+          _id: pid,
+          firstName: p.firstName ?? '',
+          lastName: p.lastName ?? '',
+          patientNumber: p.patientNumber ?? '',
+          phone: p.phone,
+          profilePicture: p.profilePicture,
+        });
+      }
+    }
+
+    let patients = Array.from(patientMap.values());
+
+    if (search?.trim()) {
+      const s = search.trim().toLowerCase();
+      patients = patients.filter((p) =>
+        p.firstName.toLowerCase().includes(s) ||
+        p.lastName.toLowerCase().includes(s) ||
+        `${p.firstName} ${p.lastName}`.toLowerCase().includes(s) ||
+        p.patientNumber.toLowerCase().includes(s),
+      );
+    }
+
+    return patients.sort((a, b) =>
+      `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`),
+    );
+  }
+
+  /**
+   * Get active patients who have at least one posted, unpaid/partially-paid invoice.
+   * Used by the payment form patient dropdown.
+   */
+  async getPatientsWithPayableInvoices(
+    search?: string,
+  ): Promise<{ _id: string; patientNumber: string; firstName: string; lastName: string; phone?: string; profilePicture?: string }[]> {
+    const invoices = await this.invoiceModel
+      .find({
+        invoiceStatus: 'posted',
+        paymentStatus: { $ne: 'paid' },
+        deletedAt: { $exists: false },
+      })
+      .populate('patientId', 'firstName lastName patientNumber phone profilePicture status')
+      .lean()
+      .exec();
+
+    // Deduplicate patients; skip inactive or unpopulated patients
+    const patientMap = new Map<string, any>();
+    for (const inv of invoices) {
+      const p = (inv as any).patientId as any;
+      if (!p?._id) continue;
+      if (p.status !== 'Active') continue;
+      const pid = p._id.toString();
+      if (!patientMap.has(pid)) {
+        patientMap.set(pid, {
+          _id: pid,
+          firstName: p.firstName ?? '',
+          lastName: p.lastName ?? '',
+          patientNumber: p.patientNumber ?? '',
+          phone: p.phone,
+          profilePicture: p.profilePicture,
+        });
+      }
+    }
+
+    let patients = Array.from(patientMap.values());
+
+    if (search?.trim()) {
+      const s = search.trim().toLowerCase();
+      patients = patients.filter((p) =>
+        p.firstName.toLowerCase().includes(s) ||
+        p.lastName.toLowerCase().includes(s) ||
+        `${p.firstName} ${p.lastName}`.toLowerCase().includes(s) ||
+        p.patientNumber.toLowerCase().includes(s),
+      );
+    }
+
+    return patients.sort((a, b) =>
+      `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`),
+    );
+  }
+
+  /**
    * Get ALL posted, unpaid/partially-paid invoices for a patient+clinic.
    * Used by the appointment booking flow to display the invoice list.
    */

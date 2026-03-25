@@ -370,6 +370,62 @@ export class InvoiceController {
   }
 
   /**
+   * Get patients who have at least one bookable invoice session for a clinic.
+   * Used by the appointment booking form patient dropdown.
+   * MUST be declared before GET ':id'.
+   *
+   * GET /invoices/bookable-patients?clinicId=...&search=...
+   */
+  @Get('bookable-patients')
+  @HttpCode(HttpStatus.OK)
+  @Roles(UserRole.STAFF, UserRole.ADMIN, UserRole.MANAGER, UserRole.OWNER, UserRole.DOCTOR)
+  @ApiOperation({ summary: 'List patients with bookable invoice sessions for a clinic' })
+  @ApiQuery({ name: 'clinicId', required: true, description: 'Clinic ID' })
+  @ApiQuery({ name: 'search', required: false, description: 'Search by patient name or number' })
+  @ApiResponse({ status: 200, description: 'Patients retrieved successfully' })
+  async getPatientsWithBookableInvoices(
+    @Query('clinicId') clinicId: string,
+    @Query('search') search?: string,
+  ) {
+    if (!clinicId) {
+      throw new BadRequestException({
+        message: { ar: 'معرف العيادة مطلوب', en: 'clinicId is required' },
+        code: 'MISSING_CLINIC_ID',
+      });
+    }
+    const patients = await this.invoiceService.getPatientsWithBookableInvoices(clinicId, search);
+    return {
+      success: true,
+      message: { ar: 'تم استرجاع المرضى بنجاح', en: 'Patients retrieved successfully' },
+      data: patients,
+    };
+  }
+
+  /**
+   * Get patients who have at least one posted, unpaid/partially-paid invoice.
+   * Used by the payment form patient dropdown.
+   * MUST be declared before GET ':id'.
+   *
+   * GET /invoices/payable-patients?search=...
+   */
+  @Get('payable-patients')
+  @HttpCode(HttpStatus.OK)
+  @Roles(UserRole.STAFF, UserRole.ADMIN, UserRole.MANAGER, UserRole.OWNER, UserRole.DOCTOR)
+  @ApiOperation({ summary: 'List patients with payable invoices' })
+  @ApiQuery({ name: 'search', required: false, description: 'Search by patient name or number' })
+  @ApiResponse({ status: 200, description: 'Patients retrieved successfully' })
+  async getPatientsWithPayableInvoices(
+    @Query('search') search?: string,
+  ) {
+    const patients = await this.invoiceService.getPatientsWithPayableInvoices(search);
+    return {
+      success: true,
+      message: { ar: 'تم استرجاع المرضى بنجاح', en: 'Patients retrieved successfully' },
+      data: patients,
+    };
+  }
+
+  /**
    * Transition a Draft invoice to Posted status.
    * PATCH /invoices/:id/post
    *

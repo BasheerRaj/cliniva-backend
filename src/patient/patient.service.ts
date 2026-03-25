@@ -441,7 +441,7 @@ export class PatientService {
     scope: PatientScopeContext,
     search?: string,
   ): Promise<{ _id: string; patientNumber: string; firstName: string; lastName: string; phone?: string; profilePicture?: string }[]> {
-    const filter: FilterQuery<Patient> = { deletedAt: { $exists: false } };
+    const filter: FilterQuery<Patient> = { deletedAt: { $exists: false }, status: 'Active' };
 
     // Scope resolution (reuse same logic as getPatients)
     const { role, complexId: jwtComplexId, organizationId, clinicId } = scope;

@@ -1170,6 +1170,13 @@ export class AppointmentService {
               { $set: { 'services.$[].sessions.$[item].sessionStatus': 'cancelled' } },
               { arrayFilters: [{ 'item.invoiceItemId': new Types.ObjectId(invoiceItemId) }] },
             );
+          } else {
+            // Fallback: match by appointmentId when invoiceItemId is not set on the session
+            await this.invoiceModel.updateOne(
+              { _id: appointment.invoiceId },
+              { $set: { 'services.$[].sessions.$[item].sessionStatus': 'cancelled' } },
+              { arrayFilters: [{ 'item.appointmentId': new Types.ObjectId(appointmentId) }] },
+            );
           }
         }
       } catch (err) {
@@ -1990,6 +1997,18 @@ export class AppointmentService {
       }
     }
 
+    // M7 Integration: When appointment is cancelled, update invoice session to 'cancelled'
+    if (statusDto.status === 'cancelled' && (updatedAppointment as any).invoiceId) {
+      try {
+        await this.updateInvoiceOnAppointmentCancellation(
+          (updatedAppointment as any).invoiceId.toString(),
+          appointmentId,
+        );
+      } catch (err) {
+        this.logger.error(`Failed to update invoice on appointment cancellation: ${err.message}`);
+      }
+    }
+
     return updatedAppointment;
   }
 
@@ -2057,6 +2076,55 @@ export class AppointmentService {
     this.logger.log(
       `Invoice ${invoiceId}: session completed, paidAmount=${newPaidAmount}, paymentStatus=${newPaymentStatus}`,
     );
+  }
+
+  /**
+   * M7 Integration: Mark invoice session as cancelled.
+   * Called when an appointment transitions to 'cancelled' via the status endpoint.
+   */
+  private async updateInvoiceOnAppointmentCancellation(
+    invoiceId: string,
+    appointmentId: string,
+  ): Promise<void> {
+    const invoice = await this.invoiceModel.findOne({
+      _id: new Types.ObjectId(invoiceId),
+      deletedAt: { $exists: false },
+    });
+    if (!invoice) {
+      this.logger.warn(`Invoice ${invoiceId} not found for cancellation update`);
+      return;
+    }
+
+    let serviceIndex = -1;
+    let sessionIndex = -1;
+    const services = invoice.services as any[];
+    for (let si = 0; si < services.length; si++) {
+      const sessions = services[si].sessions || [];
+      for (let idx = 0; idx < sessions.length; idx++) {
+        if (sessions[idx].appointmentId?.toString() === appointmentId) {
+          serviceIndex = si;
+          sessionIndex = idx;
+          break;
+        }
+      }
+      if (serviceIndex >= 0) break;
+    }
+
+    if (serviceIndex < 0) {
+      this.logger.warn(`No invoice session found for appointment ${appointmentId} in invoice ${invoiceId}`);
+      return;
+    }
+
+    await this.invoiceModel.updateOne(
+      { _id: invoice._id },
+      {
+        $set: {
+          [`services.${serviceIndex}.sessions.${sessionIndex}.sessionStatus`]: 'cancelled',
+        },
+      },
+    );
+
+    this.logger.log(`Invoice ${invoiceId}: session cancelled for appointment ${appointmentId}`);
   }
 
   // =========================================================================
@@ -2685,16 +2753,65 @@ export class AppointmentService {
       }
     }
 
-    // 5. Return only doctors that are NOT busy
-    return doctors
-      .filter((dr) => !busyDoctorIds.has(dr._id.toString()))
-      .map((dr) => ({
-        _id: dr._id.toString(),
-        name:
-          (dr as any).name ||
-          `${(dr as any).firstName || ''} ${(dr as any).lastName || ''}`.trim() ||
-          dr._id.toString(),
-      }));
+    // 5. Filter out busy doctors
+    const nonBusyDoctors = doctors.filter((dr) => !busyDoctorIds.has(dr._id.toString()));
+
+    // 6. Mirror the working-hours gate used in createAppointment:
+    //    Only filter by WH when BOTH clinic and doctor have WH configured.
+    const dateObj = new Date(year, month - 1, day);
+    const clinicWH = await this.workingHoursIntegrationService.getClinicWorkingHours(clinicId);
+    const clinicHasWH = clinicWH.length > 0;
+
+    const results = await Promise.all(
+      nonBusyDoctors.map(async (dr) => {
+        const drId = dr._id.toString();
+        if (clinicHasWH) {
+          const doctorWH = await this.workingHoursIntegrationService.getDoctorWorkingHours(drId);
+          if (doctorWH.length > 0) {
+            // Both have WH — validate effective hours just like createAppointment does
+            const effectiveHours =
+              await this.workingHoursIntegrationService.getEffectiveWorkingHours(
+                drId,
+                clinicId,
+                dateObj,
+              );
+            if (!effectiveHours) return null; // holiday or non-working day
+
+            const openMin = this.timeToMinutes(effectiveHours.openingTime);
+            const closeMin = this.timeToMinutes(effectiveHours.closingTime);
+
+            // Slot must fit within working hours
+            if (slotStart < openMin || slotEnd > closeMin) return null;
+
+            // Slot must not overlap break
+            if (effectiveHours.breakStartTime && effectiveHours.breakEndTime) {
+              const brkStart = this.timeToMinutes(effectiveHours.breakStartTime);
+              const brkEnd = this.timeToMinutes(effectiveHours.breakEndTime);
+              const overlapsBreak =
+                (slotStart >= brkStart && slotStart < brkEnd) ||
+                (slotEnd > brkStart && slotEnd <= brkEnd) ||
+                (slotStart <= brkStart && slotEnd >= brkEnd);
+              if (overlapsBreak) return null;
+            }
+          }
+        }
+
+        return {
+          _id: drId,
+          name:
+            (dr as any).name ||
+            `${(dr as any).firstName || ''} ${(dr as any).lastName || ''}`.trim() ||
+            drId,
+        };
+      }),
+    );
+
+    return results.filter((d): d is { _id: string; name: string } => d !== null);
+  }
+
+  private timeToMinutes(time: string): number {
+    const [h, m] = time.split(':').map(Number);
+    return h * 60 + m;
   }
 
   /**
