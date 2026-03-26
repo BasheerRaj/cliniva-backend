@@ -27,6 +27,8 @@ export interface DropdownUser {
   email: string;
   role: string;
   isActive: boolean;
+  clinicID: string | null;
+  ClinicName: string | null;
 }
 
 /**
@@ -128,7 +130,8 @@ export class UserDropdownService {
       // Execute query with sorting by firstName, lastName
       const users = await this.userModel
         .find(query)
-        .select('_id firstName lastName email role isActive')
+        .select('_id firstName lastName email role isActive clinicId')
+        .populate('clinicId', 'name')
         .sort({ firstName: 1, lastName: 1 })
         .lean()
         .exec();
@@ -138,14 +141,25 @@ export class UserDropdownService {
       );
 
       // Map to DropdownUser interface
-      return users.map((user) => ({
-        _id: user._id.toString(),
-        firstName: user.firstName,
-        lastName: user.lastName,
-        email: user.email,
-        role: user.role,
-        isActive: user.isActive,
-      }));
+      return users.map((user) => {
+        const clinicRef = user.clinicId as any;
+        const clinicID = clinicRef ? String(clinicRef._id ?? clinicRef) : null;
+        const clinicName =
+          clinicRef && typeof clinicRef === 'object'
+            ? (clinicRef.name ?? null)
+            : null;
+
+        return {
+          _id: user._id.toString(),
+          firstName: user.firstName,
+          lastName: user.lastName,
+          email: user.email,
+          role: user.role,
+          isActive: user.isActive,
+          clinicID,
+          ClinicName: clinicName,
+        };
+      });
     } catch (error) {
       this.logger.error('Error getting users for dropdown:', error);
       throw error;

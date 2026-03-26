@@ -9,6 +9,7 @@ describe('UserDropdownService', () => {
   let userModel: jest.Mocked<Model<User>>;
   let mockQueryChain: {
     select: jest.Mock;
+    populate: jest.Mock;
     sort: jest.Mock;
     lean: jest.Mock;
     exec: jest.Mock;
@@ -22,6 +23,7 @@ describe('UserDropdownService', () => {
     userModel = createMockModel() as any;
     mockQueryChain = {
       select: jest.fn().mockReturnThis(),
+      populate: jest.fn().mockReturnThis(),
       sort: jest.fn().mockReturnThis(),
       lean: jest.fn().mockReturnThis(),
       exec: jest.fn(),
@@ -94,6 +96,39 @@ describe('UserDropdownService', () => {
       clinicId: {
         $in: [new Types.ObjectId(clinicId1), new Types.ObjectId(clinicId2)],
       },
+    });
+  });
+
+  it('should include clinicID and ClinicName in response', async () => {
+    const clinicObjectId = new Types.ObjectId();
+    const userId = new Types.ObjectId();
+
+    mockQueryChain.exec.mockResolvedValue([
+      {
+        _id: userId,
+        firstName: 'Nora',
+        lastName: 'Al-Sulaiman',
+        email: 'doctor2.1a@medicare.example.com',
+        role: 'doctor',
+        isActive: true,
+        clinicId: {
+          _id: clinicObjectId,
+          name: 'Cardiology Clinic',
+        },
+      },
+    ] as any);
+
+    const result = await service.getUsersForDropdown({ role: 'doctor' });
+
+    expect(result[0]).toMatchObject({
+      _id: userId.toString(),
+      firstName: 'Nora',
+      lastName: 'Al-Sulaiman',
+      email: 'doctor2.1a@medicare.example.com',
+      role: 'doctor',
+      isActive: true,
+      clinicID: clinicObjectId.toString(),
+      ClinicName: 'Cardiology Clinic',
     });
   });
 });
