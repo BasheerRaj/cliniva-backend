@@ -251,7 +251,12 @@ export class InvoiceController {
     description: 'Unauthorized - Invalid or missing token',
   })
   async getInvoices(@Query() query: InvoiceQueryDto, @Request() req: any) {
-    const result = await this.invoiceService.getInvoices(query);
+    const result = await this.invoiceService.getInvoices(
+      query,
+      req.user?.role,
+      req.user?.subscriptionId,
+      req.user?.clinicId,
+    );
 
     return {
       success: true,
@@ -416,8 +421,14 @@ export class InvoiceController {
   @ApiResponse({ status: 200, description: 'Patients retrieved successfully' })
   async getPatientsWithPayableInvoices(
     @Query('search') search?: string,
+    @Request() req?: any,
   ) {
-    const patients = await this.invoiceService.getPatientsWithPayableInvoices(search);
+    const patients = await this.invoiceService.getPatientsWithPayableInvoices(
+      search,
+      req?.user?.role,
+      req?.user?.clinicId,
+      req?.user?.subscriptionId,
+    );
     return {
       success: true,
       message: { ar: 'تم استرجاع المرضى بنجاح', en: 'Patients retrieved successfully' },

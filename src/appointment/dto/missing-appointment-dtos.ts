@@ -43,6 +43,8 @@ export class AppointmentSearchQueryDto {
   @ApiPropertyOptional() @IsOptional() @IsString() clinicIds?: string;
   /** Comma-separated doctor IDs for multi-select filter */
   @ApiPropertyOptional() @IsOptional() @IsString() doctorIds?: string;
+  /** Filter by complex ID — resolves to all clinics under that complex */
+  @ApiPropertyOptional() @IsOptional() @IsString() complexId?: string;
 }
 
 /**

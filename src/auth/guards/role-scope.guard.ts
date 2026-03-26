@@ -46,6 +46,10 @@ export class RoleScopeGuard implements CanActivate {
         break;
 
       case UserRole.ADMIN:
+        // Admins are scoped to their assigned clinic
+        this.applyAdminScope(request, user);
+        break;
+
       case UserRole.MANAGER:
       case UserRole.OWNER:
       case UserRole.SUPER_ADMIN:
@@ -89,8 +93,37 @@ export class RoleScopeGuard implements CanActivate {
   }
 
   /**
+   * Apply admin scope restriction
+   *
+   * Security: Admins can ONLY view data for their assigned clinic
+   * Override any clinicId provided in query to prevent cross-clinic access
+   */
+  private applyAdminScope(request: any, user: any): void {
+    if (!user.clinicId) {
+      this.logger.warn(
+        `Admin user ${user.id} has no assigned clinic - denying access`,
+      );
+      request.query.clinicId = 'none';
+      return;
+    }
+
+    const originalClinicId = request.query.clinicId;
+    request.query.clinicId = user.clinicId.toString();
+
+    if (originalClinicId && originalClinicId !== user.clinicId.toString()) {
+      this.logger.warn(
+        `Admin ${user.id} attempted to access data for clinic ${originalClinicId} - request blocked`,
+      );
+    }
+
+    this.logger.debug(
+      `Applied admin scope: clinicId=${user.clinicId} for user ${user.id}`,
+    );
+  }
+
+  /**
    * Apply staff scope restriction
-   * 
+   *
    * Security: Staff can ONLY view appointments for their assigned clinic
    * Override any clinicId provided in query to prevent privilege escalation
    */

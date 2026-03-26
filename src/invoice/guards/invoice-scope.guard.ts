@@ -99,16 +99,30 @@ export class InvoiceScopeGuard implements CanActivate {
 
   /**
    * Apply admin/manager scope restriction
-   * 
-   * Admin/Manager can view invoices for clinics they have access to
-   * If clinicId is provided in query, use it (assuming access control is handled elsewhere)
-   * If not provided, they see all accessible clinics
+   *
+   * Admins and Managers are scoped to their assigned clinic.
+   * Override any clinicId provided in query to prevent cross-clinic access.
    */
   private applyAdminScope(request: any, user: any): void {
-    // Admin/Manager can filter by clinicId if they want
-    // Access control for specific clinics should be handled by user access records
+    if (!user.clinicId) {
+      this.logger.warn(
+        `Admin/Manager user ${user.id} has no assigned clinic - denying access`,
+      );
+      request.query.clinicId = 'none';
+      return;
+    }
+
+    const originalClinicId = request.query.clinicId;
+    request.query.clinicId = user.clinicId.toString();
+
+    if (originalClinicId && originalClinicId !== user.clinicId.toString()) {
+      this.logger.warn(
+        `Admin/Manager ${user.id} attempted to access invoices for clinic ${originalClinicId} - request blocked`,
+      );
+    }
+
     this.logger.debug(
-      `Admin/Manager ${user.id} accessing invoices with provided filters`,
+      `Applied admin scope: clinicId=${user.clinicId} for user ${user.id}`,
     );
   }
 }

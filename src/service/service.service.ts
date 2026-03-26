@@ -464,16 +464,61 @@ export class ServiceService {
   }
 
   async getAllServicesPaginated(
-    complexId?: string,
+    complexIdParam?: string,
     options?: PaginationOptions,
+    userRole?: string,
+    userComplexId?: string,
+    userClinicId?: string,
+    subscriptionId?: string,
   ): Promise<PaginatedResult<Service>> {
     const query: any = {
       deletedAt: { $exists: false },
     };
 
-    if (complexId) {
-      query.complexId = new Types.ObjectId(complexId);
+    if (complexIdParam && Types.ObjectId.isValid(complexIdParam)) {
+      // Explicit complexId filter (e.g., owner narrowing to a specific complex)
+      query.complexId = new Types.ObjectId(complexIdParam);
+    } else if (
+      userRole === 'admin' || userRole === 'manager' ||
+      userRole === 'staff' || userRole === 'doctor'
+    ) {
+      // Resolve the complex for this user: prefer direct complexId, fallback to clinic lookup
+      let effectiveComplexId = userComplexId && Types.ObjectId.isValid(userComplexId)
+        ? userComplexId
+        : null;
+
+      if (!effectiveComplexId && userClinicId && Types.ObjectId.isValid(userClinicId)) {
+        const clinic = await this.clinicModel
+          .findById(new Types.ObjectId(userClinicId))
+          .select('complexId')
+          .lean();
+        effectiveComplexId = (clinic as any)?.complexId?.toString() || null;
+      }
+
+      if (effectiveComplexId) {
+        // { complexId: null } matches both absent-field and explicitly-null docs (global services)
+        query.$or = [
+          { complexId: new Types.ObjectId(effectiveComplexId) },
+          { complexId: null },
+        ];
+      } else {
+        // Scoped role but no complex found — deny all
+        query._id = new Types.ObjectId('000000000000000000000000');
+      }
+    } else if (userRole === 'owner' && subscriptionId && Types.ObjectId.isValid(subscriptionId)) {
+      // Owner: services for all complexes under their subscription + global
+      const ownerComplexes = await this.complexModel
+        .find({ subscriptionId: new Types.ObjectId(subscriptionId), deletedAt: { $exists: false } })
+        .select('_id').lean();
+      const ownerComplexIds = ownerComplexes.map((c: any) => c._id);
+      if (ownerComplexIds.length > 0) {
+        query.$or = [
+          { complexId: { $in: ownerComplexIds } },
+          { complexId: null },
+        ];
+      }
     }
+    // super_admin / owner without subscription → unrestricted
 
     return this.getPaginatedServicesByQuery(query, options);
   }
@@ -845,6 +890,7 @@ export class ServiceService {
 
     return {
       ...plain,
+      description: plain?.description ?? null,
       requiredEquipment: plain?.requiredEquipment ?? null,
       complexName,
       clinicsNames,

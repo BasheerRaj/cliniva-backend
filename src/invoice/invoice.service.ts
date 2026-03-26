@@ -210,13 +210,35 @@ export class InvoiceService {
    */
   async getInvoices(
     queryDto: InvoiceQueryDto,
+    userRole?: string,
+    subscriptionId?: string,
+    userClinicId?: string,
   ): Promise<{ data: InvoiceResponseDto[]; meta: any }> {
     // Build query filter
     const filter: any = { deletedAt: { $exists: false } };
 
-    // clinicId is set by InvoiceScopeGuard based on user role
-    if (queryDto.clinicId) {
+    // Service-level scoping for clinic-bound roles (admin, manager, staff, doctor)
+    // Applied directly from req.user to bypass guard→DTO validation chain issues
+    if (
+      (userRole === 'admin' || userRole === 'manager' || userRole === 'staff' || userRole === 'doctor') &&
+      userClinicId && Types.ObjectId.isValid(userClinicId)
+    ) {
+      filter.clinicId = new Types.ObjectId(userClinicId);
+    } else if (queryDto.clinicId) {
+      // Fall back to query param (for owner/super_admin with explicit filter)
       filter.clinicId = new Types.ObjectId(queryDto.clinicId);
+    }
+
+    // Owner role scoping: owners see invoices for all their subscription's clinics
+    if (userRole === 'owner' && subscriptionId && !filter.clinicId) {
+      const ownerClinics = await this.clinicModel
+        .find({ subscriptionId: new Types.ObjectId(subscriptionId), deletedAt: { $exists: false } })
+        .select('_id')
+        .lean();
+      const ownerClinicIds = ownerClinics.map((c: any) => c._id);
+      if (ownerClinicIds.length > 0) {
+        filter.clinicId = { $in: ownerClinicIds };
+      }
     }
 
     // Support filtering by invoiceStatus
@@ -808,13 +830,34 @@ export class InvoiceService {
    */
   async getPatientsWithPayableInvoices(
     search?: string,
+    userRole?: string,
+    userClinicId?: string,
+    subscriptionId?: string,
   ): Promise<{ _id: string; patientNumber: string; firstName: string; lastName: string; phone?: string; profilePicture?: string }[]> {
+    const invoiceFilter: any = {
+      invoiceStatus: 'posted',
+      paymentStatus: { $ne: 'paid' },
+      deletedAt: { $exists: false },
+    };
+
+    // Scope to clinic for clinic-bound roles
+    if (
+      (userRole === 'admin' || userRole === 'manager' || userRole === 'staff' || userRole === 'doctor') &&
+      userClinicId && Types.ObjectId.isValid(userClinicId)
+    ) {
+      invoiceFilter.clinicId = new Types.ObjectId(userClinicId);
+    } else if (userRole === 'owner' && subscriptionId && Types.ObjectId.isValid(subscriptionId)) {
+      const ownerClinics = await this.clinicModel
+        .find({ subscriptionId: new Types.ObjectId(subscriptionId), deletedAt: { $exists: false } })
+        .select('_id').lean();
+      const ownerClinicIds = ownerClinics.map((c: any) => c._id);
+      if (ownerClinicIds.length > 0) {
+        invoiceFilter.clinicId = { $in: ownerClinicIds };
+      }
+    }
+
     const invoices = await this.invoiceModel
-      .find({
-        invoiceStatus: 'posted',
-        paymentStatus: { $ne: 'paid' },
-        deletedAt: { $exists: false },
-      })
+      .find(invoiceFilter)
       .populate('patientId', 'firstName lastName patientNumber phone profilePicture status')
       .lean()
       .exec();

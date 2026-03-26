@@ -615,6 +615,7 @@ export class AppointmentService {
     userId?: string,
     userRole?: string,
     userClinicId?: string,
+    subscriptionId?: string,
   ): Promise<{
     appointments: TransformedAppointment[];
     total: number;
@@ -650,6 +651,19 @@ export class AppointmentService {
     if (clinicId) filter.clinicId = new Types.ObjectId(clinicId);
     if (serviceId) filter.serviceId = new Types.ObjectId(serviceId);
 
+    // Complex filter: resolve to clinic IDs under that complex
+    const complexId = (query as any).complexId;
+    if (complexId && Types.ObjectId.isValid(complexId)) {
+      const complexClinics = await this.clinicModel
+        .find({ complexId: new Types.ObjectId(complexId), deletedAt: { $exists: false } })
+        .select('_id')
+        .lean();
+      const complexClinicIds = complexClinics.map((c: any) => c._id);
+      if (complexClinicIds.length > 0) {
+        filter.clinicId = { $in: complexClinicIds };
+      }
+    }
+
     // Multi-select filters (comma-separated IDs override single ID filters)
     if (clinicIds) {
       const ids = String(clinicIds).split(',').filter(Boolean);
@@ -678,7 +692,24 @@ export class AppointmentService {
     if (userRole === 'staff' && userClinicId) {
       filter.clinicId = new Types.ObjectId(userClinicId);
     }
-    
+
+    // Admin role scoping: admins can only see appointments for their assigned clinic
+    if (userRole === 'admin' && userClinicId) {
+      filter.clinicId = new Types.ObjectId(userClinicId);
+    }
+
+    // Owner role scoping: owners see appointments across all their subscription's clinics
+    if (userRole === 'owner' && subscriptionId) {
+      const ownerClinics = await this.clinicModel
+        .find({ subscriptionId: new Types.ObjectId(subscriptionId), deletedAt: { $exists: false } })
+        .select('_id')
+        .lean();
+      const ownerClinicIds = ownerClinics.map((c: any) => c._id);
+      if (ownerClinicIds.length > 0 && !filter.clinicId) {
+        filter.clinicId = { $in: ownerClinicIds };
+      }
+    }
+
     // Status validation (P2 - MEDIUM)
     if (status) {
       const validStatuses = ['scheduled', 'confirmed', 'in_progress', 'completed', 'cancelled', 'no_show'];

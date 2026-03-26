@@ -1005,11 +1005,17 @@ export class ServiceController {
   async getAllServices(
     @Query('complexId') complexId?: string,
     @Query() paginationQuery?: ServicePaginationQuery,
+    @Request() req?: any,
   ): Promise<PaginatedServiceResponse> {
     const pagination = this.parsePaginationQuery(paginationQuery);
+    const user = req?.user;
     const services = await this.serviceService.getAllServicesPaginated(
       complexId,
       pagination,
+      user?.role,
+      user?.complexId,
+      user?.clinicId,
+      user?.subscriptionId,
     );
 
     return this.enrichPaginatedServiceResponse(services);

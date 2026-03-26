@@ -448,20 +448,24 @@ export class PaymentService {
     userClinicId: string | null,
     userOrganizationId: string | null,
   ): Promise<{ data: PaymentResponseDto[]; meta: any }> {
-    const filter: any = {};
+    const filter: any = { deletedAt: { $exists: false } };
 
-    if (userRole === 'staff' || userRole === 'doctor') {
-      // Clinic-level scope
-      if (userClinicId) {
-        filter.clinicId = new Types.ObjectId(userClinicId);
-      }
-    } else if (userRole === 'admin' || userRole === 'manager') {
-      // Org-level scope — see all payments in their organization
-      if (userOrganizationId) {
-        filter.organizationId = new Types.ObjectId(userOrganizationId);
-      }
+    // Clinic scoping — applied directly from req.user, not from query params,
+    // to prevent privilege escalation via query param injection.
+    if (
+      (userRole === 'staff' || userRole === 'doctor' || userRole === 'admin' || userRole === 'manager') &&
+      userClinicId && Types.ObjectId.isValid(userClinicId)
+    ) {
+      // Hard-lock to user's assigned clinic
+      filter.clinicId = new Types.ObjectId(userClinicId);
+    } else if (userRole === 'staff' || userRole === 'doctor' || userRole === 'admin' || userRole === 'manager') {
+      // Scoped role with no clinic assigned — deny all
+      filter._id = new Types.ObjectId('000000000000000000000000');
+    } else if (queryDto.clinicId && Types.ObjectId.isValid(queryDto.clinicId)) {
+      // Owner/super_admin: optional explicit filter by clinicId
+      filter.clinicId = new Types.ObjectId(queryDto.clinicId);
     }
-    // owner / super_admin → no scope filter
+    // owner / super_admin without clinicId filter → unrestricted
 
     if (queryDto.paymentMethod) {
       filter.paymentMethod = queryDto.paymentMethod;
@@ -479,10 +483,6 @@ export class PaymentService {
 
     if (queryDto.patientId) {
       filter.patientId = new Types.ObjectId(queryDto.patientId);
-    }
-
-    if (queryDto.clinicId) {
-      filter.clinicId = new Types.ObjectId(queryDto.clinicId);
     }
 
     if (queryDto.search) {

@@ -10,6 +10,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types, FilterQuery } from 'mongoose';
 import { Patient } from '../database/schemas/patient.schema';
 import { Appointment } from '../database/schemas/appointment.schema';
+import { Invoice } from '../database/schemas/invoice.schema';
 import { AuditService } from '../auth/audit.service';
 import { ERROR_MESSAGES } from '../common/utils/error-messages.constant';
 import {
@@ -34,6 +35,7 @@ export class PatientService {
     @InjectModel('Patient') private readonly patientModel: Model<Patient>,
     @InjectModel('Appointment')
     private readonly appointmentModel: Model<Appointment>,
+    @InjectModel('Invoice') private readonly invoiceModel: Model<Invoice>,
     private readonly auditService: AuditService,
   ) {}
 
@@ -342,19 +344,19 @@ export class PatientService {
       filter.organizationId = new Types.ObjectId(scope.organizationId);
     }
 
-    // Clinic sub-scope: staff/doctor/manager are always locked to JWT clinicId
+    // Clinic sub-scope: staff/doctor/manager/admin are always locked to JWT clinicId
     if (
       scope.role === UserRole.STAFF ||
       scope.role === UserRole.DOCTOR ||
-      scope.role === UserRole.MANAGER
+      scope.role === UserRole.MANAGER ||
+      scope.role === UserRole.ADMIN
     ) {
       if (scope.clinicId) {
         filter.clinicId = new Types.ObjectId(scope.clinicId);
       }
     } else if (
       query.clinicId &&
-      (scope.role === UserRole.ADMIN ||
-        scope.role === UserRole.OWNER ||
+      (scope.role === UserRole.OWNER ||
         scope.role === UserRole.SUPER_ADMIN)
     ) {
       filter.clinicId = new Types.ObjectId(query.clinicId);
@@ -440,6 +442,7 @@ export class PatientService {
   async getPatientsForDropdown(
     scope: PatientScopeContext,
     search?: string,
+    hasOutstandingInvoice?: boolean,
   ): Promise<{ _id: string; patientNumber: string; firstName: string; lastName: string; phone?: string; profilePicture?: string }[]> {
     const filter: FilterQuery<Patient> = { deletedAt: { $exists: false }, status: 'Active' };
 
@@ -451,11 +454,30 @@ export class PatientService {
     } else if (role === UserRole.OWNER) {
       if (organizationId) filter.organizationId = new Types.ObjectId(organizationId);
     } else {
-      // admin / manager / doctor / staff — scoped to JWT complexId
+      // admin / manager / doctor / staff — scoped to JWT complexId, then clinic
       if (jwtComplexId) filter.complexId = new Types.ObjectId(jwtComplexId);
-      if ((role === UserRole.STAFF || role === UserRole.DOCTOR || role === UserRole.MANAGER) && clinicId) {
+      if ((role === UserRole.STAFF || role === UserRole.DOCTOR || role === UserRole.MANAGER || role === UserRole.ADMIN) && clinicId) {
         filter.clinicId = new Types.ObjectId(clinicId);
       }
+    }
+
+    // If hasOutstandingInvoice=true, restrict to patients who have at least one
+    // posted invoice with unpaid or partially_paid status in the same clinic scope.
+    if (hasOutstandingInvoice) {
+      const invoiceFilter: any = {
+        deletedAt: { $exists: false },
+        invoiceStatus: 'posted',
+        paymentStatus: { $in: ['unpaid', 'partially_paid'] },
+      };
+      if (clinicId && Types.ObjectId.isValid(clinicId)) {
+        invoiceFilter.clinicId = new Types.ObjectId(clinicId);
+      }
+      const invoiceDocs = await this.invoiceModel
+        .find(invoiceFilter, { patientId: 1 })
+        .lean();
+      const eligiblePatientIds = [...new Set(invoiceDocs.map((inv: any) => inv.patientId.toString()))];
+      if (eligiblePatientIds.length === 0) return [];
+      filter._id = { $in: eligiblePatientIds.map((id) => new Types.ObjectId(id)) };
     }
 
     if (search && search.trim().length > 0) {

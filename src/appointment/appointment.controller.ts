@@ -393,7 +393,7 @@ export class AppointmentController {
     example: 'desc',
   })
   @UseGuards(RoleScopeGuard) // UC-e1f2d3c: Apply role-based filtering
-  @Roles(UserRole.ADMIN, UserRole.STAFF, UserRole.DOCTOR)
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.STAFF, UserRole.DOCTOR)
   @Get()
   async getAppointments(
     @Query(new ValidationPipe()) query: AppointmentSearchQueryDto,
@@ -405,6 +405,7 @@ export class AppointmentController {
         req.user?.userId,
         req.user?.role,
         req.user?.clinicId,
+        req.user?.subscriptionId,
       );
       return {
         success: true,
