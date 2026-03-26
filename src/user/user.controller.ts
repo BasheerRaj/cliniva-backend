@@ -1445,7 +1445,8 @@ export class UserController {
    *
    * @param role - Optional role filter
    * @param complexId - Optional complex ID filter
-   * @param clinicId - Optional clinic ID filter
+    * @param clinicId - Optional clinic ID filter
+    * @param clinicIds - Optional list of clinic IDs filter (comma-separated or repeated query param)
    * @param includeDeactivated - Optional flag to include deactivated users
    * @returns List of users for dropdown
    */
@@ -1491,6 +1492,14 @@ export class UserController {
     example: '507f1f77bcf86cd799439014',
   })
   @ApiQuery({
+    name: 'clinicIds',
+    required: false,
+    type: String,
+    description:
+      'Filter by multiple clinic IDs. Use comma-separated values or repeat clinicIds query parameter',
+    example: '507f1f77bcf86cd799439014,507f1f77bcf86cd799439015',
+  })
+  @ApiQuery({
     name: 'includeDeactivated',
     required: false,
     type: Boolean,
@@ -1504,17 +1513,20 @@ export class UserController {
     @Query('role') role?: string,
     @Query('complexId') complexId?: string,
     @Query('clinicId') clinicId?: string,
+    @Query('clinicIds') clinicIdsQuery?: string | string[],
     @Query('includeDeactivated') includeDeactivated?: string,
   ) {
     try {
       // Parse includeDeactivated as boolean
       const includeDeactivatedBool = includeDeactivated === 'true';
+      const clinicIds = this.parseClinicIdsQuery(clinicIdsQuery);
 
       // Create cache key from query parameters
       const cacheKey = JSON.stringify({
         role,
         complexId,
         clinicId,
+        clinicIds,
         includeDeactivated: includeDeactivatedBool,
       });
 
@@ -1532,6 +1544,7 @@ export class UserController {
         role,
         complexId,
         clinicId,
+        clinicIds,
         includeDeactivated: includeDeactivatedBool,
       });
 
@@ -1584,6 +1597,24 @@ export class UserController {
         HttpStatus.BAD_REQUEST,
       );
     }
+  }
+
+  private parseClinicIdsQuery(clinicIdsQuery?: string | string[]): string[] {
+    if (!clinicIdsQuery) {
+      return [];
+    }
+
+    const clinicIds = Array.isArray(clinicIdsQuery)
+      ? clinicIdsQuery
+      : clinicIdsQuery.split(',');
+
+    return Array.from(
+      new Set(
+        clinicIds
+          .map((clinicId) => clinicId.trim())
+          .filter((clinicId) => clinicId.length > 0),
+      ),
+    );
   }
 
   /**
