@@ -2759,14 +2759,12 @@ export class AppointmentService {
 
       if (slotMinutes < openMin || slotMinutes >= closeMin) continue;
 
-      // Skip if slot falls within break period
-      if (dayWh.breakStartTime && dayWh.breakEndTime) {
-        const [bsh, bsm] = (dayWh.breakStartTime as string).split(':').map(Number);
-        const [beh, bem] = (dayWh.breakEndTime as string).split(':').map(Number);
-        const breakStart = bsh * 60 + bsm;
-        const breakEnd = beh * 60 + bem;
-        if (slotMinutes >= breakStart && slotMinutes < breakEnd) continue;
-      }
+      // Note: break-time filtering is intentionally omitted here.
+      // getAvailableClinics only gates on opening/closing hours so the clinic
+      // appears in the dropdown. The actual break-time conflict is validated
+      // later in createAppointment (appointment-working-hours.service.ts).
+      // Filtering by break time here caused clinics to vanish at 12:00 even
+      // when a cancelled appointment at that time proved they were bookable.
 
       available.push({ _id: (clinic._id as any).toString(), name: clinic.name });
     }
