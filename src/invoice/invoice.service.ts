@@ -61,20 +61,29 @@ export class InvoiceService {
       }
     }
 
-    // 1. Find clinic by dto.clinicId when provided (validate exists, not deleted)
-    let clinic: any = null;
-    let organizationId: any = undefined;
-    if (createInvoiceDto.clinicId) {
-      clinic = await this.clinicModel.findOne({
-        _id: new Types.ObjectId(createInvoiceDto.clinicId),
-        deletedAt: { $exists: false },
+    // 1. Resolve clinicId: prefer DTO, fall back to caller's assigned clinic
+    const resolvedClinicId = createInvoiceDto.clinicId || userClinicId;
+
+    if (!resolvedClinicId) {
+      throw new BadRequestException({
+        message: {
+          ar: 'معرف العيادة مطلوب',
+          en: 'clinicId is required',
+        },
+        code: 'CLINIC_ID_REQUIRED',
       });
-      if (!clinic) {
-        throw new NotFoundException(NOT_FOUND_ERRORS.CLINIC);
-      }
-      // 2. Derive organizationId from clinic
-      organizationId = clinic.organizationId;
     }
+
+    // Find clinic (validate exists, not deleted)
+    const clinic = await this.clinicModel.findOne({
+      _id: new Types.ObjectId(resolvedClinicId),
+      deletedAt: { $exists: false },
+    });
+    if (!clinic) {
+      throw new NotFoundException(NOT_FOUND_ERRORS.CLINIC);
+    }
+    // 2. Derive organizationId from clinic
+    const organizationId = clinic.organizationId;
 
     // 3. Find patient by dto.patientId (validate exists, not deleted)
     const patient = await this.patientModel.findOne({
@@ -173,8 +182,8 @@ export class InvoiceService {
       invoiceNumber,
       invoiceTitle: createInvoiceDto.invoiceTitle,
       patientId: new Types.ObjectId(createInvoiceDto.patientId),
-      clinicId: createInvoiceDto.clinicId ? new Types.ObjectId(createInvoiceDto.clinicId) : undefined,
-      organizationId: organizationId ? organizationId : undefined,
+      clinicId: new Types.ObjectId(resolvedClinicId),
+      organizationId: organizationId ?? undefined,
       services: builtServices,
       subtotal,
       discountAmount: totalDiscount,
