@@ -12,6 +12,7 @@ export interface DropdownFilters {
   role?: string;
   complexId?: string;
   clinicId?: string;
+  clinicIds?: string[];
   includeDeactivated?: boolean;
 }
 
@@ -26,6 +27,8 @@ export interface DropdownUser {
   email: string;
   role: string;
   isActive: boolean;
+  clinicID: string | null;
+  ClinicName: string | null;
 }
 
 /**
@@ -91,14 +94,35 @@ export class UserDropdownService {
         }
       }
 
-      // Requirement 10.3: Support filtering by clinicId
-      if (filters?.clinicId) {
-        if (Types.ObjectId.isValid(filters.clinicId)) {
-          query.clinicId = new Types.ObjectId(filters.clinicId);
-        } else {
+      // Requirement 10.3: Support filtering by clinicId / clinicIds
+      const clinicFilters = [
+        ...(filters?.clinicId ? [filters.clinicId] : []),
+        ...(filters?.clinicIds || []),
+      ];
+
+      if (clinicFilters.length > 0) {
+        const validClinicIds = Array.from(
+          new Set(
+            clinicFilters.filter((clinicId) => Types.ObjectId.isValid(clinicId)),
+          ),
+        );
+
+        const invalidClinicIds = clinicFilters.filter(
+          (clinicId) => !Types.ObjectId.isValid(clinicId),
+        );
+
+        if (invalidClinicIds.length > 0) {
           this.logger.warn(
-            `Invalid clinicId format: ${filters.clinicId}. Skipping filter.`,
+            `Invalid clinicId format(s): ${invalidClinicIds.join(', ')}. Skipping invalid values.`,
           );
+        }
+
+        if (validClinicIds.length === 1) {
+          query.clinicId = new Types.ObjectId(validClinicIds[0]);
+        } else if (validClinicIds.length > 1) {
+          query.clinicId = {
+            $in: validClinicIds.map((clinicId) => new Types.ObjectId(clinicId)),
+          };
         }
       }
 
@@ -106,7 +130,8 @@ export class UserDropdownService {
       // Execute query with sorting by firstName, lastName
       const users = await this.userModel
         .find(query)
-        .select('_id firstName lastName email role isActive')
+        .select('_id firstName lastName email role isActive clinicId')
+        .populate('clinicId', 'name')
         .sort({ firstName: 1, lastName: 1 })
         .lean()
         .exec();
@@ -116,14 +141,25 @@ export class UserDropdownService {
       );
 
       // Map to DropdownUser interface
-      return users.map((user) => ({
-        _id: user._id.toString(),
-        firstName: user.firstName,
-        lastName: user.lastName,
-        email: user.email,
-        role: user.role,
-        isActive: user.isActive,
-      }));
+      return users.map((user) => {
+        const clinicRef = user.clinicId as any;
+        const clinicID = clinicRef ? String(clinicRef._id ?? clinicRef) : null;
+        const clinicName =
+          clinicRef && typeof clinicRef === 'object'
+            ? (clinicRef.name ?? null)
+            : null;
+
+        return {
+          _id: user._id.toString(),
+          firstName: user.firstName,
+          lastName: user.lastName,
+          email: user.email,
+          role: user.role,
+          isActive: user.isActive,
+          clinicID,
+          ClinicName: clinicName,
+        };
+      });
     } catch (error) {
       this.logger.error('Error getting users for dropdown:', error);
       throw error;
