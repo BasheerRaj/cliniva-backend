@@ -140,7 +140,9 @@ export function transformAppointment(doc: any): TransformedAppointment {
     service = {
       _id: rawService._id?.toString() ?? '',
       name: rawService.name ?? '',
-      duration: rawService.durationMinutes ?? 0,
+      // Use the appointment's actual booked duration (set by user or auto-filled).
+      // Fall back to the service default only when no appointment duration was stored.
+      duration: doc.durationMinutes ?? rawService.durationMinutes ?? 0,
       description: rawService.description ?? null,
       price: rawService.price ?? null,
       sessions: rawService.sessions ?? undefined,
