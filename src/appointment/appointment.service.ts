@@ -2731,13 +2731,21 @@ export class AppointmentService {
     const [slotH, slotM] = time.split(':').map(Number);
     const slotMinutes = slotH * 60 + slotM;
 
-    // 4. Filter clinics whose working hours cover the requested slot
+    // 4. Filter clinics whose working hours cover the requested slot.
+    //    Mirrors createAppointment logic: clinics with NO working hours configured
+    //    are always considered available (same permissive default used on creation).
     const available: { _id: string; name: string }[] = [];
 
     for (const clinic of clinics) {
       const wh = await this.workingHoursIntegrationService.getClinicWorkingHours(
         clinic._id.toString(),
       );
+
+      // No WH configured → always available (consistent with createAppointment behaviour)
+      if (!wh || wh.length === 0) {
+        available.push({ _id: (clinic._id as any).toString(), name: clinic.name });
+        continue;
+      }
 
       const dayWh = wh.find(
         (w: any) => w.dayOfWeek === dayOfWeek && w.isWorkingDay && w.isActive,
