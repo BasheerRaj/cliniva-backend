@@ -913,11 +913,11 @@ export class InvoiceService {
    */
   async getInvoicesListForBooking(
     patientId: string,
-    clinicId: string,
+    clinicId: string | undefined,
     userRole?: string,
     userClinicId?: string,
   ): Promise<any[]> {
-    // For staff/doctor role: enforce clinic scope
+    // Staff/doctor are always scoped to their own clinic via JWT
     const effectiveClinicId =
       userRole && ['staff', 'doctor'].includes(userRole) && userClinicId
         ? userClinicId
@@ -927,11 +927,15 @@ export class InvoiceService {
     // exclude fully paid and cancelled invoices
     const filter: any = {
       patientId: new Types.ObjectId(patientId),
-      clinicId: new Types.ObjectId(effectiveClinicId),
       invoiceStatus: { $in: ['draft', 'posted'] },
       paymentStatus: { $ne: 'paid' },
       deletedAt: { $exists: false },
     };
+
+    // Only filter by clinic when known (allows admin/owner to see all clinics)
+    if (effectiveClinicId) {
+      filter.clinicId = new Types.ObjectId(effectiveClinicId);
+    }
 
     const invoices = await this.invoiceModel
       .find(filter)

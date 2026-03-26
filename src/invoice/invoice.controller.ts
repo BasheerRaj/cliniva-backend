@@ -324,8 +324,9 @@ export class InvoiceController {
   }
 
   /**
-   * Get ALL posted, unpaid/partially-paid invoices for a patient+clinic.
-   * Used by the appointment booking flow to display the invoice selection list.
+   * Get bookable invoices for a patient.
+   * clinicId is optional: when omitted, returns across all accessible clinics
+   * (staff/doctor are always scoped to their own clinic via JWT).
    * MUST be declared before GET ':id' to avoid route conflict.
    *
    * GET /invoices/list-for-booking?patientId=...&clinicId=...
@@ -342,20 +343,21 @@ export class InvoiceController {
   @ApiOperation({
     summary: 'List invoices for booking',
     description:
-      'Returns all posted, unpaid or partially-paid invoices for a specific patient and clinic. ' +
+      'Returns all posted/draft, unpaid or partially-paid invoices for a patient. ' +
+      'When clinicId is omitted, returns across all accessible clinics (staff/doctor scoped via JWT). ' +
       'Used by the appointment booking flow to let the user choose which invoice to link.',
   })
   @ApiQuery({ name: 'patientId', required: true, description: 'Patient ID' })
-  @ApiQuery({ name: 'clinicId', required: true, description: 'Clinic ID' })
+  @ApiQuery({ name: 'clinicId', required: false, description: 'Clinic ID (optional; omit to fetch across all accessible clinics)' })
   @ApiResponse({ status: 200, description: 'Invoices retrieved successfully' })
   async getInvoicesListForBooking(
     @Query('patientId') patientId: string,
-    @Query('clinicId') clinicId: string,
+    @Query('clinicId') clinicId: string | undefined,
     @Request() req: any,
   ) {
-    if (!patientId || !clinicId) {
+    if (!patientId) {
       throw new BadRequestException({
-        message: { ar: 'معرف المريض والعيادة مطلوبان', en: 'patientId and clinicId are required' },
+        message: { ar: 'معرف المريض مطلوب', en: 'patientId is required' },
         code: 'MISSING_PARAMS',
       });
     }
