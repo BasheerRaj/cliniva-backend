@@ -344,6 +344,9 @@ export const USERS_DROPDOWN_RESPONSE_EXAMPLE = {
       lastName: 'Doe',
       email: 'john.doe@example.com',
       role: 'doctor',
+      isActive: true,
+      clinicID: '507f1f77bcf86cd799439040',
+      ClinicName: 'Cardiology Clinic',
     },
     {
       id: '507f1f77bcf86cd799439012',
@@ -351,6 +354,9 @@ export const USERS_DROPDOWN_RESPONSE_EXAMPLE = {
       lastName: 'Smith',
       email: 'jane.smith@example.com',
       role: 'doctor',
+      isActive: true,
+      clinicID: '507f1f77bcf86cd799439041',
+      ClinicName: 'General Medicine Clinic',
     },
   ],
 };
