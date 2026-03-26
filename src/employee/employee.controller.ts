@@ -111,6 +111,8 @@ export class EmployeeController {
       const employee = await this.employeeService.createEmployee(
         createEmployeeDto,
         req.user?.userId,
+        undefined,
+        req.user,
       );
       return {
         success: true,
