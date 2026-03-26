@@ -417,6 +417,7 @@ export class EmployeeService {
     createEmployeeDto: CreateEmployeeDto,
     createdByUserId?: string,
     subscription?: any,
+    requestingUser?: any,
   ): Promise<any> {
     this.logger.log(`Creating employee: ${createEmployeeDto.username}`);
 
@@ -491,6 +492,46 @@ export class EmployeeService {
     const employeeNumber =
       createEmployeeDto.employeeNumber || (await this.generateEmployeeNumber());
 
+    const explicitSubscriptionId = (createEmployeeDto as any).subscriptionId;
+
+    let resolvedSubscriptionId: Types.ObjectId | undefined;
+
+    if (explicitSubscriptionId && Types.ObjectId.isValid(explicitSubscriptionId)) {
+      resolvedSubscriptionId = new Types.ObjectId(explicitSubscriptionId);
+    } else if (requestingUser?.subscriptionId && Types.ObjectId.isValid(requestingUser.subscriptionId)) {
+      resolvedSubscriptionId = new Types.ObjectId(requestingUser.subscriptionId);
+    } else if (createEmployeeDto.clinicId) {
+      const clinic = await this.clinicModel
+        .findById(createEmployeeDto.clinicId)
+        .select('_id subscriptionId')
+        .lean()
+        .exec();
+      if (clinic?.subscriptionId && Types.ObjectId.isValid(clinic.subscriptionId as any)) {
+        resolvedSubscriptionId = new Types.ObjectId(clinic.subscriptionId as any);
+      }
+    } else if (createEmployeeDto.complexId) {
+      const complex = await this.complexModel
+        .findById(createEmployeeDto.complexId)
+        .select('_id subscriptionId')
+        .lean()
+        .exec();
+      if (complex?.subscriptionId && Types.ObjectId.isValid(complex.subscriptionId as any)) {
+        resolvedSubscriptionId = new Types.ObjectId(complex.subscriptionId as any);
+      }
+    } else if (createEmployeeDto.organizationId) {
+      const organization = await this.organizationModel
+        .findById(createEmployeeDto.organizationId)
+        .select('_id subscriptionId')
+        .lean()
+        .exec();
+      if (
+        organization?.subscriptionId &&
+        Types.ObjectId.isValid(organization.subscriptionId as any)
+      ) {
+        resolvedSubscriptionId = new Types.ObjectId(organization.subscriptionId as any);
+      }
+    }
+
     // Create user account
     const userData = {
       username: createEmployeeDto.username.toLowerCase().trim(),
@@ -504,6 +545,7 @@ export class EmployeeService {
       gender: createEmployeeDto.gender,
       dateOfBirth: new Date(createEmployeeDto.dateOfBirth),
       address: createEmployeeDto.address,
+      subscriptionId: resolvedSubscriptionId,
       organizationId: createEmployeeDto.organizationId,
       complexId: createEmployeeDto.complexId,
       clinicId: createEmployeeDto.clinicId,
