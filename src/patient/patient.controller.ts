@@ -241,10 +241,12 @@ Scope is enforced by the caller's role:
   })
   @ApiQuery({ name: 'search', required: false, type: String, description: 'Filter by name or patient number' })
   @ApiQuery({ name: 'hasOutstandingInvoice', required: false, type: Boolean, description: 'If true, only return patients with at least one posted unpaid/partially-paid invoice' })
+  @ApiQuery({ name: 'hasBookableSession', required: false, type: Boolean, description: 'If true, only return patients with at least one draft/posted invoice that has remaining unboooked sessions (use for appointment booking)' })
   @ApiResponse({ status: 200, description: 'Patient dropdown list retrieved successfully' })
   async getPatientsDropdown(
     @Query('search') search: string | undefined,
     @Query('hasOutstandingInvoice') hasOutstandingInvoice: string | undefined,
+    @Query('hasBookableSession') hasBookableSession: string | undefined,
     @Request() req: any,
   ) {
     const user = req.user;
@@ -256,7 +258,8 @@ Scope is enforced by the caller's role:
       organizationId:   user.organizationId ?? null,
     };
     const filterByInvoice = hasOutstandingInvoice === 'true';
-    const patients = await this.patientService.getPatientsForDropdown(scope, search, filterByInvoice);
+    const filterByBookable = hasBookableSession === 'true';
+    const patients = await this.patientService.getPatientsForDropdown(scope, search, filterByInvoice, filterByBookable);
     return ResponseBuilder.success(patients, {
       ar: 'تم جلب قائمة المرضى بنجاح',
       en: 'Patient dropdown list retrieved successfully',

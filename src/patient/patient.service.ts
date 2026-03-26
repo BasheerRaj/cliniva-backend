@@ -443,6 +443,7 @@ export class PatientService {
     scope: PatientScopeContext,
     search?: string,
     hasOutstandingInvoice?: boolean,
+    hasBookableSession?: boolean,
   ): Promise<{ _id: string; patientNumber: string; firstName: string; lastName: string; phone?: string; profilePicture?: string }[]> {
     const filter: FilterQuery<Patient> = { deletedAt: { $exists: false }, status: 'Active' };
 
@@ -476,6 +477,34 @@ export class PatientService {
         .find(invoiceFilter, { patientId: 1 })
         .lean();
       const eligiblePatientIds = [...new Set(invoiceDocs.map((inv: any) => inv.patientId.toString()))];
+      if (eligiblePatientIds.length === 0) return [];
+      filter._id = { $in: eligiblePatientIds.map((id) => new Types.ObjectId(id)) };
+    }
+
+    // If hasBookableSession=true, restrict to patients who have at least one
+    // draft or posted invoice with remaining (unboooked) sessions in the same clinic.
+    if (hasBookableSession) {
+      const invoiceFilter: any = {
+        deletedAt: { $exists: false },
+        invoiceStatus: { $in: ['draft', 'posted'] },
+        paymentStatus: { $ne: 'paid' },
+      };
+      if (clinicId && Types.ObjectId.isValid(clinicId)) {
+        invoiceFilter.clinicId = new Types.ObjectId(clinicId);
+      }
+      const invoiceDocs = await this.invoiceModel.find(invoiceFilter).lean();
+
+      // Keep only invoices that have at least one service with remaining capacity
+      const bookable = invoiceDocs.filter((inv: any) =>
+        (inv.services ?? []).some((svc: any) => {
+          const active = (svc.sessions ?? []).filter((s: any) =>
+            ['booked', 'in_progress', 'completed'].includes(s.sessionStatus),
+          ).length;
+          return active < (svc.totalSessions ?? 0);
+        }),
+      );
+
+      const eligiblePatientIds = [...new Set(bookable.map((inv: any) => inv.patientId.toString()))];
       if (eligiblePatientIds.length === 0) return [];
       filter._id = { $in: eligiblePatientIds.map((id) => new Types.ObjectId(id)) };
     }
