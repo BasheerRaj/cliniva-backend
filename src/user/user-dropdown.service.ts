@@ -12,6 +12,7 @@ export interface DropdownFilters {
   role?: string;
   complexId?: string;
   clinicId?: string;
+  clinicIds?: string[];
   includeDeactivated?: boolean;
 }
 
@@ -91,14 +92,35 @@ export class UserDropdownService {
         }
       }
 
-      // Requirement 10.3: Support filtering by clinicId
-      if (filters?.clinicId) {
-        if (Types.ObjectId.isValid(filters.clinicId)) {
-          query.clinicId = new Types.ObjectId(filters.clinicId);
-        } else {
+      // Requirement 10.3: Support filtering by clinicId / clinicIds
+      const clinicFilters = [
+        ...(filters?.clinicId ? [filters.clinicId] : []),
+        ...(filters?.clinicIds || []),
+      ];
+
+      if (clinicFilters.length > 0) {
+        const validClinicIds = Array.from(
+          new Set(
+            clinicFilters.filter((clinicId) => Types.ObjectId.isValid(clinicId)),
+          ),
+        );
+
+        const invalidClinicIds = clinicFilters.filter(
+          (clinicId) => !Types.ObjectId.isValid(clinicId),
+        );
+
+        if (invalidClinicIds.length > 0) {
           this.logger.warn(
-            `Invalid clinicId format: ${filters.clinicId}. Skipping filter.`,
+            `Invalid clinicId format(s): ${invalidClinicIds.join(', ')}. Skipping invalid values.`,
           );
+        }
+
+        if (validClinicIds.length === 1) {
+          query.clinicId = new Types.ObjectId(validClinicIds[0]);
+        } else if (validClinicIds.length > 1) {
+          query.clinicId = {
+            $in: validClinicIds.map((clinicId) => new Types.ObjectId(clinicId)),
+          };
         }
       }
 
