@@ -511,6 +511,8 @@ export class AppointmentController {
         req.user?.organizationId,
         req.user?.role,
         serviceId,
+        req.user?.subscriptionId,
+        req.user?.complexId,
       );
       return {
         success: true,

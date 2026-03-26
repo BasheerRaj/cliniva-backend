@@ -2678,6 +2678,8 @@ export class AppointmentService {
     userOrganizationId?: string,
     userRole?: string,
     serviceId?: string,
+    userSubscriptionId?: string,
+    userComplexId?: string,
   ): Promise<{ _id: string; name: string }[]> {
     // 1. Build clinic filter with scope enforcement (IDOR protection)
     const clinicFilter: any = {
@@ -2685,13 +2687,23 @@ export class AppointmentService {
       deletedAt: { $exists: false },
     };
 
-    // Only staff and doctors are scoped to their assigned clinic.
-    // Admins, managers, and owners can see all clinics in their organization.
-    const clinicScopedRoles = ['staff', 'doctor'];
+    // Staff, doctors, admins, and managers are scoped to their assigned clinic (clinicId from JWT).
+    // Owners see all clinics within their subscription (+ complex if set).
+    // super_admin sees everything.
+    const clinicScopedRoles = ['staff', 'doctor', 'admin', 'manager'];
     if (userClinicId && clinicScopedRoles.includes(userRole ?? '')) {
       clinicFilter._id = new Types.ObjectId(userClinicId);
-    } else if (userOrganizationId && userRole && !['super_admin'].includes(userRole)) {
-      clinicFilter.organizationId = new Types.ObjectId(userOrganizationId);
+    } else if (userRole && !['super_admin'].includes(userRole)) {
+      // Owner: scope by subscriptionId (primary tenant boundary) + complexId if set
+      if (userSubscriptionId) {
+        clinicFilter.subscriptionId = new Types.ObjectId(userSubscriptionId);
+      }
+      if (userComplexId) {
+        clinicFilter.complexId = new Types.ObjectId(userComplexId);
+      } else if (userOrganizationId) {
+        // Fallback: organizationId scope for company-plan owners without complexId
+        clinicFilter.organizationId = new Types.ObjectId(userOrganizationId);
+      }
     }
 
     if (clinicCollectionId) {
