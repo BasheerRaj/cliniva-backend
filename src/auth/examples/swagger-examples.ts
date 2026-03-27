@@ -234,8 +234,8 @@ export const GET_PROFILE_RESPONSE_EXAMPLE = {
 export const LOGOUT_RESPONSE_EXAMPLE = {
   success: true,
   message: {
-    ar: 'تم تسجيل الخروج بنجاح',
-    en: 'Logout successful',
+    ar: 'تم تسجيل الخروج بنجاح.',
+    en: 'Logged out successfully',
   },
 };
 
@@ -246,8 +246,8 @@ export const LOGOUT_RESPONSE_EXAMPLE = {
 export const ERROR_INVALID_CREDENTIALS_EXAMPLE = {
   statusCode: 401,
   message: {
-    ar: 'بيانات الاعتماد غير صحيحة',
-    en: 'Invalid credentials',
+    ar: 'اسم المستخدم أو كلمة المرور غير صحيحة. يرجى المحاولة مرة أخرى.',
+    en: 'Incorrect Username or password. Please try again',
   },
   code: 'INVALID_CREDENTIALS',
   timestamp: '2024-02-03T10:30:00.000Z',
@@ -268,8 +268,8 @@ export const ERROR_EMAIL_EXISTS_EXAMPLE = {
 export const ERROR_ACCOUNT_INACTIVE_EXAMPLE = {
   statusCode: 401,
   message: {
-    ar: 'الحساب غير نشط',
-    en: 'Account is inactive',
+    ar: 'حسابك غير نشط حالياً. يرجى التواصل مع مسؤول النظام للحصول على المساعدة.',
+    en: 'Your account is currently inactive. Please contact the system administrator for assistance.',
   },
   code: 'ACCOUNT_INACTIVE',
   timestamp: '2024-02-03T10:30:00.000Z',
@@ -312,8 +312,8 @@ export const ERROR_RATE_LIMIT_EXCEEDED_EXAMPLE = {
 export const ERROR_TOKEN_EXPIRED_EXAMPLE = {
   statusCode: 401,
   message: {
-    ar: 'انتهت صلاحية الرمز',
-    en: 'Token expired',
+    ar: 'انتهت صلاحية الجلسة. يرجى تسجيل الدخول مرة أخرى.',
+    en: 'Your session has expired. Please log in again',
   },
   code: 'AUTH_002',
   timestamp: '2024-02-03T10:30:00.000Z',
@@ -323,10 +323,10 @@ export const ERROR_TOKEN_EXPIRED_EXAMPLE = {
 export const ERROR_TOKEN_BLACKLISTED_EXAMPLE = {
   statusCode: 401,
   message: {
-    ar: 'الرمز محظور',
-    en: 'Token blacklisted',
+    ar: 'تم إنهاء جلستك لأن معلومات أساسية في حسابك تم تعديلها. يرجى تسجيل الدخول مرة أخرى باستخدام البيانات المحدثة.',
+    en: 'Your session has ended because essential account information was updated. Please log in again using your updated credentials.',
   },
-  code: 'AUTH_012',
+  code: 'SESSION_INVALIDATED',
   timestamp: '2024-02-03T10:30:00.000Z',
   path: '/auth/refresh',
 };

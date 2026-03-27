@@ -66,20 +66,20 @@ export const STANDARD_ERROR_MESSAGES: Record<ErrorCode, BilingualMessage> = {
     en: 'Unauthorized access',
   },
   [ErrorCode.INVALID_CREDENTIALS]: {
-    ar: 'بيانات الاعتماد غير صحيحة',
-    en: 'Invalid credentials',
+    ar: 'اسم المستخدم أو كلمة المرور غير صحيحة. يرجى المحاولة مرة أخرى.',
+    en: 'Incorrect Username or password. Please try again',
   },
   [ErrorCode.TOKEN_EXPIRED]: {
-    ar: 'انتهت صلاحية الرمز',
-    en: 'Token expired',
+    ar: 'انتهت صلاحية الجلسة. يرجى تسجيل الدخول مرة أخرى.',
+    en: 'Your session has expired. Please log in again',
   },
   [ErrorCode.TOKEN_INVALID]: {
     ar: 'رمز غير صالح',
     en: 'Invalid token',
   },
   [ErrorCode.TOKEN_BLACKLISTED]: {
-    ar: 'الرمز محظور',
-    en: 'Token blacklisted',
+    ar: 'تم إنهاء جلستك لأن معلومات أساسية في حسابك تم تعديلها. يرجى تسجيل الدخول مرة أخرى باستخدام البيانات المحدثة.',
+    en: 'Your session has ended because essential account information was updated. Please log in again using your updated credentials.',
   },
   [ErrorCode.INSUFFICIENT_PERMISSIONS]: {
     ar: 'ليس لديك الصلاحيات الكافية',

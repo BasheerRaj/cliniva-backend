@@ -179,7 +179,7 @@ export const errorResponseFixtures = {
   },
   unauthorizedError: {
     statusCode: 401,
-    message: 'Invalid credentials',
+    message: 'Incorrect Username or password. Please try again',
     error: 'Unauthorized',
   },
   conflictError: {

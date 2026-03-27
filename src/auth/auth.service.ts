@@ -372,8 +372,8 @@ export class AuthService {
         if (!user.isActive) {
           throw new UnauthorizedException({
             message: {
-              ar: 'الحساب غير نشط',
-              en: 'Account is inactive',
+              ar: 'حسابك غير نشط حالياً. يرجى التواصل مع مسؤول النظام للحصول على المساعدة.',
+              en: 'Your account is currently inactive. Please contact the system administrator for assistance.',
             },
             code: 'ACCOUNT_INACTIVE',
           });
@@ -470,10 +470,10 @@ export class AuthService {
         }
         throw new UnauthorizedException({
           message: {
-            ar: 'بيانات الاعتماد غير صحيحة',
-            en: 'Invalid credentials',
+            ar: 'اسم المستخدم هذا غير مسجل في النظام.',
+            en: 'This Username is not registered in the system',
           },
-          code: 'INVALID_CREDENTIALS',
+          code: 'USERNAME_NOT_FOUND',
         });
       }
 
@@ -489,8 +489,8 @@ export class AuthService {
         }
         throw new UnauthorizedException({
           message: {
-            ar: 'الحساب غير نشط',
-            en: 'Account is inactive',
+            ar: 'حسابك غير نشط حالياً. يرجى التواصل مع مسؤول النظام للحصول على المساعدة.',
+            en: 'Your account is currently inactive. Please contact the system administrator for assistance.',
           },
           code: 'ACCOUNT_INACTIVE',
         });
@@ -513,8 +513,8 @@ export class AuthService {
         }
         throw new UnauthorizedException({
           message: {
-            ar: 'بيانات الاعتماد غير صحيحة',
-            en: 'Invalid credentials',
+            ar: 'اسم المستخدم أو كلمة المرور غير صحيحة. يرجى المحاولة مرة أخرى.',
+            en: 'Incorrect Username or password. Please try again',
           },
           code: 'INVALID_CREDENTIALS',
         });
@@ -722,8 +722,8 @@ export class AuthService {
         this.logger.warn('Refresh token expired');
         throw new UnauthorizedException({
           message: {
-            ar: 'انتهت صلاحية الرمز',
-            en: 'Token expired',
+            ar: 'انتهت صلاحية الجلسة. يرجى تسجيل الدخول مرة أخرى.',
+            en: 'Your session has expired. Please log in again',
           },
           code: 'AUTH_002',
         });
@@ -1702,8 +1702,8 @@ export class AuthService {
       return {
         success: true,
         message: {
-          ar: 'تم تسجيل الخروج بنجاح',
-          en: 'Logout successful',
+          ar: 'تم تسجيل الخروج بنجاح.',
+          en: 'Logged out successfully',
         },
       };
     } catch (error) {

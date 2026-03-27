@@ -7,28 +7,28 @@ import { AuthErrorCode } from '../enums/auth-error-code.enum';
  */
 export const AUTH_ERROR_MESSAGES: Record<AuthErrorCode, BilingualMessage> = {
   [AuthErrorCode.INVALID_CREDENTIALS]: {
-    ar: 'بيانات الاعتماد غير صحيحة',
-    en: 'Invalid credentials',
+    ar: 'اسم المستخدم أو كلمة المرور غير صحيحة. يرجى المحاولة مرة أخرى.',
+    en: 'Incorrect Username or password. Please try again',
   },
   [AuthErrorCode.TOKEN_EXPIRED]: {
-    ar: 'انتهت صلاحية الرمز',
-    en: 'Token expired',
+    ar: 'انتهت صلاحية الجلسة. يرجى تسجيل الدخول مرة أخرى.',
+    en: 'Your session has expired. Please log in again',
   },
   [AuthErrorCode.TOKEN_INVALID]: {
     ar: 'رمز غير صالح',
     en: 'Invalid token',
   },
   [AuthErrorCode.USER_NOT_FOUND]: {
-    ar: 'المستخدم غير موجود',
-    en: 'User not found',
+    ar: 'اسم المستخدم هذا غير مسجل في النظام.',
+    en: 'This Username is not registered in the system',
   },
   [AuthErrorCode.EMAIL_NOT_VERIFIED]: {
     ar: 'البريد الإلكتروني غير مؤكد',
     en: 'Email not verified',
   },
   [AuthErrorCode.ACCOUNT_DEACTIVATED]: {
-    ar: 'الحساب معطل',
-    en: 'Account deactivated',
+    ar: 'حسابك غير نشط حالياً. يرجى التواصل مع مسؤول النظام للحصول على المساعدة.',
+    en: 'Your account is currently inactive. Please contact the system administrator for assistance.',
   },
   [AuthErrorCode.PASSWORD_RESET_TOKEN_INVALID]: {
     ar: 'رمز إعادة تعيين كلمة المرور غير صالح',
@@ -51,8 +51,8 @@ export const AUTH_ERROR_MESSAGES: Record<AuthErrorCode, BilingualMessage> = {
     en: 'Rate limit exceeded',
   },
   [AuthErrorCode.TOKEN_BLACKLISTED]: {
-    ar: 'الرمز محظور',
-    en: 'Token blacklisted',
+    ar: 'تم إنهاء جلستك لأن معلومات أساسية في حسابك تم تعديلها. يرجى تسجيل الدخول مرة أخرى باستخدام البيانات المحدثة.',
+    en: 'Your session has ended because essential account information was updated. Please log in again using your updated credentials.',
   },
   [AuthErrorCode.PASSWORDS_DO_NOT_MATCH]: {
     ar: 'كلمات المرور غير متطابقة',
@@ -69,12 +69,12 @@ export const AUTH_ERROR_MESSAGES: Record<AuthErrorCode, BilingualMessage> = {
  */
 export const AUTH_SUCCESS_MESSAGES = {
   LOGIN_SUCCESS: {
-    ar: 'تم تسجيل الدخول بنجاح',
-    en: 'Login successful',
+    ar: 'تم تسجيل الدخول بنجاح.',
+    en: 'Logged in successfully',
   },
   LOGOUT_SUCCESS: {
-    ar: 'تم تسجيل الخروج بنجاح',
-    en: 'Logout successful',
+    ar: 'تم تسجيل الخروج بنجاح.',
+    en: 'Logged out successfully',
   },
   PASSWORD_CHANGED: {
     ar: 'تم تغيير كلمة المرور بنجاح',

@@ -112,13 +112,26 @@ export class RateLimitGuard implements CanActivate {
           `Rate limit exceeded for ${type} from IP ${ipAddress}${userId ? ` (user: ${userId})` : ''}`,
         );
 
-        // Throw TooManyRequestsException with AUTH_011 code and bilingual message
+        const lockoutMessage = {
+          ar: 'تم قفل حسابك بسبب محاولات دخول فاشلة متعددة. يرجى المحاولة مرة أخرى بعد 15 دقيقة أو التواصل مع المسؤول.',
+          en: 'Your account has been locked due to multiple failed login attempts. Please try again after 15 minutes or contact the administrator.',
+        };
+
+        const errorMessage =
+          type === RateLimitType.LOGIN_ATTEMPT
+            ? lockoutMessage
+            : AUTH_ERROR_MESSAGES[AuthErrorCode.RATE_LIMIT_EXCEEDED];
+
+        // Throw TooManyRequestsException with bilingual message
         throw new HttpException(
           {
             success: false,
             error: {
-              code: AuthErrorCode.RATE_LIMIT_EXCEEDED,
-              message: AUTH_ERROR_MESSAGES[AuthErrorCode.RATE_LIMIT_EXCEEDED],
+              code:
+                type === RateLimitType.LOGIN_ATTEMPT
+                  ? 'ACCOUNT_LOCKED'
+                  : AuthErrorCode.RATE_LIMIT_EXCEEDED,
+              message: errorMessage,
             },
           },
           HttpStatus.TOO_MANY_REQUESTS,

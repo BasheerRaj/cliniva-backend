@@ -64,20 +64,20 @@ export type AuthErrorCode =
  */
 export const AUTH_ERROR_MESSAGES = {
   [AUTH_ERROR_CODES.INVALID_CREDENTIALS]: {
-    ar: 'بيانات الاعتماد غير صحيحة',
-    en: 'Invalid credentials',
+    ar: 'اسم المستخدم أو كلمة المرور غير صحيحة. يرجى المحاولة مرة أخرى.',
+    en: 'Incorrect Username or password. Please try again',
   },
   [AUTH_ERROR_CODES.TOKEN_EXPIRED]: {
-    ar: 'انتهت صلاحية الرمز',
-    en: 'Token expired',
+    ar: 'انتهت صلاحية الجلسة. يرجى تسجيل الدخول مرة أخرى.',
+    en: 'Your session has expired. Please log in again',
   },
   [AUTH_ERROR_CODES.INVALID_TOKEN]: {
     ar: 'رمز غير صالح',
     en: 'Invalid token',
   },
   [AUTH_ERROR_CODES.ACCOUNT_INACTIVE]: {
-    ar: 'الحساب غير نشط',
-    en: 'Account is inactive',
+    ar: 'حسابك غير نشط حالياً. يرجى التواصل مع مسؤول النظام للحصول على المساعدة.',
+    en: 'Your account is currently inactive. Please contact the system administrator for assistance.',
   },
   [AUTH_ERROR_CODES.EMAIL_NOT_VERIFIED]: {
     ar: 'البريد الإلكتروني غير مؤكد',
@@ -96,8 +96,8 @@ export const AUTH_ERROR_MESSAGES = {
     en: 'Unauthorized',
   },
   [AUTH_ERROR_CODES.TOKEN_BLACKLISTED]: {
-    ar: 'الرمز محظور',
-    en: 'Token blacklisted',
+    ar: 'تم إنهاء جلستك لأن معلومات أساسية في حسابك تم تعديلها. يرجى تسجيل الدخول مرة أخرى باستخدام البيانات المحدثة.',
+    en: 'Your session has ended because essential account information was updated. Please log in again using your updated credentials.',
   },
   [AUTH_ERROR_CODES.EMAIL_ALREADY_EXISTS]: {
     ar: 'مستخدم بهذا البريد الإلكتروني موجود بالفعل',

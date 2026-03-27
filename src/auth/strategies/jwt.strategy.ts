@@ -40,8 +40,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       if (isBlacklisted) {
         throw new UnauthorizedException({
           message: {
-            ar: 'الجلسة غير صالحة',
-            en: 'Session invalidated',
+            ar: 'تم إنهاء جلستك لأن معلومات أساسية في حسابك تم تعديلها. يرجى تسجيل الدخول مرة أخرى باستخدام البيانات المحدثة.',
+            en: 'Your session has ended because essential account information was updated. Please log in again using your updated credentials.',
           },
           code: 'SESSION_INVALIDATED',
         });
@@ -52,8 +52,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       if (!session) {
         throw new UnauthorizedException({
           message: {
-            ar: 'الجلسة غير موجودة أو منتهية الصلاحية',
-            en: 'Session not found or expired',
+            ar: 'انتهت صلاحية الجلسة. يرجى تسجيل الدخول مرة أخرى.',
+            en: 'Your session has expired. Please log in again',
           },
           code: 'SESSION_EXPIRED',
         });
