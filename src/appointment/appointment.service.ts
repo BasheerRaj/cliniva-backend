@@ -500,7 +500,6 @@ export class AppointmentService {
         );
         if (serviceIndex >= 0) {
           const svcItem = services[serviceIndex];
-          const sessionNumber = (svcItem.sessions?.length || 0) + 1;
           const unitPrice = +(svcItem.pricePerSession || 0);
           const discountPercent = svcItem.discountPercent || 0;
           const discountAmount = +(unitPrice * discountPercent / 100).toFixed(2);
@@ -509,31 +508,62 @@ export class AppointmentService {
           const taxAmount = +(priceAfterDiscount * taxRate / 100).toFixed(2);
           const lineTotal = +(priceAfterDiscount + taxAmount).toFixed(2);
 
-          await this.invoiceModel.updateOne(
-            { _id: validatedInvoice._id, deletedAt: { $exists: false } },
-            {
-              $push: {
-                [`services.${serviceIndex}.sessions`]: {
-                  invoiceItemId: new Types.ObjectId(),
-                  sessionStatus: 'booked',
-                  sessionOrder: sessionNumber,
-                  sessionName: `Session ${sessionNumber}`,
-                  doctorId: new Types.ObjectId(createAppointmentDto.doctorId),
-                  unitPrice,
-                  discountPercent,
-                  discountAmount,
-                  taxRate,
-                  taxAmount,
-                  lineTotal,
-                  paidAmount: 0,
-                  appointmentId: savedAppointment._id,
+          // Reuse the first cancelled/pending session slot rather than pushing a new one.
+          // This prevents session history from growing unboundedly when appointments
+          // are cancelled and re-booked against the same invoice service.
+          const reusableSession = (svcItem.sessions || []).find(
+            (s: any) => s.sessionStatus === 'pending' || s.sessionStatus === 'cancelled',
+          );
+
+          if (reusableSession) {
+            await this.invoiceModel.updateOne(
+              { _id: validatedInvoice._id, deletedAt: { $exists: false } },
+              {
+                $set: {
+                  [`services.${serviceIndex}.sessions.$[item].sessionStatus`]: 'booked',
+                  [`services.${serviceIndex}.sessions.$[item].appointmentId`]: savedAppointment._id,
+                  [`services.${serviceIndex}.sessions.$[item].doctorId`]: new Types.ObjectId(createAppointmentDto.doctorId),
+                  [`services.${serviceIndex}.sessions.$[item].unitPrice`]: unitPrice,
+                  [`services.${serviceIndex}.sessions.$[item].discountPercent`]: discountPercent,
+                  [`services.${serviceIndex}.sessions.$[item].discountAmount`]: discountAmount,
+                  [`services.${serviceIndex}.sessions.$[item].taxRate`]: taxRate,
+                  [`services.${serviceIndex}.sessions.$[item].taxAmount`]: taxAmount,
+                  [`services.${serviceIndex}.sessions.$[item].lineTotal`]: lineTotal,
                 },
               },
-            },
-          );
-          this.logger.log(
-            `Auto-created session ${sessionNumber} on invoice ${validatedInvoice._id} for appointment ${savedAppointment._id}`,
-          );
+              { arrayFilters: [{ 'item.invoiceItemId': reusableSession.invoiceItemId }] },
+            );
+            this.logger.log(
+              `Reused existing session on invoice ${validatedInvoice._id} for appointment ${savedAppointment._id}`,
+            );
+          } else {
+            const sessionNumber = (svcItem.sessions?.length || 0) + 1;
+            await this.invoiceModel.updateOne(
+              { _id: validatedInvoice._id, deletedAt: { $exists: false } },
+              {
+                $push: {
+                  [`services.${serviceIndex}.sessions`]: {
+                    invoiceItemId: new Types.ObjectId(),
+                    sessionStatus: 'booked',
+                    sessionOrder: sessionNumber,
+                    sessionName: `Session ${sessionNumber}`,
+                    doctorId: new Types.ObjectId(createAppointmentDto.doctorId),
+                    unitPrice,
+                    discountPercent,
+                    discountAmount,
+                    taxRate,
+                    taxAmount,
+                    lineTotal,
+                    paidAmount: 0,
+                    appointmentId: savedAppointment._id,
+                  },
+                },
+              },
+            );
+            this.logger.log(
+              `Auto-created session ${sessionNumber} on invoice ${validatedInvoice._id} for appointment ${savedAppointment._id}`,
+            );
+          }
         }
       } catch (err) {
         this.logger.error(`Failed to auto-create invoice session: ${err.message}`);

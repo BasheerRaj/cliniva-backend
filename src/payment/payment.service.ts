@@ -141,7 +141,22 @@ export class PaymentService {
       addedBy: new Types.ObjectId(userId),
     });
 
-    await payment.save();
+    let savedMulti = false;
+    let retriesMulti = 0;
+    while (!savedMulti) {
+      try {
+        await payment.save();
+        savedMulti = true;
+      } catch (err: any) {
+        if (err.code === 11000 && err.keyPattern?.paymentId && retriesMulti < 10) {
+          retriesMulti++;
+          payment.paymentId = await this.generatePaymentId(organizationId);
+          this.logger.warn(`Payment ID collision, retrying with ${payment.paymentId} (attempt ${retriesMulti})`);
+        } else {
+          throw err;
+        }
+      }
+    }
 
     // Apply per-session allocations if provided (cross-invoice allowed)
     if (
@@ -328,7 +343,22 @@ export class PaymentService {
       addedBy: new Types.ObjectId(userId),
     });
 
-    await payment.save();
+    let savedSingle = false;
+    let retriesSingle = 0;
+    while (!savedSingle) {
+      try {
+        await payment.save();
+        savedSingle = true;
+      } catch (err: any) {
+        if (err.code === 11000 && err.keyPattern?.paymentId && retriesSingle < 10) {
+          retriesSingle++;
+          payment.paymentId = await this.generatePaymentId(organizationId);
+          this.logger.warn(`Payment ID collision, retrying with ${payment.paymentId} (attempt ${retriesSingle})`);
+        } else {
+          throw err;
+        }
+      }
+    }
 
     try {
 

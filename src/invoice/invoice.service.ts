@@ -12,6 +12,8 @@ import { Patient } from '../database/schemas/patient.schema';
 import { Service } from '../database/schemas/service.schema';
 import { Clinic } from '../database/schemas/clinic.schema';
 import { Counter } from '../database/schemas/counter.schema';
+import { Payment } from '../database/schemas/payment.schema';
+import { ResponseBuilder } from '../common/utils/response-builder.util';
 import { InvoiceNumberService } from './invoice-number.service';
 import { CreateInvoiceDto } from './dto/create-invoice.dto';
 import { UpdateInvoiceDto } from './dto/update-invoice.dto';
@@ -34,6 +36,7 @@ export class InvoiceService {
     @InjectModel(Service.name) private serviceModel: Model<Service>,
     @InjectModel(Clinic.name) private clinicModel: Model<Clinic>,
     @InjectModel(Counter.name) private counterModel: Model<Counter>,
+    @InjectModel(Payment.name) private readonly paymentModel: Model<Payment>,
     private invoiceNumberService: InvoiceNumberService,
   ) {}
 
@@ -624,7 +627,27 @@ export class InvoiceService {
     invoice.paymentStatus = 'not_due';
     invoice.postedAt = new Date();
 
-    await invoice.save();
+    // Retry loop: if the generated number collides with an existing invoice
+    // (e.g. counter is behind seeded data), advance the counter and try again.
+    let saved = false;
+    let retries = 0;
+    while (!saved) {
+      try {
+        await invoice.save();
+        saved = true;
+      } catch (err: any) {
+        if (err.code === 11000 && err.keyPattern?.invoiceNumber && retries < 10) {
+          retries++;
+          invoice.invoiceNumber =
+            await this.invoiceNumberService.generatePostedNumber(organizationId);
+          this.logger.warn(
+            `Invoice number collision, retrying with ${invoice.invoiceNumber} (attempt ${retries})`,
+          );
+        } else {
+          throw err;
+        }
+      }
+    }
 
     this.logger.log(
       `Invoice transitioned to Posted: ${invoice.invoiceNumber} (was ${invoice.draftNumber})`,
@@ -1031,6 +1054,44 @@ export class InvoiceService {
         { path: 'patientId', select: 'firstName lastName patientNumber' },
         { path: 'clinicId', select: 'name' },
       ]),
+    );
+  }
+
+  /**
+   * Get all payments for a specific invoice, paginated, sorted newest first.
+   */
+  async getInvoicePayments(invoiceId: string, page = 1, limit = 20) {
+    const invoice = await this.invoiceModel.findOne({
+      _id: invoiceId,
+      deletedAt: { $exists: false },
+    });
+    if (!invoice) {
+      throw new NotFoundException(NOT_FOUND_ERRORS.INVOICE);
+    }
+
+    const objectId = new Types.ObjectId(invoiceId);
+    const filter = {
+      $or: [{ invoiceId: objectId }, { invoiceIds: objectId }],
+      deletedAt: { $exists: false },
+    };
+
+    const [payments, total] = await Promise.all([
+      this.paymentModel
+        .find(filter)
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .populate('addedBy', 'firstName lastName')
+        .lean(),
+      this.paymentModel.countDocuments(filter),
+    ]);
+
+    return ResponseBuilder.paginated(
+      payments,
+      page,
+      limit,
+      total,
+      { ar: 'تم جلب سجل المدفوعات بنجاح', en: 'Payment history fetched successfully' },
     );
   }
 

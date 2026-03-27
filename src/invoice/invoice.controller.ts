@@ -544,6 +544,37 @@ export class InvoiceController {
   }
 
   /**
+   * Get payment history for an invoice
+   * Returns all payments linked to a specific invoice, paginated, newest first.
+   */
+  @Get(':id/payments')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard, RolesGuard, InvoiceScopeGuard)
+  @Roles(
+    UserRole.STAFF,
+    UserRole.ADMIN,
+    UserRole.MANAGER,
+    UserRole.OWNER,
+    UserRole.DOCTOR,
+  )
+  @ApiOperation({
+    summary: 'Get payment history for an invoice',
+    description: 'Returns all payments linked to a specific invoice, sorted newest first.',
+  })
+  @ApiParam({ name: 'id', description: 'Invoice ID', example: '507f1f77bcf86cd799439014' })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiResponse({ status: 200, description: 'Payment history retrieved successfully' })
+  @ApiResponse({ status: 404, description: 'Invoice not found' })
+  async getInvoicePayments(
+    @Param('id') id: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+  ) {
+    return this.invoiceService.getInvoicePayments(id, page, limit);
+  }
+
+  /**
    * Get invoice by ID
    * Requirements: 3.1, 11.5
    *
