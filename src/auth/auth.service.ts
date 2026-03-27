@@ -523,6 +523,14 @@ export class AuthService {
       const userId = (user._id as any).toString();
       this.logger.log(`User logged in: ${user.email}`);
 
+      const resolvedContext = await this.resolveUserScopeContext(user);
+      if (!user.clinicId && resolvedContext.clinicId) {
+        user.clinicId = new Types.ObjectId(resolvedContext.clinicId) as any;
+      }
+      if (!user.planType && resolvedContext.planType) {
+        user.planType = resolvedContext.planType as any;
+      }
+
       // Generate tokens with rememberMe support
       const tokens = await this.generateTokens(user, loginDto.rememberMe);
 
@@ -564,26 +572,6 @@ export class AuthService {
         );
       }
 
-      // Get planType from subscription if user has one
-      let planType: string | null = null;
-      if (user.subscriptionId) {
-        try {
-          const subscription =
-            await this.subscriptionService.getSubscriptionById(
-              user.subscriptionId.toString(),
-            );
-          if (subscription) {
-            // The planId is populated with the full SubscriptionPlan object
-            const plan = subscription.planId as any;
-            planType = plan.name; // The planType is stored in the plan's 'name' field
-          }
-        } catch (error) {
-          this.logger.warn(
-            `Could not fetch planType for user ${user.email}: ${error.message}`,
-          );
-        }
-      }
-
       // Check isFirstLogin flag and include passwordChangeRequired in response - Requirement 1.1
       const passwordChangeRequired =
         user.isFirstLogin || user.passwordChangeRequired || false;
@@ -608,10 +596,10 @@ export class AuthService {
           subscriptionId: user.subscriptionId?.toString() || null,
           organizationId: user.organizationId?.toString() || null,
           complexId: user.complexId?.toString() || null,
-          clinicId: user.clinicId?.toString() || null,
+          clinicId: resolvedContext.clinicId || user.clinicId?.toString() || null,
           onboardingComplete: user.onboardingComplete || false,
           onboardingProgress: user.onboardingProgress || [],
-          planType: planType, // Add planType from subscription
+          planType: resolvedContext.planType,
           isOwner: user.role === 'owner',
         },
       };
@@ -766,7 +754,95 @@ export class AuthService {
       });
     }
 
-    return new UserProfileDto(user);
+    const resolvedContext = await this.resolveUserScopeContext(user);
+    const profile = new UserProfileDto(user);
+
+    profile.planType = resolvedContext.planType;
+    profile.clinicId = resolvedContext.clinicId || profile.clinicId || null;
+
+    return profile;
+  }
+
+  private async resolveUserScopeContext(
+    user: User,
+  ): Promise<{ planType: string | null; clinicId: string | null }> {
+    let planType: string | null = user.planType ?? null;
+    let clinicId: string | null = user.clinicId?.toString() || null;
+
+    if (user.subscriptionId) {
+      try {
+        const subscription = await this.subscriptionService.getSubscriptionById(
+          user.subscriptionId.toString(),
+        );
+
+        if (subscription?.planId) {
+          const plan = subscription.planId as any;
+          if (plan?.name) {
+            planType = plan.name;
+          }
+        }
+      } catch (error) {
+        this.logger.warn(
+          `Could not resolve planType from subscription for user ${user.email}: ${error.message}`,
+        );
+      }
+
+      if (!clinicId) {
+        try {
+          const clinic = await this.clinicModel
+            .findOne({
+              subscriptionId: user.subscriptionId,
+              deletedAt: { $exists: false },
+            })
+            .sort({ createdAt: 1 })
+            .select('_id')
+            .lean();
+
+          if (clinic?._id) {
+            clinicId = clinic._id.toString();
+          }
+        } catch (error) {
+          this.logger.warn(
+            `Could not resolve clinicId by subscription for user ${user.email}: ${error.message}`,
+          );
+        }
+      }
+    }
+
+    if (!clinicId) {
+      try {
+        const clinic = await this.clinicModel
+          .findOne({
+            ownerId: user._id,
+            deletedAt: { $exists: false },
+          })
+          .sort({ createdAt: 1 })
+          .select('_id')
+          .lean();
+
+        if (clinic?._id) {
+          clinicId = clinic._id.toString();
+        }
+      } catch (error) {
+        this.logger.warn(
+          `Could not resolve clinicId by owner for user ${user.email}: ${error.message}`,
+        );
+      }
+    }
+
+    const updates: Partial<User> = {};
+    if (!user.planType && planType) {
+      (updates as any).planType = planType;
+    }
+    if (!user.clinicId && clinicId) {
+      (updates as any).clinicId = new Types.ObjectId(clinicId);
+    }
+
+    if (Object.keys(updates).length > 0) {
+      await this.userModel.findByIdAndUpdate(user._id, { $set: updates }).exec();
+    }
+
+    return { planType, clinicId };
   }
 
   /**
