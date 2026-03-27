@@ -14,6 +14,7 @@ import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import { User } from '../database/schemas/user.schema';
 import { Clinic } from '../database/schemas/clinic.schema';
+import { Complex } from '../database/schemas/complex.schema';
 import { AuditLog } from '../database/schemas/audit-log.schema';
 import { LoginDto, RegisterDto, AuthResponseDto, UserProfileDto } from './dto';
 import { SubscriptionService } from '../subscription/subscription.service';
@@ -38,6 +39,7 @@ export class AuthService {
   constructor(
     @InjectModel(User.name) private userModel: Model<User>,
     @InjectModel(Clinic.name) private clinicModel: Model<Clinic>,
+    @InjectModel(Complex.name) private complexModel: Model<Complex>,
     @InjectModel(AuditLog.name) private auditLogModel: Model<AuditLog>,
     private jwtService: JwtService,
     private readonly subscriptionService: SubscriptionService,
@@ -527,6 +529,9 @@ export class AuthService {
       if (!user.clinicId && resolvedContext.clinicId) {
         user.clinicId = new Types.ObjectId(resolvedContext.clinicId) as any;
       }
+      if (!user.complexId && resolvedContext.complexId) {
+        user.complexId = new Types.ObjectId(resolvedContext.complexId) as any;
+      }
       if (!user.planType && resolvedContext.planType) {
         user.planType = resolvedContext.planType as any;
       }
@@ -595,7 +600,7 @@ export class AuthService {
           setupComplete: user.setupComplete || false,
           subscriptionId: user.subscriptionId?.toString() || null,
           organizationId: user.organizationId?.toString() || null,
-          complexId: user.complexId?.toString() || null,
+          complexId: resolvedContext.complexId || user.complexId?.toString() || null,
           clinicId: resolvedContext.clinicId || user.clinicId?.toString() || null,
           onboardingComplete: user.onboardingComplete || false,
           onboardingProgress: user.onboardingProgress || [],
@@ -758,6 +763,7 @@ export class AuthService {
     const profile = new UserProfileDto(user);
 
     profile.planType = resolvedContext.planType;
+    profile.complexId = resolvedContext.complexId || profile.complexId || null;
     profile.clinicId = resolvedContext.clinicId || profile.clinicId || null;
 
     return profile;
@@ -765,8 +771,13 @@ export class AuthService {
 
   private async resolveUserScopeContext(
     user: User,
-  ): Promise<{ planType: string | null; clinicId: string | null }> {
+  ): Promise<{
+    planType: string | null;
+    complexId: string | null;
+    clinicId: string | null;
+  }> {
     let planType: string | null = user.planType ?? null;
+    let complexId: string | null = user.complexId?.toString() || null;
     let clinicId: string | null = user.clinicId?.toString() || null;
 
     if (user.subscriptionId) {
@@ -787,7 +798,7 @@ export class AuthService {
         );
       }
 
-      if (!clinicId) {
+      if (!clinicId || !complexId) {
         try {
           const clinic = await this.clinicModel
             .findOne({
@@ -795,23 +806,71 @@ export class AuthService {
               deletedAt: { $exists: false },
             })
             .sort({ createdAt: 1 })
-            .select('_id')
+            .select('_id complexId')
             .lean();
 
           if (clinic?._id) {
             clinicId = clinic._id.toString();
           }
+          if ((clinic as any)?.complexId) {
+            complexId = (clinic as any).complexId.toString();
+          }
         } catch (error) {
           this.logger.warn(
-            `Could not resolve clinicId by subscription for user ${user.email}: ${error.message}`,
+            `Could not resolve clinicId/complexId by subscription for user ${user.email}: ${error.message}`,
           );
         }
       }
     }
 
-    if (!clinicId) {
+    if (!clinicId || !complexId) {
       try {
         const clinic = await this.clinicModel
+          .findOne({
+            ownerId: user._id,
+            deletedAt: { $exists: false },
+          })
+          .sort({ createdAt: 1 })
+          .select('_id complexId')
+          .lean();
+
+        if (clinic?._id) {
+          clinicId = clinic._id.toString();
+        }
+        if ((clinic as any)?.complexId) {
+          complexId = (clinic as any).complexId.toString();
+        }
+      } catch (error) {
+        this.logger.warn(
+          `Could not resolve clinicId/complexId by owner for user ${user.email}: ${error.message}`,
+        );
+      }
+    }
+
+    if (!complexId && user.subscriptionId) {
+      try {
+        const complex = await this.complexModel
+          .findOne({
+            subscriptionId: user.subscriptionId,
+            deletedAt: { $exists: false },
+          })
+          .sort({ createdAt: 1 })
+          .select('_id')
+          .lean();
+
+        if (complex?._id) {
+          complexId = complex._id.toString();
+        }
+      } catch (error) {
+        this.logger.warn(
+          `Could not resolve complexId by subscription for user ${user.email}: ${error.message}`,
+        );
+      }
+    }
+
+    if (!complexId) {
+      try {
+        const complex = await this.complexModel
           .findOne({
             ownerId: user._id,
             deletedAt: { $exists: false },
@@ -820,12 +879,12 @@ export class AuthService {
           .select('_id')
           .lean();
 
-        if (clinic?._id) {
-          clinicId = clinic._id.toString();
+        if (complex?._id) {
+          complexId = complex._id.toString();
         }
       } catch (error) {
         this.logger.warn(
-          `Could not resolve clinicId by owner for user ${user.email}: ${error.message}`,
+          `Could not resolve complexId by owner for user ${user.email}: ${error.message}`,
         );
       }
     }
@@ -837,12 +896,15 @@ export class AuthService {
     if (!user.clinicId && clinicId) {
       (updates as any).clinicId = new Types.ObjectId(clinicId);
     }
+    if (!user.complexId && complexId) {
+      (updates as any).complexId = new Types.ObjectId(complexId);
+    }
 
     if (Object.keys(updates).length > 0) {
       await this.userModel.findByIdAndUpdate(user._id, { $set: updates }).exec();
     }
 
-    return { planType, clinicId };
+    return { planType, complexId, clinicId };
   }
 
   /**
