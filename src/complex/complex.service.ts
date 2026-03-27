@@ -488,7 +488,7 @@ export class ComplexService {
     // Calculate clinics assigned count
     const clinicsAssignedCount = await this.calculateClinicsAssigned(complexId);
 
-    const [departments, capacity, assignedClinics, doctorStaffList] =
+    const [departments, capacity, assignedClinics, doctorStaffList, workingHours] =
       await Promise.all([
         this.complexModel.db
           .collection('complex_departments')
@@ -514,7 +514,28 @@ export class ComplexService {
         this.calculateCapacity(complexId),
         this.getAssignedClinicList(complexId),
         this.getDoctorAndStaffList(complexId),
+        this.complexModel.db
+          .collection('working_hours')
+          .find({
+            entityType: 'complex',
+            entityId: new Types.ObjectId(complexId),
+            isActive: true,
+          })
+          .toArray(),
       ]);
+
+    const dayOrder = [
+      'monday',
+      'tuesday',
+      'wednesday',
+      'thursday',
+      'friday',
+      'saturday',
+      'sunday',
+    ];
+    const sortedWorkingHours = workingHours.sort((a: any, b: any) => {
+      return dayOrder.indexOf(a.dayOfWeek) - dayOrder.indexOf(b.dayOfWeek);
+    });
 
     // Build ComplexDetailsResponse
     return {
@@ -529,6 +550,8 @@ export class ComplexService {
         clinicsAssignedCount,
         departmentsCount: departments.length,
         departments,
+        schedule: sortedWorkingHours,
+        workingHours: sortedWorkingHours,
         capacity,
         assignedClinics,
         doctorStaffList,

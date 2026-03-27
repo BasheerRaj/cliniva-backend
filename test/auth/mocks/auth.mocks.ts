@@ -112,8 +112,8 @@ export const mockAuthService = {
   logout: jest.fn().mockResolvedValue({
     success: true,
     message: {
-      ar: 'تم تسجيل الخروج بنجاح',
-      en: 'Logout successful',
+      ar: 'تم تسجيل الخروج بنجاح.',
+      en: 'Logged out successfully',
     },
   }),
 };
@@ -164,9 +164,10 @@ export const createMockAuthResponse = (
 
 // Error Messages
 export const AUTH_ERROR_MESSAGES = {
-  INVALID_CREDENTIALS: 'Invalid credentials',
+  INVALID_CREDENTIALS: 'Incorrect Username or password. Please try again',
   USER_EXISTS: 'User with this email already exists',
-  ACCOUNT_INACTIVE: 'Account is inactive',
+  ACCOUNT_INACTIVE:
+    'Your account is currently inactive. Please contact the system administrator for assistance.',
   INVALID_TOKEN: 'Invalid token',
   USER_NOT_FOUND: 'User not found',
   REGISTRATION_FAILED: 'Registration failed',

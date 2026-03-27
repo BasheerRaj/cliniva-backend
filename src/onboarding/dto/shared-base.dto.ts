@@ -143,7 +143,7 @@ export class SocialMediaLinksDto {
     example: 'https://facebook.com/cliniva',
     type: String,
   })
-  @IsUrl()
+  @IsString()
   @IsOptional()
   facebook?: string;
 
@@ -152,7 +152,7 @@ export class SocialMediaLinksDto {
     example: 'https://instagram.com/cliniva',
     type: String,
   })
-  @IsUrl()
+  @IsString()
   @IsOptional()
   instagram?: string;
 
@@ -161,7 +161,7 @@ export class SocialMediaLinksDto {
     example: 'https://twitter.com/cliniva',
     type: String,
   })
-  @IsUrl()
+  @IsString()
   @IsOptional()
   twitter?: string;
 
@@ -170,7 +170,7 @@ export class SocialMediaLinksDto {
     example: 'https://linkedin.com/company/cliniva',
     type: String,
   })
-  @IsUrl()
+  @IsString()
   @IsOptional()
   linkedin?: string;
 
@@ -179,7 +179,7 @@ export class SocialMediaLinksDto {
     example: 'https://wa.me/966501234567',
     type: String,
   })
-  @IsUrl()
+  @IsString()
   @IsOptional()
   whatsapp?: string;
 
@@ -188,7 +188,7 @@ export class SocialMediaLinksDto {
     example: 'https://youtube.com/c/cliniva',
     type: String,
   })
-  @IsUrl()
+  @IsString()
   @IsOptional()
   youtube?: string;
 
@@ -197,7 +197,7 @@ export class SocialMediaLinksDto {
     example: 'https://blog.cliniva.com',
     type: String,
   })
-  @IsUrl()
+  @IsString()
   @IsOptional()
   website?: string; // Secondary website
 }

@@ -1,13 +1,11 @@
 import {
   Injectable,
-  BadRequestException,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Contact } from '../database/schemas/contact.schema';
 import { CreateContactsDto, UpdateContactDto } from './dto/create-contact.dto';
-import { ValidationUtil } from '../common/utils/validation.util';
 
 @Injectable()
 export class ContactService {
@@ -19,18 +17,6 @@ export class ContactService {
     const contacts: Contact[] = [];
 
     for (const contactData of createDto.contacts) {
-      // Validate social media URL
-      if (
-        !ValidationUtil.validateSocialMediaUrl(
-          contactData.contactType,
-          contactData.contactValue,
-        )
-      ) {
-        throw new BadRequestException(
-          `Invalid ${contactData.contactType} URL: ${contactData.contactValue}`,
-        );
-      }
-
       const contact = new this.contactModel({
         entityType: createDto.entityType,
         entityId: new Types.ObjectId(createDto.entityId),
@@ -52,20 +38,6 @@ export class ContactService {
     const contact = await this.contactModel.findById(contactId);
     if (!contact) {
       throw new NotFoundException('Contact not found');
-    }
-
-    // Validate URL if contactValue is being updated
-    if (updateDto.contactValue && updateDto.contactType) {
-      if (
-        !ValidationUtil.validateSocialMediaUrl(
-          updateDto.contactType,
-          updateDto.contactValue,
-        )
-      ) {
-        throw new BadRequestException(
-          `Invalid ${updateDto.contactType} URL: ${updateDto.contactValue}`,
-        );
-      }
     }
 
     Object.assign(contact, updateDto);

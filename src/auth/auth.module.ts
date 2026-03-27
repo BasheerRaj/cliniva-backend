@@ -33,6 +33,7 @@ import {
   RateLimitCounter,
   RateLimitCounterSchema,
 } from '../database/schemas/rate-limit-counter.schema';
+import { Complex, ComplexSchema } from '../database/schemas/complex.schema';
 import { SubscriptionModule } from '../subscription/subscription.module';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from './guards/optional-jwt-auth.guard';
@@ -52,6 +53,7 @@ import { WorkingHoursModule } from '../working-hours/working-hours.module';
       { name: SubscriptionPlan.name, schema: SubscriptionPlanSchema },
       { name: TokenBlacklist.name, schema: TokenBlacklistSchema },
       { name: Clinic.name, schema: ClinicSchema },
+      { name: Complex.name, schema: ComplexSchema },
       { name: Session.name, schema: SessionSchema },
       { name: AuditLog.name, schema: AuditLogSchema },
       { name: RateLimitCounter.name, schema: RateLimitCounterSchema },

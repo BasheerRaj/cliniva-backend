@@ -150,7 +150,9 @@ describe('Authentication (e2e)', () => {
         })
         .expect(401)
         .expect((res) => {
-          expect(res.body.message).toBe('Invalid credentials');
+          expect(res.body.message.en).toBe(
+            'Incorrect Username or password. Please try again',
+          );
         });
     });
 
@@ -163,7 +165,9 @@ describe('Authentication (e2e)', () => {
         })
         .expect(401)
         .expect((res) => {
-          expect(res.body.message).toBe('Invalid credentials');
+          expect(res.body.message.en).toBe(
+            'This Username is not registered in the system',
+          );
         });
     });
 
@@ -251,7 +255,7 @@ describe('Authentication (e2e)', () => {
           expect(res.body.success).toBe(true);
           expect(res.body.message).toHaveProperty('ar');
           expect(res.body.message).toHaveProperty('en');
-          expect(res.body.message.en).toBe('Logout successful');
+          expect(res.body.message.en).toBe('Logged out successfully');
         });
     });
 
