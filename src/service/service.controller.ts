@@ -24,6 +24,7 @@ import {
   ApiBearerAuth,
 } from '@nestjs/swagger';
 import { ServiceService } from './service.service';
+import { FilterHeaderQueryDto } from './dto/filter-header-query.dto';
 import { CreateServiceDto, AssignServicesDto } from './dto/create-service.dto';
 import { UpdateServiceDto } from './dto/update-service.dto';
 import { CreateServiceWithSessionsDto } from './dto/create-service-with-sessions.dto';
@@ -155,6 +156,73 @@ export class ServiceController {
     dto: UpdateServiceCategoryDto,
   ): Promise<Service> {
     return this.serviceService.updateServiceCategory(id, dto.serviceCategory);
+  }
+
+  /**
+   * Get clinic and doctor IDs from junction tables for a set of service IDs.
+   * Used to filter the calendar header to show only relevant clinics/doctors.
+   * MUST be defined before GET :id to avoid route conflicts.
+   */
+  @ApiOperation({
+    summary: 'Get header filter data for selected services',
+    description:
+      'Returns the union of clinic IDs and doctor IDs (from junction tables) for the given service IDs. Used by the calendar to filter header columns.',
+  })
+  @ApiQuery({
+    name: 'serviceIds',
+    description: 'Comma-separated service IDs',
+    type: String,
+    example: '507f1f77bcf86cd799439011,507f1f77bcf86cd799439012',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Filter data loaded successfully',
+    schema: {
+      example: {
+        success: true,
+        data: {
+          clinicIds: ['507f1f77bcf86cd799439040'],
+          doctorIds: ['507f1f77bcf86cd799439015'],
+        },
+        message: { ar: 'تم تحميل البيانات', en: 'Data loaded successfully' },
+      },
+    },
+  })
+  @ApiBearerAuth()
+  @Roles(
+    UserRole.ADMIN,
+    UserRole.OWNER,
+    UserRole.SUPER_ADMIN,
+    UserRole.STAFF,
+    UserRole.DOCTOR,
+    UserRole.MANAGER,
+  )
+  @Get('filter-header')
+  async getHeaderFilter(
+    @Query('serviceIds') serviceIds?: string,
+    @Request() req?: any,
+  ): Promise<any> {
+    if (!serviceIds?.trim()) {
+      return ResponseBuilder.success(
+        { clinicIds: [], doctorIds: [] },
+        { ar: 'تم تحميل البيانات', en: 'Data loaded successfully' },
+      );
+    }
+    const ids = serviceIds
+      .split(',')
+      .map((id) => id.trim())
+      .filter((id) => id.length > 0);
+    const userScope = {
+      subscriptionId: req?.user?.subscriptionId,
+      complexId: req?.user?.complexId,
+      clinicId: req?.user?.clinicId,
+      role: req?.user?.role,
+    };
+    const result = await this.serviceService.getHeaderFilter(ids, userScope);
+    return ResponseBuilder.success(result, {
+      ar: 'تم تحميل البيانات',
+      en: 'Data loaded successfully',
+    });
   }
 
   /**

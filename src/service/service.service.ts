@@ -1916,6 +1916,67 @@ export class ServiceService {
     };
   }
 
+  /**
+   * Get clinic and doctor IDs from junction tables for a given set of service IDs.
+   * Scoped to the authenticated user's subscription to prevent cross-tenant data leakage.
+   */
+  async getHeaderFilter(
+    serviceIds: string[],
+    userScope: {
+      subscriptionId?: string;
+      complexId?: string;
+      clinicId?: string;
+      role?: string;
+    },
+  ): Promise<{ clinicIds: Types.ObjectId[]; doctorIds: Types.ObjectId[] }> {
+    if (!serviceIds.length) {
+      return { clinicIds: [], doctorIds: [] };
+    }
+
+    // Build a clinic filter scoped to the user's actual access level.
+    // Priority mirrors the /clinics endpoint: most-specific scope wins.
+    // - super_admin / owner → subscription scope (all their clinics)
+    // - admin / manager / doctor / staff → clinic scope (their clinic only)
+    const clinicScopeFilter: any = { deletedAt: { $exists: false } };
+    const role = userScope.role;
+    if (role === 'super_admin') {
+      // no restriction
+    } else if (role === 'owner') {
+      if (userScope.subscriptionId && Types.ObjectId.isValid(userScope.subscriptionId)) {
+        clinicScopeFilter.subscriptionId = new Types.ObjectId(userScope.subscriptionId);
+      }
+    } else {
+      // admin, manager, doctor, staff — scope to the most specific identifier available
+      if (userScope.clinicId && Types.ObjectId.isValid(userScope.clinicId)) {
+        clinicScopeFilter._id = new Types.ObjectId(userScope.clinicId);
+      } else if (userScope.complexId && Types.ObjectId.isValid(userScope.complexId)) {
+        clinicScopeFilter.complexId = new Types.ObjectId(userScope.complexId);
+      } else if (userScope.subscriptionId && Types.ObjectId.isValid(userScope.subscriptionId)) {
+        clinicScopeFilter.subscriptionId = new Types.ObjectId(userScope.subscriptionId);
+      }
+    }
+
+    // Get the clinic IDs accessible to this user
+    const allowedClinics = await this.clinicModel
+      .find(clinicScopeFilter)
+      .distinct('_id');
+
+    const serviceObjectIds = serviceIds.map((id) => new Types.ObjectId(id));
+
+    const junctionFilter = {
+      serviceId: { $in: serviceObjectIds },
+      clinicId: { $in: allowedClinics },
+      isActive: true,
+    };
+
+    const [clinicIds, doctorIds] = await Promise.all([
+      this.clinicServiceModel.find(junctionFilter).distinct('clinicId'),
+      this.doctorServiceModel.find(junctionFilter).distinct('doctorId'),
+    ]);
+
+    return { clinicIds, doctorIds };
+  }
+
   // ==================== Doctor Assignment Methods (PART H) ====================
 
   /**
