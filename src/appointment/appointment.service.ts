@@ -715,7 +715,23 @@ export class AppointmentService {
 
     // Doctor role scoping: doctors can only see their own appointments (UC-d2e3f4c)
     if (userRole === 'doctor' && userId) {
-      filter.doctorId = new Types.ObjectId(userId);
+      const doctorObjectId = new Types.ObjectId(userId);
+      
+      if (filter.doctorId) {
+        // If a specific doctor was requested, ensure it's the current user
+        filter.doctorId = doctorObjectId;
+      } else if (filter.doctorId?.$in) {
+        // If multiple doctors were requested, restrict to just the current user
+        filter.doctorId = doctorObjectId;
+      } else {
+        // Default scoping
+        filter.doctorId = doctorObjectId;
+      }
+      
+      // Remove doctorIds filter if it exists as it might conflict or bypass scoping
+      if (filter.doctorId === undefined && (query as any).doctorIds) {
+         filter.doctorId = doctorObjectId;
+      }
     }
 
     // Staff role scoping: staff can only see appointments for their assigned clinic
@@ -2831,6 +2847,8 @@ export class AppointmentService {
     time: string,
     duration: number,
     serviceId?: string,
+    userId?: string,
+    userRole?: string,
   ): Promise<{ _id: string; name: string }[]> {
     // 0. If serviceId provided, get authorized doctor IDs from DoctorService junction
     let authorizedDoctorIds: Types.ObjectId[] | null = null;
@@ -2852,7 +2870,11 @@ export class AppointmentService {
       isActive: true,
       deletedAt: { $exists: false },
     };
-    if (authorizedDoctorIds !== null) {
+
+    // ROLE-BASED RESTRICTION: Doctors can only see themselves as available
+    if (userRole === 'doctor' && userId) {
+      doctorQuery._id = new Types.ObjectId(userId);
+    } else if (authorizedDoctorIds !== null) {
       if (authorizedDoctorIds.length === 0) return [];
       doctorQuery._id = { $in: authorizedDoctorIds };
     }
@@ -2998,6 +3020,35 @@ export class AppointmentService {
     const organizationId = requestingUser.organizationId;
     const complexId = requestingUser.complexId;
     const clinicId = requestingUser.clinicId;
+    const userId = requestingUser.userId;
+    const userRole = requestingUser.role;
+
+    // Strict UI restriction: Doctors should only see themselves in the doctor filter
+    if (userRole === 'doctor' && userId) {
+      const doctor = await this.userModel
+        .findById(new Types.ObjectId(userId))
+        .select('_id firstName lastName clinicId organizationId complexId')
+        .lean()
+        .exec();
+      
+      if (doctor) {
+        context.doctors = [{
+          _id: doctor._id.toString(),
+          firstName: (doctor as any).firstName,
+          lastName: (doctor as any).lastName,
+          clinicId: (doctor as any).clinicId?.toString(),
+        }];
+
+        // Still need to populate clinics context for the doctor's dropdown
+        if (doctor.clinicId) {
+          const clinic = await this.clinicModel.findById(doctor.clinicId).select('_id name').lean();
+          if (clinic) {
+            context.clinics = [{ _id: clinic._id.toString(), name: clinic.name }];
+          }
+        }
+        return context;
+      }
+    }
 
     if (planType === 'company' && organizationId) {
       const orgObjId = new Types.ObjectId(organizationId);

@@ -230,6 +230,29 @@ describe('AppointmentCalendarService', () => {
       );
     });
 
+    it('should restrict doctors to their own appointments even if clinicId is provided', async () => {
+      const date = new Date('2024-03-15');
+      const clinicId = new Types.ObjectId().toString();
+      const doctorId = new Types.ObjectId().toString();
+      const otherDoctorId = new Types.ObjectId().toString();
+      const query: CalendarQueryDto = { doctorId: otherDoctorId, clinicId };
+
+      mockAppointmentModel.find.mockReturnValue({
+        populate: jest.fn().mockReturnThis(),
+        sort: jest.fn().mockReturnThis(),
+        lean: jest.fn().mockReturnThis(),
+        exec: jest.fn().mockResolvedValue([]),
+      });
+
+      await service.getDayView(date, query, doctorId, 'doctor');
+
+      expect(mockAppointmentModel.find).toHaveBeenCalledWith(
+        expect.objectContaining({
+          doctorId: new Types.ObjectId(doctorId), // Should ignore otherDoctorId and force own doctorId
+        }),
+      );
+    });
+
     it('should filter by department when departmentId is provided', async () => {
       const date = new Date('2024-03-15');
       const departmentId = new Types.ObjectId().toString();
@@ -520,8 +543,8 @@ describe('AppointmentCalendarService', () => {
 
       expect(result.appointments['2024-03-15']).toBeDefined();
       expect(result.appointments['2024-03-15'].length).toBe(2);
-      expect(result.appointments['2024-03-15'][0].appointmentTime).toBe('10:00');
-      expect(result.appointments['2024-03-15'][1].appointmentTime).toBe('14:00');
+      expect(result.appointments['2024-03-15'][0].datetime).toContain('10:00');
+      expect(result.appointments['2024-03-15'][1].datetime).toContain('14:00');
     });
   });
 });

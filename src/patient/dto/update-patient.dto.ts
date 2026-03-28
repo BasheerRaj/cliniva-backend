@@ -60,6 +60,12 @@ export class UpdatePatientDto {
   @MaxLength(20)
   phone?: string;
 
+  @IsArray()
+  @IsOptional()
+  @IsString({ each: true })
+  @MinLength(10, { each: true })
+  additionalPhones?: string[];
+
   @IsEmail()
   @IsOptional()
   email?: string;

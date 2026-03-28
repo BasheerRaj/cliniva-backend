@@ -50,6 +50,9 @@ export class Patient extends Document {
   @Prop()
   phone?: string;
 
+  @Prop({ type: [String], default: [] })
+  additionalPhones?: string[];
+
   @Prop()
   email?: string;
 

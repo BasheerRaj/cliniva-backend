@@ -84,6 +84,12 @@ export class CreatePatientDto {
   @MaxLength(20)
   phone?: string;
 
+  @IsArray()
+  @IsOptional()
+  @IsString({ each: true })
+  @MinLength(10, { each: true })
+  additionalPhones?: string[];
+
   @IsEmail()
   @IsOptional()
   email?: string;
@@ -228,6 +234,7 @@ export class PatientResponseDto {
   gender: string;
   status: string;
   phone?: string;
+  additionalPhones?: string[];
   email?: string;
   address?: string;
   nationality?: string;

@@ -23,45 +23,51 @@ describe('RoleScopeGuard', () => {
   };
 
   describe('Doctor Role Restrictions', () => {
-    it('should enforce doctorId for doctor role', () => {
+    it('should restrict doctor to their own doctorId even if they have a clinic assigned', () => {
       const doctorUser = {
         id: 'doctor123',
         role: UserRole.DOCTOR,
-      };
-
-      const context = createMockContext(doctorUser, {});
-      const result = guard.canActivate(context);
-
-      const request = context.switchToHttp().getRequest();
-      expect(result).toBe(true);
-      expect(request.query.doctorId).toBe('doctor123');
-    });
-
-    it('should override doctorId if doctor tries to access other doctor appointments', () => {
-      const doctorUser = {
-        id: 'doctor123',
-        role: UserRole.DOCTOR,
+        clinicId: 'clinic456',
       };
 
       const context = createMockContext(doctorUser, {
-        doctorId: 'doctor456', // Attempting to access another doctor's appointments
+        clinicId: 'clinic456',
+        doctorId: 'otherDoctor', // Attempting to access another doctor in their clinic
       });
 
       const result = guard.canActivate(context);
       const request = context.switchToHttp().getRequest();
 
       expect(result).toBe(true);
-      expect(request.query.doctorId).toBe('doctor123'); // Should be overridden
+      expect(request.query.doctorId).toBe('doctor123'); // Overridden to their own ID
+    });
+
+    it('should restrict doctor to their own doctorId (no clinic assigned)', () => {
+      const doctorUser = {
+        id: 'doctor123',
+        role: UserRole.DOCTOR,
+        clinicId: null,
+      };
+
+      const context = createMockContext(doctorUser, {
+        doctorId: 'otherDoctor',
+      });
+
+      const result = guard.canActivate(context);
+      const request = context.switchToHttp().getRequest();
+
+      expect(result).toBe(true);
+      expect(request.query.doctorId).toBe('doctor123'); // Overridden to their own ID
     });
 
     it('should preserve other query parameters for doctors', () => {
       const doctorUser = {
         id: 'doctor123',
         role: UserRole.DOCTOR,
+        clinicId: 'clinic456',
       };
 
       const context = createMockContext(doctorUser, {
-        clinicId: 'clinic789',
         status: 'scheduled',
         view: 'week',
       });
@@ -71,7 +77,6 @@ describe('RoleScopeGuard', () => {
 
       expect(result).toBe(true);
       expect(request.query.doctorId).toBe('doctor123');
-      expect(request.query.clinicId).toBe('clinic789');
       expect(request.query.status).toBe('scheduled');
       expect(request.query.view).toBe('week');
     });

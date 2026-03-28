@@ -552,6 +552,7 @@ export class AppointmentController {
   @Get('available-doctors')
   @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.MANAGER, UserRole.DOCTOR, UserRole.STAFF)
   async getAvailableDoctors(
+    @Request() req: any,
     @Query('date') date: string,
     @Query('time') time: string,
     @Query('clinicId') clinicId: string,
@@ -568,6 +569,8 @@ export class AppointmentController {
         time,
         duration ? parseInt(duration, 10) : 30,
         serviceId,
+        req.user?.userId,
+        req.user?.role,
       );
       return {
         success: true,

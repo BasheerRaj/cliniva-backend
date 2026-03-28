@@ -709,6 +709,14 @@ export class EmployeeService {
     // Build user filter
     const userFilter: any = {};
 
+    // ROLE-BASED SELF-RESTRICTION: Doctors can only see themselves
+    if (requestingUser && requestingUser.role === 'doctor') {
+      const doctorId = requestingUser.id || requestingUser.userId || requestingUser.sub;
+      if (doctorId) {
+        userFilter._id = new Types.ObjectId(doctorId);
+      }
+    }
+
     if (firstName) userFilter.firstName = { $regex: firstName, $options: 'i' };
     if (lastName) userFilter.lastName = { $regex: lastName, $options: 'i' };
     if (email) userFilter.email = { $regex: email, $options: 'i' };
