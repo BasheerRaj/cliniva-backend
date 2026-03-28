@@ -529,6 +529,7 @@ export class ClinicService {
     // 1. Get clinic with populated relationships
     const clinic = await this.clinicModel
       .findById(clinicId)
+      .select('+_id')
       .populate('personInChargeId', 'firstName lastName email role')
       .lean()
       .exec();
@@ -558,9 +559,10 @@ export class ClinicService {
     }
 
     // 2. Calculate doctors capacity with personnel list
+    const clinicObjectId = new Types.ObjectId(clinicId);
     const doctorsList = await this.userModel
       .find({
-        clinicId: new Types.ObjectId(clinicId),
+        $or: [{ clinicId: clinicObjectId }, { clinicId: clinicId }],
         role: 'doctor',
         isActive: true,
       })
@@ -587,7 +589,7 @@ export class ClinicService {
     // 3. Calculate staff capacity with personnel list
     const staffList = await this.userModel
       .find({
-        clinicId: new Types.ObjectId(clinicId),
+        $or: [{ clinicId: clinicObjectId }, { clinicId: clinicId }],
         role: { $nin: ['doctor', 'patient'] },
         isActive: true,
       })

@@ -547,8 +547,12 @@ export class EmployeeService {
       address: createEmployeeDto.address,
       subscriptionId: resolvedSubscriptionId,
       organizationId: createEmployeeDto.organizationId,
-      complexId: createEmployeeDto.complexId,
-      clinicId: createEmployeeDto.clinicId,
+      complexId: createEmployeeDto.complexId
+        ? new Types.ObjectId(createEmployeeDto.complexId)
+        : undefined,
+      clinicId: createEmployeeDto.clinicId
+        ? new Types.ObjectId(createEmployeeDto.clinicId)
+        : undefined,
       isActive: true,
       emailVerified: false, // Will need to verify email
       setupComplete: false,

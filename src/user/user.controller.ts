@@ -60,11 +60,6 @@ import { User } from '../database/schemas/user.schema';
 export class UserController {
   private readonly logger = new Logger(UserController.name);
 
-  // Simple in-memory cache for dropdown results
-  private dropdownCache: Map<string, { data: any; timestamp: number }> =
-    new Map();
-  private readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes in milliseconds
-
   constructor(
     private readonly userService: UserService,
     private readonly userDropdownService: UserDropdownService,
@@ -1521,24 +1516,6 @@ export class UserController {
       const includeDeactivatedBool = includeDeactivated === 'true';
       const clinicIds = this.parseClinicIdsQuery(clinicIdsQuery);
 
-      // Create cache key from query parameters
-      const cacheKey = JSON.stringify({
-        role,
-        complexId,
-        clinicId,
-        clinicIds,
-        includeDeactivated: includeDeactivatedBool,
-      });
-
-      // Check cache
-      const cached = this.dropdownCache.get(cacheKey);
-      const now = Date.now();
-
-      if (cached && now - cached.timestamp < this.CACHE_TTL) {
-        this.logger.log('Returning cached dropdown results');
-        return cached.data;
-      }
-
       // Call UserDropdownService.getUsersForDropdown()
       const users = await this.userDropdownService.getUsersForDropdown({
         role,
@@ -1548,8 +1525,7 @@ export class UserController {
         includeDeactivated: includeDeactivatedBool,
       });
 
-      // Build response
-      const response = {
+      return {
         success: true,
         data: users,
         message: {
@@ -1557,25 +1533,6 @@ export class UserController {
           en: 'Users retrieved successfully',
         },
       };
-
-      // Cache the result for 5 minutes
-      this.dropdownCache.set(cacheKey, {
-        data: response,
-        timestamp: now,
-      });
-
-      // Clean up old cache entries (simple cleanup strategy)
-      if (this.dropdownCache.size > 100) {
-        const keysToDelete: string[] = [];
-        this.dropdownCache.forEach((value, key) => {
-          if (now - value.timestamp >= this.CACHE_TTL) {
-            keysToDelete.push(key);
-          }
-        });
-        keysToDelete.forEach((key) => this.dropdownCache.delete(key));
-      }
-
-      return response;
     } catch (error: any) {
       // Re-throw if already an HTTP exception
       if (error instanceof HttpException) {

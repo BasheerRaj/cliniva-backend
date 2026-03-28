@@ -118,11 +118,16 @@ export class UserDropdownService {
         }
 
         if (validClinicIds.length === 1) {
-          query.clinicId = new Types.ObjectId(validClinicIds[0]);
+          query.$or = [
+            { clinicId: new Types.ObjectId(validClinicIds[0]) },
+            { clinicId: validClinicIds[0] },
+          ];
         } else if (validClinicIds.length > 1) {
-          query.clinicId = {
-            $in: validClinicIds.map((clinicId) => new Types.ObjectId(clinicId)),
-          };
+          const objectIds = validClinicIds.map((id) => new Types.ObjectId(id));
+          query.$or = [
+            { clinicId: { $in: objectIds } },
+            { clinicId: { $in: validClinicIds } },
+          ];
         }
       }
 
