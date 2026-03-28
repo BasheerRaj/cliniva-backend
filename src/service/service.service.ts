@@ -882,6 +882,16 @@ export class ServiceService {
       }
     }
 
+    // Resolve serviceCategory: if stored as ObjectId, look up the name
+    let serviceCategoryName: string | null = plain?.serviceCategory ?? null;
+    if (serviceCategoryName && /^[a-f\d]{24}$/i.test(serviceCategoryName)) {
+      const cat = await this.serviceCategoryModel
+        .findById(serviceCategoryName)
+        .select('name')
+        .lean();
+      if (cat) serviceCategoryName = (cat as any).name;
+    }
+
     const [complexName, clinicsNames, doctorsNames] = await Promise.all([
       this.getComplexNameById(plain?.complexId),
       this.getClinicNamesByIds([...clinicIdSet]),
@@ -890,12 +900,13 @@ export class ServiceService {
 
     return {
       ...plain,
+      serviceCategory: serviceCategoryName,
       description: plain?.description ?? null,
       requiredEquipment: plain?.requiredEquipment ?? null,
       complexName,
       clinicsNames,
       doctorsNames,
-      category: plain?.serviceCategory ?? null,
+      category: serviceCategoryName,
     };
   }
 
