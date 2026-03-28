@@ -49,6 +49,19 @@ type PaginatedResult<T> = {
 
 @Injectable()
 export class ServiceService {
+  private readonly defaultServiceCategories = [
+    'Consultation',
+    'Medical Examination',
+    'Therapy Session',
+    'Dental Session',
+    'Laboratory Test',
+    'Radiology',
+    'Vaccination',
+    'Cosmetic Procedure',
+    'Wellness or Counseling',
+    'Follow-up / Reevaluation',
+  ];
+
   constructor(
     @InjectModel('Service') private readonly serviceModel: Model<Service>,
     @InjectModel('ServiceCategory')
@@ -1183,54 +1196,50 @@ export class ServiceService {
   }
 
   async getServiceCategoryList(): Promise<Array<{ id: string; name: string }>> {
-    const usedCategories = await this.serviceModel.distinct('serviceCategory', {
-      deletedAt: { $exists: false },
-      serviceCategory: { $exists: true, $nin: ['', null] },
-    });
+    const configuredCategories = this.defaultServiceCategories;
 
-    const normalizedUsedNames = Array.from(
-      new Set(
-        usedCategories
-          .map((value) => (typeof value === 'string' ? value.trim() : ''))
-          .filter((value) => value.length > 0),
-      ),
+    const existing = await this.serviceCategoryModel
+      .find()
+      .select('_id name')
+      .lean();
+
+    const existingNames = new Set(
+      existing.map((item) => item.name.trim().toLowerCase()),
     );
 
-    if (normalizedUsedNames.length > 0) {
-      const existing = await this.serviceCategoryModel
-        .find()
-        .select('name')
-        .lean();
+    const missingNames = configuredCategories.filter(
+      (name) => !existingNames.has(name.toLowerCase()),
+    );
 
-      const existingNames = new Set(
-        existing.map((item) => item.name.trim().toLowerCase()),
-      );
-
-      const missingNames = normalizedUsedNames.filter(
-        (name) => !existingNames.has(name.toLowerCase()),
-      );
-
-      if (missingNames.length > 0) {
-        try {
-          await this.serviceCategoryModel.insertMany(
-            missingNames.map((name) => ({ name })),
-            { ordered: false },
-          );
-        } catch {
-          // Ignore duplicate key races; final list is fetched below.
-        }
+    if (missingNames.length > 0) {
+      try {
+        await this.serviceCategoryModel.insertMany(
+          missingNames.map((name) => ({ name })),
+          { ordered: false },
+        );
+      } catch {
+        // Ignore duplicate key races; categories are fetched again below.
       }
     }
 
     const categories = await this.serviceCategoryModel
       .find()
-      .sort({ name: 1 })
-      .exec();
+      .select('_id name')
+      .lean();
 
-    return categories.map((category) => ({
-      id: (category._id as Types.ObjectId).toString(),
-      name: category.name,
-    }));
+    const categoriesByName = new Map(
+      categories.map((category) => [category.name.trim().toLowerCase(), category]),
+    );
+
+    return configuredCategories.map((name) => {
+      const matched = categoriesByName.get(name.toLowerCase());
+      return {
+        id:
+          matched?._id?.toString() ??
+          name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, ''),
+        name,
+      };
+    });
   }
 
   async createServiceCategory(name: string): Promise<{ name: string }> {
