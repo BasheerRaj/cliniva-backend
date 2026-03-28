@@ -227,6 +227,52 @@ export class ClinicService {
       this.clinicModel.countDocuments(query).exec(),
     ]);
 
+    // Enrich clinics with complexName when a linked complex exists.
+    const complexIds = Array.from(
+      new Set(
+        clinics
+          .map((clinic) => clinic?.complexId?.toString())
+          .filter((id): id is string => Boolean(id)),
+      ),
+    );
+
+    let complexNameById = new Map<string, string>();
+    if (complexIds.length > 0) {
+      const complexes = await this.complexModel
+        .find(
+          {
+            _id: {
+              $in: complexIds.map((id) => new Types.ObjectId(id)),
+            },
+          },
+          { name: 1 },
+        )
+        .lean()
+        .exec();
+
+      complexNameById = new Map(
+        complexes
+          .filter((complex) => Boolean(complex?.name))
+          .map((complex: any) => [complex._id.toString(), complex.name]),
+      );
+    }
+
+    const withComplexName = (clinic: any) => {
+      const complexId = clinic?.complexId?.toString();
+      const complexName = complexId
+        ? complexNameById.get(complexId)
+        : undefined;
+
+      if (!complexName) {
+        return clinic;
+      }
+
+      return {
+        ...clinic,
+        complexName,
+      };
+    };
+
     // Add capacity calculations if requested
     let enrichedClinics = clinics;
     if (includeCounts) {
@@ -317,6 +363,10 @@ export class ClinicService {
           };
         }),
       );
+
+      enrichedClinics = enrichedClinics.map(withComplexName);
+    } else {
+      enrichedClinics = clinics.map(withComplexName);
     }
 
     // Calculate meta
