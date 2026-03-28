@@ -14,6 +14,7 @@ import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import { User } from '../database/schemas/user.schema';
 import { Clinic } from '../database/schemas/clinic.schema';
+import { Complex } from '../database/schemas/complex.schema';
 import { AuditLog } from '../database/schemas/audit-log.schema';
 import { LoginDto, RegisterDto, AuthResponseDto, UserProfileDto } from './dto';
 import { SubscriptionService } from '../subscription/subscription.service';
@@ -38,6 +39,7 @@ export class AuthService {
   constructor(
     @InjectModel(User.name) private userModel: Model<User>,
     @InjectModel(Clinic.name) private clinicModel: Model<Clinic>,
+    @InjectModel(Complex.name) private complexModel: Model<Complex>,
     @InjectModel(AuditLog.name) private auditLogModel: Model<AuditLog>,
     private jwtService: JwtService,
     private readonly subscriptionService: SubscriptionService,
@@ -372,8 +374,8 @@ export class AuthService {
         if (!user.isActive) {
           throw new UnauthorizedException({
             message: {
-              ar: 'الحساب غير نشط',
-              en: 'Account is inactive',
+              ar: 'حسابك غير نشط حالياً. يرجى التواصل مع مسؤول النظام للحصول على المساعدة.',
+              en: 'Your account is currently inactive. Please contact the system administrator for assistance.',
             },
             code: 'ACCOUNT_INACTIVE',
           });
@@ -470,10 +472,10 @@ export class AuthService {
         }
         throw new UnauthorizedException({
           message: {
-            ar: 'بيانات الاعتماد غير صحيحة',
-            en: 'Invalid credentials',
+            ar: 'اسم المستخدم هذا غير مسجل في النظام.',
+            en: 'This Username is not registered in the system',
           },
-          code: 'INVALID_CREDENTIALS',
+          code: 'USERNAME_NOT_FOUND',
         });
       }
 
@@ -489,8 +491,8 @@ export class AuthService {
         }
         throw new UnauthorizedException({
           message: {
-            ar: 'الحساب غير نشط',
-            en: 'Account is inactive',
+            ar: 'حسابك غير نشط حالياً. يرجى التواصل مع مسؤول النظام للحصول على المساعدة.',
+            en: 'Your account is currently inactive. Please contact the system administrator for assistance.',
           },
           code: 'ACCOUNT_INACTIVE',
         });
@@ -513,8 +515,8 @@ export class AuthService {
         }
         throw new UnauthorizedException({
           message: {
-            ar: 'بيانات الاعتماد غير صحيحة',
-            en: 'Invalid credentials',
+            ar: 'اسم المستخدم أو كلمة المرور غير صحيحة. يرجى المحاولة مرة أخرى.',
+            en: 'Incorrect Username or password. Please try again',
           },
           code: 'INVALID_CREDENTIALS',
         });
@@ -522,6 +524,17 @@ export class AuthService {
 
       const userId = (user._id as any).toString();
       this.logger.log(`User logged in: ${user.email}`);
+
+      const resolvedContext = await this.resolveUserScopeContext(user);
+      if (!user.clinicId && resolvedContext.clinicId) {
+        user.clinicId = new Types.ObjectId(resolvedContext.clinicId) as any;
+      }
+      if (!user.complexId && resolvedContext.complexId) {
+        user.complexId = new Types.ObjectId(resolvedContext.complexId) as any;
+      }
+      if (!user.planType && resolvedContext.planType) {
+        user.planType = resolvedContext.planType as any;
+      }
 
       // Generate tokens with rememberMe support
       const tokens = await this.generateTokens(user, loginDto.rememberMe);
@@ -564,26 +577,6 @@ export class AuthService {
         );
       }
 
-      // Get planType from subscription if user has one
-      let planType: string | null = null;
-      if (user.subscriptionId) {
-        try {
-          const subscription =
-            await this.subscriptionService.getSubscriptionById(
-              user.subscriptionId.toString(),
-            );
-          if (subscription) {
-            // The planId is populated with the full SubscriptionPlan object
-            const plan = subscription.planId as any;
-            planType = plan.name; // The planType is stored in the plan's 'name' field
-          }
-        } catch (error) {
-          this.logger.warn(
-            `Could not fetch planType for user ${user.email}: ${error.message}`,
-          );
-        }
-      }
-
       // Check isFirstLogin flag and include passwordChangeRequired in response - Requirement 1.1
       const passwordChangeRequired =
         user.isFirstLogin || user.passwordChangeRequired || false;
@@ -607,11 +600,11 @@ export class AuthService {
           setupComplete: user.setupComplete || false,
           subscriptionId: user.subscriptionId?.toString() || null,
           organizationId: user.organizationId?.toString() || null,
-          complexId: user.complexId?.toString() || null,
-          clinicId: user.clinicId?.toString() || null,
+          complexId: resolvedContext.complexId || user.complexId?.toString() || null,
+          clinicId: resolvedContext.clinicId || user.clinicId?.toString() || null,
           onboardingComplete: user.onboardingComplete || false,
           onboardingProgress: user.onboardingProgress || [],
-          planType: planType, // Add planType from subscription
+          planType: resolvedContext.planType,
           isOwner: user.role === 'owner',
         },
       };
@@ -722,8 +715,8 @@ export class AuthService {
         this.logger.warn('Refresh token expired');
         throw new UnauthorizedException({
           message: {
-            ar: 'انتهت صلاحية الرمز',
-            en: 'Token expired',
+            ar: 'انتهت صلاحية الجلسة. يرجى تسجيل الدخول مرة أخرى.',
+            en: 'Your session has expired. Please log in again',
           },
           code: 'AUTH_002',
         });
@@ -766,7 +759,152 @@ export class AuthService {
       });
     }
 
-    return new UserProfileDto(user);
+    const resolvedContext = await this.resolveUserScopeContext(user);
+    const profile = new UserProfileDto(user);
+
+    profile.planType = resolvedContext.planType;
+    profile.complexId = resolvedContext.complexId || profile.complexId || null;
+    profile.clinicId = resolvedContext.clinicId || profile.clinicId || null;
+
+    return profile;
+  }
+
+  private async resolveUserScopeContext(
+    user: User,
+  ): Promise<{
+    planType: string | null;
+    complexId: string | null;
+    clinicId: string | null;
+  }> {
+    let planType: string | null = user.planType ?? null;
+    let complexId: string | null = user.complexId?.toString() || null;
+    let clinicId: string | null = user.clinicId?.toString() || null;
+
+    if (user.subscriptionId) {
+      try {
+        const subscription = await this.subscriptionService.getSubscriptionById(
+          user.subscriptionId.toString(),
+        );
+
+        if (subscription?.planId) {
+          const plan = subscription.planId as any;
+          if (plan?.name) {
+            planType = plan.name;
+          }
+        }
+      } catch (error) {
+        this.logger.warn(
+          `Could not resolve planType from subscription for user ${user.email}: ${error.message}`,
+        );
+      }
+
+      if (!clinicId || !complexId) {
+        try {
+          const clinic = await this.clinicModel
+            .findOne({
+              subscriptionId: user.subscriptionId,
+              deletedAt: { $exists: false },
+            })
+            .sort({ createdAt: 1 })
+            .select('_id complexId')
+            .lean();
+
+          if (clinic?._id) {
+            clinicId = clinic._id.toString();
+          }
+          if ((clinic as any)?.complexId) {
+            complexId = (clinic as any).complexId.toString();
+          }
+        } catch (error) {
+          this.logger.warn(
+            `Could not resolve clinicId/complexId by subscription for user ${user.email}: ${error.message}`,
+          );
+        }
+      }
+    }
+
+    if (!clinicId || !complexId) {
+      try {
+        const clinic = await this.clinicModel
+          .findOne({
+            ownerId: user._id,
+            deletedAt: { $exists: false },
+          })
+          .sort({ createdAt: 1 })
+          .select('_id complexId')
+          .lean();
+
+        if (clinic?._id) {
+          clinicId = clinic._id.toString();
+        }
+        if ((clinic as any)?.complexId) {
+          complexId = (clinic as any).complexId.toString();
+        }
+      } catch (error) {
+        this.logger.warn(
+          `Could not resolve clinicId/complexId by owner for user ${user.email}: ${error.message}`,
+        );
+      }
+    }
+
+    if (!complexId && user.subscriptionId) {
+      try {
+        const complex = await this.complexModel
+          .findOne({
+            subscriptionId: user.subscriptionId,
+            deletedAt: { $exists: false },
+          })
+          .sort({ createdAt: 1 })
+          .select('_id')
+          .lean();
+
+        if (complex?._id) {
+          complexId = complex._id.toString();
+        }
+      } catch (error) {
+        this.logger.warn(
+          `Could not resolve complexId by subscription for user ${user.email}: ${error.message}`,
+        );
+      }
+    }
+
+    if (!complexId) {
+      try {
+        const complex = await this.complexModel
+          .findOne({
+            ownerId: user._id,
+            deletedAt: { $exists: false },
+          })
+          .sort({ createdAt: 1 })
+          .select('_id')
+          .lean();
+
+        if (complex?._id) {
+          complexId = complex._id.toString();
+        }
+      } catch (error) {
+        this.logger.warn(
+          `Could not resolve complexId by owner for user ${user.email}: ${error.message}`,
+        );
+      }
+    }
+
+    const updates: Partial<User> = {};
+    if (!user.planType && planType) {
+      (updates as any).planType = planType;
+    }
+    if (!user.clinicId && clinicId) {
+      (updates as any).clinicId = new Types.ObjectId(clinicId);
+    }
+    if (!user.complexId && complexId) {
+      (updates as any).complexId = new Types.ObjectId(complexId);
+    }
+
+    if (Object.keys(updates).length > 0) {
+      await this.userModel.findByIdAndUpdate(user._id, { $set: updates }).exec();
+    }
+
+    return { planType, complexId, clinicId };
   }
 
   /**
@@ -1702,8 +1840,8 @@ export class AuthService {
       return {
         success: true,
         message: {
-          ar: 'تم تسجيل الخروج بنجاح',
-          en: 'Logout successful',
+          ar: 'تم تسجيل الخروج بنجاح.',
+          en: 'Logged out successfully',
         },
       };
     } catch (error) {

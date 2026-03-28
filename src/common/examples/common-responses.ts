@@ -202,8 +202,8 @@ export const ERROR_EXAMPLES = {
     error: {
       code: ErrorCode.INVALID_CREDENTIALS,
       message: {
-        ar: 'بيانات الاعتماد غير صحيحة',
-        en: 'Invalid credentials',
+        ar: 'اسم المستخدم أو كلمة المرور غير صحيحة. يرجى المحاولة مرة أخرى.',
+        en: 'Incorrect Username or password. Please try again',
       },
     },
   },
@@ -216,8 +216,8 @@ export const ERROR_EXAMPLES = {
     error: {
       code: ErrorCode.TOKEN_EXPIRED,
       message: {
-        ar: 'انتهت صلاحية الرمز',
-        en: 'Token expired',
+        ar: 'انتهت صلاحية الجلسة. يرجى تسجيل الدخول مرة أخرى.',
+        en: 'Your session has expired. Please log in again',
       },
     },
   },

@@ -163,8 +163,8 @@ describe('AuthController', () => {
       const mockLogoutResponse = {
         success: true,
         message: {
-          ar: 'تم تسجيل الخروج بنجاح',
-          en: 'Logout successful',
+          ar: 'تم تسجيل الخروج بنجاح.',
+          en: 'Logged out successfully',
         },
       };
 
