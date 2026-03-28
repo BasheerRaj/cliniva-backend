@@ -25,6 +25,7 @@ import {
 import { DoctorServiceService } from './doctor-service.service';
 import {
   AssignDoctorToServiceDto,
+  ActivateDoctorFromServiceDto,
   DeactivateDoctorFromServiceDto,
   UpdateDoctorServiceNotesDto,
 } from './dto/doctor-service.dto';
@@ -400,6 +401,87 @@ export class DoctorServiceController {
       message: {
         ar: 'تم إلغاء تنشيط الطبيب من الخدمة بنجاح',
         en: 'Doctor deactivated from service successfully',
+      },
+      data: result,
+    };
+  }
+
+  /**
+   * Activate doctor from service
+   * PATCH /services/:serviceId/doctors/:doctorId/activate
+   */
+  @ApiOperation({
+    summary: 'Activate doctor from service',
+    description: 'Re-activates a previously deactivated doctor in a service.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Doctor activated successfully',
+    schema: {
+      example: {
+        success: true,
+        message: {
+          ar: 'تم تنشيط الطبيب في الخدمة بنجاح',
+          en: 'Doctor activated in service successfully',
+        },
+        data: {
+          _id: '507f1f77bcf86cd799439011',
+          doctorId: '507f1f77bcf86cd799439012',
+          serviceId: '507f1f77bcf86cd799439013',
+          clinicId: '507f1f77bcf86cd799439014',
+          isActive: true,
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Assignment not found',
+    schema: {
+      example: {
+        statusCode: 404,
+        message: {
+          ar: 'الطبيب غير مسند لهذه الخدمة',
+          en: 'Doctor is not assigned to this service',
+        },
+        error: 'Not Found',
+      },
+    },
+  })
+  @ApiBearerAuth()
+  @ApiParam({
+    name: 'serviceId',
+    description: 'Service ID (MongoDB ObjectId)',
+    type: String,
+    example: '507f1f77bcf86cd799439013',
+  })
+  @ApiParam({
+    name: 'doctorId',
+    description: 'Doctor User ID (MongoDB ObjectId)',
+    type: String,
+    example: '507f1f77bcf86cd799439012',
+  })
+  @ApiBody({ type: ActivateDoctorFromServiceDto })
+  @Patch(':serviceId/doctors/:doctorId/activate')
+  async activateDoctorFromService(
+    @Param('serviceId') serviceId: string,
+    @Param('doctorId') doctorId: string,
+    @Body(new ValidationPipe({ transform: true, whitelist: true }))
+    dto: ActivateDoctorFromServiceDto,
+    @Request() req: any,
+  ) {
+    const userId = req?.user?.id || req?.user?.userId;
+    const result = await this.doctorServiceService.activateDoctorFromService(
+      serviceId,
+      doctorId,
+      dto,
+      userId,
+    );
+    return {
+      success: true,
+      message: {
+        ar: 'تم تنشيط الطبيب في الخدمة بنجاح',
+        en: 'Doctor activated in service successfully',
       },
       data: result,
     };

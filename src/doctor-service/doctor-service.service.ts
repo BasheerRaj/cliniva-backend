@@ -302,6 +302,39 @@ export class DoctorServiceService {
   }
 
   /**
+   * Activate doctor from service
+   */
+  async activateDoctorFromService(
+    serviceId: string,
+    doctorId: string,
+    dto: { clinicId: string },
+    userId: string,
+  ): Promise<any> {
+    const doctorService = await this.doctorServiceModel.findOne({
+      doctorId: new Types.ObjectId(doctorId),
+      serviceId: new Types.ObjectId(serviceId),
+      clinicId: new Types.ObjectId(dto.clinicId),
+    });
+
+    if (!doctorService) {
+      throw new NotFoundException({
+        message: {
+          ar: 'الطبيب غير مسند لهذه الخدمة',
+          en: 'Doctor is not assigned to this service',
+        },
+      });
+    }
+
+    doctorService.isActive = true;
+    doctorService.deactivatedAt = undefined;
+    doctorService.deactivationReason = undefined;
+    doctorService.deactivatedBy = undefined;
+
+    const result = await doctorService.save();
+    return result.toObject();
+  }
+
+  /**
    * Transfer appointments to another doctor
    */
   private async transferAppointments(

@@ -87,6 +87,18 @@ export class DeactivateDoctorFromServiceDto {
   notifyPatients?: boolean;
 }
 
+export class ActivateDoctorFromServiceDto {
+  @ApiProperty({
+    description: 'Clinic ID (MongoDB ObjectId)',
+    example: '507f1f77bcf86cd799439014',
+    type: String,
+  })
+  @IsString()
+  @IsNotEmpty()
+  @IsMongoId()
+  clinicId: string;
+}
+
 export class UpdateDoctorServiceNotesDto {
   @ApiProperty({
     description: 'Clinic ID (MongoDB ObjectId)',
