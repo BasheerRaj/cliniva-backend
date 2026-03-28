@@ -40,28 +40,13 @@ export class PatientService {
   ) {}
 
   /**
-   * Generate unique patient number
+   * Generate a patient number derived from a pre-generated MongoDB ObjectId.
+   * Format: PAT-{last 5 hex chars of _id}  e.g. PAT-a3f9c
    */
-  private async generatePatientNumber(): Promise<string> {
-    const prefix = 'PAT';
-    const year = new Date().getFullYear();
-
-    // Find the last patient number for current year
-    const lastPatient = await this.patientModel.findOne(
-      {
-        patientNumber: { $regex: `^${prefix}${year}` },
-      },
-      {},
-      { sort: { patientNumber: -1 } },
-    );
-
-    let nextNumber = 1;
-    if (lastPatient && lastPatient.patientNumber) {
-      const lastNumber = parseInt(lastPatient.patientNumber.substring(7)); // PAT2024001
-      nextNumber = lastNumber + 1;
-    }
-
-    return `${prefix}${year}${nextNumber.toString().padStart(3, '0')}`;
+  private generatePatientNumber(): { patientNumber: string; _id: Types.ObjectId } {
+    const _id = new Types.ObjectId();
+    const patientNumber = `PAT-${_id.toString().slice(-5)}`;
+    return { patientNumber, _id };
   }
 
   /**
@@ -167,6 +152,7 @@ export class PatientService {
   async createPatient(
     createPatientDto: CreatePatientDto,
     createdByUserId?: string,
+    scope?: PatientScopeContext,
   ): Promise<Patient> {
     this.logger.log(
       `Creating patient: ${createPatientDto.firstName} ${createPatientDto.lastName}`,
@@ -174,9 +160,10 @@ export class PatientService {
 
     await this.validatePatientData(createPatientDto);
 
-    const patientNumber = await this.generatePatientNumber();
+    const { patientNumber, _id } = this.generatePatientNumber();
 
     const patientData = {
+      _id,
       ...createPatientDto,
       patientNumber,
       dateOfBirth: new Date(createPatientDto.dateOfBirth),
@@ -191,6 +178,9 @@ export class PatientService {
       createdBy: createdByUserId
         ? new Types.ObjectId(createdByUserId)
         : undefined,
+      ...(scope?.clinicId ? { clinicId: new Types.ObjectId(scope.clinicId) } : {}),
+      ...(scope?.complexId ? { complexId: new Types.ObjectId(scope.complexId) } : {}),
+      ...(scope?.organizationId ? { organizationId: new Types.ObjectId(scope.organizationId) } : {}),
     };
 
     const patient = new this.patientModel(patientData);

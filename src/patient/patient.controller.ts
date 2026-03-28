@@ -131,23 +131,22 @@ export class PatientController {
     @Body(new ValidationPipe()) createPatientDto: CreatePatientDto,
     @Request() req: any,
   ) {
-    try {
-      const patient = await this.patientService.createPatient(
-        createPatientDto,
-        req.user?.userId,
-      );
-      return {
-        success: true,
-        message: 'Patient created successfully',
-        data: patient,
-      };
-    } catch (error) {
-      return {
-        success: false,
-        message: 'Failed to create patient',
-        error: error.message,
-      };
-    }
+    const scope: PatientScopeContext = {
+      requestingUserId: req.user?.userId,
+      role: req.user?.role,
+      complexId: req.user?.complexId ?? null,
+      clinicId: req.user?.clinicId ?? null,
+      organizationId: req.user?.organizationId ?? null,
+    };
+    const patient = await this.patientService.createPatient(
+      createPatientDto,
+      req.user?.userId,
+      scope,
+    );
+    return ResponseBuilder.success(patient, {
+      ar: 'تم إنشاء المريض بنجاح',
+      en: 'Patient created successfully',
+    });
   }
 
   /**
