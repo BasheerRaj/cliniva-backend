@@ -151,7 +151,10 @@ jspm_packages/
 ehthumbs.db
 Thumbs.db 
 
-*.md
+# *.md
 
-uploads/*
-files/*
+# uploads/*
+# files/*
+
+# Git worktrees
+.worktrees/
