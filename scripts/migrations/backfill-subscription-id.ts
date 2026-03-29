@@ -23,6 +23,7 @@ async function run() {
   console.log('Connected to MongoDB. Starting backfill...\n');
 
   const db = mongoose.connection.db;
+  if (!db) throw new Error('Database connection not established');
 
   // ── 1. Backfill Specialty ──────────────────────────────────────────────────
   const specialties = await db
