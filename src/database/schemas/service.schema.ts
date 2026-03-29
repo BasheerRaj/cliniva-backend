@@ -9,6 +9,9 @@ export class Service extends Document {
   @Prop({ type: Types.ObjectId, ref: 'Complex', required: false })
   complexId?: Types.ObjectId; // Optional for clinic-only services
 
+  @Prop({ type: Types.ObjectId, ref: 'Subscription', index: true })
+  subscriptionId?: Types.ObjectId;
+
   @Prop({ type: Types.ObjectId, ref: 'Clinic', required: false })
   clinicId?: Types.ObjectId; // For direct clinic services
 
