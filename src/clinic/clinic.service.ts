@@ -23,6 +23,7 @@ import { ResponseBuilder } from '../common/utils/response-builder.util';
 import { ERROR_MESSAGES } from '../common/utils/error-messages.constant';
 import { ERROR_CODES } from './constants/error-codes.constant';
 import { SubscriptionService } from '../subscription/subscription.service';
+import { buildTenantFilter, TenantUser } from '../common/utils/tenant-scope.util';
 
 @Injectable()
 export class ClinicService {
@@ -726,7 +727,7 @@ export class ClinicService {
    * @param filters - Optional filters (isActive, sortBy, sortOrder)
    * @returns Standardized response with clinics array
    */
-  async getClinicsByComplex(complexId: string, filters?: ClinicFilterDto) {
+  async getClinicsByComplex(complexId: string, filters?: ClinicFilterDto, requestingUser?: TenantUser) {
     // Validate complex exists
     await ValidationUtil.validateEntityExists(
       this.complexModel,
@@ -734,8 +735,9 @@ export class ClinicService {
       ERROR_MESSAGES.COMPLEX_NOT_FOUND,
     );
 
-    // Build query
-    const query: any = { complexId: new Types.ObjectId(complexId) };
+    // Build query with tenant scope
+    const tenantFilter = requestingUser ? buildTenantFilter(requestingUser) : {};
+    const query: any = { ...tenantFilter, complexId: new Types.ObjectId(complexId) };
 
     if (filters?.isActive !== undefined) {
       query.isActive = filters.isActive;

@@ -733,9 +733,10 @@ export class ClinicController {
   async getClinicsByComplex(
     @Param('complexId') complexId: string,
     @Query() filters: ClinicFilterDto,
+    @Request() req: any,
   ) {
     try {
-      return await this.clinicService.getClinicsByComplex(complexId, filters);
+      return await this.clinicService.getClinicsByComplex(complexId, filters, req.user);
     } catch (error) {
       // Re-throw if already an HTTP exception
       if (error instanceof HttpException) {
