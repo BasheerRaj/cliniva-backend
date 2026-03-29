@@ -12,6 +12,7 @@ import {
   HttpStatus,
   Query,
   Request,
+  Req,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -110,8 +111,9 @@ export class ServiceController {
   async createService(
     @Body(new ValidationPipe({ transform: true, whitelist: true }))
     createServiceDto: CreateServiceWithSessionsDto,
+    @Req() req: any,
   ): Promise<any> {
-    const service = await this.serviceService.createService(createServiceDto);
+    const service = await this.serviceService.createService(createServiceDto, req.user);
     return this.enrichServiceResponse(service);
   }
 
@@ -1084,6 +1086,7 @@ export class ServiceController {
       user?.complexId,
       user?.clinicId,
       user?.subscriptionId,
+      user,
     );
 
     return this.enrichPaginatedServiceResponse(services);
