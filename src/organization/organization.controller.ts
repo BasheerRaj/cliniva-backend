@@ -27,6 +27,9 @@ import {
   SetupLegalInfoDto,
 } from './dto/create-organization.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../common/guards/roles.guard';
+import { Roles } from '../common/decorators/roles.decorator';
+import { UserRole } from '../common/enums/user-role.enum';
 import * as SWAGGER_EXAMPLES from './constants/swagger-examples';
 
 @ApiTags('Organizations')
@@ -102,7 +105,8 @@ export class OrganizationController {
     },
   })
   @Post()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER)
   @HttpCode(HttpStatus.CREATED)
   async createOrganization(
     @Body() createOrganizationDto: CreateOrganizationDto,
@@ -161,6 +165,7 @@ export class OrganizationController {
     type: String,
   })
   @Get(':id')
+  @UseGuards(JwtAuthGuard)
   async getOrganization(@Param('id') id: string, @Req() req) {
     try {
       const organization = await this.organizationService.getOrganization(id, req.user);

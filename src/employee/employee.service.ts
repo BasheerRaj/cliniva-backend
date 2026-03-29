@@ -1968,7 +1968,7 @@ export class EmployeeService {
         userId: new Types.ObjectId(employeeId),
         isActive: true,
       })
-      .populate('entityId')
+      .populate('entityId', 'name')
       .sort({ dayOfWeek: 1, startTime: 1 })
       .exec();
   }

@@ -26,6 +26,9 @@ import {
 } from '@nestjs/swagger';
 import { EmployeeService } from './employee.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../common/guards/roles.guard';
+import { Roles } from '../common/decorators/roles.decorator';
+import { UserRole } from '../common/enums/user-role.enum';
 import {
   CreateEmployeeDto,
   UpdateEmployeeDto,
@@ -102,6 +105,8 @@ export class EmployeeController {
   })
   @ApiBearerAuth()
   @ApiBody({ type: CreateEmployeeDto })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.MANAGER)
   @Post()
   async createEmployee(
     @Body(new ValidationPipe()) createEmployeeDto: CreateEmployeeDto,
@@ -506,6 +511,8 @@ export class EmployeeController {
     type: String,
   })
   @ApiBody({ type: UpdateEmployeeDto })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.MANAGER)
   @Put(':id')
   async updateEmployee(
     @Param('id') id: string,
@@ -589,6 +596,8 @@ export class EmployeeController {
     description: 'Employee ID (MongoDB ObjectId)',
     type: String,
   })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.MANAGER)
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
   async deleteEmployee(@Param('id') id: string, @Request() req: any) {
@@ -665,6 +674,8 @@ export class EmployeeController {
     type: String,
   })
   @ApiBody({ type: TerminateEmployeeDto })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.MANAGER)
   @Post(':id/terminate')
   async terminateEmployee(
     @Param('id') id: string,
@@ -1315,6 +1326,8 @@ export class EmployeeController {
   })
   @ApiBearerAuth()
   @ApiBody({ type: BulkEmployeeActionDto })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.MANAGER)
   @Post('bulk-action')
   async bulkEmployeeAction(
     @Body(new ValidationPipe()) bulkActionDto: BulkEmployeeActionDto,
@@ -1409,6 +1422,8 @@ export class EmployeeController {
     type: String,
   })
   @ApiBody({ type: CreateEmployeeDocumentDto })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.MANAGER)
   @Post(':id/documents')
   async createEmployeeDocument(
     @Param('id') employeeId: string,
@@ -1592,6 +1607,8 @@ export class EmployeeController {
     type: String,
   })
   @ApiBody({ type: UpdateEmployeeDocumentDto })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.MANAGER)
   @Put('documents/:documentId')
   async updateEmployeeDocument(
     @Param('documentId') documentId: string,

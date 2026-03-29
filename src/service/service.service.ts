@@ -694,7 +694,7 @@ export class ServiceService {
         clinicId: new Types.ObjectId(clinicId),
         isActive: true,
       })
-      .populate('serviceId')
+      .populate('serviceId', 'name serviceCategory price isActive description')
       .exec();
 
     return clinicServices.map((cs) => cs.serviceId as unknown as Service);
@@ -717,7 +717,7 @@ export class ServiceService {
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
-        .populate('serviceId')
+        .populate('serviceId', 'name serviceCategory price isActive description')
         .exec(),
       this.clinicServiceModel.countDocuments(clinicQuery),
     ]);

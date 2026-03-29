@@ -151,6 +151,7 @@ export class ServiceController {
     example: '507f1f77bcf86cd799439011',
   })
   @ApiBody({ type: UpdateServiceCategoryDto })
+  @Roles(UserRole.ADMIN, UserRole.OWNER, UserRole.SUPER_ADMIN, UserRole.MANAGER)
   @Patch(':id/category')
   async updateServiceCategory(
     @Param('id') id: string,

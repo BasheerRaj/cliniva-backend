@@ -280,7 +280,7 @@ export class DepartmentService {
         complexId: new Types.ObjectId(complexId),
         isActive: true,
       })
-      .populate('departmentId')
+      .populate('departmentId', 'name description status')
       .exec();
   }
 
@@ -294,7 +294,7 @@ export class DepartmentService {
   ): Promise<ComplexDepartment | null> {
     return await this.complexDepartmentModel
       .findById(complexDepartmentId)
-      .populate('departmentId')
+      .populate('departmentId', 'name description status')
       .exec();
   }
 

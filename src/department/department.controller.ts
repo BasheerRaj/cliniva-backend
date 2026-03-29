@@ -672,6 +672,7 @@ export class DepartmentController {
    * Assign departments to a complex
    */
   @Post('complexes/:complexId/assign')
+  @UseGuards(JwtAuthGuard, AdminGuard)
   @HttpCode(HttpStatus.CREATED)
   async assignDepartmentsToComplex(
     @Param('complexId') complexId: string,
@@ -700,6 +701,7 @@ export class DepartmentController {
    * Get complex-department relationships for a complex
    */
   @Get('complexes/:complexId/relationships')
+  @UseGuards(JwtAuthGuard, AdminGuard)
   async getComplexDepartmentsByComplex(
     @Param('complexId') complexId: string,
   ): Promise<ComplexDepartment[]> {
@@ -710,6 +712,7 @@ export class DepartmentController {
    * Create a relationship between complex and department
    */
   @Post('complexes/:complexId/departments/:departmentId')
+  @UseGuards(JwtAuthGuard, AdminGuard)
   @HttpCode(HttpStatus.CREATED)
   async createComplexDepartment(
     @Param('complexId') complexId: string,
