@@ -12,6 +12,7 @@ import {
   HttpStatus,
   Query,
   Request,
+  Req,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -70,8 +71,9 @@ export class SpecialtyController {
   async createSpecialty(
     @Body(new ValidationPipe({ transform: true, whitelist: true }))
     createSpecialtyDto: CreateSpecialtyDto,
+    @Req() req: any,
   ) {
-    const specialty = await this.specialtyService.createSpecialty(createSpecialtyDto);
+    const specialty = await this.specialtyService.createSpecialty(createSpecialtyDto, req.user);
     return ResponseBuilder.success(specialty, {
       ar: 'تم إنشاء التخصص بنجاح',
       en: 'Specialty created successfully',
@@ -123,8 +125,9 @@ export class SpecialtyController {
   })
   async getAllSpecialties(
     @Query(new ValidationPipe({ transform: true })) query: SpecialtySearchDto,
+    @Req() req: any,
   ) {
-    const result = await this.specialtyService.getAllSpecialties(query);
+    const result = await this.specialtyService.getAllSpecialties(query, req.user);
     return ResponseBuilder.success(
       {
         specialties: result.specialties,
@@ -190,8 +193,9 @@ export class SpecialtyController {
   async getSpecialtiesForDropdown(
     @Query(new ValidationPipe({ transform: true, whitelist: true }))
     query: SpecialtyDropdownQueryDto,
+    @Req() req: any,
   ) {
-    const specialties = await this.specialtyService.getSpecialtiesForDropdown(query);
+    const specialties = await this.specialtyService.getSpecialtiesForDropdown(query, req.user);
     return ResponseBuilder.success(specialties, {
       ar: 'تم جلب قائمة التخصصات بنجاح',
       en: 'Specialties retrieved successfully',

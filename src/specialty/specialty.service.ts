@@ -16,6 +16,7 @@ import {
   SpecialtySearchDto,
 } from './dto';
 import { ResponseBuilder } from '../common/utils/response-builder.util';
+import { buildTenantFilter, TenantUser } from '../common/utils/tenant-scope.util';
 
 @Injectable()
 export class SpecialtyService {
@@ -28,7 +29,7 @@ export class SpecialtyService {
     @InjectModel('Complex') private readonly complexModel: Model<any>,
   ) {}
 
-  async createSpecialty(createDto: CreateSpecialtyDto): Promise<Specialty> {
+  async createSpecialty(createDto: CreateSpecialtyDto, creatingUser: TenantUser): Promise<Specialty> {
     const existing = await this.specialtyModel.findOne({
       name: { $regex: new RegExp(`^${createDto.name}$`, 'i') },
     });
@@ -50,6 +51,9 @@ export class SpecialtyService {
     const specialty = new this.specialtyModel({
       ...createDto,
       isActive: createDto.isActive !== undefined ? createDto.isActive : true,
+      subscriptionId: creatingUser.subscriptionId
+        ? new Types.ObjectId(creatingUser.subscriptionId)
+        : undefined,
     });
     return await specialty.save();
   }
@@ -58,8 +62,9 @@ export class SpecialtyService {
     complexId?: string;
     search?: string;
     includeInactive?: boolean;
-  }): Promise<any[]> {
-    const query: any = {};
+  }, requestingUser?: TenantUser): Promise<any[]> {
+    const tenantFilter = buildTenantFilter(requestingUser ?? {} as TenantUser);
+    const query: any = { ...tenantFilter };
 
     if (!filters?.includeInactive) {
       query.isActive = true;
@@ -83,7 +88,7 @@ export class SpecialtyService {
       .lean();
   }
 
-  async getAllSpecialties(query: SpecialtySearchDto): Promise<{
+  async getAllSpecialties(query: SpecialtySearchDto, requestingUser?: TenantUser): Promise<{
     specialties: any[];
     total: number;
     page: number;
@@ -99,7 +104,8 @@ export class SpecialtyService {
       sortOrder = 'asc',
     } = query;
 
-    const filter: any = {};
+    const tenantFilter = buildTenantFilter(requestingUser ?? {} as TenantUser);
+    const filter: any = { ...tenantFilter };
     if (search) {
       filter.$or = [
         { name: { $regex: search, $options: 'i' } },
