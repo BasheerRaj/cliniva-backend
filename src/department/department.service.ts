@@ -29,6 +29,10 @@ import {
   buildCannotDeleteReason,
   buildDeletionRecommendations,
 } from './constants';
+import {
+  buildTenantFilter,
+  TenantUser,
+} from '../common/utils/tenant-scope.util';
 
 /**
  * Internal interface for clinic data with populated complex
@@ -61,15 +65,21 @@ export class DepartmentService {
   /**
    * Create a new department
    * @param createDepartmentDto - Department creation data
+   * @param creatingUser - Authenticated user creating the department (provides tenant scope).
+   *   Optional for backward compatibility with the onboarding flow which creates
+   *   departments before the user has a full JWT scope.
    * @returns Created department document
    * @throws BadRequestException if department name already exists
    */
   async createDepartment(
     createDepartmentDto: CreateDepartmentDto,
+    creatingUser?: TenantUser,
   ): Promise<Department> {
-    // Check if department already exists
+    // Check if department already exists (scoped to the same subscription when user is provided)
+    const tenantFilter = creatingUser ? buildTenantFilter(creatingUser) : {};
     const existingDepartment = await this.departmentModel.findOne({
       name: createDepartmentDto.name,
+      ...tenantFilter,
     });
 
     if (existingDepartment) {
@@ -79,16 +89,28 @@ export class DepartmentService {
       });
     }
 
-    const department = new this.departmentModel(createDepartmentDto);
+    const department = new this.departmentModel({
+      ...createDepartmentDto,
+      subscriptionId:
+        creatingUser?.subscriptionId
+          ? new Types.ObjectId(creatingUser.subscriptionId)
+          : undefined,
+      complexId:
+        creatingUser?.complexId
+          ? new Types.ObjectId(creatingUser.complexId)
+          : undefined,
+    });
     return await department.save();
   }
 
   /**
    * Get all departments
-   * @returns Array of all department documents
+   * @param requestingUser - Authenticated user (used to scope results to tenant)
+   * @returns Array of department documents scoped to the requesting user's subscription
    */
-  async getAllDepartments(): Promise<Department[]> {
-    return await this.departmentModel.find().exec();
+  async getAllDepartments(requestingUser?: TenantUser): Promise<Department[]> {
+    const tenantFilter = requestingUser ? buildTenantFilter(requestingUser) : {};
+    return await this.departmentModel.find(tenantFilter).exec();
   }
 
   /**
@@ -222,20 +244,27 @@ export class DepartmentService {
   /**
    * Get all departments assigned to a specific complex
    * @param complexId - Complex ID
+   * @param requestingUser - Authenticated user (used to scope results to tenant)
    * @returns Array of department documents
    */
-  async getDepartmentsByComplex(complexId: string): Promise<Department[]> {
+  async getDepartmentsByComplex(
+    complexId: string,
+    requestingUser?: TenantUser,
+  ): Promise<Department[]> {
     const complexDepartments = await this.complexDepartmentModel
       .find({
         complexId: new Types.ObjectId(complexId),
         isActive: true,
       })
-      .populate('departmentId')
+      .populate({
+        path: 'departmentId',
+        match: requestingUser ? buildTenantFilter(requestingUser) : {},
+      })
       .exec();
 
-    return complexDepartments.map(
-      (cd) => cd.departmentId as unknown as Department,
-    );
+    return complexDepartments
+      .filter((cd) => cd.departmentId !== null)
+      .map((cd) => cd.departmentId as unknown as Department);
   }
 
   /**

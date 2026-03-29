@@ -548,6 +548,11 @@ export class ComplexController {
         data: complex,
       };
     } catch (error) {
+      // Re-throw ForbiddenException so NestJS returns HTTP 403
+      if (error instanceof ForbiddenException) {
+        throw error;
+      }
+
       // Handle specific error types
       if (
         error instanceof BadRequestException ||
@@ -599,6 +604,11 @@ export class ComplexController {
         data: complexes,
       };
     } catch (error) {
+      // Re-throw ForbiddenException so NestJS returns HTTP 403
+      if (error instanceof ForbiddenException) {
+        throw error;
+      }
+
       // Handle specific error types
       if (
         error instanceof BadRequestException ||

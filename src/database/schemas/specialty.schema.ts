@@ -6,7 +6,7 @@ import { Document, Types } from 'mongoose';
   collection: 'specialties',
 })
 export class Specialty extends Document {
-  @Prop({ required: true, unique: true })
+  @Prop({ required: true })
   name: string; // 'Cardiology', 'Dermatology', etc.
 
   @Prop()
@@ -17,6 +17,9 @@ export class Specialty extends Document {
 
   @Prop({ type: Types.ObjectId, ref: 'Complex' })
   complexId?: Types.ObjectId;
+
+  @Prop({ type: Types.ObjectId, ref: 'Subscription', index: true })
+  subscriptionId?: Types.ObjectId;
 
   @Prop()
   deactivatedAt?: Date;
@@ -34,3 +37,4 @@ export const SpecialtySchema = SchemaFactory.createForClass(Specialty);
 SpecialtySchema.index({ isActive: 1 });
 SpecialtySchema.index({ complexId: 1 });
 SpecialtySchema.index({ name: 'text', description: 'text' });
+SpecialtySchema.index({ name: 1, subscriptionId: 1 }, { unique: true, sparse: true });

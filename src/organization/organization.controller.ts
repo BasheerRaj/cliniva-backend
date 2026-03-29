@@ -9,6 +9,8 @@ import {
   HttpCode,
   UseGuards,
   Request,
+  Req,
+  ForbiddenException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -159,9 +161,9 @@ export class OrganizationController {
     type: String,
   })
   @Get(':id')
-  async getOrganization(@Param('id') id: string) {
+  async getOrganization(@Param('id') id: string, @Req() req) {
     try {
-      const organization = await this.organizationService.getOrganization(id);
+      const organization = await this.organizationService.getOrganization(id, req.user);
 
       return {
         success: true,
@@ -169,6 +171,7 @@ export class OrganizationController {
         data: organization,
       };
     } catch (error) {
+      if (error instanceof ForbiddenException) throw error;
       return {
         success: false,
         message: 'Failed to retrieve organization',

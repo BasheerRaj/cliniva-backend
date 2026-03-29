@@ -29,6 +29,7 @@ import { ServiceOfferService } from '../service-offer/service-offer.service';
 import { CalculateServicePriceDto } from '../service-offer/dto/calculate-service-price.dto';
 import { PriceCalculation } from '../service-offer/interfaces/price-calculation.interface';
 import { SessionManagerService } from './services/session-manager.service';
+import { buildTenantFilter, TenantUser } from '../common/utils/tenant-scope.util';
 
 type PaginationOptions = {
   page?: number;
@@ -83,7 +84,7 @@ export class ServiceService {
     private readonly sessionManagerService: SessionManagerService,
   ) {}
 
-  async createService(createDto: CreateServiceWithSessionsDto): Promise<Service> {
+  async createService(createDto: CreateServiceWithSessionsDto, creatingUser?: TenantUser): Promise<Service> {
     // Validate service name length
     if (createDto.name.trim().length < 2) {
       throw new BadRequestException(
@@ -147,6 +148,9 @@ export class ServiceService {
       price: createDto.price || 0,
       serviceCategory: createDto.serviceCategory?.trim() || undefined,
       requiredEquipment: createDto.requiredEquipment?.trim() || undefined,
+      ...(creatingUser?.subscriptionId
+        ? { subscriptionId: new Types.ObjectId(creatingUser.subscriptionId) }
+        : {}),
     };
 
     // Add complex ID only if provided
@@ -442,9 +446,12 @@ export class ServiceService {
 
   async getServicesByComplex(
     complexId: string,
+    requestingUser?: TenantUser,
   ): Promise<Service[]> {
+    const tenantFilter = requestingUser ? buildTenantFilter(requestingUser) : {};
     return this.serviceModel
       .find({
+        ...tenantFilter,
         complexId: new Types.ObjectId(complexId),
         deletedAt: { $exists: false },
       })
@@ -483,8 +490,11 @@ export class ServiceService {
     userComplexId?: string,
     userClinicId?: string,
     subscriptionId?: string,
+    requestingUser?: TenantUser,
   ): Promise<PaginatedResult<Service>> {
+    const tenantFilter = requestingUser ? buildTenantFilter(requestingUser) : {};
     const query: any = {
+      ...tenantFilter,
       deletedAt: { $exists: false },
     };
 
