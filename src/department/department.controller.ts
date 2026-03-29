@@ -11,6 +11,7 @@ import {
   HttpCode,
   HttpStatus,
   UseGuards,
+  Req,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -48,6 +49,7 @@ export class DepartmentController {
    * Create a new department
    */
   @Post()
+  @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({
     summary: 'Create new department',
@@ -195,8 +197,9 @@ export class DepartmentController {
   async createDepartment(
     @Body(new ValidationPipe({ transform: true, whitelist: true }))
     createDepartmentDto: CreateDepartmentDto,
+    @Req() req,
   ): Promise<Department> {
-    return this.departmentService.createDepartment(createDepartmentDto);
+    return this.departmentService.createDepartment(createDepartmentDto, req.user);
   }
 
   /**
@@ -299,8 +302,8 @@ export class DepartmentController {
       },
     },
   })
-  async getAllDepartments(): Promise<Department[]> {
-    return this.departmentService.getAllDepartments();
+  async getAllDepartments(@Req() req): Promise<Department[]> {
+    return this.departmentService.getAllDepartments(req.user);
   }
 
   /**
@@ -685,10 +688,12 @@ export class DepartmentController {
    * Get departments for a specific complex
    */
   @Get('complexes/:complexId')
+  @UseGuards(JwtAuthGuard)
   async getDepartmentsByComplex(
     @Param('complexId') complexId: string,
+    @Req() req,
   ): Promise<Department[]> {
-    return this.departmentService.getDepartmentsByComplex(complexId);
+    return this.departmentService.getDepartmentsByComplex(complexId, req.user);
   }
 
   /**
