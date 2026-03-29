@@ -2,8 +2,10 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ForbiddenException,
   InternalServerErrorException,
 } from '@nestjs/common';
+import { assertSameTenant, TenantUser } from '../common/utils/tenant-scope.util';
 import { InjectModel, InjectConnection } from '@nestjs/mongoose';
 import { Model, Types, Connection } from 'mongoose';
 import { Organization } from '../database/schemas/organization.schema';
@@ -219,13 +221,19 @@ export class OrganizationService {
     }
   }
 
-  async getOrganization(organizationId: string): Promise<Organization> {
+  async getOrganization(organizationId: string, requestingUser?: TenantUser): Promise<Organization> {
     const organization = await this.organizationModel
       .findById(organizationId)
       .exec();
     if (!organization) {
       throw new NotFoundException('Organization not found');
     }
+
+    // Tenant ownership check — non-super_admin cannot read other tenants' orgs
+    if (requestingUser) {
+      assertSameTenant(organization.subscriptionId, requestingUser);
+    }
+
     return this.formatOrganizationResponse(organization);
   }
 
