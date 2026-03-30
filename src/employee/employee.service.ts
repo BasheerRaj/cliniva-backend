@@ -1070,6 +1070,28 @@ export class EmployeeService {
         },
       },
       {
+        $lookup: {
+          from: 'clinics',
+          let: {
+            clinicIds: {
+              $map: {
+                input: { $ifNull: ['$clinicIds', []] },
+                as: 'cid',
+                in: {
+                  $cond: {
+                    if: { $eq: [{ $type: '$$cid' }, 'string'] },
+                    then: { $convert: { input: '$$cid', to: 'objectId', onError: null, onNull: null } },
+                    else: '$$cid',
+                  },
+                },
+              },
+            },
+          },
+          pipeline: [{ $match: { $expr: { $in: ['$_id', '$$clinicIds'] } } }],
+          as: 'clinicsList',
+        },
+      },
+      {
         $addFields: {
           organization: { $arrayElemAt: ['$organization', 0] },
           complex: { $arrayElemAt: ['$complex', 0] },
@@ -1238,6 +1260,31 @@ export class EmployeeService {
         { $set: profileUpdates },
         { new: true, runValidators: true },
       );
+    }
+
+    // Update doctor specialties if provided
+    if (Array.isArray(updateEmployeeDto.specialties)) {
+      const employeeObjectId = new Types.ObjectId(employeeId);
+      // Deactivate all existing specialty assignments
+      await this.doctorSpecialtyModel.updateMany(
+        { doctorId: employeeObjectId },
+        { $set: { isActive: false } },
+      );
+      // Create new active assignments
+      if (updateEmployeeDto.specialties.length > 0) {
+        const validIds = updateEmployeeDto.specialties
+          .filter((id) => Types.ObjectId.isValid(id))
+          .map((id) => new Types.ObjectId(id));
+        if (validIds.length > 0) {
+          const assignments = validIds.map((specialtyId) => ({
+            doctorId: employeeObjectId,
+            specialtyId,
+            isActive: true,
+            assignedAt: new Date(),
+          }));
+          await this.doctorSpecialtyModel.insertMany(assignments);
+        }
+      }
     }
 
     // Audit log for employee update
