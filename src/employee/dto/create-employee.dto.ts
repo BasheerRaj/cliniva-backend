@@ -638,6 +638,27 @@ export class CreateEmployeeDto {
   clinicId?: string;
 
   @ApiPropertyOptional({
+    description: 'Array of clinic IDs to assign employee to (multi-clinic support)',
+    example: ['507f1f77bcf86cd799439032'],
+    type: [String],
+  })
+  @IsArray({
+    message: JSON.stringify({
+      ar: 'معرف العيادات يجب أن يكون مصفوفة',
+      en: 'Clinic IDs must be an array',
+    }),
+  })
+  @IsMongoId({
+    each: true,
+    message: JSON.stringify({
+      ar: 'معرف العيادة غير صالح',
+      en: 'Invalid clinic ID',
+    }),
+  })
+  @IsOptional()
+  clinicIds?: string[];
+
+  @ApiPropertyOptional({
     description: 'Array of specialty IDs for medical staff',
     example: ['507f1f77bcf86cd799439040', '507f1f77bcf86cd799439041'],
     type: [String],
@@ -669,6 +690,28 @@ export class UpdateEmployeeDto {
   @IsEmail()
   @IsOptional()
   email?: string;
+
+  @ApiPropertyOptional({ description: 'Employee username', example: 'john.doe', type: String })
+  @IsString()
+  @IsOptional()
+  @MinLength(3)
+  @MaxLength(50)
+  username?: string;
+
+  @ApiPropertyOptional({ description: 'Employee gender', example: 'male', enum: ['male', 'female', 'other'] })
+  @IsEnum(['male', 'female', 'other'])
+  @IsOptional()
+  gender?: string;
+
+  @ApiPropertyOptional({ description: 'Employee date of birth', example: '1990-01-15', type: String })
+  @IsDateString()
+  @IsOptional()
+  dateOfBirth?: string;
+
+  @ApiPropertyOptional({ description: 'Employee date of hiring', example: '2023-06-01', type: String })
+  @IsDateString()
+  @IsOptional()
+  dateOfHiring?: string;
 
   @ApiPropertyOptional({
     description: 'Employee role',
@@ -879,6 +922,16 @@ export class UpdateEmployeeDto {
   @IsString({ each: true })
   @IsOptional()
   specialties?: string[];
+
+  @ApiPropertyOptional({
+    description: 'Array of clinic IDs to assign the employee to',
+    example: ['507f1f77bcf86cd799439040'],
+    type: [String],
+  })
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  clinicIds?: string[];
 }
 
 // Employee Document DTOs

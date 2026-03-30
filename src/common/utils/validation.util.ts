@@ -59,23 +59,18 @@ export class ValidationUtil {
     );
   }
 
-  static validateVATNumber(vatNumber: string, country = 'SA'): boolean {
+  static validateVATNumber(vatNumber: string): boolean {
     if (!vatNumber) return true; // Optional field
 
-    // Saudi Arabia VAT number format: 15 digits
-    if (country === 'SA') {
-      return /^\d{15}$/.test(vatNumber);
-    }
-
-    // Generic validation for other countries
-    return /^[A-Z0-9]{8,15}$/.test(vatNumber.toUpperCase());
+    // Accept international formats: 5-25 alphanumeric characters, dashes and spaces allowed
+    return /^[A-Z0-9\-\s]{5,25}$/i.test(vatNumber.trim());
   }
 
   static validateCRNumber(crNumber: string): boolean {
     if (!crNumber) return true; // Optional field
 
-    // Saudi Arabia Commercial Registration: 10 digits
-    return /^\d{10}$/.test(crNumber);
+    // Accept international formats: 5-20 alphanumeric characters, dashes and spaces allowed
+    return /^[A-Z0-9\-\s]{5,20}$/i.test(crNumber.trim());
   }
 
   static validateWorkingHours(schedule: WorkingHoursData[]): ValidationResult {

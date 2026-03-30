@@ -77,13 +77,15 @@ export class EmployeeService {
       return employee;
     }
 
-    const { clinic, complex, ...employeeWithoutLinkedEntities } = employee;
+    const { clinic, complex, clinicsList, ...employeeWithoutLinkedEntities } = employee;
 
     return {
       ...employeeWithoutLinkedEntities,
       userType: employee.role,
       linkedComplex: this.toLinkedEntity(employee.complex, employee.complexId),
-      linkedClinic: this.toLinkedEntity(employee.clinic, employee.clinicId),
+      linkedClinics: (employee.clinicsList || [])
+        .map((c: any) => this.toLinkedEntity(c, null))
+        .filter((c: any) => c !== null),
     };
   }
 
@@ -547,8 +549,15 @@ export class EmployeeService {
       address: createEmployeeDto.address,
       subscriptionId: resolvedSubscriptionId,
       organizationId: createEmployeeDto.organizationId,
-      complexId: createEmployeeDto.complexId,
-      clinicId: createEmployeeDto.clinicId,
+      complexId: createEmployeeDto.complexId && Types.ObjectId.isValid(createEmployeeDto.complexId)
+        ? new Types.ObjectId(createEmployeeDto.complexId) : createEmployeeDto.complexId,
+      clinicId: createEmployeeDto.clinicId && Types.ObjectId.isValid(createEmployeeDto.clinicId)
+        ? new Types.ObjectId(createEmployeeDto.clinicId) : createEmployeeDto.clinicId,
+      clinicIds: (
+        createEmployeeDto.clinicIds?.length
+          ? createEmployeeDto.clinicIds
+          : createEmployeeDto.clinicId ? [createEmployeeDto.clinicId] : []
+      ).filter((id: string) => Types.ObjectId.isValid(id)).map((id: string) => new Types.ObjectId(id)),
       isActive: true,
       emailVerified: false, // Will need to verify email
       setupComplete: false,
@@ -804,10 +813,29 @@ export class EmployeeService {
           as: 'organization',
         },
       },
+      // Normalize complexId/clinicId — older records may store these as strings instead of ObjectId
+      {
+        $addFields: {
+          clinicIdNorm: {
+            $cond: {
+              if: { $eq: [{ $type: '$clinicId' }, 'string'] },
+              then: { $convert: { input: '$clinicId', to: 'objectId', onError: null, onNull: null } },
+              else: '$clinicId',
+            },
+          },
+          complexIdNorm: {
+            $cond: {
+              if: { $eq: [{ $type: '$complexId' }, 'string'] },
+              then: { $convert: { input: '$complexId', to: 'objectId', onError: null, onNull: null } },
+              else: '$complexId',
+            },
+          },
+        },
+      },
       {
         $lookup: {
           from: 'complexes',
-          localField: 'complexId',
+          localField: 'complexIdNorm',
           foreignField: '_id',
           as: 'complex',
         },
@@ -815,9 +843,31 @@ export class EmployeeService {
       {
         $lookup: {
           from: 'clinics',
-          localField: 'clinicId',
+          localField: 'clinicIdNorm',
           foreignField: '_id',
           as: 'clinic',
+        },
+      },
+      {
+        $lookup: {
+          from: 'clinics',
+          let: {
+            clinicIds: {
+              $map: {
+                input: { $ifNull: ['$clinicIds', []] },
+                as: 'cid',
+                in: {
+                  $cond: {
+                    if: { $eq: [{ $type: '$$cid' }, 'string'] },
+                    then: { $convert: { input: '$$cid', to: 'objectId', onError: null, onNull: null } },
+                    else: '$$cid',
+                  },
+                },
+              },
+            },
+          },
+          pipeline: [{ $match: { $expr: { $in: ['$_id', '$$clinicIds'] } } }],
+          as: 'clinicsList',
         },
       },
       {
@@ -1093,6 +1143,7 @@ export class EmployeeService {
 
     // User fields
     if (updateEmployeeDto.email) userUpdates.email = updateEmployeeDto.email;
+    if (updateEmployeeDto.username) userUpdates.username = updateEmployeeDto.username.toLowerCase().trim();
     if (updateEmployeeDto.firstName)
       userUpdates.firstName = updateEmployeeDto.firstName;
     if (updateEmployeeDto.lastName)
@@ -1102,9 +1153,16 @@ export class EmployeeService {
       userUpdates.nationality = updateEmployeeDto.nationality;
     if (updateEmployeeDto.address)
       userUpdates.address = updateEmployeeDto.address;
+    if (updateEmployeeDto.gender) userUpdates.gender = updateEmployeeDto.gender;
+    if (updateEmployeeDto.dateOfBirth) userUpdates.dateOfBirth = new Date(updateEmployeeDto.dateOfBirth);
     if (updateEmployeeDto.isActive !== undefined)
       userUpdates.isActive = updateEmployeeDto.isActive;
     if (normalizedRole) userUpdates.role = normalizedRole;
+    if (updateEmployeeDto.clinicIds !== undefined) {
+      userUpdates.clinicIds = updateEmployeeDto.clinicIds
+        .filter((id) => Types.ObjectId.isValid(id))
+        .map((id) => new Types.ObjectId(id));
+    }
 
     // Profile fields
     if (updateEmployeeDto.cardNumber)
@@ -1117,6 +1175,8 @@ export class EmployeeService {
       profileUpdates.profilePictureUrl = updateEmployeeDto.profilePictureUrl;
     if (updateEmployeeDto.jobTitle)
       profileUpdates.jobTitle = updateEmployeeDto.jobTitle;
+    if (updateEmployeeDto.dateOfHiring)
+      profileUpdates.dateOfHiring = new Date(updateEmployeeDto.dateOfHiring);
     if (updateEmployeeDto.salary !== undefined)
       profileUpdates.salary = updateEmployeeDto.salary;
     if (updateEmployeeDto.bankAccount)
@@ -1471,10 +1531,6 @@ export class EmployeeService {
           linkedComplex: {
             id: '$complex._id',
             name: '$complex.name',
-          },
-          linkedClinic: {
-            id: '$clinic._id',
-            name: '$clinic.name',
           },
         },
       },

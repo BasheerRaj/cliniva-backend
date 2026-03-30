@@ -64,7 +64,7 @@ export class SpecialtyService {
     includeInactive?: boolean;
   }, requestingUser?: TenantUser): Promise<any[]> {
     const tenantFilter = buildTenantFilter(requestingUser ?? {} as TenantUser);
-    const query: any = { ...tenantFilter };
+    const query: any = { ...tenantFilter, deletedAt: { $exists: false } };
 
     if (!filters?.includeInactive) {
       query.isActive = true;

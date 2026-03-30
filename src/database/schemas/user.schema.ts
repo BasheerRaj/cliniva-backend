@@ -138,6 +138,9 @@ export class User extends Document {
   @Prop({ type: Types.ObjectId, ref: 'Clinic' })
   clinicId?: Types.ObjectId;
 
+  @Prop({ type: [{ type: Types.ObjectId, ref: 'Clinic' }], default: [] })
+  clinicIds?: Types.ObjectId[];
+
   @Prop([String])
   onboardingProgress?: string[];
 

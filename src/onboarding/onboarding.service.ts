@@ -1388,10 +1388,16 @@ export class OnboardingService {
               (d) => d.name.toLowerCase() === nameTrimmed.toLowerCase(),
             );
             if (!department) {
-              department = await this.departmentService.createDepartment({
-                name: nameTrimmed,
-                description: `Department for ${dto.name}`,
-              });
+              department = await this.departmentService.createDepartment(
+                {
+                  name: nameTrimmed,
+                  description: `Department for ${dto.name}`,
+                },
+                {
+                  subscriptionId: (subscription._id as any).toString(),
+                  complexId,
+                } as any,
+              );
             }
             // Link department to complex
             const junction =
@@ -1600,12 +1606,12 @@ export class OnboardingService {
 
       // Prepare working hours data for the service
       const scheduleData = workingHours
-        .filter((wh) => wh.isWorkingDay && wh.openingTime && wh.closingTime)
+        .filter((wh) => wh.isWorkingDay)
         .map((workingHour) => ({
           dayOfWeek: workingHour.dayOfWeek,
-          isWorkingDay: workingHour.isWorkingDay,
-          openingTime: workingHour.openingTime,
-          closingTime: workingHour.closingTime,
+          isWorkingDay: true,
+          openingTime: workingHour.openingTime || '09:00',
+          closingTime: workingHour.closingTime || '17:00',
           breakStartTime: workingHour.breakStartTime,
           breakEndTime: workingHour.breakEndTime,
         }));

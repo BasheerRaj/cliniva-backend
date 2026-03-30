@@ -197,6 +197,8 @@ export class ClinicService {
       }
     }
 
+    query.deletedAt = { $exists: false };
+
     if (status) {
       query.status = status;
     }
@@ -737,7 +739,7 @@ export class ClinicService {
 
     // Build query with tenant scope
     const tenantFilter = requestingUser ? buildTenantFilter(requestingUser) : {};
-    const query: any = { ...tenantFilter, complexId: new Types.ObjectId(complexId) };
+    const query: any = { ...tenantFilter, complexId: new Types.ObjectId(complexId), deletedAt: { $exists: false } };
 
     if (filters?.isActive !== undefined) {
       query.isActive = filters.isActive;
@@ -769,7 +771,7 @@ export class ClinicService {
    * @returns Standardized response with active clinics
    */
   async getClinicsForDropdown(filters?: { complexId?: string }) {
-    const query: any = { isActive: true };
+    const query: any = { isActive: true, deletedAt: { $exists: false } };
 
     if (filters?.complexId) {
       query.complexId = new Types.ObjectId(filters.complexId);

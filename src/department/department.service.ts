@@ -258,7 +258,10 @@ export class DepartmentService {
       })
       .populate({
         path: 'departmentId',
-        match: requestingUser ? buildTenantFilter(requestingUser) : {},
+        // Tenant scope is enforced by the complexId join — complexes are tenant-scoped.
+        // Filtering by subscriptionId here breaks departments created during onboarding
+        // that were not stamped with a subscriptionId at creation time.
+        match: { deletedAt: { $exists: false } },
       })
       .exec();
 
