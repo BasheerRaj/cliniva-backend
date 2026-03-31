@@ -1997,9 +1997,9 @@ export class ServiceService {
     }
 
     // Get the clinic IDs accessible to this user
-    const allowedClinics = await this.clinicModel
+    const allowedClinics = (await this.clinicModel
       .find(clinicScopeFilter)
-      .distinct('_id');
+      .distinct('_id')) as any[];
 
     const serviceObjectIds = serviceIds.map((id) => new Types.ObjectId(id));
 
@@ -2009,12 +2009,51 @@ export class ServiceService {
       isActive: true,
     };
 
-    const [clinicIds, doctorIds] = await Promise.all([
+    const [mappedClinicIds, mappedDoctorIds] = (await Promise.all([
       this.clinicServiceModel.find(junctionFilter).distinct('clinicId'),
       this.doctorServiceModel.find(junctionFilter).distinct('doctorId'),
-    ]);
+    ])) as [any[], any[]];
 
-    return { clinicIds, doctorIds };
+    // Root-Cause Fix: Permission Defaults
+    // getHeaderFilter only returned items from junction tables.
+    // AppointmentValidationService is permissive if 0 records exist.
+    // We must mirror that logic here so the UI (calendar) shows all doctors
+    // when a service is selected but has no specific assignments.
+
+    let finalClinicIds = mappedClinicIds;
+    let finalDoctorIds = mappedDoctorIds;
+
+    // Check each service if it has explicit clinic assignments
+    const clinicAssignmentsCount = await this.clinicServiceModel.countDocuments({
+      serviceId: { $in: serviceObjectIds },
+      isActive: true,
+    });
+
+    if (clinicAssignmentsCount === 0) {
+      // PERMISSIVE: All clinics provide this service
+      finalClinicIds = allowedClinics;
+    }
+
+    const doctorAssignmentsCount = await this.doctorServiceModel.countDocuments({
+      serviceId: { $in: serviceObjectIds },
+      isActive: true,
+    });
+
+    if (doctorAssignmentsCount === 0) {
+      // PERMISSIVE: All doctors in allowed clinics provide this service
+      const allDoctorsInAllowedClinics = (await this.userModel.find({
+        role: 'doctor',
+        isActive: true,
+        $or: [
+          { clinicId: { $in: allowedClinics } },
+          { clinicIds: { $in: allowedClinics } },
+        ],
+        deletedAt: { $exists: false },
+      }).distinct('_id')) as any[];
+      finalDoctorIds = allDoctorsInAllowedClinics;
+    }
+
+    return { clinicIds: finalClinicIds, doctorIds: finalDoctorIds };
   }
 
   // ==================== Doctor Assignment Methods (PART H) ====================

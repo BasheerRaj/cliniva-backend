@@ -256,6 +256,7 @@ export class InvoiceController {
       req.user?.role,
       req.user?.subscriptionId,
       req.user?.clinicId,
+      req.user?.organizationId,
     );
 
     return {

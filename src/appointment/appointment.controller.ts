@@ -488,7 +488,9 @@ export class AppointmentController {
   @ApiQuery({ name: 'date', required: true, type: String, description: 'Date in YYYY-MM-DD format' })
   @ApiQuery({ name: 'time', required: true, type: String, description: 'Time in HH:mm (24-hour)' })
   @ApiQuery({ name: 'clinicCollectionId', required: false, type: String, description: 'Optional complex ID filter' })
-  @ApiQuery({ name: 'serviceId', required: false, type: String, description: 'Filter clinics by service offered (ClinicService junction)' })
+  @ApiQuery({ name: 'serviceId', required: false, type: String, description: 'Single service ID filter (ClinicService junction)' })
+  @ApiQuery({ name: 'serviceIds', required: false, type: String, description: 'Comma-separated service IDs — returns UNION of clinics that offer any service' })
+  @ApiQuery({ name: 'doctorId', required: false, type: String, description: 'Pre-selected doctor ID — filters to clinics where that doctor is assigned' })
   @ApiResponse({ status: 200, description: 'Available clinics returned successfully' })
   @Get('available-clinics')
   @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.MANAGER, UserRole.DOCTOR, UserRole.STAFF)
@@ -498,10 +500,16 @@ export class AppointmentController {
     @Query('time') time: string,
     @Query('clinicCollectionId') clinicCollectionId?: string,
     @Query('serviceId') serviceId?: string,
+    @Query('serviceIds') serviceIdsParam?: string,
+    @Query('doctorId') doctorId?: string,
   ) {
     if (!date || !time) {
       throw new BadRequestException('date and time query parameters are required');
     }
+    // Parse comma-separated serviceIds into array
+    const serviceIds = serviceIdsParam
+      ? serviceIdsParam.split(',').map((s) => s.trim()).filter(Boolean)
+      : undefined;
     try {
       const clinics = await this.appointmentService.getAvailableClinics(
         date,
@@ -513,6 +521,8 @@ export class AppointmentController {
         serviceId,
         req.user?.subscriptionId,
         req.user?.complexId,
+        serviceIds,
+        doctorId,
       );
       return {
         success: true,

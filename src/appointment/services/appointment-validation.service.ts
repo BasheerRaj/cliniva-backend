@@ -293,21 +293,37 @@ export class AppointmentValidationService {
       `Validating service-clinic relationship: service=${serviceId}, clinic=${clinicId}`,
     );
 
-    // Check if the service is directly associated with the clinic
+    // Check if the service lists this clinic in its clinicIds[] array
+    // (Service schema uses clinicIds[], not clinicId scalar)
     const service = await this.serviceModel.findOne({
       _id: new Types.ObjectId(serviceId),
-      clinicId: new Types.ObjectId(clinicId),
+      clinicIds: new Types.ObjectId(clinicId),
       deletedAt: { $exists: false },
     });
 
     if (service) {
       this.logger.debug(
-        `Service ${serviceId} is directly associated with clinic ${clinicId}`,
+        `Service ${serviceId} lists clinic ${clinicId} in clinicIds[]`,
       );
       return;
     }
 
-    // Check the ClinicService junction table
+    // Count how many clinic_services records exist for this service across ALL clinics.
+    // If none exist, the service has no explicit clinic assignments → permissive default:
+    // any active clinic can provide it (mirrors the doctor-service fallback).
+    const totalClinicAssignments = await this.clinicServiceModel.countDocuments({
+      serviceId: new Types.ObjectId(serviceId),
+      isActive: true,
+    });
+
+    if (totalClinicAssignments === 0) {
+      this.logger.debug(
+        `No clinic_services assignments for service=${serviceId} — skipping check (permissive default)`,
+      );
+      return;
+    }
+
+    // Assignments exist — check this specific clinic is in the authorized set
     const clinicService = await this.clinicServiceModel.findOne({
       clinicId: new Types.ObjectId(clinicId),
       serviceId: new Types.ObjectId(serviceId),
@@ -351,7 +367,22 @@ export class AppointmentValidationService {
       `Validating doctor-service authorization: doctor=${doctorId}, service=${serviceId}, clinic=${clinicId}`,
     );
 
-    // Check the DoctorService junction table
+    // Check if ANY doctor-service assignments exist for this service across all clinics.
+    // If none exist, the service has no explicitly assigned doctors — use permissive default:
+    // any active doctor at the clinic can provide it (mirrors the clinic_services fallback).
+    const totalAssignments = await this.doctorServiceModel.countDocuments({
+      serviceId: new Types.ObjectId(serviceId),
+      isActive: true,
+    });
+
+    if (totalAssignments === 0) {
+      this.logger.debug(
+        `No doctor-service assignments configured for service=${serviceId} — skipping authorization check (permissive default)`,
+      );
+      return;
+    }
+
+    // Assignments exist — enforce that this specific doctor+clinic is in the authorized set
     const doctorService = await this.doctorServiceModel.findOne({
       doctorId: new Types.ObjectId(doctorId),
       serviceId: new Types.ObjectId(serviceId),

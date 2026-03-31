@@ -218,18 +218,17 @@ export class AppointmentService {
       });
     }
 
-    // Check clinic conflicts (same doctor in same clinic double-booked)
-    if (clinicId) {
+    // Check clinic conflicts (Strict: 1 Appointment/Clinic)
+    if (clinicId && Types.ObjectId.isValid(clinicId)) {
       const clinicConflicts = await this.appointmentModel.find({
         ...overlapQuery,
         clinicId: new Types.ObjectId(clinicId),
-        doctorId: new Types.ObjectId(doctorId),
       });
 
       if (clinicConflicts.length > 0) {
         conflicts.push({
           conflictType: 'clinic_busy',
-          message: 'Doctor is already booked in this clinic at this time',
+          message: 'Clinic has another appointment at this time',
           conflictingAppointmentId: (clinicConflicts[0] as any)._id.toString(),
         });
       }
@@ -2769,6 +2768,8 @@ export class AppointmentService {
     serviceId?: string,
     userSubscriptionId?: string,
     userComplexId?: string,
+    serviceIds?: string[], // multi-service: union of clinics that offer ANY of these services
+    doctorId?: string, // if pre-filled from calendar, intersect with doctor's assigned clinics
   ): Promise<{ _id: string; name: string }[]> {
     // 1. Build clinic filter with scope enforcement (IDOR protection)
     const clinicFilter: any = {
@@ -2799,19 +2800,50 @@ export class AppointmentService {
       clinicFilter.complexId = new Types.ObjectId(clinicCollectionId);
     }
 
-    // Filter by service if serviceId provided (ClinicService junction table)
-    if (serviceId) {
+    // Filter by service(s) if provided — uses ClinicService junction table.
+    // Supports both single serviceId and multi-service union (serviceIds[]).
+    // FALLBACK: if no clinic_services records exist for the service(s), we do NOT
+    // return empty — instead we skip the junction filter and return clinics based
+    // on working hours only. This handles org-level services not yet assigned to
+    // specific clinics, preventing a blank clinic dropdown in the booking form.
+    const effectiveServiceIds = [
+      ...(serviceId ? [serviceId] : []),
+      ...(serviceIds ?? []),
+    ].filter(Boolean);
+
+    if (effectiveServiceIds.length > 0) {
       const validClinicIds = await this.clinicServiceModel
-        .find({ serviceId: new Types.ObjectId(serviceId), isActive: true })
+        .find({
+          serviceId: { $in: effectiveServiceIds.map((id) => new Types.ObjectId(id)) },
+          isActive: true,
+        })
         .distinct('clinicId');
-      if (validClinicIds.length === 0) return [];
-      if (clinicFilter._id) {
-        // Intersect with existing clinic ID filter
-        const existingId = clinicFilter._id.toString();
-        if (!validClinicIds.some((id: any) => id.toString() === existingId)) return [];
-      } else {
-        clinicFilter._id = { $in: validClinicIds };
+
+      if (validClinicIds.length > 0) {
+        // Apply junction intersection with any existing clinic scope
+        if (clinicFilter._id) {
+          const existingId = clinicFilter._id instanceof Types.ObjectId
+            ? clinicFilter._id.toString()
+            : clinicFilter._id.$in
+              ? null // already an $in array — handled below
+              : clinicFilter._id.toString();
+
+          if (existingId) {
+            // Single-clinic scope: check it's in the valid set
+            if (!validClinicIds.some((id: any) => id.toString() === existingId)) return [];
+          } else if (clinicFilter._id.$in) {
+            // Multi-clinic scope: intersect
+            const scopeSet = new Set(clinicFilter._id.$in.map((id: any) => id.toString()));
+            const intersection = validClinicIds.filter((id: any) => scopeSet.has(id.toString()));
+            if (intersection.length === 0) return [];
+            clinicFilter._id = { $in: intersection };
+          }
+        } else {
+          clinicFilter._id = { $in: validClinicIds };
+        }
       }
+      // If validClinicIds.length === 0: service not in junction table →
+      // skip filter (service available everywhere) — permissive default.
     }
 
     // 2. Fetch matching clinics
@@ -2870,6 +2902,24 @@ export class AppointmentService {
       available.push({ _id: (clinic._id as any).toString(), name: clinic.name });
     }
 
+    // If a doctor was pre-filled from the calendar, restrict to clinics where that doctor works.
+    // This prevents the clinic list from showing clinics incompatible with the pre-selected doctor.
+    if (doctorId && Types.ObjectId.isValid(doctorId)) {
+      const doctor = await this.userModel
+        .findOne({ _id: new Types.ObjectId(doctorId) }, { clinicId: 1, clinicIds: 1 })
+        .lean();
+      if (doctor) {
+        const doctorClinicSet = new Set<string>();
+        if ((doctor as any).clinicIds?.length) {
+          (doctor as any).clinicIds.forEach((id: any) => doctorClinicSet.add(id.toString()));
+        }
+        if ((doctor as any).clinicId) {
+          doctorClinicSet.add((doctor as any).clinicId.toString());
+        }
+        return available.filter((c) => doctorClinicSet.has(c._id.toString()));
+      }
+    }
+
     return available;
   }
 
@@ -2893,7 +2943,9 @@ export class AppointmentService {
     userId?: string,
     userRole?: string,
   ): Promise<{ _id: string; name: string }[]> {
-    // 0. If serviceId provided, get authorized doctor IDs from DoctorService junction
+    // 0. If serviceId provided, filter to doctors authorized for that service via DoctorService junction.
+    //    FALLBACK: if no records exist (service has no assigned doctors yet), skip the filter —
+    //    any doctor at the clinic is returned. Consistent with validateDoctorServiceAuthorization.
     let authorizedDoctorIds: Types.ObjectId[] | null = null;
     if (serviceId) {
       const doctorServiceEntries = await this.doctorServiceModel
@@ -2903,7 +2955,10 @@ export class AppointmentService {
           isActive: true,
         })
         .distinct('doctorId');
-      authorizedDoctorIds = doctorServiceEntries;
+      // Only apply the filter if records actually exist; if 0 records, fall through to all-doctors
+      if (doctorServiceEntries.length > 0) {
+        authorizedDoctorIds = doctorServiceEntries;
+      }
     }
 
     // 1. Get all active doctors assigned to this clinic
@@ -2918,7 +2973,6 @@ export class AppointmentService {
     if (userRole === 'doctor' && userId) {
       doctorQuery._id = new Types.ObjectId(userId);
     } else if (authorizedDoctorIds !== null) {
-      if (authorizedDoctorIds.length === 0) return [];
       doctorQuery._id = { $in: authorizedDoctorIds };
     }
     const doctors = await this.userModel
@@ -2929,14 +2983,16 @@ export class AppointmentService {
 
     if (!doctors.length) return [];
 
-    // 2. Fetch all non-cancelled appointments for these doctors on this date
+    // 2. Fetch all non-cancelled appointments for THIS CLINIC on this date
+    // ROOT CAUSE FIX: Strict Clinic Overlap (1 appointment per clinic at a time)
+    // To enforce this, we check for ANY appointment in the clinic, not just the current doctors.
     const [year, month, day] = date.split('-').map(Number);
     const dayStart = new Date(year, month - 1, day, 0, 0, 0);
     const dayEnd = new Date(year, month - 1, day, 23, 59, 59);
 
-    const todayAppts = await this.appointmentModel
+    const clinicAppts = await this.appointmentModel
       .find({
-        doctorId: { $in: doctors.map((d) => new Types.ObjectId(d._id.toString())) },
+        clinicId: new Types.ObjectId(clinicId),
         appointmentDate: { $gte: dayStart, $lte: dayEnd },
         status: { $nin: ['cancelled', 'no_show'] },
         deletedAt: { $exists: false },
@@ -2950,20 +3006,25 @@ export class AppointmentService {
     const slotStart = slotH * 60 + slotM;
     const slotEnd = slotStart + duration;
 
-    // 4. Identify doctors with any overlapping appointment
-    const busyDoctorIds = new Set<string>();
-    for (const appt of todayAppts) {
+    // 4. Check if the entire clinic is busy at this time
+    let isClinicBusy = false;
+    for (const appt of clinicAppts) {
       const [aH, aM] = ((appt as any).appointmentTime as string).split(':').map(Number);
       const aStart = aH * 60 + aM;
       const aEnd = aStart + ((appt as any).durationMinutes || 30);
+      
       // Overlap when: slotStart < aEnd AND slotEnd > aStart
       if (slotStart < aEnd && slotEnd > aStart) {
-        busyDoctorIds.add((appt as any).doctorId.toString());
+        isClinicBusy = true;
+        break;
       }
     }
 
-    // 5. Filter out busy doctors
-    const nonBusyDoctors = doctors.filter((dr) => !busyDoctorIds.has(dr._id.toString()));
+    // If the clinic is busy, no doctor can be available
+    if (isClinicBusy) return [];
+
+    // 5. If clinic is not busy, all candidates from step 1 are potentially available
+    const nonBusyDoctors = doctors;
 
     // 6. Mirror the working-hours gate used in createAppointment:
     //    Only filter by WH when BOTH clinic and doctor have WH configured.

@@ -225,6 +225,7 @@ export class InvoiceService {
     userRole?: string,
     subscriptionId?: string,
     userClinicId?: string,
+    userOrganizationId?: string,
   ): Promise<{ data: InvoiceResponseDto[]; meta: any }> {
     // Build query filter
     const filter: any = { deletedAt: { $exists: false } };
@@ -241,15 +242,24 @@ export class InvoiceService {
       filter.clinicId = new Types.ObjectId(queryDto.clinicId);
     }
 
-    // Owner role scoping: owners see invoices for all their subscription's clinics
-    if (userRole === 'owner' && subscriptionId && !filter.clinicId) {
-      const ownerClinics = await this.clinicModel
-        .find({ subscriptionId: new Types.ObjectId(subscriptionId), deletedAt: { $exists: false } })
-        .select('_id')
-        .lean();
-      const ownerClinicIds = ownerClinics.map((c: any) => c._id);
-      if (ownerClinicIds.length > 0) {
-        filter.clinicId = { $in: ownerClinicIds };
+    // Owner role scoping: scope to their organization to prevent cross-tenant data leak
+    if (userRole === 'owner') {
+      if (userOrganizationId && Types.ObjectId.isValid(userOrganizationId)) {
+        // Direct org scope — fast and covers edge case where owner has no clinics yet
+        filter.organizationId = new Types.ObjectId(userOrganizationId);
+      } else if (subscriptionId && Types.ObjectId.isValid(subscriptionId) && !filter.clinicId) {
+        // Fallback: derive from subscription → clinics (legacy path)
+        const ownerClinics = await this.clinicModel
+          .find({ subscriptionId: new Types.ObjectId(subscriptionId), deletedAt: { $exists: false } })
+          .select('_id')
+          .lean();
+        const ownerClinicIds = ownerClinics.map((c: any) => c._id);
+        if (ownerClinicIds.length > 0) {
+          filter.clinicId = { $in: ownerClinicIds };
+        } else {
+          // No clinics found — deny all to prevent unscoped access
+          filter._id = new Types.ObjectId('000000000000000000000000');
+        }
       }
     }
 

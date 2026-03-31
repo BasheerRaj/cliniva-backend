@@ -14,8 +14,8 @@ import { Document, Types } from 'mongoose';
 export class Invoice extends Document {
   // ==================== Identification ====================
 
-  @Prop({ required: true, unique: true, index: true })
-  invoiceNumber: string; // DFT-xxxx or INV-xxxx
+  @Prop({ required: true, index: true })
+  invoiceNumber: string; // DFT-xxxx or INV-xxxx — unique per org (see compound index below)
 
   @Prop({ required: false })
   draftNumber?: string; // Preserved DFT-xxxx after posting
@@ -224,7 +224,8 @@ InvoiceSchema.index({ createdAt: -1 });
 // Soft delete filtering
 InvoiceSchema.index({ deletedAt: 1 });
 
-InvoiceSchema.index({ organizationId: 1, invoiceNumber: 1 });
+// Unique invoice number per organization (tenant-scoped — replaces global unique: true)
+InvoiceSchema.index({ organizationId: 1, invoiceNumber: 1 }, { unique: true });
 InvoiceSchema.index({ organizationId: 1, invoiceStatus: 1 });
 InvoiceSchema.index({ 'services.sessions.appointmentId': 1 });
 InvoiceSchema.index({ 'services.sessions.invoiceItemId': 1 });

@@ -491,11 +491,17 @@ export class PaymentService {
     } else if (userRole === 'staff' || userRole === 'doctor' || userRole === 'admin' || userRole === 'manager') {
       // Scoped role with no clinic assigned — deny all
       filter._id = new Types.ObjectId('000000000000000000000000');
-    } else if (queryDto.clinicId && Types.ObjectId.isValid(queryDto.clinicId)) {
-      // Owner/super_admin: optional explicit filter by clinicId
+    } else if (userRole === 'owner' && userOrganizationId && Types.ObjectId.isValid(userOrganizationId)) {
+      // Owner: always scope to their organization to prevent cross-tenant data leak
+      filter.organizationId = new Types.ObjectId(userOrganizationId);
+      // Then optionally narrow to a specific clinic
+      if (queryDto.clinicId && Types.ObjectId.isValid(queryDto.clinicId)) {
+        filter.clinicId = new Types.ObjectId(queryDto.clinicId);
+      }
+    } else if (userRole === 'super_admin' && queryDto.clinicId && Types.ObjectId.isValid(queryDto.clinicId)) {
+      // super_admin: can optionally filter by clinicId; otherwise sees all tenants (intentional)
       filter.clinicId = new Types.ObjectId(queryDto.clinicId);
     }
-    // owner / super_admin without clinicId filter → unrestricted
 
     if (queryDto.paymentMethod) {
       filter.paymentMethod = queryDto.paymentMethod;
