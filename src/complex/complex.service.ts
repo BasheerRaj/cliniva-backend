@@ -1179,27 +1179,39 @@ export class ComplexService {
       ),
     ];
 
-    const clinics = uniqueClinicIds.length
-      ? await this.complexModel.db
-          .collection('clinics')
-          .find({
-            _id: {
-              $in: uniqueClinicIds.map((clinicId) => new Types.ObjectId(clinicId)),
-            },
-          })
-          .project({ name: 1 })
-          .toArray()
-      : [];
+    const [clinics, employeeProfiles] = await Promise.all([
+      uniqueClinicIds.length
+        ? this.complexModel.db
+            .collection('clinics')
+            .find({
+              _id: {
+                $in: uniqueClinicIds.map((clinicId) => new Types.ObjectId(clinicId)),
+              },
+            })
+            .project({ name: 1 })
+            .toArray()
+        : Promise.resolve([]),
+      this.complexModel.db
+        .collection('employee_profiles')
+        .find({
+          userId: { $in: users.map((u) => u._id) },
+        })
+        .project({ userId: 1, employeeNumber: 1 })
+        .toArray(),
+    ]);
 
     const clinicNameMap = new Map(
       clinics.map((clinic) => [clinic._id.toString(), clinic.name]),
+    );
+    const employeeNumberMap = new Map(
+      employeeProfiles.map((ep) => [ep.userId.toString(), ep.employeeNumber]),
     );
 
     return users.map((user, index) => {
       const clinicId = user.clinicId?.toString() || null;
       return {
         no: index + 1,
-        clinicId,
+        employeeNumber: employeeNumberMap.get(user._id.toString()) || null,
         name: `${user.firstName || ''} ${user.lastName || ''}`.trim(),
         clinic: clinicId ? clinicNameMap.get(clinicId) || null : null,
         userType: user.role,

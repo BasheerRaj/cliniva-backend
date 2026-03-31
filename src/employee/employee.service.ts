@@ -1192,6 +1192,13 @@ export class EmployeeService {
       userUpdates.clinicIds = updateEmployeeDto.clinicIds
         .filter((id) => Types.ObjectId.isValid(id))
         .map((id) => new Types.ObjectId(id));
+      
+      // Sync singular clinicId with the first element of clinicIds for legacy support
+      if (userUpdates.clinicIds.length > 0) {
+        userUpdates.clinicId = userUpdates.clinicIds[0];
+      } else {
+        userUpdates.clinicId = null;
+      }
     }
 
     // Profile fields
@@ -1273,11 +1280,8 @@ export class EmployeeService {
     // Update doctor specialties if provided
     if (Array.isArray(updateEmployeeDto.specialties)) {
       const employeeObjectId = new Types.ObjectId(employeeId);
-      // Deactivate all existing specialty assignments
-      await this.doctorSpecialtyModel.updateMany(
-        { doctorId: employeeObjectId },
-        { $set: { isActive: false } },
-      );
+      // Delete all existing specialty assignments (unique index prevents re-inserting deactivated records)
+      await this.doctorSpecialtyModel.deleteMany({ doctorId: employeeObjectId });
       // Create new active assignments
       if (updateEmployeeDto.specialties.length > 0) {
         const validIds = updateEmployeeDto.specialties

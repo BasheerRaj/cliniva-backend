@@ -227,10 +227,10 @@ export class CreateEmployeeDto {
   @ApiPropertyOptional({
     description: 'Simplified user type for employee creation',
     example: 'doctor',
-    enum: ['doctor', 'staff'],
+    enum: ['admin', 'doctor', 'staff'],
   })
   @ValidateIf((o) => !o.role)
-  @IsEnum(['doctor', 'staff'], {
+  @IsEnum(['admin', 'doctor', 'staff'], {
     message: JSON.stringify({
       ar: 'نوع المستخدم غير صالح',
       en: 'Invalid user type',
@@ -242,7 +242,7 @@ export class CreateEmployeeDto {
       en: 'User type is required',
     }),
   })
-  userType?: 'doctor' | 'staff';
+  userType?: 'admin' | 'doctor' | 'staff';
 
   @ApiPropertyOptional({
     description: 'Employee nationality',
@@ -725,11 +725,11 @@ export class UpdateEmployeeDto {
   @ApiPropertyOptional({
     description: 'Simplified user type for employee updates',
     example: 'staff',
-    enum: ['doctor', 'staff'],
+    enum: ['admin', 'doctor', 'staff'],
   })
-  @IsEnum(['doctor', 'staff'])
+  @IsEnum(['admin', 'doctor', 'staff'])
   @IsOptional()
-  userType?: 'doctor' | 'staff';
+  userType?: 'admin' | 'doctor' | 'staff';
 
   @ApiPropertyOptional({
     description: 'Employee first name',

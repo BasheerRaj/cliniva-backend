@@ -98,61 +98,74 @@ export class WorkingHoursValidationService {
     entityId: string,
     schedule: WorkingHoursSchedule[],
   ): Promise<ValidationResult> {
-    // Determine parent entity
-    const parentInfo = await this.getParentEntity(entityType, entityId);
+    // Determine parent entities
+    const parentsInfo = await this.getParentEntities(entityType, entityId);
 
-    // If no parent entity exists, validation passes
-    if (!parentInfo) {
+    // If no parent entities exist, validation passes
+    if (!parentsInfo || parentsInfo.length === 0) {
       return { isValid: true, errors: [] };
     }
 
     // Get entity name for error messages
     const entityName = await this.getEntityName(entityType, entityId);
 
-    // Validate against parent
-    return this.validateHierarchical(
+    // Validate against parents (multi-parent support for Users linked to multiple clinics)
+    return this.validateHierarchicalMulti(
       schedule,
-      parentInfo.parentEntityType,
-      parentInfo.parentEntityId,
+      parentsInfo,
       entityName,
     );
   }
 
   /**
-   * Determines the parent entity for a given entity type and ID.
+   * Determines the parent entities for a given entity type and ID.
    *
    * Hierarchy:
-   * - User → Clinic (via clinicId)
+   * - User → Clinics (via clinicIds array or clinicId fallback)
    * - Clinic → Complex (via complexId)
    * - Complex → Organization (via organizationId)
-   * - Organization → null (top level)
    *
    * @param {string} entityType - Entity type
    * @param {string} entityId - Entity ID
-   * @returns {Promise<{parentEntityType: string, parentEntityId: string} | null>} Parent entity info or null
+   * @returns {Promise<{parentEntityType: string, parentEntityId: string}[] | null>} Parent entities info or null
    * @private
    */
-  private async getParentEntity(
+  private async getParentEntities(
     entityType: string,
     entityId: string,
-  ): Promise<{ parentEntityType: string; parentEntityId: string } | null> {
+  ): Promise<{ parentEntityType: string; parentEntityId: string }[] | null> {
     try {
       switch (entityType.toLowerCase()) {
         case 'user': {
-          // User → Clinic
+          // User → Clinics (BZR-5e6f7a8b support)
           const user = await this.userModel
             .findById(entityId)
-            .select('clinicId')
+            .select('clinicId clinicIds')
             .lean()
             .exec();
 
-          if ((user as any)?.clinicId) {
-            return {
+          if (!user) return null;
+
+          const parentInfos: { parentEntityType: string; parentEntityId: string }[] = [];
+          
+          // Use clinicIds array if available
+          if ((user as any).clinicIds && Array.isArray((user as any).clinicIds) && (user as any).clinicIds.length > 0) {
+            (user as any).clinicIds.forEach(id => {
+              parentInfos.push({
+                parentEntityType: 'clinic',
+                parentEntityId: id.toString(),
+              });
+            });
+          } 
+          // Fallback to singular clinicId
+          else if ((user as any).clinicId) {
+            parentInfos.push({
               parentEntityType: 'clinic',
               parentEntityId: (user as any).clinicId.toString(),
-            };
+            });
           }
-          return null;
+
+          return parentInfos.length > 0 ? parentInfos : null;
         }
 
         case 'clinic': {
@@ -164,10 +177,10 @@ export class WorkingHoursValidationService {
             .exec();
 
           if ((clinic as any)?.complexId) {
-            return {
+            return [{
               parentEntityType: 'complex',
               parentEntityId: (clinic as any).complexId.toString(),
-            };
+            }];
           }
           return null;
         }
@@ -181,16 +194,15 @@ export class WorkingHoursValidationService {
             .exec();
 
           if ((complex as any)?.organizationId) {
-            return {
+            return [{
               parentEntityType: 'organization',
               parentEntityId: (complex as any).organizationId.toString(),
-            };
+            }];
           }
           return null;
         }
 
         case 'organization': {
-          // Organization is top level, no parent
           return null;
         }
 
@@ -206,13 +218,105 @@ export class WorkingHoursValidationService {
       if (error instanceof BadRequestException) {
         throw error;
       }
-      // Log error and return null to allow validation to proceed
       console.error(
-        `Error determining parent entity for ${entityType}:${entityId}`,
+        `Error determining parent entities for ${entityType}:${entityId}`,
         error,
       );
       return null;
     }
+  }
+
+  /**
+   * Validates child working hours against multiple parent working hours.
+   * Passes if child hours are valid according to AT LEAST ONE parent entity.
+   */
+  async validateHierarchicalMulti(
+    childSchedule: WorkingHoursSchedule[],
+    parents: { parentEntityType: string; parentEntityId: string }[],
+    childEntityName: string,
+  ): Promise<ValidationResult> {
+    // If only one parent, use standard validation
+    if (parents.length === 1) {
+      return this.validateHierarchical(
+        childSchedule,
+        parents[0].parentEntityType,
+        parents[0].parentEntityId,
+        childEntityName,
+      );
+    }
+
+    console.log(`🔍 [Validation] Starting multi-parent validation against ${parents.length} parents`);
+
+    // Get all parent schedules
+    const parentSchedulesResults = await Promise.all(
+      parents.map(async (p) => {
+        const schedule = await this.getParentWorkingHours(p.parentEntityType, p.parentEntityId);
+        return { parent: p, schedule };
+      })
+    );
+
+    // If no parents have working hours, allow any child hours
+    const anyParentHasHours = parentSchedulesResults.some(r => r.schedule.length > 0);
+    if (!anyParentHasHours) {
+      return { isValid: true, errors: [] };
+    }
+
+    const errors: ValidationError[] = [];
+
+    // For each day in child schedule, it must be valid for AT LEAST ONE parent that has working hours defined
+    for (const childDay of childSchedule) {
+      if (!childDay.isWorkingDay) continue; // Closed days are always valid
+
+      let dayValidWithAtLeastOneParent = false;
+      const daySpecificErrors: ValidationError[] = [];
+
+      for (const parentResult of parentSchedulesResults) {
+        // If this parent has no hours, skip it for this specific day check
+        if (parentResult.schedule.length === 0) continue;
+
+        const parentMap = new Map<string, WorkingHours>();
+        parentResult.schedule.forEach(s => parentMap.set(s.dayOfWeek.toLowerCase(), s));
+        
+        const parentDay = parentMap.get(childDay.dayOfWeek.toLowerCase());
+
+        // Check if valid with this parent
+        if (parentDay && parentDay.isWorkingDay) {
+          const timeErrors = this.validateDayHours(
+            parentDay,
+            childDay,
+            childEntityName,
+            parentResult.parent.parentEntityType,
+          );
+
+          if (timeErrors.length === 0) {
+            dayValidWithAtLeastOneParent = true;
+            break; 
+          } else {
+            daySpecificErrors.push(...timeErrors);
+          }
+        } else {
+          // Parent is closed or day not defined for this parent
+          daySpecificErrors.push({
+            dayOfWeek: childDay.dayOfWeek,
+            message: createDynamicMessage(
+              ERROR_MESSAGES.CHILD_OPEN_PARENT_CLOSED.ar,
+              ERROR_MESSAGES.CHILD_OPEN_PARENT_CLOSED.en,
+              {
+                childEntity: childEntityName,
+                parentEntity: parentResult.parent.parentEntityType,
+              },
+            ),
+          });
+        }
+      }
+
+      if (!dayValidWithAtLeastOneParent) {
+        // If not valid with any parent, report the first error found for this day (or a generic one)
+        errors.push(daySpecificErrors[0]);
+      }
+    }
+
+    return { isValid: errors.length === 0, errors };
   }
 
   /**

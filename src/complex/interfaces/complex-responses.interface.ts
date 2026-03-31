@@ -135,7 +135,7 @@ export interface AssignedClinicSummary {
 
 export interface DoctorStaffSummary {
   no: number;
-  clinicId?: string | null;
+  employeeNumber?: string | null;
   name: string;
   clinic?: string | null;
   userType: string;

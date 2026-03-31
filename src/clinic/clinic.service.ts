@@ -818,7 +818,26 @@ export class ClinicService {
       }
     }
 
-    Object.assign(clinic, updateClinicDto);
+    // Handle phoneNumbers array (preferred) or legacy single phone string
+    if (Array.isArray((updateClinicDto as any).phoneNumbers)) {
+      const phones: string[] = (updateClinicDto as any).phoneNumbers;
+      clinic.phoneNumbers = phones
+        .filter(Boolean)
+        .map((n) => ({ number: n, type: 'primary' }) as any);
+      delete (updateClinicDto as any).phoneNumbers;
+    } else if ((updateClinicDto as any).phone !== undefined) {
+      const phoneStr = (updateClinicDto as any).phone;
+      clinic.phoneNumbers = phoneStr
+        ? [{ number: phoneStr, type: 'primary' } as any]
+        : [];
+      delete (updateClinicDto as any).phone;
+    }
+
+    // Only assign defined values to prevent clearing existing fields with undefined
+    const safeUpdates = Object.fromEntries(
+      Object.entries(updateClinicDto).filter(([, v]) => v !== undefined),
+    );
+    Object.assign(clinic, safeUpdates);
     return await clinic.save();
   }
 
