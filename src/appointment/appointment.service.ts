@@ -98,6 +98,7 @@ export class AppointmentService {
     excludeAppointmentId?: string,
     serviceId?: string,
     sessionId?: string,
+    clinicId?: string,
   ): Promise<AppointmentConflictDto[]> {
     // Resolve session-specific duration when both serviceId and sessionId are known
     if (serviceId && sessionId) {
@@ -215,6 +216,23 @@ export class AppointmentService {
         message: 'Patient has another appointment at this time',
         conflictingAppointmentId: (patientConflicts[0] as any)._id.toString(),
       });
+    }
+
+    // Check clinic conflicts (same doctor in same clinic double-booked)
+    if (clinicId) {
+      const clinicConflicts = await this.appointmentModel.find({
+        ...overlapQuery,
+        clinicId: new Types.ObjectId(clinicId),
+        doctorId: new Types.ObjectId(doctorId),
+      });
+
+      if (clinicConflicts.length > 0) {
+        conflicts.push({
+          conflictType: 'clinic_busy',
+          message: 'Doctor is already booked in this clinic at this time',
+          conflictingAppointmentId: (clinicConflicts[0] as any)._id.toString(),
+        });
+      }
     }
 
     return conflicts;
@@ -394,6 +412,31 @@ export class AppointmentService {
         createAppointmentDto.appointmentTime,
         duration,
       );
+    }
+
+    // 8c. Check for scheduling conflicts — doctor + clinic double-booking prevention
+    const conflictDateStr = createAppointmentDto.appointmentDate instanceof Date
+      ? createAppointmentDto.appointmentDate.toISOString().split('T')[0]
+      : String(createAppointmentDto.appointmentDate).split('T')[0];
+    const schedulingConflicts = await this.checkAppointmentConflicts(
+      createAppointmentDto.patientId,
+      createAppointmentDto.doctorId,
+      conflictDateStr,
+      createAppointmentDto.appointmentTime,
+      duration,
+      undefined,
+      undefined,
+      undefined,
+      createAppointmentDto.clinicId,
+    );
+    if (schedulingConflicts.length > 0) {
+      throw new ConflictException({
+        message: {
+          ar: 'يوجد تعارض في المواعيد المحددة',
+          en: 'Scheduling conflict: the selected time slot is already booked',
+        },
+        conflicts: schedulingConflicts,
+      });
     }
 
     // 9. Reject past dates (Requirement 1.10)

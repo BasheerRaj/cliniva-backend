@@ -643,6 +643,7 @@ export class EmployeeService {
       organizationId,
       complexId,
       clinicId,
+      clinicIds,
       dateHiredFrom,
       dateHiredTo,
       page = '1',
@@ -732,8 +733,15 @@ export class EmployeeService {
     if (role) userFilter.role = role;
     if (isActive !== undefined) userFilter.isActive = isActive;
     if (effectiveClinicId) userFilter.clinicId = new Types.ObjectId(effectiveClinicId);
-    if (!effectiveClinicId && effectiveComplexId) userFilter.complexId = new Types.ObjectId(effectiveComplexId);
-    if (!effectiveClinicId && !effectiveComplexId && effectiveOrgId) userFilter.subscriptionId = new Types.ObjectId(effectiveOrgId);
+    // Multi-clinic filter: when clinicIds (comma-separated) is provided and no single clinicId forced by role
+    if (!effectiveClinicId && clinicIds) {
+      const ids = clinicIds.split(',').map((id) => id.trim()).filter(Boolean);
+      if (ids.length > 0) {
+        userFilter.clinicIds = { $in: ids.map((id) => new Types.ObjectId(id)) };
+      }
+    }
+    if (!effectiveClinicId && !clinicIds && effectiveComplexId) userFilter.complexId = new Types.ObjectId(effectiveComplexId);
+    if (!effectiveClinicId && !clinicIds && !effectiveComplexId && effectiveOrgId) userFilter.subscriptionId = new Types.ObjectId(effectiveOrgId);
 
     // Search across multiple fields
     if (search) {

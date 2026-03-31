@@ -177,7 +177,7 @@ export class ChangeAppointmentStatusDto {
 /** DTO representing a scheduling conflict */
 export class AppointmentConflictDto {
   @ApiProperty({ description: 'Type of conflict', example: 'doctor_busy' })
-  conflictType: 'doctor_busy' | 'patient_busy';
+  conflictType: 'doctor_busy' | 'patient_busy' | 'clinic_busy';
 
   @ApiProperty({ description: 'Human-readable conflict message' })
   message: string;

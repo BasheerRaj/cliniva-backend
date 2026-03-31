@@ -141,6 +141,28 @@ export class WorkingHoursService {
   }
 
   /**
+   * Fetches working hours for multiple entities in a single query.
+   * Returns a map keyed by entityId string.
+   */
+  async getBatchWorkingHours(
+    entityType: string,
+    ids: string[],
+  ): Promise<Record<string, WorkingHours[]>> {
+    if (!ids || ids.length === 0) return {};
+    const objectIds = ids.map((id) => new Types.ObjectId(id));
+    const records = await this.workingHoursModel
+      .find({ entityType, entityId: { $in: objectIds }, isActive: true })
+      .exec();
+    const result: Record<string, WorkingHours[]> = {};
+    for (const id of ids) result[id] = [];
+    for (const record of records) {
+      const key = record.entityId.toString();
+      if (result[key]) result[key].push(record);
+    }
+    return result;
+  }
+
+  /**
    * Creates working hours with parent entity validation.
    * Uses WorkingHoursValidationService for hierarchical validation.
    *

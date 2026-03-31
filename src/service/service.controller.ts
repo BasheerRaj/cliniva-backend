@@ -828,11 +828,14 @@ export class ServiceController {
   async getServicesByClinic(
     @Param('clinicId') clinicId: string,
     @Query() paginationQuery: ServicePaginationQuery,
+    @Request() req?: any,
   ): Promise<PaginatedServiceResponse> {
     const pagination = this.parsePaginationQuery(paginationQuery);
+    const subscriptionId = req?.user?.subscriptionId?.toString();
     const services = await this.serviceService.getServicesByClinicPaginated(
       clinicId,
       pagination,
+      subscriptionId,
     );
 
     return this.enrichPaginatedServiceResponse(services);

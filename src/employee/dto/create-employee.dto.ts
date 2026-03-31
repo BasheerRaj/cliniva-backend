@@ -1167,6 +1167,10 @@ export class EmployeeSearchQueryDto {
   @IsOptional()
   clinicId?: string;
 
+  @IsString()
+  @IsOptional()
+  clinicIds?: string; // comma-separated clinic IDs for multi-clinic filter
+
   @IsBoolean()
   @IsOptional()
   @Transform(({ value }) => value === 'true' || value === true)

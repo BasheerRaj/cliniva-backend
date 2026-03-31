@@ -703,10 +703,11 @@ export class ServiceService {
   async getServicesByClinicPaginated(
     clinicId: string,
     options?: PaginationOptions,
+    subscriptionId?: string,
   ): Promise<PaginatedResult<Service>> {
     const { page, limit, skip } = this.normalizePaginationOptions(options);
 
-    const clinicQuery = {
+    const clinicQuery: any = {
       clinicId: new Types.ObjectId(clinicId),
       isActive: true,
     };
@@ -717,12 +718,21 @@ export class ServiceService {
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
-        .populate('serviceId', 'name serviceCategory price isActive description')
+        .populate('serviceId', 'name serviceCategory price isActive description subscriptionId')
         .exec(),
       this.clinicServiceModel.countDocuments(clinicQuery),
     ]);
 
-    const data = clinicServices.map((cs) => cs.serviceId as unknown as Service);
+    let data = clinicServices
+      .map((cs) => cs.serviceId as unknown as Service)
+      .filter(Boolean);
+
+    // Tenant isolation: filter out services that don't belong to the requesting subscription
+    if (subscriptionId) {
+      data = data.filter(
+        (s) => !s.subscriptionId || s.subscriptionId.toString() === subscriptionId,
+      );
+    }
 
     return {
       data,

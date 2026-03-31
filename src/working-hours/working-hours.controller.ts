@@ -1757,6 +1757,48 @@ export class WorkingHoursController {
   }
 
   /**
+   * Batch retrieves working hours for multiple entities of the same type.
+   * Returns a map keyed by entityId.
+   *
+   * @query entityType - 'clinic' | 'complex' | 'user'
+   * @query entityIds  - comma-separated entity IDs
+   */
+  @Get('batch')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Batch get working hours for multiple entities',
+    description:
+      'Fetches working hours for multiple entities (same entityType) in one request. ' +
+      'Returns an object keyed by entityId.',
+  })
+  @ApiQuery({ name: 'entityType', required: true, example: 'clinic' })
+  @ApiQuery({
+    name: 'entityIds',
+    required: true,
+    example: 'id1,id2,id3',
+    description: 'Comma-separated entity IDs',
+  })
+  @ApiResponse({ status: 200, description: 'Batch working hours retrieved successfully' })
+  async getBatchWorkingHours(
+    @Query('entityType') entityType: string,
+    @Query('entityIds') entityIds: string,
+  ): Promise<StandardResponse> {
+    if (!entityType || !entityIds) {
+      throw new BadRequestException({
+        message: { ar: 'entityType و entityIds مطلوبان', en: 'entityType and entityIds are required' },
+      });
+    }
+    const ids = entityIds.split(',').map((id) => id.trim()).filter(Boolean);
+    const data = await this.workingHoursService.getBatchWorkingHours(entityType, ids);
+    return this.createSuccessResponse(data, {
+      ar: 'تم استرجاع ساعات العمل بنجاح',
+      en: 'Batch working hours retrieved successfully',
+    });
+  }
+
+  /**
    * Retrieves working hours for an entity.
    *
    * @param {string} entityType - Entity type
