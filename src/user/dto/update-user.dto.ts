@@ -6,6 +6,8 @@ import {
   IsString,
   MinLength,
   IsBoolean,
+  IsMongoId,
+  Matches,
 } from 'class-validator';
 import { UserRole } from '../../common/enums/user-role.enum';
 
@@ -24,6 +26,16 @@ export class UpdateUserDto {
   @IsOptional()
   @IsEmail()
   email?: string;
+
+  @ApiPropertyOptional({
+    description: 'Unique username used for login',
+    example: 'john.doe',
+    type: String,
+  })
+  @IsOptional()
+  @IsString()
+  @Matches(/^[a-zA-Z0-9._-]{3,30}$/)
+  username?: string;
 
   @ApiPropertyOptional({
     description: 'User first name',
@@ -118,4 +130,40 @@ export class UpdateUserDto {
   @IsOptional()
   @IsBoolean()
   setupComplete?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Organization ID association',
+    example: '507f1f77bcf86cd799439011',
+    type: String,
+  })
+  @IsOptional()
+  @IsMongoId()
+  organizationId?: string;
+
+  @ApiPropertyOptional({
+    description: 'Complex ID association',
+    example: '507f1f77bcf86cd799439011',
+    type: String,
+  })
+  @IsOptional()
+  @IsMongoId()
+  complexId?: string;
+
+  @ApiPropertyOptional({
+    description: 'Primary Clinic ID association',
+    example: '507f1f77bcf86cd799439011',
+    type: String,
+  })
+  @IsOptional()
+  @IsMongoId()
+  clinicId?: string;
+
+  @ApiPropertyOptional({
+    description: 'Clinic IDs for users associated with multiple clinics',
+    example: ['507f1f77bcf86cd799439011'],
+    type: [String],
+  })
+  @IsOptional()
+  @IsMongoId({ each: true })
+  clinicIds?: string[];
 }

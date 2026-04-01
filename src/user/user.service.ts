@@ -130,6 +130,7 @@ export class UserService {
           .populate('organizationId', 'name nameAr')
           .populate('complexId', 'name nameAr')
           .populate('clinicId', 'name nameAr')
+          .populate('clinicIds', 'name nameAr')
           .select('-passwordHash -__v')
           .lean()
           .exec(),
@@ -996,6 +997,7 @@ export class UserService {
           .populate('organizationId', 'name nameAr')
           .populate('complexId', 'name nameAr')
           .populate('clinicId', 'name nameAr')
+          .populate('clinicIds', 'name nameAr')
           .exec(),
         this.workingHoursService.getWorkingHours('user', userId),
       ]);

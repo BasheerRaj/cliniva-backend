@@ -67,6 +67,7 @@ export class AuthResponseDto {
     organizationId?: string | null;
     complexId?: string | null;
     clinicId?: string | null;
+    clinicIds?: string[];
     onboardingComplete?: boolean;
     onboardingProgress?: string[];
     planType?: string | null;
@@ -257,6 +258,13 @@ export class UserProfileDto {
   clinicId?: string | null;
 
   @ApiPropertyOptional({
+    description: 'Clinic IDs for users associated with multiple clinics',
+    example: ['507f1f77bcf86cd799439015'],
+    type: [String],
+  })
+  clinicIds?: string[];
+
+  @ApiPropertyOptional({
     description: 'Whether onboarding is complete',
     example: true,
     type: Boolean,
@@ -319,6 +327,7 @@ export class UserProfileDto {
       : null;
     this.complexId = user.complexId ? (user.complexId as any).toString() : null;
     this.clinicId = user.clinicId ? (user.clinicId as any).toString() : null;
+    this.clinicIds = user.clinicIds?.map((id: any) => id.toString()) || [];
     this.onboardingComplete = user.onboardingComplete;
     this.onboardingProgress = user.onboardingProgress;
     this.planType = user.planType ?? null;

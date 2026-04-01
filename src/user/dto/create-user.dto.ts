@@ -39,6 +39,27 @@ export class CreateUserDto {
   email: string;
 
   @ApiPropertyOptional({
+    description: 'Unique username used for login. If not provided, email will be used.',
+    example: 'john.doe',
+    type: String,
+  })
+  @Transform(({ value }) => value?.toLowerCase().trim())
+  @IsOptional()
+  @IsString({
+    message: JSON.stringify({
+      ar: 'اسم المستخدم يجب أن يكون نصاً',
+      en: 'Username must be a string',
+    }),
+  })
+  @Matches(/^[a-zA-Z0-9._-]{3,30}$/, {
+    message: JSON.stringify({
+      ar: 'اسم المستخدم يجب أن يكون من 3 إلى 30 حرفاً ويمكن أن يحتوي على أحرف وأرقام و . _ - فقط',
+      en: 'Username must be 3-30 characters and can contain only letters, numbers, ., _, and -',
+    }),
+  })
+  username?: string;
+
+  @ApiPropertyOptional({
     description:
       'User password. If not provided, a temporary password will be generated.',
     example: 'SecurePass123!',
@@ -163,6 +184,20 @@ export class CreateUserDto {
   gender?: string;
 
   @ApiPropertyOptional({
+    description: 'Subscription ID',
+    example: '507f1f77bcf86cd799439011',
+    type: String,
+  })
+  @IsOptional()
+  @IsMongoId({
+    message: JSON.stringify({
+      ar: 'معرف الاشتراك غير صالح',
+      en: 'Invalid subscription ID',
+    }),
+  })
+  subscriptionId?: string;
+
+  @ApiPropertyOptional({
     description: 'Organization ID',
     example: '507f1f77bcf86cd799439011',
     type: String,
@@ -203,4 +238,19 @@ export class CreateUserDto {
     }),
   })
   clinicId?: string;
+
+  @ApiPropertyOptional({
+    description: 'Clinic IDs for users associated with multiple clinics',
+    example: ['507f1f77bcf86cd799439011'],
+    type: [String],
+  })
+  @IsOptional()
+  @IsMongoId({
+    each: true,
+    message: JSON.stringify({
+      ar: 'معرفات العيادة غير صالحة',
+      en: 'Invalid clinic IDs',
+    }),
+  })
+  clinicIds?: string[];
 }

@@ -230,8 +230,16 @@ export class OrganizationService {
     }
 
     // Tenant ownership check — non-super_admin cannot read other tenants' orgs
-    if (requestingUser) {
-      assertSameTenant(organization.subscriptionId, requestingUser);
+    if (requestingUser && requestingUser.role !== 'super_admin') {
+      // Allow if user's organizationId directly matches (owner accessing their own org)
+      const userOrgId = requestingUser.organizationId;
+      const isOwner = userOrgId && (
+        userOrgId === organizationId ||
+        userOrgId === organization._id?.toString()
+      );
+      if (!isOwner) {
+        assertSameTenant(organization.subscriptionId, requestingUser);
+      }
     }
 
     return this.formatOrganizationResponse(organization);

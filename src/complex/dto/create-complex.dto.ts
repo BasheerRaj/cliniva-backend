@@ -221,6 +221,17 @@ export class CreateComplexDto {
   @IsArray()
   @IsOptional()
   departmentIds?: string[];
+
+  @ApiPropertyOptional({
+    description: 'Array of new department names to create and assign to the complex',
+    example: ['Cardiology', 'Pediatrics', 'Orthopedics'],
+    type: [String],
+    isArray: true,
+  })
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  newDepartmentNames?: string[];
 }
 
 /**

@@ -189,6 +189,34 @@ export class RegisterDto {
   gender?: string;
 
   @ApiPropertyOptional({
+    description: 'Subscription ID (optional)',
+    example: '507f1f77bcf86cd799439011',
+    type: String,
+  })
+  @IsOptional()
+  @IsMongoId({
+    message: JSON.stringify({
+      ar: 'معرف الاشتراك غير صالح',
+      en: 'Invalid subscription ID',
+    }),
+  })
+  subscriptionId?: string;
+
+  @ApiPropertyOptional({
+    description: 'Organization ID (optional)',
+    example: '507f1f77bcf86cd799439011',
+    type: String,
+  })
+  @IsOptional()
+  @IsMongoId({
+    message: JSON.stringify({
+      ar: 'معرف المنظمة غير صالح',
+      en: 'Invalid organization ID',
+    }),
+  })
+  organizationId?: string;
+
+  @ApiPropertyOptional({
     description:
       'Complex ID (optional) - Associates user with a specific complex',
     example: '507f1f77bcf86cd799439011',
@@ -216,4 +244,19 @@ export class RegisterDto {
     }),
   })
   clinicId?: string;
+
+  @ApiPropertyOptional({
+    description: 'Clinic IDs for users associated with multiple clinics',
+    example: ['507f1f77bcf86cd799439011'],
+    type: [String],
+  })
+  @IsOptional()
+  @IsMongoId({
+    each: true,
+    message: JSON.stringify({
+      ar: 'معرفات العيادة غير صالحة',
+      en: 'Invalid clinic IDs',
+    }),
+  })
+  clinicIds?: string[];
 }

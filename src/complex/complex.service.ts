@@ -17,6 +17,7 @@ import { UpdateComplexStatusDto } from './dto/update-complex-status.dto';
 import { ValidationUtil } from '../common/utils/validation.util';
 import { TransactionUtil } from '../common/utils/transaction.util';
 import { SubscriptionService } from '../subscription/subscription.service';
+import { DepartmentService } from '../department/department.service';
 import {
   AssignedClinicSummary,
   CapacityBreakdown,
@@ -33,6 +34,7 @@ export class ComplexService {
     @InjectModel('Complex') private readonly complexModel: Model<Complex>,
     @InjectConnection() private readonly connection: Connection,
     private readonly subscriptionService: SubscriptionService,
+    private readonly departmentService: DepartmentService,
   ) { }
 
   /**
@@ -310,7 +312,7 @@ export class ComplexService {
       });
     }
 
-    const { phone, googleLocation, departmentIds: createDepartmentIds, ...restDto } = createComplexDto as any;
+    const { phone, googleLocation, departmentIds: createDepartmentIds, newDepartmentNames, ...restDto } = createComplexDto as any;
 
     const complexData: any = {
       ...restDto,
@@ -373,6 +375,28 @@ export class ComplexService {
       );
     }
 
+    // Create new departments by name and link them to this complex
+    if (newDepartmentNames && newDepartmentNames.length > 0) {
+      const allExisting = await this.departmentService.getAllDepartments();
+      for (const rawName of newDepartmentNames) {
+        const nameTrimmed = rawName.trim();
+        if (!nameTrimmed) continue;
+        let dept = allExisting.find(
+          (d: any) => d.name.toLowerCase() === nameTrimmed.toLowerCase(),
+        );
+        if (!dept) {
+          dept = await this.departmentService.createDepartment({
+            name: nameTrimmed,
+            description: `Department for ${savedComplex.name}`,
+          });
+        }
+        await this.departmentService.createComplexDepartment(
+          (savedComplex._id as Types.ObjectId).toString(),
+          (dept._id as any).toString(),
+        );
+      }
+    }
+
     // Populate relationships in response
     const populatedComplex = await this.complexModel
       .findById(savedComplex._id)
@@ -389,8 +413,8 @@ export class ComplexService {
       });
     }
 
-    // Fetch linked departments for response
-    const departments = createDepartmentIds?.length
+    // Fetch linked departments for response (includes both existing IDs and newly created ones)
+    const departments = (createDepartmentIds?.length || newDepartmentNames?.length)
       ? await this.complexModel.db
           .collection('complex_departments')
           .aggregate([

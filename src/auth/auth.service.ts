@@ -137,7 +137,24 @@ export class AuthService {
       // ==========================================
 
       // Check if user already exists
-      const normalizedUsername = registerDto.username.toLowerCase().trim();
+      const normalizedEmail = registerDto.email?.toLowerCase().trim();
+
+      // If username is not provided (e.g. from CreateUserDto), use email local part
+      let normalizedUsername = registerDto.username?.toLowerCase().trim();
+      if (!normalizedUsername && normalizedEmail) {
+        normalizedUsername = normalizedEmail.split('@')[0];
+      }
+
+      if (!normalizedUsername) {
+        throw new BadRequestException({
+          message: {
+            ar: 'اسم المستخدم مطلوب',
+            en: 'Username is required',
+          },
+          code: 'USERNAME_REQUIRED',
+        });
+      }
+
       const existingUserByUsername = await this.userModel.findOne({
         username: normalizedUsername,
       });
@@ -152,7 +169,6 @@ export class AuthService {
         });
       }
 
-      const normalizedEmail = registerDto.email?.toLowerCase().trim();
       const emailToStore = normalizedEmail || `${normalizedUsername}@cliniva.local`;
 
       if (normalizedEmail) {
@@ -185,6 +201,24 @@ export class AuthService {
         }
       }
 
+      // Validate clinicIds if provided
+      if (registerDto.clinicIds && registerDto.clinicIds.length > 0) {
+        const uniqueClinicIds = [...new Set(registerDto.clinicIds)];
+        const clinicsCount = await this.clinicModel.countDocuments({
+          _id: { $in: uniqueClinicIds },
+        });
+
+        if (clinicsCount !== uniqueClinicIds.length) {
+          throw new NotFoundException({
+            message: {
+              ar: 'واحدة أو أكثر من العيادات المحددة غير موجودة',
+              en: 'One or more of the specified clinics were not found',
+            },
+            code: 'CLINICS_NOT_FOUND',
+          });
+        }
+      }
+
       // Hash password
       const hashedPassword = await this.hashPassword(registerDto.password);
 
@@ -199,23 +233,54 @@ export class AuthService {
         scopeFields.createdBy = creatorUser.id;
         const creator = await this.userModel.findById(creatorUser.id);
         if (creator) {
-          if (creator.organizationId) {
+          // Priority 1: Explicitly provided in DTO
+          // Priority 2: Inherited from creator
+          
+          // Handle subscriptionId
+          if (registerDto.subscriptionId) {
+            scopeFields.subscriptionId = registerDto.subscriptionId;
+          } else if (creator.subscriptionId) {
+            scopeFields.subscriptionId = creator.subscriptionId;
+          }
+
+          // Handle organizationId
+          if (registerDto.organizationId) {
+            scopeFields.organizationId = registerDto.organizationId;
+          } else if (creator.organizationId) {
             scopeFields.organizationId = creator.organizationId;
           }
-          // Use explicitly provided complexId from DTO, otherwise inherit from creator
+
+          // Handle complexId
           if (registerDto.complexId) {
             scopeFields.complexId = registerDto.complexId;
           } else if (creator.complexId) {
             scopeFields.complexId = creator.complexId;
           }
-          // Use explicitly provided clinicId from DTO, otherwise inherit from creator
+
+          // Handle clinicId
           if (registerDto.clinicId) {
             scopeFields.clinicId = registerDto.clinicId;
           } else if (creator.clinicId) {
             scopeFields.clinicId = creator.clinicId;
           }
+
+          // Handle planType
+          if (creator.planType) {
+            scopeFields.planType = creator.planType;
+          }
+
+          // Use explicitly provided clinicIds from DTO, otherwise inherit from creator
+          if (registerDto.clinicIds && registerDto.clinicIds.length > 0) {
+            scopeFields.clinicIds = registerDto.clinicIds;
+          } else if (creator.clinicIds && creator.clinicIds.length > 0) {
+            scopeFields.clinicIds = creator.clinicIds;
+          } else if (creator.clinicId) {
+            // Fallback: use creator's primary clinicId as the single clinicIds entry
+            scopeFields.clinicIds = [creator.clinicId];
+          }
+
           this.logger.log(
-            `New user will be associated with scope: org=${scopeFields.organizationId || creator.organizationId}, complex=${scopeFields.complexId || creator.complexId}, clinic=${scopeFields.clinicId || creator.clinicId}`,
+            `New user will be associated with scope: sub=${scopeFields.subscriptionId}, org=${scopeFields.organizationId}, complex=${scopeFields.complexId}, clinic=${scopeFields.clinicId}, clinics=${scopeFields.clinicIds?.length || 0}`,
           );
         }
       }
@@ -274,9 +339,6 @@ export class AuthService {
         );
       }
 
-      // Update last login
-      await this.updateLastLogin(userId);
-
       return {
         ...tokens,
         user: {
@@ -297,6 +359,7 @@ export class AuthService {
           organizationId: (savedUser.organizationId as any)?.toString() || null,
           complexId: (savedUser.complexId as any)?.toString() || null,
           clinicId: (savedUser.clinicId as any)?.toString() || null,
+          clinicIds: savedUser.clinicIds?.map((id: any) => id.toString()) || [],
         },
       };
     } catch (error) {
@@ -422,6 +485,7 @@ export class AuthService {
           passwordChangeRequired: user.passwordChangeRequired,
           preferredLanguage: user.preferredLanguage,
           isOwner: user.role === 'owner',
+          clinicIds: user.clinicIds?.map((id: any) => id.toString()) || [],
         },
       };
     } catch (error) {
@@ -602,6 +666,7 @@ export class AuthService {
           organizationId: user.organizationId?.toString() || null,
           complexId: resolvedContext.complexId || user.complexId?.toString() || null,
           clinicId: resolvedContext.clinicId || user.clinicId?.toString() || null,
+          clinicIds: user.clinicIds?.map((id: any) => id.toString()) || [],
           onboardingComplete: user.onboardingComplete || false,
           onboardingProgress: user.onboardingProgress || [],
           planType: resolvedContext.planType,
