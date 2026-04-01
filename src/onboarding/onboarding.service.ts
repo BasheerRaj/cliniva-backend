@@ -1840,11 +1840,8 @@ export class OnboardingService {
           }
         }
 
-        // If no valid inherited logo found, use default placeholder
-        if (!logoUrl) {
-          logoUrl = '/uploads/logos/default-clinic-logo.png';
-          console.log('📷 Using default clinic logo placeholder');
-        }
+        // If no valid inherited logo found, leave logoUrl undefined
+        // (company/complex plan clinics do not need individual clinic logos)
       } else {
         // Custom logo provided - validate and normalize
         logoUrl = normalizeLogoUrl(logoUrl);
@@ -1874,9 +1871,9 @@ export class OnboardingService {
               '🔗 Fallback: Using organization logo due to invalid custom logo',
             );
           } else {
-            logoUrl = '/uploads/logos/default-clinic-logo.png';
+            logoUrl = undefined;
             console.log(
-              '📷 Fallback: Using default logo due to all invalid logos',
+              '📷 Fallback: No valid logo available, leaving clinic logoUrl unset',
             );
           }
         } else {

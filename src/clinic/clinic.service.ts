@@ -298,10 +298,10 @@ export class ClinicService {
                 : 0,
           };
 
-          // Calculate staff capacity
+          // Calculate staff capacity (exclude owners/super_admins — they are not clinic staff)
           const staffCount = await this.userModel.countDocuments({
             clinicId: clinic._id,
-            role: { $nin: ['doctor', 'patient'] },
+            role: { $nin: ['doctor', 'patient', 'owner', 'super_admin'] },
             isActive: true,
           });
 
@@ -587,11 +587,11 @@ export class ClinicService {
       })),
     };
 
-    // 3. Calculate staff capacity with personnel list
+    // 3. Calculate staff capacity with personnel list (exclude owners/super_admins)
     const staffList = await this.userModel
       .find({
         clinicId: new Types.ObjectId(clinicId),
-        role: { $nin: ['doctor', 'patient'] },
+        role: { $nin: ['doctor', 'patient', 'owner', 'super_admin'] },
         isActive: true,
       })
       .select('_id firstName lastName email role')
