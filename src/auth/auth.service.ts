@@ -1030,6 +1030,7 @@ export class AuthService {
       subscriptionId: user.subscriptionId?.toString(),
       complexId: user.complexId?.toString(),
       clinicId: user.clinicId?.toString(),
+      clinicIds: user.clinicIds?.map((id: any) => id.toString()) || [],
     };
 
     // If rememberMe is true, extend expiration to 30 days

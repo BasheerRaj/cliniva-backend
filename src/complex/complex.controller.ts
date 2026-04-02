@@ -25,7 +25,7 @@ import {
   ApiBearerAuth,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { AdminGuard } from '../auth/guards/admin.guard';
+import { AdminGuard, SkipAdminGuard } from '../auth/guards/admin.guard';
 import { ComplexService } from './complex.service';
 import { CreateComplexDto, UpdateComplexDto } from './dto/create-complex.dto';
 import { ListComplexesQueryDto } from './dto/list-complexes-query.dto';
@@ -54,6 +54,27 @@ import { TransferClinicsDto } from './dto/transfer-clinics.dto';
 @ApiBearerAuth()
 export class ComplexController {
   constructor(private readonly complexService: ComplexService) { }
+
+  /**
+   * Get the complex assigned to the requesting user (Doctor/Staff)
+   * Perm #21: View Assigned Complex — accessible by all authenticated roles
+   * GET /complexes/assigned
+   *
+   * @SkipAdminGuard() bypasses the class-level AdminGuard for this endpoint,
+   * allowing doctor and staff roles to access their assigned complex.
+   */
+  @Get('assigned')
+  @SkipAdminGuard()
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Get assigned complex',
+    description: 'Returns the complex assigned to the authenticated user. Accessible by all roles including Doctor and Staff (Perm #21).',
+  })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Assigned complex retrieved successfully' })
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'No complex assigned to this user' })
+  async getAssignedComplex(@Request() req: any) {
+    return await this.complexService.getAssignedComplex(req.user);
+  }
 
   /**
    * List complexes with pagination, filters, and optional counts

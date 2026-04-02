@@ -335,10 +335,14 @@ export class ClinicController {
   })
   @ApiResponse({ status: 200, description: 'Clinics retrieved successfully' })
   @HttpCode(HttpStatus.OK)
-  async getClinicsForDropdown(@Query('complexId') complexId?: string) {
+  async getClinicsForDropdown(
+    @Query('complexId') complexId?: string,
+    @Request() req?: any,
+  ) {
     try {
       return await this.clinicService.getClinicsForDropdown(
         complexId ? { complexId } : undefined,
+        req?.user,
       );
     } catch (error) {
       // Re-throw if already an HTTP exception

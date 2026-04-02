@@ -125,11 +125,7 @@ export class EmployeeController {
         data: employee,
       };
     } catch (error) {
-      return {
-        success: false,
-        message: 'Failed to create employee',
-        error: error.message,
-      };
+      throw error;
     }
   }
 
@@ -286,6 +282,8 @@ export class EmployeeController {
     example: 'desc',
     description: 'Sort order',
   })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.MANAGER)
   @Get()
   async getEmployees(
     @Query(new ValidationPipe()) query: EmployeeSearchQueryDto,
@@ -429,9 +427,9 @@ export class EmployeeController {
     type: String,
   })
   @Get(':id')
-  async getEmployee(@Param('id') id: string) {
+  async getEmployee(@Param('id') id: string, @Request() req: any) {
     try {
-      const employee = await this.employeeService.getEmployeeById(id);
+      const employee = await this.employeeService.getEmployeeById(id, req.user);
       return {
         success: true,
         message: 'Employee retrieved successfully',
@@ -884,9 +882,9 @@ export class EmployeeController {
   })
   @ApiBearerAuth()
   @Get('stats/overview')
-  async getEmployeeStats() {
+  async getEmployeeStats(@Request() req: any) {
     try {
-      const stats = await this.employeeService.getEmployeeStats();
+      const stats = await this.employeeService.getEmployeeStats(req.user);
       return {
         success: true,
         message: 'Employee statistics retrieved successfully',
@@ -2130,9 +2128,9 @@ export class EmployeeController {
   })
   @ApiBearerAuth()
   @Get('analytics/roles')
-  async getEmployeeRoleAnalytics() {
+  async getEmployeeRoleAnalytics(@Request() req: any) {
     try {
-      const stats = await this.employeeService.getEmployeeStats();
+      const stats = await this.employeeService.getEmployeeStats(req.user);
 
       return {
         success: true,
@@ -2211,9 +2209,9 @@ export class EmployeeController {
   })
   @ApiBearerAuth()
   @Get('analytics/salary')
-  async getEmployeeSalaryAnalytics() {
+  async getEmployeeSalaryAnalytics(@Request() req: any) {
     try {
-      const stats = await this.employeeService.getEmployeeStats();
+      const stats = await this.employeeService.getEmployeeStats(req.user);
 
       return {
         success: true,
@@ -2279,9 +2277,9 @@ export class EmployeeController {
   })
   @ApiBearerAuth()
   @Get('analytics/hiring-trends')
-  async getHiringTrends() {
+  async getHiringTrends(@Request() req: any) {
     try {
-      const stats = await this.employeeService.getEmployeeStats();
+      const stats = await this.employeeService.getEmployeeStats(req.user);
 
       return {
         success: true,
@@ -2362,9 +2360,10 @@ export class EmployeeController {
   @Get('documents/expiring')
   async getUpcomingDocumentExpirations(
     @Query('days', new ParseIntPipe({ optional: true })) days?: number,
+    @Request() req?: any,
   ) {
     try {
-      const stats = await this.employeeService.getEmployeeStats();
+      const stats = await this.employeeService.getEmployeeStats(req?.user);
 
       return {
         success: true,

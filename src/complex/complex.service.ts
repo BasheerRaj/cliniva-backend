@@ -636,6 +636,49 @@ export class ComplexService {
     };
   }
 
+  /**
+   * Get the complex assigned to the requesting user (Doctor/Staff)
+   * Perm #21: View Assigned Complex
+   */
+  async getAssignedComplex(requestingUser: any): Promise<any> {
+    if (!requestingUser?.complexId) {
+      throw new NotFoundException({
+        message: {
+          ar: 'لا يوجد مجمع معين لهذا المستخدم',
+          en: 'No complex is assigned to this user',
+        },
+        code: 'COMPLEX_007',
+      });
+    }
+
+    const complexId = requestingUser.complexId.toString();
+
+    if (!Types.ObjectId.isValid(complexId)) {
+      throw new NotFoundException({
+        message: { ar: 'معرف المجمع غير صالح', en: 'Invalid complex ID' },
+        code: 'COMPLEX_008',
+      });
+    }
+
+    const complex = await this.complexModel
+      .findOne({ _id: new Types.ObjectId(complexId), deletedAt: null })
+      .lean()
+      .exec();
+
+    if (!complex) {
+      throw new NotFoundException({
+        message: { ar: 'المجمع غير موجود', en: 'Assigned complex not found' },
+        code: 'COMPLEX_006',
+      });
+    }
+
+    return {
+      success: true,
+      message: { ar: 'تم استرجاع المجمع بنجاح', en: 'Assigned complex retrieved successfully' },
+      data: complex,
+    };
+  }
+
   async getComplexesByOrganization(organizationId: string, requestingUser?: any): Promise<Complex[]> {
     let targetOrganizationId = organizationId;
 

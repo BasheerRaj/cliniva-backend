@@ -169,7 +169,15 @@ export class ClinicService {
         if (requestingUser.complexId) {
           targetComplexId = requestingUser.complexId;
         }
-        if (requestingUser.clinicId) {
+        // Doctor/Staff may be assigned to multiple clinics — use clinicIds array if available
+        if (
+          (requestingUser.role === 'doctor' || requestingUser.role === 'staff') &&
+          requestingUser.clinicIds?.length > 0
+        ) {
+          permittedClinicIds = requestingUser.clinicIds.map(
+            (id: string) => new Types.ObjectId(id),
+          );
+        } else if (requestingUser.clinicId) {
           targetClinicId = requestingUser.clinicId.toString();
         }
       }
@@ -281,9 +289,9 @@ export class ClinicService {
     if (includeCounts) {
       enrichedClinics = await Promise.all(
         clinics.map(async (clinic) => {
-          // Calculate doctors capacity
+          // Calculate doctors capacity (match primary clinicId OR secondary clinicIds)
           const doctorsCount = await this.userModel.countDocuments({
-            clinicId: clinic._id,
+            $or: [{ clinicId: clinic._id }, { clinicIds: clinic._id }],
             role: 'doctor',
             isActive: true,
           });
@@ -298,9 +306,9 @@ export class ClinicService {
                 : 0,
           };
 
-          // Calculate staff capacity (exclude owners/super_admins — they are not clinic staff)
+          // Calculate staff capacity (exclude owners/super_admins; match primary clinicId OR secondary clinicIds)
           const staffCount = await this.userModel.countDocuments({
-            clinicId: clinic._id,
+            $or: [{ clinicId: clinic._id }, { clinicIds: clinic._id }],
             role: { $nin: ['doctor', 'patient', 'owner', 'super_admin'] },
             isActive: true,
           });
@@ -560,10 +568,11 @@ export class ClinicService {
       }
     }
 
-    // 2. Calculate doctors capacity with personnel list
+    // 2. Calculate doctors capacity with personnel list (match primary clinicId OR secondary clinicIds)
+    const clinicObjectId = new Types.ObjectId(clinicId);
     const doctorsList = await this.userModel
       .find({
-        clinicId: new Types.ObjectId(clinicId),
+        $or: [{ clinicId: clinicObjectId }, { clinicIds: clinicObjectId }],
         role: 'doctor',
         isActive: true,
       })
@@ -587,10 +596,10 @@ export class ClinicService {
       })),
     };
 
-    // 3. Calculate staff capacity with personnel list (exclude owners/super_admins)
+    // 3. Calculate staff capacity with personnel list (exclude owners/super_admins; match primary clinicId OR secondary clinicIds)
     const staffList = await this.userModel
       .find({
-        clinicId: new Types.ObjectId(clinicId),
+        $or: [{ clinicId: clinicObjectId }, { clinicIds: clinicObjectId }],
         role: { $nin: ['doctor', 'patient', 'owner', 'super_admin'] },
         isActive: true,
       })
@@ -770,9 +779,23 @@ export class ClinicService {
    * @param filters - Optional filters (complexId)
    * @returns Standardized response with active clinics
    */
-  async getClinicsForDropdown(filters?: { complexId?: string }) {
+  async getClinicsForDropdown(filters?: { complexId?: string }, requestingUser?: any) {
     const query: any = { isActive: true, deletedAt: { $exists: false } };
 
+    // TENANT ISOLATION: scope to requesting user's subscription/clinic
+    if (requestingUser && requestingUser.role !== 'super_admin') {
+      if (requestingUser.role === 'owner' && requestingUser.subscriptionId) {
+        query.subscriptionId = new Types.ObjectId(requestingUser.subscriptionId.toString());
+      } else if (requestingUser.clinicId) {
+        query._id = new Types.ObjectId(requestingUser.clinicId.toString());
+      } else if (requestingUser.complexId) {
+        query.complexId = new Types.ObjectId(requestingUser.complexId.toString());
+      } else if (requestingUser.subscriptionId) {
+        query.subscriptionId = new Types.ObjectId(requestingUser.subscriptionId.toString());
+      }
+    }
+
+    // Override with explicit complexId filter if provided
     if (filters?.complexId) {
       query.complexId = new Types.ObjectId(filters.complexId);
     }

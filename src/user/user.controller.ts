@@ -1515,19 +1515,21 @@ export class UserController {
     @Query('clinicId') clinicId?: string,
     @Query('clinicIds') clinicIdsQuery?: string | string[],
     @Query('includeDeactivated') includeDeactivated?: string,
+    @Request() req?: any,
   ) {
     try {
       // Parse includeDeactivated as boolean
       const includeDeactivatedBool = includeDeactivated === 'true';
       const clinicIds = this.parseClinicIdsQuery(clinicIdsQuery);
 
-      // Create cache key from query parameters
+      // Create cache key from query parameters (include subscriptionId for tenant isolation)
       const cacheKey = JSON.stringify({
         role,
         complexId,
         clinicId,
         clinicIds,
         includeDeactivated: includeDeactivatedBool,
+        subscriptionId: req?.user?.subscriptionId,
       });
 
       // Check cache
@@ -1540,13 +1542,10 @@ export class UserController {
       }
 
       // Call UserDropdownService.getUsersForDropdown()
-      const users = await this.userDropdownService.getUsersForDropdown({
-        role,
-        complexId,
-        clinicId,
-        clinicIds,
-        includeDeactivated: includeDeactivatedBool,
-      });
+      const users = await this.userDropdownService.getUsersForDropdown(
+        { role, complexId, clinicId, clinicIds, includeDeactivated: includeDeactivatedBool },
+        req?.user,
+      );
 
       // Build response
       const response = {

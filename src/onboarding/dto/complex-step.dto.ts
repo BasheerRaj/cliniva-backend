@@ -37,7 +37,7 @@ export class ComplexOverviewDto {
     example: 'https://example.com/complex-logo.png',
     type: String,
   })
-  @IsUrl()
+  @IsString()
   @IsOptional()
   logoUrl?: string;
 

@@ -3,6 +3,7 @@ import {
   NotFoundException,
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Logger,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
@@ -15,6 +16,7 @@ import { EmployeeShift } from '../database/schemas/employee-shift.schema';
 import { Organization } from '../database/schemas/organization.schema';
 import { Complex } from '../database/schemas/complex.schema';
 import { Clinic } from '../database/schemas/clinic.schema';
+import { UserAccess } from '../database/schemas/user-access.schema';
 import { DoctorSpecialty } from '../database/schemas/doctor-specialty.schema';
 import { Specialty } from '../database/schemas/specialty.schema';
 import {
@@ -101,6 +103,8 @@ export class EmployeeService {
     private readonly organizationModel: Model<Organization>,
     @InjectModel('Complex') private readonly complexModel: Model<Complex>,
     @InjectModel('Clinic') private readonly clinicModel: Model<Clinic>,
+    @InjectModel('UserAccess')
+    private readonly userAccessModel: Model<UserAccess>,
     @InjectModel('DoctorSpecialty')
     private readonly doctorSpecialtyModel: Model<DoctorSpecialty>,
     @InjectModel('Specialty')
@@ -166,13 +170,15 @@ export class EmployeeService {
         throw new ConflictException('Email already exists');
       }
 
-      // Validate phone uniqueness
-      const existingUserByPhone = await this.userModel.findOne({
-        phone: createDto.phone,
-      });
+      // Validate phone uniqueness (only if phone is provided)
+      if (createDto.phone) {
+        const existingUserByPhone = await this.userModel.findOne({
+          phone: createDto.phone,
+        });
 
-      if (existingUserByPhone) {
-        throw new ConflictException('Phone number already exists');
+        if (existingUserByPhone) {
+          throw new ConflictException('Phone number already exists');
+        }
       }
 
       // Validate employee number uniqueness (if provided)
@@ -438,7 +444,7 @@ export class EmployeeService {
       await this.validatePlanBasedAssignment(createEmployeeDto, subscription);
     }
 
-    const normalizedRole = createEmployeeDto.userType || createEmployeeDto.role;
+    const normalizedRole = createEmployeeDto.role || createEmployeeDto.userType;
 
     const specialties = Array.isArray(createEmployeeDto.specialties)
       ? createEmployeeDto.specialties.filter(Boolean)
@@ -697,7 +703,7 @@ export class EmployeeService {
     }
 
     // TENANT ISOLATION: enforce scope based on requesting user (same pattern as user.service.ts)
-    let effectiveClinicId = clinicId;
+    let effectiveClinicId: string | string[] | undefined = clinicId;
     let effectiveComplexId = complexId;
     let effectiveOrgId = organizationId;
 
@@ -714,16 +720,63 @@ export class EmployeeService {
       } else if (requestingUser.subscriptionId) {
         if (!effectiveClinicId && !effectiveComplexId) effectiveOrgId = requestingUser.subscriptionId.toString();
       }
+
+      const userId = requestingUser.role !== 'owner'
+        ? (requestingUser.userId || requestingUser.id)
+        : null;
+      if (userId) {
+        const now = new Date();
+        const accessRecords = await this.userAccessModel
+          .find({
+            userId: new Types.ObjectId(userId),
+            isActive: true,
+            $or: [
+              { expiresAt: { $gt: now } },
+              { expiresAt: { $exists: false } },
+              { expiresAt: null },
+            ],
+          })
+          .lean()
+          .exec();
+
+        if (accessRecords.length > 0) {
+          const directClinicIds = accessRecords
+            .filter((a) => a.scopeType === 'clinic')
+            .map((a) => new Types.ObjectId(a.scopeId));
+
+          const accessComplexIds = accessRecords
+            .filter((a) => a.scopeType === 'complex')
+            .map((a) => new Types.ObjectId(a.scopeId));
+
+          let complexClinicIds: Types.ObjectId[] = [];
+          if (accessComplexIds.length > 0) {
+            const complexClinics = await this.clinicModel
+              .find({ complexId: { $in: accessComplexIds } }, { _id: 1 })
+              .lean()
+              .exec();
+            complexClinicIds = complexClinics.map(
+              (c) => new Types.ObjectId((c._id as any).toString()),
+            );
+          }
+
+          const expandedClinicIds = [...directClinicIds, ...complexClinicIds];
+          if (expandedClinicIds.length > 0) {
+            effectiveClinicId = expandedClinicIds.map((id) => id.toString());
+            effectiveComplexId = undefined;
+            effectiveOrgId = undefined;
+          }
+        }
+      }
     }
 
     // Build user filter
     const userFilter: any = {};
 
-    // ROLE-BASED SELF-RESTRICTION: Doctors can only see themselves
-    if (requestingUser && requestingUser.role === 'doctor') {
-      const doctorId = requestingUser.id || requestingUser.userId || requestingUser.sub;
-      if (doctorId) {
-        userFilter._id = new Types.ObjectId(doctorId);
+    // ROLE-BASED SELF-RESTRICTION: Doctors and Staff can only see themselves
+    if (requestingUser && (requestingUser.role === 'doctor' || requestingUser.role === 'staff')) {
+      const userId = requestingUser.id || requestingUser.userId || requestingUser.sub;
+      if (userId) {
+        userFilter._id = new Types.ObjectId(userId);
       }
     }
 
@@ -732,7 +785,15 @@ export class EmployeeService {
     if (email) userFilter.email = { $regex: email, $options: 'i' };
     if (role) userFilter.role = role;
     if (isActive !== undefined) userFilter.isActive = isActive;
-    if (effectiveClinicId) userFilter.clinicId = new Types.ObjectId(effectiveClinicId);
+    if (effectiveClinicId) {
+      if (Array.isArray(effectiveClinicId)) {
+        userFilter.clinicId = {
+          $in: effectiveClinicId.map((id) => new Types.ObjectId(id)),
+        };
+      } else {
+        userFilter.clinicId = new Types.ObjectId(effectiveClinicId);
+      }
+    }
     // Multi-clinic filter: when clinicIds (comma-separated) is provided and no single clinicId forced by role
     if (!effectiveClinicId && clinicIds) {
       const ids = clinicIds.split(',').map((id) => id.trim()).filter(Boolean);
@@ -915,7 +976,7 @@ export class EmployeeService {
   /**
    * Get employee by ID
    */
-  async getEmployeeById(employeeId: string): Promise<any> {
+  async getEmployeeById(employeeId: string, requestingUser?: any): Promise<any> {
     if (!Types.ObjectId.isValid(employeeId)) {
       throw new BadRequestException('Invalid employee ID format');
     }
@@ -1114,7 +1175,24 @@ export class EmployeeService {
       throw new NotFoundException('Employee not found');
     }
 
-    return this.enrichEmployeeResponse(result[0]);
+    const employee = result[0];
+
+    // IDOR protection: verify employee belongs to requesting user's tenant
+    if (requestingUser && requestingUser.role !== 'super_admin') {
+      const empSubId = employee.subscriptionId?.toString();
+      const userSubId = requestingUser.subscriptionId?.toString();
+      if (empSubId && userSubId && empSubId !== userSubId) {
+        throw new ForbiddenException({
+          message: {
+            ar: 'غير مصرح لك بالوصول إلى هذا الموظف',
+            en: 'Access denied: employee belongs to a different tenant',
+          },
+          code: 'EMPLOYEE_403',
+        });
+      }
+    }
+
+    return this.enrichEmployeeResponse(employee);
   }
 
   /**
@@ -1601,10 +1679,23 @@ export class EmployeeService {
   /**
    * Get employee statistics
    */
-  async getEmployeeStats(): Promise<EmployeeStatsDto> {
+  async getEmployeeStats(requestingUser?: any): Promise<EmployeeStatsDto> {
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const startOfYear = new Date(now.getFullYear(), 0, 1);
+
+    // TENANT SCOPING: scope stats to requesting user's subscription
+    let scopedUserIds: Types.ObjectId[] | null = null;
+    if (requestingUser && requestingUser.role !== 'super_admin' && requestingUser.subscriptionId) {
+      scopedUserIds = (await this.userModel.distinct('_id', {
+        subscriptionId: new Types.ObjectId(requestingUser.subscriptionId.toString()),
+      })) as Types.ObjectId[];
+    }
+    const userIdFilter: any = scopedUserIds ? { userId: { $in: scopedUserIds } } : {};
+    const userSubMatch: any =
+      requestingUser && requestingUser.role !== 'super_admin' && requestingUser.subscriptionId
+        ? { subscriptionId: new Types.ObjectId(requestingUser.subscriptionId.toString()) }
+        : {};
 
     const [
       totalEmployees,
@@ -1618,25 +1709,28 @@ export class EmployeeService {
       upcomingExpirations,
     ] = await Promise.all([
       // Total employees count
-      this.employeeProfileModel.countDocuments({}),
+      this.employeeProfileModel.countDocuments({ ...userIdFilter }),
 
       // Active employees count
-      this.employeeProfileModel.countDocuments({ isActive: true }),
+      this.employeeProfileModel.countDocuments({ ...userIdFilter, isActive: true }),
 
       // New hires this month
       this.employeeProfileModel.countDocuments({
+        ...userIdFilter,
         dateOfHiring: { $gte: startOfMonth },
         isActive: true,
       }),
 
       // New hires this year
       this.employeeProfileModel.countDocuments({
+        ...userIdFilter,
         dateOfHiring: { $gte: startOfYear },
         isActive: true,
       }),
 
       // Employees by role
       this.userModel.aggregate([
+        { $match: userSubMatch },
         {
           $lookup: {
             from: 'employee_profiles',
@@ -1666,6 +1760,7 @@ export class EmployeeService {
       this.employeeProfileModel.aggregate([
         {
           $match: {
+            ...userIdFilter,
             isActive: true,
             salary: { $gt: 0 },
           },
@@ -1698,6 +1793,7 @@ export class EmployeeService {
 
       // Gender distribution
       this.userModel.aggregate([
+        { $match: userSubMatch },
         {
           $lookup: {
             from: 'employee_profiles',
@@ -1724,6 +1820,7 @@ export class EmployeeService {
       this.employeeProfileModel.aggregate([
         {
           $match: {
+            ...userIdFilter,
             dateOfHiring: {
               $gte: new Date(now.getFullYear() - 1, now.getMonth(), 1),
             },
@@ -1794,7 +1891,7 @@ export class EmployeeService {
     // Calculate average tenure
     const tenureResult = await this.employeeProfileModel.aggregate([
       {
-        $match: { isActive: true },
+        $match: { ...userIdFilter, isActive: true },
       },
       {
         $addFields: {

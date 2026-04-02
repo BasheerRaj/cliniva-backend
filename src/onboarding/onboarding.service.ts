@@ -1683,6 +1683,9 @@ export class OnboardingService {
         role: UserRole.ADMIN,
       });
 
+      // Assign complexId to user so GET /complexes/assigned works after onboarding
+      await this.userModel.findByIdAndUpdate(userId, { $set: { complexId } });
+
       // Get subscription to determine next steps
       const subscription =
         await this.subscriptionService.getSubscriptionByUser(userId);

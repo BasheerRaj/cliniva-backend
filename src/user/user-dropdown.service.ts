@@ -68,10 +68,18 @@ export class UserDropdownService {
    */
   async getUsersForDropdown(
     filters?: DropdownFilters,
+    requestingUser?: any,
   ): Promise<DropdownUser[]> {
     try {
       // Build query - Requirement 10.1: Default isActive: true filter
       const query: any = {};
+
+      // TENANT ISOLATION: scope to requesting user's subscription/org
+      if (requestingUser && requestingUser.role !== 'super_admin') {
+        if (requestingUser.subscriptionId) {
+          query.subscriptionId = new Types.ObjectId(requestingUser.subscriptionId.toString());
+        }
+      }
 
       // Requirement 10.2: Support includeDeactivated parameter
       if (!filters?.includeDeactivated) {

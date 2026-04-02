@@ -90,6 +90,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       subscriptionId: (user.subscriptionId as any)?.toString() || null,
       complexId: (user.complexId as any)?.toString() || null,
       clinicId: (user.clinicId as any)?.toString() || null,
+      clinicIds: user.clinicIds?.map((id: any) => id.toString()) || [],
       permissions: [], // Will be populated by permissions system if needed
     };
   }

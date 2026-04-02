@@ -5,8 +5,21 @@ import {
   ForbiddenException,
   UnauthorizedException,
   Logger,
+  SetMetadata,
 } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 import { UserRole } from '../../common/enums/user-role.enum';
+
+export const SKIP_ADMIN_GUARD_KEY = 'skipAdminGuard';
+
+/**
+ * Decorator to bypass AdminGuard for a specific endpoint while still
+ * requiring JWT authentication. Use on endpoints within an AdminGuard-protected
+ * controller that should be accessible by non-admin roles (e.g., doctor, staff).
+ *
+ * Usage: @SkipAdminGuard()
+ */
+export const SkipAdminGuard = () => SetMetadata(SKIP_ADMIN_GUARD_KEY, true);
 
 /**
  * AdminGuard - Ensures user has admin, owner, or super_admin role
@@ -21,6 +34,9 @@ import { UserRole } from '../../common/enums/user-role.enum';
  *
  * Usage:
  * @UseGuards(JwtAuthGuard, AdminGuard)
+ *
+ * To allow non-admin access to a specific endpoint within an AdminGuard controller:
+ * @SkipAdminGuard()
  */
 @Injectable()
 export class AdminGuard implements CanActivate {
@@ -31,7 +47,16 @@ export class AdminGuard implements CanActivate {
     UserRole.ADMIN,
   ];
 
+  constructor(private readonly reflector: Reflector) {}
+
   canActivate(context: ExecutionContext): boolean {
+    // Allow endpoints decorated with @SkipAdminGuard() to bypass this guard
+    const skip = this.reflector.getAllAndOverride<boolean>(SKIP_ADMIN_GUARD_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+    if (skip) return true;
+
     const request = context.switchToHttp().getRequest();
     const user = request.user;
 
