@@ -40,6 +40,7 @@ import {
   ClinicStepDto,
   ClinicOverviewDto,
   ClinicContactDto,
+  ClinicServicesCapacityDto,
   ClinicLegalInfoDto,
   ClinicWorkingHoursDto,
   OnboardingStepProgressDto,
@@ -2302,7 +2303,7 @@ Save basic clinic information for onboarding process.
   @UseGuards(JwtAuthGuard)
   async saveClinicServicesCapacity(
     @Request() req,
-    @Body() servicesCapacityDto: any,
+    @Body() servicesCapacityDto: ClinicServicesCapacityDto,
   ): Promise<StepSaveResponseDto> {
     try {
       const userId = req.user.id;

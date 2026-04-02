@@ -97,6 +97,26 @@ export class ClinicServiceDto {
   complexDepartmentId?: string; // Department this service belongs to
 }
 
+export class ClinicServicesCapacityDto {
+  @ApiPropertyOptional({
+    description: 'Services offered by this clinic',
+    type: [ClinicServiceDto],
+  })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ClinicServiceDto)
+  @IsOptional()
+  services?: ClinicServiceDto[];
+
+  @ApiProperty({
+    description: 'Clinic capacity settings',
+    type: ClinicCapacityDto,
+  })
+  @ValidateNested()
+  @Type(() => ClinicCapacityDto)
+  capacity: ClinicCapacityDto;
+}
+
 // Clinic overview form - basic entity information
 export class ClinicOverviewDto {
   @ApiProperty({
@@ -245,7 +265,14 @@ export class ClinicOverviewDto {
   @IsOptional()
   inheritanceSettings?: InheritanceSettingsDto;
 
-  // Note: Capacity fields removed from form, will use schema defaults
+  @ApiPropertyOptional({
+    description: 'Clinic capacity settings (optional in overview)',
+    type: ClinicCapacityDto,
+  })
+  @ValidateNested()
+  @Type(() => ClinicCapacityDto)
+  @IsOptional()
+  capacity?: ClinicCapacityDto;
 }
 
 // Clinic contact form - extends standardized contact structure
