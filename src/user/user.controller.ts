@@ -1848,6 +1848,7 @@ export class UserController {
         userId,
         updateStatusDto,
         currentUserId,
+        req.user?.role,
         req.ip,
         req.headers['user-agent'],
       );

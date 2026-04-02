@@ -444,6 +444,7 @@ export class UserService {
     userId: string,
     updateUserStatusDto: UpdateUserStatusDto,
     currentUserId: string,
+    currentUserRole: string,
     ipAddress: string,
     userAgent: string,
   ) {
@@ -480,6 +481,22 @@ export class UserService {
         userId,
         ERROR_MESSAGES.USER_NOT_FOUND,
       );
+
+      // Role hierarchy check: only higher roles can change lower roles' status
+      const ROLE_PRIORITY: Record<string, number> = {
+        super_admin: 5, owner: 4, admin: 3, doctor: 2, staff: 1, patient: 0,
+      };
+      const actorPriority = ROLE_PRIORITY[currentUserRole] ?? 0;
+      const targetPriority = ROLE_PRIORITY[user.role] ?? 0;
+      if (actorPriority <= targetPriority) {
+        throw new ForbiddenException({
+          message: {
+            ar: 'لا يمكنك تغيير حالة مستخدم يملك صلاحيات مساوية أو أعلى من صلاحياتك',
+            en: 'You cannot change the status of a user with equal or higher permissions than yours',
+          },
+          code: 'INSUFFICIENT_ROLE_FOR_STATUS_CHANGE',
+        });
+      }
 
       // Store previous status for audit log
       const previousStatus = user.isActive;
