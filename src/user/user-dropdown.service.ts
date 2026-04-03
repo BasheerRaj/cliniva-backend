@@ -126,11 +126,18 @@ export class UserDropdownService {
         }
 
         if (validClinicIds.length === 1) {
-          query.clinicId = new Types.ObjectId(validClinicIds[0]);
+          const cid = new Types.ObjectId(validClinicIds[0]);
+          query.$or = [
+            { clinicId: cid },
+            { clinicIds: cid },
+            { clinicIds: { $in: [cid] } }
+          ];
         } else if (validClinicIds.length > 1) {
-          query.clinicId = {
-            $in: validClinicIds.map((clinicId) => new Types.ObjectId(clinicId)),
-          };
+          const cids = validClinicIds.map((clinicId) => new Types.ObjectId(clinicId));
+          query.$or = [
+            { clinicId: { $in: cids } },
+            { clinicIds: { $in: cids } }
+          ];
         }
       }
 
@@ -138,7 +145,7 @@ export class UserDropdownService {
       // Execute query with sorting by firstName, lastName
       const users = await this.userModel
         .find(query)
-        .select('_id firstName lastName email role isActive clinicId')
+        .select('_id firstName lastName email role isActive clinicId clinicIds')
         .populate('clinicId', 'name')
         .sort({ firstName: 1, lastName: 1 })
         .lean()
@@ -151,7 +158,13 @@ export class UserDropdownService {
       // Map to DropdownUser interface
       return users.map((user) => {
         const clinicRef = user.clinicId as any;
-        const clinicID = clinicRef ? String(clinicRef._id ?? clinicRef) : null;
+        let clinicID = clinicRef ? String(clinicRef._id ?? clinicRef) : null;
+        
+        // Fallback to first clinic in clinicIds if clinicId is not set
+        if (!clinicID && user.clinicIds && user.clinicIds.length > 0) {
+          clinicID = user.clinicIds[0].toString();
+        }
+
         const clinicName =
           clinicRef && typeof clinicRef === 'object'
             ? (clinicRef.name ?? null)

@@ -444,6 +444,13 @@ export class EmployeeService {
       await this.validatePlanBasedAssignment(createEmployeeDto, subscription);
     }
 
+    // Auto-assign clinicId when not explicitly provided and requestingUser is scoped to a clinic.
+    // Prevents employees from being created without clinic linkage when the frontend
+    // auth context doesn't yet have clinicId (e.g., right after account creation).
+    if (!createEmployeeDto.clinicId && requestingUser?.clinicId) {
+      createEmployeeDto.clinicId = requestingUser.clinicId.toString();
+    }
+
     const normalizedRole = createEmployeeDto.role || createEmployeeDto.userType;
 
     const specialties = Array.isArray(createEmployeeDto.specialties)
