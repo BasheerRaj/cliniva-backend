@@ -478,6 +478,7 @@ export class PaymentService {
     userClinicId: string | null,
     userOrganizationId: string | null,
     userComplexId?: string | null,
+    subscriptionId?: string | null,
   ): Promise<{ data: PaymentResponseDto[]; meta: any }> {
     const filter: any = { deletedAt: { $exists: false } };
 
@@ -493,8 +494,23 @@ export class PaymentService {
       // Scoped role with no clinic assigned — deny all
       filter._id = new Types.ObjectId('000000000000000000000000');
     } else if (userRole === 'owner' && userOrganizationId && Types.ObjectId.isValid(userOrganizationId)) {
-      // Company-plan owner: scope by organizationId (multi-complex/org tenant boundary)
-      filter.organizationId = new Types.ObjectId(userOrganizationId);
+      // Company-plan owner: use $or to catch payments for clinics missing organizationId
+      if (subscriptionId && Types.ObjectId.isValid(subscriptionId)) {
+        const ownerClinics = await this.clinicModel
+          .find({ subscriptionId: new Types.ObjectId(subscriptionId), deletedAt: { $exists: false } })
+          .select('_id').lean();
+        const ownerClinicIds = ownerClinics.map((c: any) => c._id);
+        if (ownerClinicIds.length > 0) {
+          filter.$or = [
+            { organizationId: new Types.ObjectId(userOrganizationId) },
+            { clinicId: { $in: ownerClinicIds } },
+          ];
+        } else {
+          filter.organizationId = new Types.ObjectId(userOrganizationId);
+        }
+      } else {
+        filter.organizationId = new Types.ObjectId(userOrganizationId);
+      }
       // Then optionally narrow to a specific clinic
       if (queryDto.clinicId && Types.ObjectId.isValid(queryDto.clinicId)) {
         filter.clinicId = new Types.ObjectId(queryDto.clinicId);

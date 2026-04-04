@@ -274,6 +274,7 @@ export class PaymentController {
         userClinicId,
         userOrganizationId,
         userComplexId,
+        user.subscriptionId || null,
       );
 
       return {
