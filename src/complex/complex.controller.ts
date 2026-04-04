@@ -83,6 +83,7 @@ export class ComplexController {
    * Requirements: 1.1, 1.11
    */
   @Get()
+  @SkipAdminGuard()
   @ApiOperation({
     summary: 'List complexes with pagination and filters',
     description: `
