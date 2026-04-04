@@ -327,11 +327,12 @@ export class AppointmentService {
           code: 'SERVICE_NOT_IN_INVOICE',
         });
       }
-      // Count only active (non-cancelled) sessions toward the total
-      const activeSessions = ((matchingService as any).sessions || []).filter(
-        (s: any) => s.sessionStatus !== 'cancelled',
-      );
-      const bookedSessions = activeSessions.length;
+      // Count only sessions that have actually been booked (have an appointment).
+      // 'pending' sessions are pre-created placeholder slots — they are NOT bookings.
+      // Only 'booked', 'in_progress', and 'completed' sessions consume a slot.
+      const bookedSessions = ((matchingService as any).sessions || []).filter(
+        (s: any) => ['booked', 'in_progress', 'completed'].includes(s.sessionStatus),
+      ).length;
       const totalSessions = (matchingService as any).totalSessions || 1;
       if (bookedSessions >= totalSessions) {
         throw new BadRequestException({
