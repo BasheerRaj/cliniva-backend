@@ -283,7 +283,7 @@ export class EmployeeController {
     description: 'Sort order',
   })
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.MANAGER)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.MANAGER, UserRole.DOCTOR, UserRole.STAFF)
   @Get()
   async getEmployees(
     @Query(new ValidationPipe()) query: EmployeeSearchQueryDto,

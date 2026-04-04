@@ -151,6 +151,23 @@ export class InvoiceService {
       const taxAmountPerSession = +(priceAfterDiscount * taxRate / 100).toFixed(2);
       const lineTotalPerSession = +(priceAfterDiscount + taxAmountPerSession).toFixed(2);
 
+      // Pre-populate sessions from service definition
+      const invoiceSessions = ((service as any).sessions || []).map((s: any) => ({
+        invoiceItemId: new Types.ObjectId(),
+        sessionId: s._id,
+        sessionName: s.name,
+        sessionOrder: s.order,
+        unitPrice: pricePerSession,
+        discountPercent,
+        discountAmount: discountAmountPerSession,
+        taxRate,
+        taxAmount: taxAmountPerSession,
+        lineTotal: lineTotalPerSession,
+        paidAmount: 0,
+        sessionStatus: 'pending',
+        appointmentRequired: s.appointmentRequired ?? s.apptRequired ?? true,
+      }));
+
       // Accumulate invoice-level totals
       subtotal += totalPrice;
       totalDiscount += +(discountAmountPerSession * totalSessions).toFixed(2);
@@ -166,10 +183,9 @@ export class InvoiceService {
         discountPercent,
         taxRate,
         totalServicePrice: +(lineTotalPerSession * totalSessions).toFixed(2),
-        sessions: [], // Auto-populated when appointments are booked
+        sessions: invoiceSessions,
       } as any);
-    }
-
+      }
     subtotal = +subtotal.toFixed(2);
     totalDiscount = +Math.min(totalDiscount, subtotal).toFixed(2); // Cap to prevent negative totalAmount from rounding
     totalTax = +totalTax.toFixed(2);
@@ -177,7 +193,7 @@ export class InvoiceService {
 
     // 6. Generate draft number via counterModel (atomic)
     const invoiceNumber = await this.invoiceNumberService.generateDraftNumber(
-      organizationId ? organizationId.toString() : 'global',
+      organizationId ? organizationId.toString() : resolvedClinicId,
     );
 
     // 7. Create invoice
@@ -458,10 +474,11 @@ export class InvoiceService {
       throw new NotFoundException(NOT_FOUND_ERRORS.INVOICE);
     }
 
-    if (userRole === 'staff' || userRole === 'doctor') {
-      const hasAccess = userClinicIds.some(
-        (clinicId) => clinicId === invoice.clinicId.toString(),
-      );
+    if (userRole === 'staff' || userRole === 'doctor' || userRole === 'admin' || userRole === 'manager') {
+      // Extract clinic ID string correctly whether clinicId is populated (Document) or raw ObjectId
+      const invoiceClinicIdStr =
+        (invoice.clinicId as any)?._id?.toString() ?? (invoice.clinicId as any)?.toString();
+      const hasAccess = userClinicIds.some((clinicId) => clinicId === invoiceClinicIdStr);
       if (!hasAccess) {
         throw new ForbiddenException(AUTH_ERRORS.INSUFFICIENT_PERMISSIONS);
       }
@@ -979,7 +996,27 @@ export class InvoiceService {
       ])
       .exec();
 
-    return invoices.map((inv) => this.mapToResponseDto(inv));
+    // Filter to only return invoices that have at least one bookable session.
+    // A session is bookable if:
+    // 1. There are already populated sessions with status 'pending' or 'cancelled'.
+    // 2. OR the service has not yet reached its totalSessions limit (meaning new sessions can be created).
+    const bookableInvoices = invoices.filter((inv: any) =>
+      (inv.services ?? []).some((svc: any) => {
+        // Condition 1: existing available sessions
+        const hasExistingAvailable = (svc.sessions ?? []).some((sess: any) =>
+          ['pending', 'cancelled'].includes(sess.sessionStatus),
+        );
+        if (hasExistingAvailable) return true;
+
+        // Condition 2: room for new sessions
+        const activeSessions = (svc.sessions ?? []).filter(
+          (s: any) => s.sessionStatus !== 'cancelled',
+        );
+        return activeSessions.length < (svc.totalSessions ?? 1);
+      }),
+    );
+
+    return bookableInvoices.map((inv) => this.mapToResponseDto(inv));
   }
 
   /**
@@ -1152,9 +1189,44 @@ export class InvoiceService {
       lastPaymentDate: invoice.lastPaymentDate,
       postedAt: invoice.postedAt,
       notes: invoice.notes,
+      bookableSessions: (invoice.services || []).flatMap((svc: any) => {
+        const sessions = svc.sessions || [];
+        const bookable = sessions
+          .filter((sess: any) => ['pending', 'cancelled'].includes(sess.sessionStatus))
+          .map((sess: any) => ({
+            ...sess,
+            serviceId: svc.serviceId,
+            serviceName: svc.serviceName,
+            isVirtual: false,
+          }));
+
+        // If no pre-populated sessions exist (legacy invoice) but there's room for new ones,
+        // add virtual sessions based on remaining capacity.
+        const activeSessions = sessions.filter(
+          (s: any) => s.sessionStatus !== 'cancelled',
+        );
+        const remainingCount = (svc.totalSessions || 1) - activeSessions.length;
+        
+        if (bookable.length === 0 && remainingCount > 0) {
+          for (let i = 1; i <= remainingCount; i++) {
+            const nextOrder = activeSessions.length + i;
+            bookable.push({
+              sessionName: `Session ${nextOrder} (New)`,
+              sessionOrder: nextOrder,
+              sessionStatus: 'pending',
+              serviceId: svc.serviceId,
+              serviceName: svc.serviceName,
+              unitPrice: svc.pricePerSession || 0,
+              lineTotal: svc.pricePerSession || 0,
+              isVirtual: true,
+              appointmentRequired: true,
+            });
+          }
+        }
+        return bookable;
+      }),
       createdBy:
-        invoice.createdBy && invoice.createdBy._id
-          ? {
+        invoice.createdBy && invoice.createdBy._id          ? {
               _id:
                 invoice.createdBy._id?.toString() ||
                 invoice.createdBy.toString(),

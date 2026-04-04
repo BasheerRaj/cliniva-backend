@@ -308,9 +308,17 @@ Scope is enforced by the caller's role:
       example: SwaggerExamples.ERROR_PATIENT_NOT_FOUND_EXAMPLE,
     },
   })
-  async getPatient(@Param('id') id: string) {
+  async getPatient(@Param('id') id: string, @Request() req: any) {
     try {
-      const patient = await this.patientService.getPatientById(id);
+      const user = req.user;
+      const scope: PatientScopeContext = {
+        requestingUserId: user.userId,
+        role:             user.role as UserRole,
+        complexId:        user.complexId   ?? null,
+        clinicId:         user.clinicId    ?? null,
+        organizationId:   user.organizationId ?? null,
+      };
+      const patient = await this.patientService.getPatientById(id, scope);
 
       // Calculate age from dateOfBirth (Requirement 3.4)
       const calculateAge = (dateOfBirth: Date): number => {
@@ -803,9 +811,17 @@ Scope is enforced by the caller's role:
    * GET /patients/:id/medical-history
    */
   @Get(':id/medical-history')
-  async getMedicalHistory(@Param('id') id: string) {
+  async getMedicalHistory(@Param('id') id: string, @Request() req: any) {
     try {
-      const patient = await this.patientService.getPatientById(id);
+      const user = req.user;
+      const scope: PatientScopeContext = {
+        requestingUserId: user.userId,
+        role:             user.role as UserRole,
+        complexId:        user.complexId   ?? null,
+        clinicId:         user.clinicId    ?? null,
+        organizationId:   user.organizationId ?? null,
+      };
+      const patient = await this.patientService.getPatientById(id, scope);
       const medicalHistory = {
         patientId: patient._id,
         patientName: `${patient.firstName} ${patient.lastName}`,
@@ -993,9 +1009,17 @@ Scope is enforced by the caller's role:
    * GET /patients/:id/emergency-contacts
    */
   @Get(':id/emergency-contacts')
-  async getEmergencyContacts(@Param('id') id: string) {
+  async getEmergencyContacts(@Param('id') id: string, @Request() req: any) {
     try {
-      const patient = await this.patientService.getPatientById(id);
+      const user = req.user;
+      const scope: PatientScopeContext = {
+        requestingUserId: user.userId,
+        role:             user.role as UserRole,
+        complexId:        user.complexId   ?? null,
+        clinicId:         user.clinicId    ?? null,
+        organizationId:   user.organizationId ?? null,
+      };
+      const patient = await this.patientService.getPatientById(id, scope);
       const emergencyContacts: Array<{
         name: string;
         phone: string;

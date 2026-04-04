@@ -602,10 +602,11 @@ export class PaymentService {
       throw new NotFoundException(NOT_FOUND_ERRORS.PAYMENT);
     }
 
-    if (userRole === 'staff' || userRole === 'doctor') {
-      const hasAccess = userClinicIds.some(
-        (clinicId) => clinicId === payment.clinicId.toString(),
-      );
+    if (userRole === 'staff' || userRole === 'doctor' || userRole === 'admin' || userRole === 'manager') {
+      // Extract clinic ID string correctly whether clinicId is populated (Document) or raw ObjectId
+      const paymentClinicIdStr =
+        (payment.clinicId as any)?._id?.toString() ?? (payment.clinicId as any)?.toString();
+      const hasAccess = userClinicIds.some((clinicId) => clinicId === paymentClinicIdStr);
       if (!hasAccess) {
         throw new ForbiddenException(AUTH_ERRORS.INSUFFICIENT_PERMISSIONS);
       }

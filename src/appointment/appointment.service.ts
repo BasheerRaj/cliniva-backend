@@ -550,14 +550,26 @@ export class AppointmentService {
           const taxAmount = +(priceAfterDiscount * taxRate / 100).toFixed(2);
           const lineTotal = +(priceAfterDiscount + taxAmount).toFixed(2);
 
-          // Reuse the first cancelled/pending session slot rather than pushing a new one.
-          // This prevents session history from growing unboundedly when appointments
-          // are cancelled and re-booked against the same invoice service.
-          const reusableSession = (svcItem.sessions || []).find(
-            (s: any) => s.sessionStatus === 'pending' || s.sessionStatus === 'cancelled',
-          );
+          // Find the specific session if requested, otherwise find the first bookable one
+          let targetSession: any = null;
+          const invoiceItemId = (createAppointmentDto as any).invoiceItemId;
 
-          if (reusableSession) {
+          if (invoiceItemId) {
+            targetSession = (svcItem.sessions || []).find(
+              (s: any) =>
+                s.invoiceItemId.toString() === invoiceItemId &&
+                ['pending', 'cancelled'].includes(s.sessionStatus),
+            );
+          }
+
+          if (!targetSession) {
+            // Fallback: first available
+            targetSession = (svcItem.sessions || []).find(
+              (s: any) => ['pending', 'cancelled'].includes(s.sessionStatus),
+            );
+          }
+
+          if (targetSession) {
             await this.invoiceModel.updateOne(
               { _id: validatedInvoice._id, deletedAt: { $exists: false } },
               {
@@ -573,42 +585,49 @@ export class AppointmentService {
                   [`services.${serviceIndex}.sessions.$[item].lineTotal`]: lineTotal,
                 },
               },
-              { arrayFilters: [{ 'item.invoiceItemId': reusableSession.invoiceItemId }] },
+              { arrayFilters: [{ 'item.invoiceItemId': targetSession.invoiceItemId }] },
             );
             this.logger.log(
-              `Reused existing session on invoice ${validatedInvoice._id} for appointment ${savedAppointment._id}`,
+              `Booked existing session ${targetSession.invoiceItemId} on invoice ${validatedInvoice._id} for appointment ${savedAppointment._id}`,
             );
           } else {
-            const sessionNumber = (svcItem.sessions?.length || 0) + 1;
-            await this.invoiceModel.updateOne(
-              { _id: validatedInvoice._id, deletedAt: { $exists: false } },
-              {
-                $push: {
-                  [`services.${serviceIndex}.sessions`]: {
-                    invoiceItemId: new Types.ObjectId(),
-                    sessionStatus: 'booked',
-                    sessionOrder: sessionNumber,
-                    sessionName: `Session ${sessionNumber}`,
-                    doctorId: new Types.ObjectId(createAppointmentDto.doctorId),
-                    unitPrice,
-                    discountPercent,
-                    discountAmount,
-                    taxRate,
-                    taxAmount,
-                    lineTotal,
-                    paidAmount: 0,
-                    appointmentId: savedAppointment._id,
+            // No sessions or all already booked/completed? 
+            // Check if we can add a new one (only for legacy invoices where sessions weren't pre-populated)
+            const activeSessions = (svcItem.sessions || []).filter(
+              (s: any) => s.sessionStatus !== 'cancelled',
+            );
+            if (activeSessions.length < (svcItem.totalSessions || 1)) {
+              const sessionNumber = activeSessions.length + 1;
+              await this.invoiceModel.updateOne(
+                { _id: validatedInvoice._id, deletedAt: { $exists: false } },
+                {
+                  $push: {
+                    [`services.${serviceIndex}.sessions`]: {
+                      invoiceItemId: new Types.ObjectId(),
+                      sessionStatus: 'booked',
+                      sessionOrder: sessionNumber,
+                      sessionName: `Session ${sessionNumber}`,
+                      doctorId: new Types.ObjectId(createAppointmentDto.doctorId),
+                      unitPrice,
+                      discountPercent,
+                      discountAmount,
+                      taxRate,
+                      taxAmount,
+                      lineTotal,
+                      paidAmount: 0,
+                      appointmentId: savedAppointment._id,
+                    },
                   },
                 },
-              },
-            );
-            this.logger.log(
-              `Auto-created session ${sessionNumber} on invoice ${validatedInvoice._id} for appointment ${savedAppointment._id}`,
-            );
+              );
+              this.logger.log(
+                `Created and booked new session on invoice ${validatedInvoice._id} for appointment ${savedAppointment._id}`,
+              );
+            }
           }
         }
       } catch (err) {
-        this.logger.error(`Failed to auto-create invoice session: ${err.message}`);
+        this.logger.error(`Failed to update invoice session: ${err.message}`);
       }
     }
 
@@ -757,23 +776,7 @@ export class AppointmentService {
 
     // Doctor role scoping: doctors can only see their own appointments (UC-d2e3f4c)
     if (userRole === 'doctor' && userId) {
-      const doctorObjectId = new Types.ObjectId(userId);
-      
-      if (filter.doctorId) {
-        // If a specific doctor was requested, ensure it's the current user
-        filter.doctorId = doctorObjectId;
-      } else if (filter.doctorId?.$in) {
-        // If multiple doctors were requested, restrict to just the current user
-        filter.doctorId = doctorObjectId;
-      } else {
-        // Default scoping
-        filter.doctorId = doctorObjectId;
-      }
-      
-      // Remove doctorIds filter if it exists as it might conflict or bypass scoping
-      if (filter.doctorId === undefined && (query as any).doctorIds) {
-         filter.doctorId = doctorObjectId;
-      }
+      filter.doctorId = new Types.ObjectId(userId);
     }
 
     // Staff role scoping: staff can only see appointments for their assigned clinic
@@ -971,6 +974,59 @@ export class AppointmentService {
     }
 
     return transformAppointment(appointment);
+  }
+
+  /**
+   * M7 Integration: Get available sessions for an invoice.
+   * Returns sessions that are 'pending' or 'cancelled'.
+   * 
+   * Requirement: 15.1, 15.2 (Available sessions for booking)
+   */
+  async getAvailableSessionsForInvoice(invoiceId: string): Promise<any[]> {
+    if (!Types.ObjectId.isValid(invoiceId)) {
+      throw new BadRequestException({
+        message: {
+          ar: 'معرف الفاتورة غير صالح',
+          en: 'Invalid invoice ID format',
+        },
+        code: 'INVALID_INVOICE_ID',
+      });
+    }
+
+    const invoice = await this.invoiceModel.findOne({
+      _id: new Types.ObjectId(invoiceId),
+      deletedAt: { $exists: false },
+    });
+
+    if (!invoice) {
+      throw new NotFoundException({
+        message: {
+          ar: 'الفاتورة غير موجودة',
+          en: 'Invoice not found',
+        },
+        code: 'INVOICE_NOT_FOUND',
+      });
+    }
+
+    const availableSessions: any[] = [];
+    const services = invoice.services as any[];
+
+    for (const service of services) {
+      const sessions = service.sessions || [];
+      for (const session of sessions) {
+        // A session is available if it's pending or cancelled
+        // cancelled sessions are available for rebooking (e.g. if the previous booking was no_show or cancelled)
+        if (['pending', 'cancelled'].includes(session.sessionStatus)) {
+          availableSessions.push({
+            serviceId: service.serviceId,
+            serviceName: service.serviceName,
+            ...session,
+          });
+        }
+      }
+    }
+
+    return availableSessions;
   }
 
   /**
@@ -2146,8 +2202,8 @@ export class AppointmentService {
       }
     }
 
-    // M7 Integration: When appointment is cancelled, update invoice session to 'cancelled'
-    if (statusDto.status === 'cancelled' && (updatedAppointment as any).invoiceId) {
+    // M7 Integration: When appointment is cancelled or missed (no_show), update invoice session to 'cancelled'
+    if (['cancelled', 'no_show'].includes(statusDto.status) && (updatedAppointment as any).invoiceId) {
       try {
         await this.updateInvoiceOnAppointmentCancellation(
           (updatedAppointment as any).invoiceId.toString(),
@@ -2273,7 +2329,7 @@ export class AppointmentService {
       },
     );
 
-    this.logger.log(`Invoice ${invoiceId}: session cancelled for appointment ${appointmentId}`);
+    this.logger.log(`Invoice ${invoiceId}: session set to available/cancelled for appointment ${appointmentId} (cancelled or missed)`);
   }
 
   // =========================================================================
@@ -2942,22 +2998,46 @@ export class AppointmentService {
     serviceId?: string,
     userId?: string,
     userRole?: string,
+    serviceIds?: string[],
   ): Promise<{ _id: string; name: string }[]> {
-    // 0. If serviceId provided, filter to doctors authorized for that service via DoctorService junction.
+    // 0. If serviceId or serviceIds provided, filter to doctors authorized for those services via DoctorService junction.
     //    FALLBACK: if no records exist (service has no assigned doctors yet), skip the filter —
     //    any doctor at the clinic is returned. Consistent with validateDoctorServiceAuthorization.
     let authorizedDoctorIds: Types.ObjectId[] | null = null;
-    if (serviceId) {
-      const doctorServiceEntries = await this.doctorServiceModel
-        .find({
-          serviceId: new Types.ObjectId(serviceId),
-          clinicId: new Types.ObjectId(clinicId),
-          isActive: true,
-        })
-        .distinct('doctorId');
-      // Only apply the filter if records actually exist; if 0 records, fall through to all-doctors
-      if (doctorServiceEntries.length > 0) {
-        authorizedDoctorIds = doctorServiceEntries;
+
+    // Use union of serviceId and serviceIds
+    const effectiveServiceIds = [...(serviceIds || [])];
+    if (serviceId && !effectiveServiceIds.includes(serviceId)) {
+      effectiveServiceIds.push(serviceId);
+    }
+
+    if (effectiveServiceIds.length > 0) {
+      // Check each service individually. If ANY service is permissive (has 0 assignments in this clinic),
+      // then ALL doctors at the clinic are authorized for that service, so they should be in the union.
+      let isAnyServicePermissive = false;
+      const allAuthorizedInUnion = new Set<string>();
+
+      for (const sId of effectiveServiceIds) {
+        const doctorServiceEntries = await this.doctorServiceModel
+          .find({
+            serviceId: new Types.ObjectId(sId),
+            clinicId: new Types.ObjectId(clinicId),
+            isActive: true,
+          })
+          .distinct('doctorId');
+
+        if (doctorServiceEntries.length === 0) {
+          isAnyServicePermissive = true;
+          break; // Optimization: once one is permissive, the whole union allows all doctors
+        } else {
+          doctorServiceEntries.forEach(id => allAuthorizedInUnion.add(id.toString()));
+        }
+      }
+
+      if (isAnyServicePermissive) {
+        authorizedDoctorIds = null; // null triggers the permissive default later
+      } else if (allAuthorizedInUnion.size > 0) {
+        authorizedDoctorIds = Array.from(allAuthorizedInUnion).map(id => new Types.ObjectId(id));
       }
     }
 

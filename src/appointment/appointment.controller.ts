@@ -275,6 +275,51 @@ export class AppointmentController {
   }
 
   /**
+   * Get available sessions for a specific invoice
+   * GET /appointments/invoice/:invoiceId/available-sessions
+   */
+  @ApiOperation({
+    summary: 'Get available sessions for an invoice',
+    description:
+      'Returns all sessions within an invoice that are still available for booking (status is pending or cancelled).',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Available sessions retrieved successfully',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 404, description: 'Invoice not found' })
+  @ApiParam({ name: 'invoiceId', type: String, description: 'Invoice ID (MongoDB ObjectId)' })
+  @Get('invoice/:invoiceId/available-sessions')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.MANAGER, UserRole.DOCTOR, UserRole.STAFF)
+  async getAvailableSessionsForInvoice(
+    @Param('invoiceId') invoiceId: string,
+  ) {
+    try {
+      const sessions = await this.appointmentService.getAvailableSessionsForInvoice(
+        invoiceId,
+      );
+      return {
+        success: true,
+        message: {
+          ar: 'تم استرجاع الجلسات المتاحة بنجاح',
+          en: 'Available sessions retrieved successfully',
+        },
+        data: sessions,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: {
+          ar: 'فشل استرجاع الجلسات المتاحة',
+          en: 'Failed to retrieve available sessions',
+        },
+        error: error.message,
+      };
+    }
+  }
+
+  /**
    * Get all appointments with filtering and pagination
    * GET /appointments
    */
@@ -393,7 +438,14 @@ export class AppointmentController {
     example: 'desc',
   })
   @UseGuards(RoleScopeGuard) // UC-e1f2d3c: Apply role-based filtering
-  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.STAFF, UserRole.DOCTOR)
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.OWNER,
+    UserRole.ADMIN,
+    UserRole.MANAGER,
+    UserRole.STAFF,
+    UserRole.DOCTOR,
+  )
   @Get()
   async getAppointments(
     @Query(new ValidationPipe()) query: AppointmentSearchQueryDto,
@@ -551,13 +603,14 @@ export class AppointmentController {
   @ApiOperation({
     summary: 'Get doctors available at a specific date and time',
     description:
-      'Returns doctors at the given clinic who are NOT busy at the requested date/time slot. Used by the QuickAddDrawer to show only bookable doctors.',
+      'Returns doctors at the given clinic who are NOT busy at the requested date/time slot. Used by the QuickAddDrawer to show only bookable doctors. Supports filtering by multiple service IDs from the sidebar.',
   })
   @ApiQuery({ name: 'date', required: true, type: String, description: 'Date in YYYY-MM-DD format' })
   @ApiQuery({ name: 'time', required: true, type: String, description: 'Time in HH:mm (24-hour)' })
   @ApiQuery({ name: 'clinicId', required: true, type: String, description: 'Clinic ID to scope doctors' })
   @ApiQuery({ name: 'duration', required: false, type: Number, description: 'Appointment duration in minutes (default 30)' })
-  @ApiQuery({ name: 'serviceId', required: false, type: String, description: 'Filter doctors by service authorization (DoctorService junction)' })
+  @ApiQuery({ name: 'serviceId', required: false, type: String, description: 'Single service ID to filter authorized doctors' })
+  @ApiQuery({ name: 'serviceIds', required: false, type: String, description: 'Comma-separated service IDs to filter authorized doctors' })
   @ApiResponse({ status: 200, description: 'Available doctors returned successfully' })
   @Get('available-doctors')
   @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.MANAGER, UserRole.DOCTOR, UserRole.STAFF)
@@ -568,11 +621,13 @@ export class AppointmentController {
     @Query('clinicId') clinicId: string,
     @Query('duration') duration?: string,
     @Query('serviceId') serviceId?: string,
+    @Query('serviceIds') serviceIds?: string,
   ) {
     if (!date || !time || !clinicId) {
       throw new BadRequestException('date, time, and clinicId query parameters are required');
     }
     try {
+      const parsedServiceIds = serviceIds ? serviceIds.split(',').filter(Boolean) : undefined;
       const doctors = await this.appointmentService.getAvailableDoctors(
         clinicId,
         date,
@@ -581,6 +636,7 @@ export class AppointmentController {
         serviceId,
         req.user?.userId,
         req.user?.role,
+        parsedServiceIds,
       );
       return {
         success: true,
@@ -766,7 +822,14 @@ export class AppointmentController {
     example: '507f1f77bcf86cd799439011',
   })
   @UseGuards(RoleScopeGuard) // UC-1c3a2b0: Apply role-based filtering
-  @Roles(UserRole.ADMIN, UserRole.STAFF, UserRole.DOCTOR)
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.OWNER,
+    UserRole.ADMIN,
+    UserRole.MANAGER,
+    UserRole.STAFF,
+    UserRole.DOCTOR,
+  )
   @Get(':id')
   async getAppointment(
     @Param('id') id: string,

@@ -709,6 +709,11 @@ export class EmployeeService {
       }
     }
 
+    // Doctors and staff may only list doctors (not admins/staff data)
+    if (requestingUser && (requestingUser.role === 'doctor' || requestingUser.role === 'staff')) {
+      role = 'doctor';
+    }
+
     // TENANT ISOLATION: enforce scope based on requesting user (same pattern as user.service.ts)
     let effectiveClinicId: string | string[] | undefined = clinicId;
     let effectiveComplexId = complexId;
@@ -779,12 +784,14 @@ export class EmployeeService {
     // Build user filter
     const userFilter: any = {};
 
-    // ROLE-BASED SELF-RESTRICTION: Doctors and Staff can only see themselves
-    if (requestingUser && (requestingUser.role === 'doctor' || requestingUser.role === 'staff')) {
-      const userId = requestingUser.id || requestingUser.userId || requestingUser.sub;
-      if (userId) {
-        userFilter._id = new Types.ObjectId(userId);
-      }
+    // ROLE-BASED RESTRICTION: Doctors can ONLY see themselves
+    if (requestingUser && requestingUser.role === 'doctor') {
+      userFilter._id = new Types.ObjectId(requestingUser.userId || requestingUser.id);
+    } else if (requestingUser && requestingUser.role === 'staff') {
+      // Staff may only list doctors (already handled by role = 'doctor' above)
+      // but we still want to keep them scoped to their clinic
+      role = 'doctor';
+      userFilter.role = 'doctor';
     }
 
     if (firstName) userFilter.firstName = { $regex: firstName, $options: 'i' };

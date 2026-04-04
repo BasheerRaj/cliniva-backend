@@ -31,8 +31,8 @@ export class Payment extends Document {
   @Prop({ type: Types.ObjectId, ref: 'Clinic', required: true, index: true })
   clinicId: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: 'Organization', required: true, index: true })
-  organizationId: Types.ObjectId;
+  @Prop({ type: Types.ObjectId, ref: 'Organization', index: true })
+  organizationId?: Types.ObjectId; // Optional: absent for clinic-plan tenants
 
   // ==================== Payment Details ====================
   

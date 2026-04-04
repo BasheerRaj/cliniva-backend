@@ -264,17 +264,8 @@ export class PatientService {
       return query.complexId ?? null;
     }
 
-    // admin, manager, doctor, staff — always enforced from JWT
-    if (!jwtComplexId) {
-      throw new BadRequestException({
-        message: {
-          ar: 'لم يتم العثور على معرف المجمع في رمز المصادقة',
-          en: 'complexId not found in authentication token',
-        },
-        code: 'COMPLEX_ID_MISSING_IN_TOKEN',
-      });
-    }
-    return jwtComplexId;
+    // admin, manager, doctor, staff — enforced from JWT when set; null = clinic-plan scope
+    return jwtComplexId ?? null;
   }
 
   /**
@@ -330,8 +321,16 @@ export class PatientService {
     // Apply complexId scope — mandatory for all except owner without explicit complexId
     if (resolvedComplexId) {
       filter.complexId = new Types.ObjectId(resolvedComplexId);
-    } else if (scope.role === UserRole.OWNER && scope.organizationId) {
-      filter.organizationId = new Types.ObjectId(scope.organizationId);
+    } else if (scope.role === UserRole.OWNER) {
+      if (scope.organizationId) {
+        filter.organizationId = new Types.ObjectId(scope.organizationId);
+      } else if (scope.clinicId) {
+        // clinic-plan owner: scope to their single clinic
+        filter.clinicId = new Types.ObjectId(scope.clinicId);
+      } else {
+        // owner with no identifiable scope — safety net
+        return { patients: [], total: 0, page, limit, totalPages: 0 };
+      }
     }
 
     // Clinic sub-scope: staff/doctor/manager/admin are always locked to JWT clinicId
@@ -443,7 +442,15 @@ export class PatientService {
     if (role === UserRole.SUPER_ADMIN) {
       // super_admin without a complexId → return empty to avoid unbounded scan
     } else if (role === UserRole.OWNER) {
-      if (organizationId) filter.organizationId = new Types.ObjectId(organizationId);
+      if (organizationId) {
+        filter.organizationId = new Types.ObjectId(organizationId);
+      } else if (clinicId) {
+        // clinic-plan owner: scope to their single clinic
+        filter.clinicId = new Types.ObjectId(clinicId);
+      } else {
+        // owner with no scope — safety net
+        return [];
+      }
     } else {
       // admin / manager / doctor / staff — scoped to JWT complexId, then clinic
       if (jwtComplexId) filter.complexId = new Types.ObjectId(jwtComplexId);
@@ -629,16 +636,29 @@ export class PatientService {
   /**
    * Get patient by ID
    */
-  async getPatientById(patientId: string): Promise<Patient> {
+  async getPatientById(patientId: string, scope?: PatientScopeContext): Promise<Patient> {
     if (!Types.ObjectId.isValid(patientId)) {
       throw new BadRequestException(ERROR_MESSAGES.INVALID_PATIENT_ID);
     }
 
+    const query: FilterQuery<Patient> = {
+      _id: new Types.ObjectId(patientId),
+      deletedAt: { $exists: false },
+    };
+
+    // Tenant isolation: scope patient lookup when caller context is provided
+    if (scope && scope.role !== UserRole.SUPER_ADMIN) {
+      if (scope.clinicId) {
+        query.clinicId = new Types.ObjectId(scope.clinicId);
+      } else if (scope.complexId) {
+        query.complexId = new Types.ObjectId(scope.complexId);
+      } else if (scope.organizationId) {
+        query.organizationId = new Types.ObjectId(scope.organizationId);
+      }
+    }
+
     const patient = await this.patientModel
-      .findOne({
-        _id: new Types.ObjectId(patientId),
-        deletedAt: { $exists: false },
-      })
+      .findOne(query)
       .exec();
 
     if (!patient) {

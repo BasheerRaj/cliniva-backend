@@ -12,6 +12,7 @@ import {
   HttpStatus,
   HttpCode,
   BadRequestException,
+  ForbiddenException,
   NotFoundException,
   InternalServerErrorException,
   UnprocessableEntityException,
@@ -1784,13 +1785,29 @@ export class WorkingHoursController {
   async getBatchWorkingHours(
     @Query('entityType') entityType: string,
     @Query('entityIds') entityIds: string,
+    @Request() req: any,
   ): Promise<StandardResponse> {
     if (!entityType || !entityIds) {
       throw new BadRequestException({
         message: { ar: 'entityType و entityIds مطلوبان', en: 'entityType and entityIds are required' },
       });
     }
-    const ids = entityIds.split(',').map((id) => id.trim()).filter(Boolean);
+    let ids = entityIds.split(',').map((id) => id.trim()).filter(Boolean);
+
+    // ROLE-BASED RESTRICTION: Doctors can only see their own and their clinic's working hours
+    if (req.user?.role === 'doctor') {
+      const doctorId = (req.user.userId || req.user.id).toString();
+      const clinicId = req.user.clinicId?.toString();
+      
+      if (entityType === 'user') {
+        ids = ids.filter(id => id === doctorId);
+      } else if (entityType === 'clinic') {
+        ids = ids.filter(id => id === clinicId);
+      } else {
+        ids = []; // No access to complex/other entity types
+      }
+    }
+
     const data = await this.workingHoursService.getBatchWorkingHours(entityType, ids);
     return this.createSuccessResponse(data, {
       ar: 'تم استرجاع ساعات العمل بنجاح',
@@ -1806,6 +1823,8 @@ export class WorkingHoursController {
    * @returns {Promise<StandardResponse<WorkingHours[]>>} Working hours records
    */
   @Get(':entityType/:entityId')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @ApiOperation({
     summary: 'Get working hours for an entity',
     description:
@@ -1831,39 +1850,6 @@ export class WorkingHoursController {
   @ApiResponse({
     status: 200,
     description: 'Working hours retrieved successfully',
-    schema: {
-      type: 'object',
-      properties: {
-        success: { type: 'boolean', example: true },
-        data: {
-          type: 'array',
-          items: {
-            type: 'object',
-            properties: {
-              _id: { type: 'string', example: '507f1f77bcf86cd799439011' },
-              entityType: { type: 'string', example: 'clinic' },
-              entityId: { type: 'string', example: '507f1f77bcf86cd799439012' },
-              dayOfWeek: { type: 'string', example: 'monday' },
-              isWorkingDay: { type: 'boolean', example: true },
-              openingTime: { type: 'string', example: '08:00' },
-              closingTime: { type: 'string', example: '17:00' },
-              breakStartTime: { type: 'string', example: '12:00' },
-              breakEndTime: { type: 'string', example: '13:00' },
-            },
-          },
-        },
-        message: {
-          type: 'object',
-          properties: {
-            ar: { type: 'string', example: 'تم استرجاع ساعات العمل بنجاح' },
-            en: {
-              type: 'string',
-              example: 'Working hours retrieved successfully',
-            },
-          },
-        },
-      },
-    },
   })
   @ApiResponse({
     status: 404,
@@ -1873,7 +1859,24 @@ export class WorkingHoursController {
     @Param('entityType') entityType: string,
     @Param('entityId') entityId: string,
     @Query('dayOfWeek') dayOfWeek?: string,
+    @Request() req?: any,
   ): Promise<StandardResponse<WorkingHours[]>> {
+    // ROLE-BASED RESTRICTION: Doctors can only see their own and their clinic's working hours
+    if (req?.user?.role === 'doctor') {
+      const doctorId = (req.user.userId || req.user.id).toString();
+      const clinicId = req.user.clinicId?.toString();
+      
+      const isSelf = entityType === 'user' && entityId === doctorId;
+      const isMyClinic = entityType === 'clinic' && entityId === clinicId;
+      
+      if (!isSelf && !isMyClinic) {
+        throw new ForbiddenException({
+          message: { ar: 'ليس لديك صلاحية للوصول إلى ساعات العمل هذه', en: 'You do not have permission to access these working hours' },
+          code: 'WORKING_HOURS_ACCESS_DENIED',
+        });
+      }
+    }
+
     let workingHours = await this.workingHoursService.getWorkingHours(
       entityType,
       entityId,

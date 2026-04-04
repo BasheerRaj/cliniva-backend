@@ -28,8 +28,8 @@ export class Invoice extends Document {
   @Prop({ type: Types.ObjectId, ref: 'Patient', required: true, index: true })
   patientId: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: 'Organization', required: true, index: true })
-  organizationId: Types.ObjectId;
+  @Prop({ type: Types.ObjectId, ref: 'Organization', index: true })
+  organizationId?: Types.ObjectId; // Optional: absent for clinic-plan tenants
 
   @Prop({ type: Types.ObjectId, ref: 'Clinic', required: true, index: true })
   clinicId: Types.ObjectId;
@@ -206,7 +206,6 @@ InvoiceSchema.set('toObject', { virtuals: true });
 
 // ==================== Indexes for Performance ====================
 
-// Primary unique index (invoiceNumber index is already created by unique: true in @Prop)
 // Requirement: 13.10, 14.1
 
 // Patient-based queries
@@ -224,8 +223,8 @@ InvoiceSchema.index({ createdAt: -1 });
 // Soft delete filtering
 InvoiceSchema.index({ deletedAt: 1 });
 
-// Unique invoice number per organization (tenant-scoped — replaces global unique: true)
-InvoiceSchema.index({ organizationId: 1, invoiceNumber: 1 }, { unique: true });
+// Unique invoice number per clinic (works for all plan types including clinic-plan with no org)
+InvoiceSchema.index({ clinicId: 1, invoiceNumber: 1 }, { unique: true });
 InvoiceSchema.index({ organizationId: 1, invoiceStatus: 1 });
 InvoiceSchema.index({ 'services.sessions.appointmentId': 1 });
 InvoiceSchema.index({ 'services.sessions.invoiceItemId': 1 });

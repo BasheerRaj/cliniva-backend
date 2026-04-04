@@ -19,4 +19,14 @@ export class CreateAppointmentWithSessionDto extends CreateAppointmentDto {
     message: '{"ar":"معرف الجلسة يجب أن يكون نصاً","en":"Session ID must be a string"}',
   })
   sessionId?: string;
+
+  @ApiPropertyOptional({
+    description: 'Specific Invoice Item ID (references a session within the invoice services array)',
+    example: '507f1f77bcf86cd799439011',
+  })
+  @IsOptional()
+  @IsString({
+    message: '{"ar":"معرف بند الفاتورة يجب أن يكون نصاً","en":"Invoice Item ID must be a string"}',
+  })
+  invoiceItemId?: string;
 }

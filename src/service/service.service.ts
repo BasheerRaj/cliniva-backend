@@ -524,8 +524,18 @@ export class ServiceService {
           { complexId: new Types.ObjectId(effectiveComplexId) },
           { complexId: null },
         ];
+      } else if (userClinicId && Types.ObjectId.isValid(userClinicId)) {
+        // Standalone clinic plan (no complex) — return services assigned to this clinic
+        const assignedServiceIds = await this.clinicServiceModel
+          .find({ clinicId: new Types.ObjectId(userClinicId), isActive: true })
+          .distinct('serviceId');
+        if (assignedServiceIds.length > 0) {
+          query._id = { $in: assignedServiceIds };
+        } else {
+          query._id = new Types.ObjectId('000000000000000000000000');
+        }
       } else {
-        // Scoped role but no complex found — deny all
+        // Scoped role but no complex or clinic found — deny all
         query._id = new Types.ObjectId('000000000000000000000000');
       }
     } else if (userRole === 'owner' && subscriptionId && Types.ObjectId.isValid(subscriptionId)) {
@@ -1967,7 +1977,10 @@ export class ServiceService {
       complexId?: string;
       clinicId?: string;
       role?: string;
+      userId?: string;
+      id?: string;
     },
+    clinicIdParam?: string,
   ): Promise<{ clinicIds: Types.ObjectId[]; doctorIds: Types.ObjectId[] }> {
     if (!serviceIds.length) {
       return { clinicIds: [], doctorIds: [] };
@@ -1975,8 +1988,6 @@ export class ServiceService {
 
     // Build a clinic filter scoped to the user's actual access level.
     // Priority mirrors the /clinics endpoint: most-specific scope wins.
-    // - super_admin / owner → subscription scope (all their clinics)
-    // - admin / manager / doctor / staff → clinic scope (their clinic only)
     const clinicScopeFilter: any = { deletedAt: { $exists: false } };
     const role = userScope.role;
     if (role === 'super_admin') {
@@ -1996,10 +2007,28 @@ export class ServiceService {
       }
     }
 
+    // If a specific clinicId is requested from the frontend, ensure it's within the allowed scope
+    if (clinicIdParam && Types.ObjectId.isValid(clinicIdParam)) {
+      const requestedClinicId = new Types.ObjectId(clinicIdParam);
+      if (clinicScopeFilter._id) {
+        // If already scoped to a clinic, it MUST match
+        if (clinicScopeFilter._id.toString() !== requestedClinicId.toString()) {
+          return { clinicIds: [], doctorIds: [] };
+        }
+      } else {
+        // Narrow the scope to this specific clinic
+        clinicScopeFilter._id = requestedClinicId;
+      }
+    }
+
     // Get the clinic IDs accessible to this user
     const allowedClinics = (await this.clinicModel
       .find(clinicScopeFilter)
       .distinct('_id')) as any[];
+
+    if (allowedClinics.length === 0) {
+      return { clinicIds: [], doctorIds: [] };
+    }
 
     const serviceObjectIds = serviceIds.map((id) => new Types.ObjectId(id));
 
@@ -2023,25 +2052,26 @@ export class ServiceService {
     let finalClinicIds = mappedClinicIds;
     let finalDoctorIds = mappedDoctorIds;
 
-    // Check each service if it has explicit clinic assignments
-    const clinicAssignmentsCount = await this.clinicServiceModel.countDocuments({
-      serviceId: { $in: serviceObjectIds },
-      isActive: true,
-    });
-
-    if (clinicAssignmentsCount === 0) {
-      // PERMISSIVE: All clinics provide this service
-      finalClinicIds = allowedClinics;
+    // For each service, check if it has explicit assignments in our clinics.
+    // If ANY service in the set has 0 assignments, then ALL doctors in those clinics
+    // are authorized for that specific service, so they MUST be in the union.
+    
+    let isAnyServicePermissive = false;
+    for (const sId of serviceObjectIds) {
+      const count = await this.doctorServiceModel.countDocuments({
+        serviceId: sId,
+        clinicId: { $in: allowedClinics },
+        isActive: true,
+      });
+      if (count === 0) {
+        isAnyServicePermissive = true;
+        break;
+      }
     }
 
-    const doctorAssignmentsCount = await this.doctorServiceModel.countDocuments({
-      serviceId: { $in: serviceObjectIds },
-      isActive: true,
-    });
-
-    if (doctorAssignmentsCount === 0) {
-      // PERMISSIVE: All doctors in allowed clinics provide this service
-      const allDoctorsInAllowedClinics = (await this.userModel.find({
+    if (isAnyServicePermissive) {
+      // PERMISSIVE: At least one selected service allows all doctors in these clinics
+      const doctorMatch: any = {
         role: 'doctor',
         isActive: true,
         $or: [
@@ -2049,8 +2079,40 @@ export class ServiceService {
           { clinicIds: { $in: allowedClinics } },
         ],
         deletedAt: { $exists: false },
-      }).distinct('_id')) as any[];
-      finalDoctorIds = allDoctorsInAllowedClinics;
+      };
+
+      // ROLE-BASED RESTRICTION: Doctors can ONLY see themselves
+      if (userScope.role === 'doctor') {
+        doctorMatch._id = new Types.ObjectId(userScope.userId || userScope.id);
+      }
+
+      finalDoctorIds = (await this.userModel.find(doctorMatch).distinct('_id')) as any[];
+    }
+
+    // ROLE-BASED RESTRICTION: Even for non-permissive services, a doctor should only see themselves
+    if (userScope.role === 'doctor') {
+      const selfId = new Types.ObjectId(userScope.userId || userScope.id);
+      finalDoctorIds = finalDoctorIds.filter(id => id.toString() === selfId.toString());
+      // If the doctor is not in the assigned list for a non-permissive service, 
+      // they effectively see no doctors (themselves included) for that service union.
+    }
+
+    // Similarly for clinics
+    let isAnyServiceClinicPermissive = false;
+    for (const sId of serviceObjectIds) {
+      const count = await this.clinicServiceModel.countDocuments({
+        serviceId: sId,
+        clinicId: { $in: allowedClinics },
+        isActive: true,
+      });
+      if (count === 0) {
+        isAnyServiceClinicPermissive = true;
+        break;
+      }
+    }
+
+    if (isAnyServiceClinicPermissive) {
+      finalClinicIds = allowedClinics;
     }
 
     return { clinicIds: finalClinicIds, doctorIds: finalDoctorIds };
@@ -2274,6 +2336,20 @@ export class ServiceService {
                 completedCount: {
                   $sum: { $cond: [{ $eq: ['$status', 'completed'] }, 1, 0] },
                 },
+                activeCount: {
+                  $sum: {
+                    $cond: [
+                      {
+                        $in: [
+                          '$status',
+                          ['scheduled', 'confirmed', 'in_progress'],
+                        ],
+                      },
+                      1,
+                      0,
+                    ],
+                  },
+                },
                 totalDuration: {
                   $sum: {
                     $cond: [
@@ -2289,15 +2365,6 @@ export class ServiceService {
                       { $eq: ['$status', 'completed'] },
                       '$appointmentDate',
                       null,
-                    ],
-                  },
-                },
-                completedPatients: {
-                  $addToSet: {
-                    $cond: [
-                      { $eq: ['$status', 'completed'] },
-                      '$patientId',
-                      '$$REMOVE',
                     ],
                   },
                 },
@@ -2373,8 +2440,9 @@ export class ServiceService {
     const frequentDoctor = data.frequentDoctor[0] || null;
     const frequentClinic = data.frequentClinic[0] || null;
 
-    const totalPatientsServed = utilization.completedPatients?.length || 0;
+    const totalPatientsServed = patientStats.totalDistinctPatients || 0;
     const completedSessions = utilization.completedCount || 0;
+    const activeAppointments = utilization.activeCount || 0;
     const avgDuration =
       completedSessions > 0
         ? Math.round(utilization.totalDuration / completedSessions)
@@ -2404,6 +2472,7 @@ export class ServiceService {
       service_id: serviceId,
       utilization_metrics: {
         total_patients_served: totalPatientsServed,
+        active_appointments: activeAppointments,
         completed_sessions: completedSessions,
         average_duration_mins: avgDuration,
         no_show_rate: noShowRate,

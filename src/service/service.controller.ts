@@ -14,6 +14,7 @@ import {
   Request,
   Req,
   UseGuards,
+  ForbiddenException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -169,13 +170,19 @@ export class ServiceController {
   @ApiOperation({
     summary: 'Get header filter data for selected services',
     description:
-      'Returns the union of clinic IDs and doctor IDs (from junction tables) for the given service IDs. Used by the calendar to filter header columns.',
+      'Returns the union of clinic IDs and doctor IDs (from junction tables) for the given service IDs. Used by the calendar to filter header columns. Optionally scoped to a single clinic.',
   })
   @ApiQuery({
     name: 'serviceIds',
     description: 'Comma-separated service IDs',
     type: String,
     example: '507f1f77bcf86cd799439011,507f1f77bcf86cd799439012',
+  })
+  @ApiQuery({
+    name: 'clinicId',
+    description: 'Optional: Filter results to a specific clinic',
+    type: String,
+    required: false,
   })
   @ApiResponse({
     status: 200,
@@ -203,6 +210,7 @@ export class ServiceController {
   @Get('filter-header')
   async getHeaderFilter(
     @Query('serviceIds') serviceIds?: string,
+    @Query('clinicId') clinicId?: string,
     @Request() req?: any,
   ): Promise<any> {
     if (!serviceIds?.trim()) {
@@ -221,7 +229,7 @@ export class ServiceController {
       clinicId: req?.user?.clinicId,
       role: req?.user?.role,
     };
-    const result = await this.serviceService.getHeaderFilter(ids, userScope);
+    const result = await this.serviceService.getHeaderFilter(ids, userScope, clinicId);
     return ResponseBuilder.success(result, {
       ar: 'تم تحميل البيانات',
       en: 'Data loaded successfully',
@@ -832,6 +840,20 @@ export class ServiceController {
   ): Promise<PaginatedServiceResponse> {
     const pagination = this.parsePaginationQuery(paginationQuery);
     const subscriptionId = req?.user?.subscriptionId?.toString();
+    const userRole = req?.user?.role;
+
+    // Doctors and staff may only access their own assigned clinic's services
+    if (userRole === UserRole.DOCTOR || userRole === UserRole.STAFF) {
+      const userClinicIds: string[] = req?.user?.clinicIds?.map(String) ||
+        (req?.user?.clinicId ? [String(req.user.clinicId)] : []);
+      if (!userClinicIds.includes(clinicId)) {
+        throw new ForbiddenException({
+          message: { ar: 'ليس لديك صلاحية للوصول إلى بيانات هذه العيادة', en: 'You do not have permission to access this clinic\'s data' },
+          code: 'CLINIC_ACCESS_DENIED',
+        });
+      }
+    }
+
     const services = await this.serviceService.getServicesByClinicPaginated(
       clinicId,
       pagination,
@@ -1484,6 +1506,7 @@ export class ServiceController {
     UserRole.SUPER_ADMIN,
     UserRole.MANAGER,
     UserRole.STAFF,
+    UserRole.DOCTOR,
   )
   @ApiOperation({
     summary: 'Get statistics for a specific service',
