@@ -258,24 +258,35 @@ export class InvoiceService {
       filter.clinicId = new Types.ObjectId(queryDto.clinicId);
     }
 
-    // Owner role scoping: scope to their organization to prevent cross-tenant data leak
+    // Owner role scoping: scope to their organization/clinics to prevent cross-tenant data leak
     if (userRole === 'owner') {
-      if (userOrganizationId && Types.ObjectId.isValid(userOrganizationId)) {
-        // Direct org scope — fast and covers edge case where owner has no clinics yet
-        filter.organizationId = new Types.ObjectId(userOrganizationId);
-      } else if (subscriptionId && Types.ObjectId.isValid(subscriptionId) && !filter.clinicId) {
-        // Fallback: derive from subscription → clinics (legacy path)
+      if (subscriptionId && Types.ObjectId.isValid(subscriptionId)) {
+        // Derive all clinics for this owner via subscriptionId (covers clinics missing organizationId)
         const ownerClinics = await this.clinicModel
           .find({ subscriptionId: new Types.ObjectId(subscriptionId), deletedAt: { $exists: false } })
           .select('_id')
           .lean();
         const ownerClinicIds = ownerClinics.map((c: any) => c._id);
         if (ownerClinicIds.length > 0) {
-          filter.clinicId = { $in: ownerClinicIds };
+          if (userOrganizationId && Types.ObjectId.isValid(userOrganizationId)) {
+            // $or: invoices tagged with org OR invoices for any owner clinic (handles clinics with missing organizationId)
+            filter.$or = [
+              { organizationId: new Types.ObjectId(userOrganizationId) },
+              { clinicId: { $in: ownerClinicIds } },
+            ];
+          } else {
+            filter.clinicId = { $in: ownerClinicIds };
+          }
+        } else if (userOrganizationId && Types.ObjectId.isValid(userOrganizationId)) {
+          // No clinics yet — fall back to org scope
+          filter.organizationId = new Types.ObjectId(userOrganizationId);
         } else {
-          // No clinics found — deny all to prevent unscoped access
+          // No clinics and no org — deny all to prevent unscoped access
           filter._id = new Types.ObjectId('000000000000000000000000');
         }
+      } else if (userOrganizationId && Types.ObjectId.isValid(userOrganizationId)) {
+        // No subscriptionId — use org scope directly
+        filter.organizationId = new Types.ObjectId(userOrganizationId);
       }
     }
 
@@ -497,12 +508,23 @@ export class InvoiceService {
     userId: string,
     userRole: string,
     userOrganizationId?: string,
+    subscriptionId?: string,
   ): Promise<InvoiceResponseDto> {
     const query: any = {
       _id: new Types.ObjectId(id),
       deletedAt: { $exists: false },
     };
-    if (userOrganizationId) {
+    if (userOrganizationId && subscriptionId) {
+      const ownerClinics = await this.clinicModel
+        .find({ subscriptionId: new Types.ObjectId(subscriptionId), deletedAt: { $exists: false } })
+        .select('_id').lean();
+      const ownerClinicIds = ownerClinics.map((c: any) => c._id);
+      if (ownerClinicIds.length > 0) {
+        query.$or = [{ organizationId: new Types.ObjectId(userOrganizationId) }, { clinicId: { $in: ownerClinicIds } }];
+      } else {
+        query.organizationId = new Types.ObjectId(userOrganizationId);
+      }
+    } else if (userOrganizationId) {
       query.organizationId = new Types.ObjectId(userOrganizationId);
     }
     const invoice = await this.invoiceModel.findOne(query);
@@ -1027,12 +1049,23 @@ export class InvoiceService {
     userId: string,
     userRole: string,
     userOrganizationId?: string,
+    subscriptionId?: string,
   ): Promise<void> {
     const query: any = {
       _id: new Types.ObjectId(id),
       deletedAt: { $exists: false },
     };
-    if (userOrganizationId) {
+    if (userOrganizationId && subscriptionId) {
+      const ownerClinics = await this.clinicModel
+        .find({ subscriptionId: new Types.ObjectId(subscriptionId), deletedAt: { $exists: false } })
+        .select('_id').lean();
+      const ownerClinicIds = ownerClinics.map((c: any) => c._id);
+      if (ownerClinicIds.length > 0) {
+        query.$or = [{ organizationId: new Types.ObjectId(userOrganizationId) }, { clinicId: { $in: ownerClinicIds } }];
+      } else {
+        query.organizationId = new Types.ObjectId(userOrganizationId);
+      }
+    } else if (userOrganizationId) {
       query.organizationId = new Types.ObjectId(userOrganizationId);
     }
     const invoice = await this.invoiceModel.findOne(query);

@@ -762,6 +762,7 @@ export class InvoiceController {
       userId,
       userRole,
       userOrganizationId,
+      user.subscriptionId,
     );
 
     return {
@@ -835,7 +836,7 @@ export class InvoiceController {
     }
 
     const userOrganizationId = req.user?.organizationId;
-    await this.invoiceService.deleteInvoice(id, userId, userRole, userOrganizationId);
+    await this.invoiceService.deleteInvoice(id, userId, userRole, userOrganizationId, req.user?.subscriptionId);
 
     return {
       success: true,
