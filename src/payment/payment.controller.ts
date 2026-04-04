@@ -265,6 +265,7 @@ export class PaymentController {
       const userRole = user.role;
       const userClinicId = user.clinicId || null;
       const userOrganizationId = user.organizationId || null;
+      const userComplexId = user.complexId || null;
 
       const result = await this.paymentService.getPayments(
         query,
@@ -272,6 +273,7 @@ export class PaymentController {
         userRole,
         userClinicId,
         userOrganizationId,
+        userComplexId,
       );
 
       return {

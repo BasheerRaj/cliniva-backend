@@ -742,7 +742,9 @@ export class AppointmentService {
     if (clinicId) filter.clinicId = new Types.ObjectId(clinicId);
     if (serviceId) filter.serviceId = new Types.ObjectId(serviceId);
 
-    // Complex filter: resolve to clinic IDs under that complex
+    // Complex filter: resolve to clinic IDs under that complex.
+    // IMPORTANT: always apply the $in filter, even when the array is empty.
+    // An empty complex (no clinics yet) must return 0 appointments, not ALL appointments.
     const complexId = (query as any).complexId;
     if (complexId && Types.ObjectId.isValid(complexId)) {
       const complexClinics = await this.clinicModel
@@ -750,9 +752,8 @@ export class AppointmentService {
         .select('_id')
         .lean();
       const complexClinicIds = complexClinics.map((c: any) => c._id);
-      if (complexClinicIds.length > 0) {
-        filter.clinicId = { $in: complexClinicIds };
-      }
+      // $in: [] returns 0 documents in MongoDB — correct behavior for a complex with no clinics
+      filter.clinicId = { $in: complexClinicIds };
     }
 
     // Multi-select filters (comma-separated IDs override single ID filters)

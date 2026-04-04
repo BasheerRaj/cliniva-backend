@@ -477,6 +477,7 @@ export class PaymentService {
     userRole: string,
     userClinicId: string | null,
     userOrganizationId: string | null,
+    userComplexId?: string | null,
   ): Promise<{ data: PaymentResponseDto[]; meta: any }> {
     const filter: any = { deletedAt: { $exists: false } };
 
@@ -492,12 +493,27 @@ export class PaymentService {
       // Scoped role with no clinic assigned — deny all
       filter._id = new Types.ObjectId('000000000000000000000000');
     } else if (userRole === 'owner' && userOrganizationId && Types.ObjectId.isValid(userOrganizationId)) {
-      // Owner: always scope to their organization to prevent cross-tenant data leak
+      // Company-plan owner: scope by organizationId (multi-complex/org tenant boundary)
       filter.organizationId = new Types.ObjectId(userOrganizationId);
       // Then optionally narrow to a specific clinic
       if (queryDto.clinicId && Types.ObjectId.isValid(queryDto.clinicId)) {
         filter.clinicId = new Types.ObjectId(queryDto.clinicId);
       }
+    } else if (userRole === 'owner' && userComplexId && Types.ObjectId.isValid(userComplexId)) {
+      // Complex-plan owner: resolve to clinic IDs under their complex.
+      // Always apply $in filter — even if empty (0 clinics = 0 payments).
+      const complexClinics = await this.clinicModel
+        .find({ complexId: new Types.ObjectId(userComplexId), deletedAt: { $exists: false } })
+        .select('_id')
+        .lean();
+      const complexClinicIds = complexClinics.map((c: any) => c._id);
+      filter.clinicId = { $in: complexClinicIds };
+    } else if (userRole === 'owner' && userClinicId && Types.ObjectId.isValid(userClinicId)) {
+      // Clinic-plan owner: scope to their single assigned clinic
+      filter.clinicId = new Types.ObjectId(userClinicId);
+    } else if (userRole === 'owner') {
+      // Owner with no scope information — deny all to prevent data leak
+      filter._id = new Types.ObjectId('000000000000000000000000');
     } else if (userRole === 'super_admin' && queryDto.clinicId && Types.ObjectId.isValid(queryDto.clinicId)) {
       // super_admin: can optionally filter by clinicId; otherwise sees all tenants (intentional)
       filter.clinicId = new Types.ObjectId(queryDto.clinicId);
