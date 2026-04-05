@@ -708,6 +708,7 @@ export class AppointmentService {
     userRole?: string,
     userClinicId?: string,
     subscriptionId?: string,
+    complexId?: string,
   ): Promise<{
     appointments: TransformedAppointment[];
     total: number;
@@ -743,20 +744,6 @@ export class AppointmentService {
     if (clinicId) filter.clinicId = new Types.ObjectId(clinicId);
     if (serviceId) filter.serviceId = new Types.ObjectId(serviceId);
 
-    // Complex filter: resolve to clinic IDs under that complex.
-    // IMPORTANT: always apply the $in filter, even when the array is empty.
-    // An empty complex (no clinics yet) must return 0 appointments, not ALL appointments.
-    const complexId = (query as any).complexId;
-    if (complexId && Types.ObjectId.isValid(complexId)) {
-      const complexClinics = await this.clinicModel
-        .find({ complexId: new Types.ObjectId(complexId), deletedAt: { $exists: false } })
-        .select('_id')
-        .lean();
-      const complexClinicIds = complexClinics.map((c: any) => c._id);
-      // $in: [] returns 0 documents in MongoDB — correct behavior for a complex with no clinics
-      filter.clinicId = { $in: complexClinicIds };
-    }
-
     // Multi-select filters (comma-separated IDs override single ID filters)
     if (clinicIds) {
       const ids = String(clinicIds).split(',').filter(Boolean);
@@ -776,31 +763,66 @@ export class AppointmentService {
       }
     }
 
-    // Doctor role scoping: doctors can only see their own appointments (UC-d2e3f4c)
+    // Role-based scoping (Priority: Roles > subscription/complex)
     if (userRole === 'doctor' && userId) {
       filter.doctorId = new Types.ObjectId(userId);
-    }
-
-    // Staff role scoping: staff can only see appointments for their assigned clinic
-    if (userRole === 'staff' && userClinicId) {
+    } else if (userRole === 'staff' && userClinicId) {
       filter.clinicId = new Types.ObjectId(userClinicId);
-    }
-
-    // Admin role scoping: admins can only see appointments for their assigned clinic
-    if (userRole === 'admin' && userClinicId) {
+    } else if (userRole === 'admin' && userClinicId) {
       filter.clinicId = new Types.ObjectId(userClinicId);
+    } else if (userRole === 'owner' || userRole === 'manager') {
+      // Owner/Manager scoping: must be restricted to their subscription/complex
+      const queryComplexId = (query as any).complexId || complexId;
+      
+      if (queryComplexId && Types.ObjectId.isValid(queryComplexId)) {
+        const complexClinics = await this.clinicModel
+          .find({ complexId: new Types.ObjectId(queryComplexId), deletedAt: { $exists: false } })
+          .select('_id')
+          .lean();
+        const complexClinicIds = complexClinics.map((c: any) => c._id);
+        
+        if (filter.clinicId) {
+            // If specific clinic(s) requested, intersect with complex clinics
+            const requested = filter.clinicId['$in'] ? filter.clinicId['$in'] : [filter.clinicId];
+            const allowed = requested.filter(rid => complexClinicIds.some(cid => cid.toString() === rid.toString()));
+            filter.clinicId = { $in: allowed };
+        } else {
+            filter.clinicId = { $in: complexClinicIds };
+        }
+      } else if (subscriptionId && Types.ObjectId.isValid(subscriptionId)) {
+        const ownerClinics = await this.clinicModel
+          .find({ subscriptionId: new Types.ObjectId(subscriptionId), deletedAt: { $exists: false } })
+          .select('_id')
+          .lean();
+        const ownerClinicIds = ownerClinics.map((c: any) => c._id);
+        
+        if (filter.clinicId) {
+            const requested = filter.clinicId['$in'] ? filter.clinicId['$in'] : [filter.clinicId];
+            const allowed = requested.filter(rid => ownerClinicIds.some(cid => cid.toString() === rid.toString()));
+            filter.clinicId = { $in: allowed };
+        } else {
+            filter.clinicId = { $in: ownerClinicIds };
+        }
+      }
+    } else if (userRole !== 'super_admin') {
+        // Fallback for any other non-super-admin roles: ensure some form of scoping
+        if (userClinicId) {
+            filter.clinicId = new Types.ObjectId(userClinicId);
+        } else {
+            // If no identifier available and not super_admin, return nothing (safety)
+            filter.clinicId = { $in: [] };
+        }
     }
 
-    // Owner role scoping: owners see appointments across all their subscription's clinics
-    if (userRole === 'owner' && subscriptionId) {
-      const ownerClinics = await this.clinicModel
-        .find({ subscriptionId: new Types.ObjectId(subscriptionId), deletedAt: { $exists: false } })
+    // Complex filter explicitly from query (already handled for owners above, but keeping for others)
+    const explicitComplexId = (query as any).complexId;
+    if (explicitComplexId && Types.ObjectId.isValid(explicitComplexId) && userRole === 'super_admin') {
+      const complexClinics = await this.clinicModel
+        .find({ complexId: new Types.ObjectId(explicitComplexId), deletedAt: { $exists: false } })
         .select('_id')
         .lean();
-      const ownerClinicIds = ownerClinics.map((c: any) => c._id);
-      if (ownerClinicIds.length > 0 && !filter.clinicId) {
-        filter.clinicId = { $in: ownerClinicIds };
-      }
+      const complexClinicIds = complexClinics.map((c: any) => c._id);
+      filter.clinicId = { $in: complexClinicIds };
     }
 
     // Status validation (P2 - MEDIUM)
@@ -1887,11 +1909,46 @@ export class AppointmentService {
   /**
    * Get appointment statistics
    */
-  async getAppointmentStats(): Promise<AppointmentStatsDto> {
+  async getAppointmentStats(
+    userId?: string,
+    userRole?: string,
+    userClinicId?: string,
+    subscriptionId?: string,
+    complexId?: string,
+  ): Promise<AppointmentStatsDto> {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today);
     tomorrow.setDate(today.getDate() + 1);
+
+    // Build base filter for scoping
+    const filter: any = { deletedAt: { $exists: false } };
+    
+    // Role-based scoping logic (shared with getAppointments)
+    if (userRole === 'doctor' && userId) {
+      filter.doctorId = new Types.ObjectId(userId);
+    } else if (userRole === 'staff' && userClinicId) {
+      filter.clinicId = new Types.ObjectId(userClinicId);
+    } else if (userRole === 'admin' && userClinicId) {
+      filter.clinicId = new Types.ObjectId(userClinicId);
+    } else if (userRole === 'owner' || userRole === 'manager') {
+      if (complexId && Types.ObjectId.isValid(complexId)) {
+        const complexClinics = await this.clinicModel
+          .find({ complexId: new Types.ObjectId(complexId), deletedAt: { $exists: false } })
+          .select('_id')
+          .lean();
+        filter.clinicId = { $in: complexClinics.map((c: any) => c._id) };
+      } else if (subscriptionId && Types.ObjectId.isValid(subscriptionId)) {
+        const ownerClinics = await this.clinicModel
+          .find({ subscriptionId: new Types.ObjectId(subscriptionId), deletedAt: { $exists: false } })
+          .select('_id')
+          .lean();
+        filter.clinicId = { $in: ownerClinics.map((c: any) => c._id) };
+      }
+    } else if (userRole !== 'super_admin') {
+      if (userClinicId) filter.clinicId = new Types.ObjectId(userClinicId);
+      else filter.clinicId = { $in: [] };
+    }
 
     const [
       totalAppointments,
@@ -1908,52 +1965,37 @@ export class AppointmentService {
       urgencyDistributionResult,
     ] = await Promise.all([
       // Total appointments
-      this.appointmentModel.countDocuments({ deletedAt: { $exists: false } }),
+      this.appointmentModel.countDocuments(filter),
 
       // Status counts
-      this.appointmentModel.countDocuments({
-        status: 'scheduled',
-        deletedAt: { $exists: false },
-      }),
-      this.appointmentModel.countDocuments({
-        status: 'confirmed',
-        deletedAt: { $exists: false },
-      }),
-      this.appointmentModel.countDocuments({
-        status: 'completed',
-        deletedAt: { $exists: false },
-      }),
-      this.appointmentModel.countDocuments({
-        status: 'cancelled',
-        deletedAt: { $exists: false },
-      }),
-      this.appointmentModel.countDocuments({
-        status: 'no_show',
-        deletedAt: { $exists: false },
-      }),
+      this.appointmentModel.countDocuments({ ...filter, status: 'scheduled' }),
+      this.appointmentModel.countDocuments({ ...filter, status: 'confirmed' }),
+      this.appointmentModel.countDocuments({ ...filter, status: 'completed' }),
+      this.appointmentModel.countDocuments({ ...filter, status: 'cancelled' }),
+      this.appointmentModel.countDocuments({ ...filter, status: 'no_show' }),
 
       // Today's appointments
       this.appointmentModel.countDocuments({
+        ...filter,
         appointmentDate: { $gte: today, $lt: tomorrow },
-        deletedAt: { $exists: false },
       }),
 
       // Upcoming appointments
       this.appointmentModel.countDocuments({
+        ...filter,
         appointmentDate: { $gte: today },
         status: { $in: ['scheduled', 'confirmed'] },
-        deletedAt: { $exists: false },
       }),
 
       // Average duration
       this.appointmentModel.aggregate([
-        { $match: { deletedAt: { $exists: false } } },
+        { $match: filter },
         { $group: { _id: null, avgDuration: { $avg: '$durationMinutes' } } },
       ]),
 
       // Top services
       this.appointmentModel.aggregate([
-        { $match: { deletedAt: { $exists: false } } },
+        { $match: filter },
         { $group: { _id: '$serviceId', count: { $sum: 1 } } },
         {
           $lookup: {
@@ -1977,7 +2019,7 @@ export class AppointmentService {
 
       // Top doctors
       this.appointmentModel.aggregate([
-        { $match: { deletedAt: { $exists: false } } },
+        { $match: filter },
         { $group: { _id: '$doctorId', count: { $sum: 1 } } },
         {
           $lookup: {
@@ -2003,7 +2045,7 @@ export class AppointmentService {
 
       // Urgency distribution
       this.appointmentModel.aggregate([
-        { $match: { deletedAt: { $exists: false } } },
+        { $match: filter },
         { $group: { _id: '$urgency', count: { $sum: 1 } } },
       ]),
     ]);
@@ -2043,17 +2085,52 @@ export class AppointmentService {
   /**
    * Get today's appointments
    */
-  async getTodayAppointments(): Promise<Appointment[]> {
+  async getTodayAppointments(
+    userId?: string,
+    userRole?: string,
+    userClinicId?: string,
+    subscriptionId?: string,
+    complexId?: string,
+  ): Promise<Appointment[]> {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today);
     tomorrow.setDate(today.getDate() + 1);
 
-    return await this.appointmentModel
-      .find({
-        appointmentDate: { $gte: today, $lt: tomorrow },
+    // Build base filter for scoping
+    const filter: any = { 
         deletedAt: { $exists: false },
-      })
+        appointmentDate: { $gte: today, $lt: tomorrow }
+    };
+    
+    // Role-based scoping logic (shared with getAppointments)
+    if (userRole === 'doctor' && userId) {
+      filter.doctorId = new Types.ObjectId(userId);
+    } else if (userRole === 'staff' && userClinicId) {
+      filter.clinicId = new Types.ObjectId(userClinicId);
+    } else if (userRole === 'admin' && userClinicId) {
+      filter.clinicId = new Types.ObjectId(userClinicId);
+    } else if (userRole === 'owner' || userRole === 'manager') {
+      if (complexId && Types.ObjectId.isValid(complexId)) {
+        const complexClinics = await this.clinicModel
+          .find({ complexId: new Types.ObjectId(complexId), deletedAt: { $exists: false } })
+          .select('_id')
+          .lean();
+        filter.clinicId = { $in: complexClinics.map((c: any) => c._id) };
+      } else if (subscriptionId && Types.ObjectId.isValid(subscriptionId)) {
+        const ownerClinics = await this.clinicModel
+          .find({ subscriptionId: new Types.ObjectId(subscriptionId), deletedAt: { $exists: false } })
+          .select('_id')
+          .lean();
+        filter.clinicId = { $in: ownerClinics.map((c: any) => c._id) };
+      }
+    } else if (userRole !== 'super_admin') {
+      if (userClinicId) filter.clinicId = new Types.ObjectId(userClinicId);
+      else filter.clinicId = { $in: [] };
+    }
+
+    return await this.appointmentModel
+      .find(filter)
       .populate('patientId', 'firstName lastName phone')
       .populate('doctorId', 'firstName lastName')
       .populate('clinicId', 'name')
@@ -2114,17 +2191,53 @@ export class AppointmentService {
   /**
    * Get upcoming appointments (next 7 days)
    */
-  async getUpcomingAppointments(limit: number = 20): Promise<Appointment[]> {
+  async getUpcomingAppointments(
+    limit: number = 20,
+    userId?: string,
+    userRole?: string,
+    userClinicId?: string,
+    subscriptionId?: string,
+    complexId?: string,
+  ): Promise<Appointment[]> {
     const today = new Date();
     const nextWeek = new Date();
     nextWeek.setDate(today.getDate() + 7);
 
-    return await this.appointmentModel
-      .find({
-        appointmentDate: { $gte: today, $lte: nextWeek },
-        status: { $in: ['scheduled', 'confirmed'] },
+    // Build base filter for scoping
+    const filter: any = { 
         deletedAt: { $exists: false },
-      })
+        appointmentDate: { $gte: today, $lte: nextWeek },
+        status: { $in: ['scheduled', 'confirmed'] }
+    };
+    
+    // Role-based scoping logic (shared with getAppointments)
+    if (userRole === 'doctor' && userId) {
+      filter.doctorId = new Types.ObjectId(userId);
+    } else if (userRole === 'staff' && userClinicId) {
+      filter.clinicId = new Types.ObjectId(userClinicId);
+    } else if (userRole === 'admin' && userClinicId) {
+      filter.clinicId = new Types.ObjectId(userClinicId);
+    } else if (userRole === 'owner' || userRole === 'manager') {
+      if (complexId && Types.ObjectId.isValid(complexId)) {
+        const complexClinics = await this.clinicModel
+          .find({ complexId: new Types.ObjectId(complexId), deletedAt: { $exists: false } })
+          .select('_id')
+          .lean();
+        filter.clinicId = { $in: complexClinics.map((c: any) => c._id) };
+      } else if (subscriptionId && Types.ObjectId.isValid(subscriptionId)) {
+        const ownerClinics = await this.clinicModel
+          .find({ subscriptionId: new Types.ObjectId(subscriptionId), deletedAt: { $exists: false } })
+          .select('_id')
+          .lean();
+        filter.clinicId = { $in: ownerClinics.map((c: any) => c._id) };
+      }
+    } else if (userRole !== 'super_admin') {
+      if (userClinicId) filter.clinicId = new Types.ObjectId(userClinicId);
+      else filter.clinicId = { $in: [] };
+    }
+
+    return await this.appointmentModel
+      .find(filter)
       .populate('patientId', 'firstName lastName phone')
       .populate('doctorId', 'firstName lastName')
       .populate('clinicId', 'name')

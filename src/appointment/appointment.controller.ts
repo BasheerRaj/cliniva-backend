@@ -458,6 +458,7 @@ export class AppointmentController {
         req.user?.role,
         req.user?.clinicId,
         req.user?.subscriptionId,
+        req.user?.complexId,
       );
       return {
         success: true,
@@ -1585,9 +1586,16 @@ export class AppointmentController {
    * GET /appointments/today
    */
   @Get('schedule/today')
-  async getTodayAppointments() {
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.MANAGER, UserRole.DOCTOR, UserRole.STAFF)
+  async getTodayAppointments(@Request() req: any) {
     try {
-      const appointments = await this.appointmentService.getTodayAppointments();
+      const appointments = await this.appointmentService.getTodayAppointments(
+        req.user?.userId,
+        req.user?.role,
+        req.user?.clinicId,
+        req.user?.subscriptionId,
+        req.user?.complexId,
+      );
       return {
         success: true,
         message: "Today's appointments retrieved successfully",
@@ -1608,12 +1616,21 @@ export class AppointmentController {
    * GET /appointments/upcoming?limit=20
    */
   @Get('schedule/upcoming')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.MANAGER, UserRole.DOCTOR, UserRole.STAFF)
   async getUpcomingAppointments(
+    @Request() req: any,
     @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
   ) {
     try {
       const appointments =
-        await this.appointmentService.getUpcomingAppointments(limit || 20);
+        await this.appointmentService.getUpcomingAppointments(
+          limit || 20,
+          req.user?.userId,
+          req.user?.role,
+          req.user?.clinicId,
+          req.user?.subscriptionId,
+          req.user?.complexId,
+        );
       return {
         success: true,
         message: 'Upcoming appointments retrieved successfully',
@@ -1687,8 +1704,10 @@ export class AppointmentController {
    * GET /appointments/clinic/:clinicId
    */
   @Get('clinic/:clinicId')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.MANAGER, UserRole.DOCTOR, UserRole.STAFF)
   async getClinicAppointments(
     @Param('clinicId') clinicId: string,
+    @Request() req: any,
     @Query('date') date?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
@@ -1701,7 +1720,14 @@ export class AppointmentController {
         limit: limit || '10',
       };
 
-      const result = await this.appointmentService.getAppointments(query);
+      const result = await this.appointmentService.getAppointments(
+        query,
+        req.user?.userId,
+        req.user?.role,
+        req.user?.clinicId,
+        req.user?.subscriptionId,
+        req.user?.complexId,
+      );
       return {
         success: true,
         message: 'Clinic appointments retrieved successfully',
@@ -1747,9 +1773,15 @@ export class AppointmentController {
   })
   @Get('stats/overview')
   @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN)
-  async getAppointmentStats() {
+  async getAppointmentStats(@Request() req: any) {
     try {
-      const stats = await this.appointmentService.getAppointmentStats();
+      const stats = await this.appointmentService.getAppointmentStats(
+        req.user?.userId,
+        req.user?.role,
+        req.user?.clinicId,
+        req.user?.subscriptionId,
+        req.user?.complexId,
+      );
       return {
         success: true,
         message: 'Appointment statistics retrieved successfully',
@@ -1769,10 +1801,12 @@ export class AppointmentController {
    * GET /appointments/search/query?q=searchTerm
    */
   @Get('search/query')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.MANAGER, UserRole.DOCTOR, UserRole.STAFF)
   async searchAppointments(
     @Query('q') searchTerm: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
+    @Request() req?: any,
   ) {
     try {
       if (!searchTerm || searchTerm.trim().length === 0) {
@@ -1785,7 +1819,14 @@ export class AppointmentController {
         limit: limit || '20',
       };
 
-      const result = await this.appointmentService.getAppointments(query);
+      const result = await this.appointmentService.getAppointments(
+        query,
+        req?.user?.userId,
+        req?.user?.role,
+        req?.user?.clinicId,
+        req?.user?.subscriptionId,
+        req?.user?.complexId,
+      );
       return {
         success: true,
         message: 'Search completed successfully',
@@ -1912,8 +1953,10 @@ export class AppointmentController {
    * GET /appointments/status/:status
    */
   @Get('status/:status')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.MANAGER, UserRole.DOCTOR, UserRole.STAFF)
   async getAppointmentsByStatus(
     @Param('status') status: string,
+    @Request() req: any,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
@@ -1938,7 +1981,14 @@ export class AppointmentController {
         limit: limit || '10',
       };
 
-      const result = await this.appointmentService.getAppointments(query);
+      const result = await this.appointmentService.getAppointments(
+        query,
+        req.user?.userId,
+        req.user?.role,
+        req.user?.clinicId,
+        req.user?.subscriptionId,
+        req.user?.complexId,
+      );
       return {
         success: true,
         message: `Appointments with status '${status}' retrieved successfully`,
@@ -1963,9 +2013,11 @@ export class AppointmentController {
    * GET /appointments/date-range?from=YYYY-MM-DD&to=YYYY-MM-DD
    */
   @Get('reports/date-range')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.MANAGER, UserRole.DOCTOR, UserRole.STAFF)
   async getAppointmentsByDateRange(
     @Query('from') dateFrom: string,
     @Query('to') dateTo: string,
+    @Request() req: any,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
@@ -1983,7 +2035,14 @@ export class AppointmentController {
         limit: limit || '20',
       };
 
-      const result = await this.appointmentService.getAppointments(query);
+      const result = await this.appointmentService.getAppointments(
+        query,
+        req.user?.userId,
+        req.user?.role,
+        req.user?.clinicId,
+        req.user?.subscriptionId,
+        req.user?.complexId,
+      );
       return {
         success: true,
         message: 'Appointments in date range retrieved successfully',
@@ -2012,8 +2071,10 @@ export class AppointmentController {
    * GET /appointments/urgency/:urgencyLevel
    */
   @Get('urgency/:urgencyLevel')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.MANAGER, UserRole.DOCTOR, UserRole.STAFF)
   async getAppointmentsByUrgency(
     @Param('urgencyLevel') urgencyLevel: string,
+    @Request() req: any,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
@@ -2031,7 +2092,14 @@ export class AppointmentController {
         limit: limit || '10',
       };
 
-      const result = await this.appointmentService.getAppointments(query);
+      const result = await this.appointmentService.getAppointments(
+        query,
+        req.user?.userId,
+        req.user?.role,
+        req.user?.clinicId,
+        req.user?.subscriptionId,
+        req.user?.complexId,
+      );
       return {
         success: true,
         message: `Appointments with urgency level '${urgencyLevel}' retrieved successfully`,
