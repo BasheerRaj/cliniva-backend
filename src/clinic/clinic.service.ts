@@ -299,6 +299,7 @@ export class ClinicService {
           // Calculate doctors capacity (match primary clinicId OR secondary clinicIds)
           const doctorsCount = await this.userModel.countDocuments({
             $or: [{ clinicId: clinic._id }, { clinicIds: clinic._id }],
+            subscriptionId: clinic.subscriptionId,
             role: 'doctor',
             isActive: true,
           });
@@ -316,6 +317,7 @@ export class ClinicService {
           // Calculate staff capacity (exclude owners/super_admins; match primary clinicId OR secondary clinicIds)
           const staffCount = await this.userModel.countDocuments({
             $or: [{ clinicId: clinic._id }, { clinicIds: clinic._id }],
+            subscriptionId: clinic.subscriptionId,
             role: { $nin: ['doctor', 'patient', 'owner', 'super_admin'] },
             isActive: true,
           });
@@ -620,11 +622,20 @@ export class ClinicService {
     const doctorsList = await this.userModel
       .find({
         $or: [{ clinicId: clinicObjectId }, { clinicIds: clinicObjectId }],
+        subscriptionId: clinic.subscriptionId,
         role: 'doctor',
         isActive: true,
       })
-      .select('_id firstName lastName email role')
+      .select('_id firstName lastName email role publicId')
       .lean();
+
+    const toDisplayUserCode = (user: { _id: Types.ObjectId | string; publicId?: string }) => {
+      if (user.publicId && typeof user.publicId === 'string' && user.publicId.trim() !== '') {
+        return user.publicId.trim().toUpperCase();
+      }
+      const rawId = user._id?.toString?.() ?? '';
+      return rawId ? `US-${rawId.slice(-5).toUpperCase()}` : '';
+    };
 
     const doctorsCount = doctorsList.length;
     const maxDoctors = clinic.maxDoctors || 0;
@@ -637,7 +648,10 @@ export class ClinicService {
       isExceeded: doctorsCount > maxDoctors,
       list: doctorsList.map((doc: any) => ({
         id: doc._id.toString(),
+        _id: doc._id.toString(),
+        userId: toDisplayUserCode(doc),
         name: `${doc.firstName} ${doc.lastName}`,
+        userType: 'Doctor',
         role: doc.role,
         email: doc.email,
       })),
@@ -647,10 +661,11 @@ export class ClinicService {
     const staffList = await this.userModel
       .find({
         $or: [{ clinicId: clinicObjectId }, { clinicIds: clinicObjectId }],
+        subscriptionId: clinic.subscriptionId,
         role: { $nin: ['doctor', 'patient', 'owner', 'super_admin'] },
         isActive: true,
       })
-      .select('_id firstName lastName email role')
+      .select('_id firstName lastName email role publicId')
       .lean();
 
     const staffCount = staffList.length;
@@ -663,7 +678,10 @@ export class ClinicService {
       isExceeded: staffCount > maxStaff,
       list: staffList.map((staff: any) => ({
         id: staff._id.toString(),
+        _id: staff._id.toString(),
+        userId: toDisplayUserCode(staff),
         name: `${staff.firstName} ${staff.lastName}`,
+        userType: 'Staff',
         role: staff.role,
         email: staff.email,
       })),
@@ -767,6 +785,18 @@ export class ClinicService {
       personInCharge: clinic.personInChargeId || null,
       workingHours: workingSchedule,
       workingSchedule,
+      doctors: doctorsCapacity.list.map((doc: any) => ({
+        _id: doc._id,
+        userId: doc.userId,
+        name: doc.name,
+        userType: 'Doctor',
+      })),
+      employees: staffCapacity.list.map((staff: any) => ({
+        _id: staff._id,
+        userId: staff.userId,
+        name: staff.name,
+        userType: 'Staff',
+      })),
       capacity: {
         doctors: doctorsCapacity,
         staff: staffCapacity,
