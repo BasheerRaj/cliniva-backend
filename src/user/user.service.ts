@@ -4,6 +4,7 @@ import {
   Logger,
   BadRequestException,
   ForbiddenException,
+  HttpException,
 } from '@nestjs/common';
 import { InjectModel, InjectConnection } from '@nestjs/mongoose';
 import { Model, Types, Connection, RootFilterQuery } from 'mongoose';
@@ -447,6 +448,7 @@ export class UserService {
     currentUserRole: string,
     ipAddress: string,
     userAgent: string,
+    requestingUser?: any,
   ) {
     try {
       // Task 9.2: Check UserRestrictionService before allowing status change
@@ -467,7 +469,7 @@ export class UserService {
           throw new BadRequestException({
             message: {
               ar: 'لا يمكن إلغاء تفعيل المستخدم لأن لديه مواعيد مستقبلية. يرجى نقل المواعيد أو إلغاؤها أولاً',
-              en: 'Cannot deactivate user because they have future appointments. Please transfer or cancel appointments first',
+              en: 'Cannot deactivate user because they have future appointments. For doctors, use "Deactivate with Transfer". Otherwise transfer or cancel appointments first.',
             },
             code: 'USER_HAS_FUTURE_APPOINTMENTS',
             details: { appointmentCount: futureAppointmentsCount },
@@ -481,6 +483,7 @@ export class UserService {
         userId,
         ERROR_MESSAGES.USER_NOT_FOUND,
       );
+      this.assertCanManageUser(requestingUser, user);
 
       // Role hierarchy check: only higher roles can change lower roles' status
       const ROLE_PRIORITY: Record<string, number> = {
@@ -548,9 +551,16 @@ export class UserService {
           : ERROR_MESSAGES.USER_DEACTIVATED,
       );
     } catch (error) {
-      // Task 9.2: Return 403 Forbidden with bilingual error if self-action
-      // The UserRestrictionService already throws ForbiddenException with bilingual message
-      this.logger.error(`Error updating user status for ${userId}:`, error);
+      // Business-rule exceptions are expected in some flows (e.g., future appointments).
+      if (error instanceof HttpException) {
+        const response: any = error.getResponse?.() || {};
+        const code = response?.code || 'HTTP_EXCEPTION';
+        this.logger.warn(
+          `Update user status blocked for ${userId}: ${code}`,
+        );
+      } else {
+        this.logger.error(`Error updating user status for ${userId}:`, error);
+      }
       throw error;
     }
   }
@@ -578,6 +588,7 @@ export class UserService {
     currentUserId: string,
     ipAddress: string,
     userAgent: string,
+    requestingUser?: any,
   ) {
     const session = await this.connection.startSession();
     session.startTransaction();
@@ -596,6 +607,16 @@ export class UserService {
         doctorId,
         ERROR_MESSAGES.DOCTOR_NOT_FOUND,
       );
+      this.assertCanManageUser(requestingUser, doctor);
+      if (doctor.role !== 'doctor') {
+        throw new BadRequestException({
+          message: {
+            ar: 'هذا المستخدم ليس طبيباً',
+            en: 'Target user is not a doctor',
+          },
+          code: 'INVALID_DOCTOR',
+        });
+      }
 
       // Check for active appointments
       const activeAppointments = await this.appointmentModel
@@ -618,8 +639,18 @@ export class UserService {
             transferData.targetDoctorId,
             ERROR_MESSAGES.DOCTOR_NOT_FOUND,
           );
+          this.assertCanManageUser(requestingUser, targetDoctor);
 
           ValidationUtil.validateUserActive(targetDoctor);
+          if (targetDoctor.role !== 'doctor') {
+            throw new BadRequestException({
+              message: {
+                ar: 'الطبيب المستهدف غير صالح',
+                en: 'Target transfer user must be an active doctor',
+              },
+              code: 'INVALID_TARGET_DOCTOR',
+            });
+          }
 
           // Transfer appointments
           const updateResult = await this.appointmentModel
@@ -751,6 +782,66 @@ export class UserService {
       throw error;
     } finally {
       session.endSession();
+    }
+  }
+
+  private assertCanManageUser(requestingUser: any, targetUser: any): void {
+    if (!requestingUser || requestingUser.role === 'super_admin') {
+      return;
+    }
+
+    if (
+      requestingUser.subscriptionId &&
+      targetUser?.subscriptionId?.toString() !== requestingUser.subscriptionId
+    ) {
+      throw new ForbiddenException({
+        message: {
+          ar: 'لا يمكنك إدارة مستخدم من اشتراك آخر',
+          en: 'You cannot manage a user from another tenant',
+        },
+        code: 'INSUFFICIENT_PERMISSIONS',
+      });
+    }
+
+    // Owner has subscription-wide access.
+    if (requestingUser.role === 'owner') {
+      return;
+    }
+
+    const actorClinicIds = new Set<string>(
+      [
+        ...(Array.isArray(requestingUser.clinicIds)
+          ? requestingUser.clinicIds
+          : []),
+        requestingUser.clinicId,
+      ]
+        .filter(Boolean)
+        .map((id: any) => id.toString()),
+    );
+
+    if (actorClinicIds.size > 0) {
+      const targetClinicIds = new Set<string>(
+        [
+          ...(Array.isArray(targetUser?.clinicIds) ? targetUser.clinicIds : []),
+          targetUser?.clinicId,
+        ]
+          .filter(Boolean)
+          .map((id: any) => id.toString()),
+      );
+
+      const sharedClinic = [...targetClinicIds].some((id) =>
+        actorClinicIds.has(id),
+      );
+
+      if (!sharedClinic) {
+        throw new ForbiddenException({
+          message: {
+            ar: 'ليس لديك صلاحية لإدارة هذا المستخدم خارج عياداتك',
+            en: 'You do not have permission to manage this user outside your clinic scope',
+          },
+          code: 'INSUFFICIENT_PERMISSIONS',
+        });
+      }
     }
   }
 

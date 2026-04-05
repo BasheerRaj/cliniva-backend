@@ -31,10 +31,11 @@ import {
 } from './dto/doctor-service.dto';
 import { SERVICE_SWAGGER_EXAMPLES } from '../service/constants/swagger-examples';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { AdminGuard } from '../auth/guards/admin.guard';
 
 @ApiTags('Doctor-Service')
 @Controller('services')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, AdminGuard)
 export class DoctorServiceController {
   constructor(private readonly doctorServiceService: DoctorServiceService) {}
 
@@ -97,11 +98,13 @@ export class DoctorServiceController {
   async getAvailableDoctorsForService(
     @Param('serviceId') serviceId: string,
     @Query('clinicId') clinicId?: string,
+    @Request() req?: any,
   ) {
     const doctors =
       await this.doctorServiceService.getAvailableDoctorsForService(
         serviceId,
         clinicId,
+        req?.user,
       );
     return {
       success: true,
@@ -196,6 +199,7 @@ export class DoctorServiceController {
     @Query('clinicId') clinicId?: string,
     @Query('isActive') isActive?: string,
     @Query('includeStats') includeStats?: string,
+    @Request() req?: any,
   ) {
     const doctors = await this.doctorServiceService.getDoctorsForService(
       serviceId,
@@ -205,6 +209,7 @@ export class DoctorServiceController {
           isActive === 'true' ? true : isActive === 'false' ? false : undefined,
         includeStats: includeStats === 'true',
       },
+      req?.user,
     );
     return {
       success: true,
@@ -286,10 +291,12 @@ export class DoctorServiceController {
     @Param('serviceId') serviceId: string,
     @Body(new ValidationPipe({ transform: true, whitelist: true }))
     dto: AssignDoctorToServiceDto,
+    @Request() req?: any,
   ) {
     const result = await this.doctorServiceService.assignDoctorToService(
       serviceId,
       dto,
+      req?.user,
     );
     return {
       success: true,
@@ -395,6 +402,7 @@ export class DoctorServiceController {
       doctorId,
       dto,
       userId,
+      req?.user,
     );
     return {
       success: true,
@@ -476,6 +484,7 @@ export class DoctorServiceController {
       doctorId,
       dto,
       userId,
+      req?.user,
     );
     return {
       success: true,
@@ -563,11 +572,13 @@ export class DoctorServiceController {
     @Param('serviceId') serviceId: string,
     @Param('doctorId') doctorId: string,
     @Query('clinicId') clinicId: string,
+    @Request() req?: any,
   ) {
     await this.doctorServiceService.removeDoctorFromService(
       serviceId,
       doctorId,
       clinicId,
+      req?.user,
     );
     return {
       success: true,
@@ -643,11 +654,13 @@ export class DoctorServiceController {
     @Param('doctorId') doctorId: string,
     @Body(new ValidationPipe({ transform: true, whitelist: true }))
     dto: UpdateDoctorServiceNotesDto,
+    @Request() req?: any,
   ) {
     const result = await this.doctorServiceService.updateDoctorServiceNotes(
       serviceId,
       doctorId,
       dto,
+      req?.user,
     );
     return {
       success: true,

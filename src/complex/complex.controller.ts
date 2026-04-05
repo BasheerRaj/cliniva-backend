@@ -1558,50 +1558,47 @@ export class ComplexController {
         req.user,
       );
     } catch (error) {
-      // Handle NotFoundException with bilingual error
       if (error instanceof NotFoundException) {
         const errorResponse = error.getResponse() as any;
-        return {
+        throw new NotFoundException({
           success: false,
           error: {
             code: errorResponse.code || 'COMPLEX_006',
             message: errorResponse.message || {
-              ar: 'المجمع غير موجود',
+              ar: '?????? ??? ?????',
               en: 'Complex not found',
             },
             details: errorResponse.details,
           },
-        };
+        });
       }
 
-      // Handle BadRequestException with bilingual error (e.g., COMPLEX_004, COMPLEX_005)
       if (error instanceof BadRequestException) {
         const errorResponse = error.getResponse() as any;
-        return {
+        throw new BadRequestException({
           success: false,
           error: {
             code: errorResponse.code || 'COMPLEX_999',
             message: errorResponse.message || {
-              ar: 'فشل تحديث حالة المجمع',
+              ar: '??? ????? ???? ??????',
               en: 'Failed to update complex status',
             },
             details: errorResponse.details,
           },
-        };
+        });
       }
 
-      // Handle other errors with generic bilingual message
-      return {
+      throw new BadRequestException({
         success: false,
         error: {
           code: 'COMPLEX_999',
           message: {
-            ar: 'حدث خطأ غير متوقع أثناء تحديث حالة المجمع',
+            ar: '??? ??? ??? ????? ????? ????? ???? ??????',
             en: 'An unexpected error occurred while updating complex status',
           },
-          details: error.message,
+          details: (error as any)?.message,
         },
-      };
+      });
     }
   }
 

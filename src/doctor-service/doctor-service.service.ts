@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -43,6 +44,7 @@ export class DoctorServiceService {
   async assignDoctorToService(
     serviceId: string,
     dto: AssignDoctorToServiceDto,
+    requestingUser?: any,
   ): Promise<DoctorService> {
     // Validate service exists and is active
     const service = await this.serviceModel.findById(serviceId);
@@ -54,6 +56,7 @@ export class DoctorServiceService {
         },
       });
     }
+    this.assertTenantAccess(service.subscriptionId, requestingUser);
 
     if (service.deletedAt || !service.isActive) {
       throw new BadRequestException({
@@ -74,6 +77,7 @@ export class DoctorServiceService {
         },
       });
     }
+    this.assertTenantAccess(clinic.subscriptionId, requestingUser);
 
     // Validate doctor exists and is active with role 'doctor'
     const doctor = await this.userModel.findOne({
@@ -90,6 +94,7 @@ export class DoctorServiceService {
         },
       });
     }
+    this.assertTenantAccess(doctor.subscriptionId, requestingUser);
 
     // Validate doctor works at this clinic
     // Check User.clinicId OR EmployeeShift with clinic entity
@@ -175,7 +180,19 @@ export class DoctorServiceService {
       isActive?: boolean;
       includeStats?: boolean;
     },
+    requestingUser?: any,
   ): Promise<any[]> {
+    const service = await this.serviceModel.findById(serviceId).select('_id subscriptionId');
+    if (!service) {
+      throw new NotFoundException({
+        message: {
+          ar: 'الخدمة غير موجودة',
+          en: 'Service not found',
+        },
+      });
+    }
+    this.assertTenantAccess(service.subscriptionId, requestingUser);
+
     const filter: any = {
       serviceId: new Types.ObjectId(serviceId),
     };
@@ -229,7 +246,32 @@ export class DoctorServiceService {
     doctorId: string,
     dto: DeactivateDoctorFromServiceDto,
     userId: string,
+    requestingUser?: any,
   ): Promise<any> {
+    const [service, clinic, doctor] = await Promise.all([
+      this.serviceModel.findById(serviceId).select('_id subscriptionId'),
+      this.clinicModel.findById(dto.clinicId).select('_id subscriptionId'),
+      this.userModel.findById(doctorId).select('_id role subscriptionId isActive clinicId'),
+    ]);
+    if (!service) {
+      throw new NotFoundException({
+        message: { ar: 'الخدمة غير موجودة', en: 'Service not found' },
+      });
+    }
+    if (!clinic) {
+      throw new NotFoundException({
+        message: { ar: 'العيادة غير موجودة', en: 'Clinic not found' },
+      });
+    }
+    if (!doctor || doctor.role !== 'doctor') {
+      throw new NotFoundException({
+        message: { ar: 'الطبيب غير موجود', en: 'Doctor not found' },
+      });
+    }
+    this.assertTenantAccess(service.subscriptionId, requestingUser);
+    this.assertTenantAccess(clinic.subscriptionId, requestingUser);
+    this.assertTenantAccess(doctor.subscriptionId, requestingUser);
+
     // Find assignment
     const doctorService = await this.doctorServiceModel.findOne({
       doctorId: new Types.ObjectId(doctorId),
@@ -274,6 +316,28 @@ export class DoctorServiceService {
       }
 
       // Transfer appointments
+      const targetDoctor = await this.userModel.findById(dto.transferAppointmentsTo)
+        .select('_id role isActive clinicId subscriptionId');
+      if (!targetDoctor || targetDoctor.role !== 'doctor' || !targetDoctor.isActive) {
+        throw new BadRequestException({
+          message: {
+            ar: 'الطبيب المستهدف غير صالح',
+            en: 'Target transfer doctor must be an active doctor',
+          },
+        });
+      }
+      this.assertTenantAccess(targetDoctor.subscriptionId, requestingUser);
+      const targetDoctorClinicId = targetDoctor.clinicId?.toString();
+      if (targetDoctorClinicId && targetDoctorClinicId !== dto.clinicId) {
+        throw new BadRequestException({
+          message: {
+            ar: 'يجب أن يكون الطبيب المستهدف ضمن نفس العيادة',
+            en: 'Target transfer doctor must belong to the same clinic',
+          },
+        });
+      }
+
+      // Transfer appointments
       await this.transferAppointments(
         activeAppointments,
         dto.transferAppointmentsTo,
@@ -309,7 +373,32 @@ export class DoctorServiceService {
     doctorId: string,
     dto: { clinicId: string },
     userId: string,
+    requestingUser?: any,
   ): Promise<any> {
+    const [service, clinic, doctor] = await Promise.all([
+      this.serviceModel.findById(serviceId).select('_id subscriptionId'),
+      this.clinicModel.findById(dto.clinicId).select('_id subscriptionId'),
+      this.userModel.findById(doctorId).select('_id role subscriptionId'),
+    ]);
+    if (!service) {
+      throw new NotFoundException({
+        message: { ar: 'الخدمة غير موجودة', en: 'Service not found' },
+      });
+    }
+    if (!clinic) {
+      throw new NotFoundException({
+        message: { ar: 'العيادة غير موجودة', en: 'Clinic not found' },
+      });
+    }
+    if (!doctor || doctor.role !== 'doctor') {
+      throw new NotFoundException({
+        message: { ar: 'الطبيب غير موجود', en: 'Doctor not found' },
+      });
+    }
+    this.assertTenantAccess(service.subscriptionId, requestingUser);
+    this.assertTenantAccess(clinic.subscriptionId, requestingUser);
+    this.assertTenantAccess(doctor.subscriptionId, requestingUser);
+
     const doctorService = await this.doctorServiceModel.findOne({
       doctorId: new Types.ObjectId(doctorId),
       serviceId: new Types.ObjectId(serviceId),
@@ -383,7 +472,32 @@ export class DoctorServiceService {
     serviceId: string,
     doctorId: string,
     clinicId: string,
+    requestingUser?: any,
   ): Promise<void> {
+    const [service, clinic, doctor] = await Promise.all([
+      this.serviceModel.findById(serviceId).select('_id subscriptionId'),
+      this.clinicModel.findById(clinicId).select('_id subscriptionId'),
+      this.userModel.findById(doctorId).select('_id role subscriptionId'),
+    ]);
+    if (!service) {
+      throw new NotFoundException({
+        message: { ar: 'الخدمة غير موجودة', en: 'Service not found' },
+      });
+    }
+    if (!clinic) {
+      throw new NotFoundException({
+        message: { ar: 'العيادة غير موجودة', en: 'Clinic not found' },
+      });
+    }
+    if (!doctor || doctor.role !== 'doctor') {
+      throw new NotFoundException({
+        message: { ar: 'الطبيب غير موجود', en: 'Doctor not found' },
+      });
+    }
+    this.assertTenantAccess(service.subscriptionId, requestingUser);
+    this.assertTenantAccess(clinic.subscriptionId, requestingUser);
+    this.assertTenantAccess(doctor.subscriptionId, requestingUser);
+
     const doctorService = await this.doctorServiceModel.findOne({
       doctorId: new Types.ObjectId(doctorId),
       serviceId: new Types.ObjectId(serviceId),
@@ -427,6 +541,7 @@ export class DoctorServiceService {
   async getAvailableDoctorsForService(
     serviceId: string,
     clinicId?: string,
+    requestingUser?: any,
   ): Promise<any[]> {
     // Get service to validate it exists
     const service = await this.serviceModel.findById(serviceId);
@@ -438,10 +553,23 @@ export class DoctorServiceService {
         },
       });
     }
+    this.assertTenantAccess(service.subscriptionId, requestingUser);
 
     // Get clinics where service is offered
     let clinicIds: Types.ObjectId[];
     if (clinicId) {
+      const clinic = await this.clinicModel
+        .findById(clinicId)
+        .select('_id subscriptionId isActive');
+      if (!clinic || clinic.isActive === false) {
+        throw new NotFoundException({
+          message: {
+            ar: 'العيادة غير موجودة أو غير نشطة',
+            en: 'Clinic not found or inactive',
+          },
+        });
+      }
+      this.assertTenantAccess(clinic.subscriptionId, requestingUser);
       clinicIds = [new Types.ObjectId(clinicId)];
     } else {
       const clinicServices = await this.clinicServiceModel.find({
@@ -510,7 +638,32 @@ export class DoctorServiceService {
     serviceId: string,
     doctorId: string,
     dto: UpdateDoctorServiceNotesDto,
+    requestingUser?: any,
   ): Promise<DoctorService> {
+    const [service, clinic, doctor] = await Promise.all([
+      this.serviceModel.findById(serviceId).select('_id subscriptionId'),
+      this.clinicModel.findById(dto.clinicId).select('_id subscriptionId'),
+      this.userModel.findById(doctorId).select('_id role subscriptionId'),
+    ]);
+    if (!service) {
+      throw new NotFoundException({
+        message: { ar: 'الخدمة غير موجودة', en: 'Service not found' },
+      });
+    }
+    if (!clinic) {
+      throw new NotFoundException({
+        message: { ar: 'العيادة غير موجودة', en: 'Clinic not found' },
+      });
+    }
+    if (!doctor || doctor.role !== 'doctor') {
+      throw new NotFoundException({
+        message: { ar: 'الطبيب غير موجود', en: 'Doctor not found' },
+      });
+    }
+    this.assertTenantAccess(service.subscriptionId, requestingUser);
+    this.assertTenantAccess(clinic.subscriptionId, requestingUser);
+    this.assertTenantAccess(doctor.subscriptionId, requestingUser);
+
     const doctorService = await this.doctorServiceModel.findOne({
       doctorId: new Types.ObjectId(doctorId),
       serviceId: new Types.ObjectId(serviceId),
@@ -531,6 +684,27 @@ export class DoctorServiceService {
     }
 
     return await doctorService.save();
+  }
+
+  private assertTenantAccess(
+    resourceSubscriptionId: any,
+    requestingUser?: any,
+  ): void {
+    if (!requestingUser || requestingUser.role === 'super_admin') {
+      return;
+    }
+
+    const actorSubscriptionId = requestingUser.subscriptionId?.toString();
+    const targetSubscriptionId = resourceSubscriptionId?.toString();
+    if (!actorSubscriptionId || !targetSubscriptionId || actorSubscriptionId !== targetSubscriptionId) {
+      throw new ForbiddenException({
+        message: {
+          ar: 'لا يمكنك الوصول إلى بيانات تخص مستأجراً آخر',
+          en: 'You do not have permission to access another tenant data',
+        },
+        code: 'INSUFFICIENT_PERMISSIONS',
+      });
+    }
   }
 }
 

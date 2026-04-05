@@ -1715,6 +1715,25 @@ export class ComplexService {
           throw new BadRequestException({
             code: 'COMPLEX_004',
             message: ERROR_CODES.COMPLEX_004.message,
+            details: {
+              en: 'This complex has active clinics. Choose a target complex and enable clinic transfer before deactivation.',
+              ar: 'هذا المجمع يحتوي على عيادات نشطة. اختر مجمعا مستهدفا وفعل نقل العيادات قبل إلغاء التفعيل.',
+            },
+          });
+        }
+
+        if (clinics.length > 0 && dto.targetComplexId && !dto.transferClinics) {
+          throw new BadRequestException({
+            code: 'COMPLEX_004',
+            message: {
+              ar: 'يجب نقل جميع العيادات المرتبطة قبل إلغاء تفعيل المجمع',
+              en: 'All linked clinics must be transferred before deactivating this complex',
+            },
+            details: {
+              clinicsCount: clinics.length,
+              en: 'Set transferClinics=true and provide targetComplexId.',
+              ar: 'اجعل transferClinics=true وحدد targetComplexId.',
+            },
           });
         }
 
@@ -1738,9 +1757,17 @@ export class ComplexService {
             });
           }
 
+          await this.verifyComplexOwnership(targetComplex, requestingUser);
+
           // Transfer clinics if requested (Requirement 6.3, 6.4)
           if (dto.transferClinics && clinicIds.length > 0) {
             clinicsTransferred = await this.transferClinicsToComplex(
+              clinicIds,
+              dto.targetComplexId,
+              session,
+            );
+
+            await this.updateStaffAssignments(
               clinicIds,
               dto.targetComplexId,
               session,

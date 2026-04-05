@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { InjectModel, InjectConnection } from '@nestjs/mongoose';
 import { Model, Connection, Types } from 'mongoose';
@@ -11,6 +12,7 @@ import { Appointment } from '../../database/schemas/appointment.schema';
 import { ERROR_CODES } from '../constants/error-codes.constant';
 import { AuditService } from '../../auth/audit.service';
 import { TransactionUtil } from '../../common/utils/transaction.util';
+import { assertSameTenant, TenantUser } from '../../common/utils/tenant-scope.util';
 
 /**
  * Options for changing clinic status
@@ -92,6 +94,7 @@ export class ClinicStatusService {
     clinicId: string,
     options: StatusChangeOptions,
     userId: string,
+    requestingUser?: TenantUser,
   ): Promise<StatusChangeResult> {
     // 1. Validate clinic exists
     const clinic = await this.clinicModel.findById(clinicId);
@@ -101,6 +104,7 @@ export class ClinicStatusService {
         message: ERROR_CODES.CLINIC_007.message,
       });
     }
+    this.assertClinicTenantAccess(clinic, requestingUser);
 
     // Store old status for audit logging
     const oldStatus = clinic.status;
@@ -114,21 +118,30 @@ export class ClinicStatusService {
     });
 
     const assignedDoctors = await this.userModel.countDocuments({
-      clinicId: new Types.ObjectId(clinicId),
+      $or: [
+        { clinicId: new Types.ObjectId(clinicId) },
+        { clinicIds: new Types.ObjectId(clinicId) },
+      ],
       role: 'doctor',
       isActive: true,
+      deletedAt: { $exists: false },
     });
 
     const assignedStaff = await this.userModel.countDocuments({
-      clinicId: new Types.ObjectId(clinicId),
+      $or: [
+        { clinicId: new Types.ObjectId(clinicId) },
+        { clinicIds: new Types.ObjectId(clinicId) },
+      ],
       role: { $nin: ['doctor', 'patient'] },
       isActive: true,
+      deletedAt: { $exists: false },
     });
 
-    // 3. If deactivating with active resources, require transfer decision
+    // 3. If deactivating with active appointments or doctors, require transfer decision.
+    // Staff-only assignments should not block status change by themselves.
     if (options.status === 'inactive' || options.status === 'suspended') {
       if (
-        (activeAppointments > 0 || assignedDoctors > 0 || assignedStaff > 0) &&
+        (activeAppointments > 0 || assignedDoctors > 0) &&
         !options.transferDoctors &&
         !options.transferStaff &&
         !options.targetClinicId
@@ -180,6 +193,7 @@ export class ClinicStatusService {
           },
           session,
           userId,
+          requestingUser,
         );
 
         doctorsTransferred = transferResult.doctorsTransferred;
@@ -201,6 +215,9 @@ export class ClinicStatusService {
         clinic.isActive = false; // Update legacy field
       } else {
         clinic.isActive = true;
+        clinic.deactivatedAt = undefined;
+        clinic.deactivatedBy = undefined;
+        clinic.deactivationReason = undefined;
       }
       await clinic.save(
         TransactionUtil.getSessionOptions(session, useTransaction),
@@ -257,7 +274,29 @@ export class ClinicStatusService {
     options: TransferOptions,
     session?: any,
     userId?: string,
+    requestingUser?: TenantUser,
   ): Promise<TransferResult> {
+    if (options.targetClinicId === fromClinicId) {
+      throw new BadRequestException({
+        message: {
+          ar: 'لا يمكن النقل إلى نفس العيادة',
+          en: 'Cannot transfer to the same clinic',
+        },
+        code: 'CLINIC_008',
+      });
+    }
+
+    const sourceClinic = await this.clinicModel.findById(fromClinicId).select(
+      '_id subscriptionId',
+    );
+    if (!sourceClinic) {
+      throw new NotFoundException({
+        code: 'CLINIC_007',
+        message: ERROR_CODES.CLINIC_007.message,
+      });
+    }
+    this.assertClinicTenantAccess(sourceClinic, requestingUser);
+
     // 1. Validate target clinic exists
     const targetClinic = await this.clinicModel.findById(
       options.targetClinicId,
@@ -266,6 +305,16 @@ export class ClinicStatusService {
       throw new NotFoundException({
         code: 'CLINIC_008',
         message: ERROR_CODES.CLINIC_008.message,
+      });
+    }
+    this.assertClinicTenantAccess(targetClinic, requestingUser);
+    if (targetClinic.status !== 'active' || targetClinic.isActive === false) {
+      throw new BadRequestException({
+        message: {
+          ar: 'العيادة المستهدفة غير نشطة',
+          en: 'Target clinic must be active to receive transferred doctors/staff',
+        },
+        code: 'CLINIC_008',
       });
     }
 
@@ -288,6 +337,9 @@ export class ClinicStatusService {
         };
       }
 
+      const doctors = await this.userModel.find(doctorQuery).select('_id');
+      const doctorIds = doctors.map((d) => d._id);
+
       const result = await this.userModel.updateMany(
         doctorQuery,
         {
@@ -304,10 +356,7 @@ export class ClinicStatusService {
       doctorsTransferred = result.modifiedCount;
 
       // Transfer appointments for these doctors
-      if (doctorsTransferred > 0) {
-        const doctors = await this.userModel.find(doctorQuery).select('_id');
-        const doctorIds = doctors.map((d) => d._id);
-
+      if (doctorIds.length > 0) {
         const appointmentResult = await this.appointmentModel.updateMany(
           {
             doctorId: { $in: doctorIds },
@@ -380,6 +429,31 @@ export class ClinicStatusService {
       appointmentsAffected,
       errors,
     };
+  }
+
+  private assertClinicTenantAccess(clinic: any, requestingUser?: TenantUser) {
+    if (!requestingUser || requestingUser.role === 'super_admin') {
+      return;
+    }
+
+    try {
+      assertSameTenant(
+        clinic?.subscriptionId,
+        requestingUser,
+        {
+          ar: 'ليس لديك صلاحية للوصول إلى هذه العيادة',
+          en: 'You do not have permission to access this clinic',
+        },
+      );
+    } catch {
+      throw new ForbiddenException({
+        message: {
+          ar: 'ليس لديك صلاحية للوصول إلى هذه العيادة',
+          en: 'You do not have permission to access this clinic',
+        },
+        code: 'INSUFFICIENT_PERMISSIONS',
+      });
+    }
   }
 
   /**

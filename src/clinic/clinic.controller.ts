@@ -1545,6 +1545,7 @@ export class ClinicController {
         id,
         changeStatusDto,
         userId,
+        req.user,
       );
 
       return {
@@ -2008,6 +2009,7 @@ export class ClinicController {
   async transferStaff(
     @Param('id') id: string,
     @Body() transferStaffDto: TransferStaffDto,
+    @Request() req: any,
   ) {
     try {
       // Call status service to transfer staff
@@ -2019,7 +2021,7 @@ export class ClinicController {
         doctorIds: transferStaffDto.doctorIds,
         staffIds: transferStaffDto.staffIds,
         handleConflicts: transferStaffDto.handleConflicts,
-      });
+      }, undefined, req?.user?.id || req?.user?.userId || req?.user?.sub, req.user);
 
       return {
         success: true,

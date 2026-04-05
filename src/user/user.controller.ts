@@ -1851,6 +1851,7 @@ export class UserController {
         req.user?.role,
         req.ip,
         req.headers['user-agent'],
+        req.user,
       );
     } catch (error: any) {
       // Re-throw if already an HTTP exception
@@ -1971,6 +1972,7 @@ export class UserController {
         currentUserId,
         req.ip,
         req.headers['user-agent'],
+        req.user,
       );
     } catch (error: any) {
       // Re-throw if already an HTTP exception
