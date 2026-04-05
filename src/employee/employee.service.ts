@@ -511,7 +511,11 @@ export class EmployeeService {
 
     let resolvedSubscriptionId: Types.ObjectId | undefined;
 
-    if (explicitSubscriptionId && Types.ObjectId.isValid(explicitSubscriptionId)) {
+    if (
+      requestingUser?.role === 'super_admin' &&
+      explicitSubscriptionId &&
+      Types.ObjectId.isValid(explicitSubscriptionId)
+    ) {
       resolvedSubscriptionId = new Types.ObjectId(explicitSubscriptionId);
     } else if (requestingUser?.subscriptionId && Types.ObjectId.isValid(requestingUser.subscriptionId)) {
       resolvedSubscriptionId = new Types.ObjectId(requestingUser.subscriptionId);
@@ -714,23 +718,30 @@ export class EmployeeService {
       role = 'doctor';
     }
 
-    // TENANT ISOLATION: enforce scope based on requesting user (same pattern as user.service.ts)
+    // TENANT ISOLATION: enforce scope based on requesting user
     let effectiveClinicId: string | string[] | undefined = clinicId;
     let effectiveComplexId = complexId;
     let effectiveOrgId = organizationId;
 
     if (requestingUser && requestingUser.role !== 'super_admin') {
+      // 1. Mandatory subscription-level tenant isolation
+      if (requestingUser.subscriptionId) {
+        effectiveOrgId = requestingUser.subscriptionId.toString();
+      }
+
+      // 2. Resolve role-based scope restrictions
       if (requestingUser.role === 'owner') {
-        // Owners have subscription-level access — scope only by subscriptionId
-        if (!effectiveClinicId && !effectiveComplexId && requestingUser.subscriptionId) {
-          effectiveOrgId = requestingUser.subscriptionId.toString();
+        // Owners have subscription-level access — no further restrictions unless explicitly queried
+      } else {
+        // Higher-order scope resolution: Complex > Clinic
+        if (requestingUser.complexId) {
+          // If user has complex access, that is their primary scope
+          if (!effectiveComplexId) effectiveComplexId = requestingUser.complexId.toString();
+          // They can see all clinics within this complex unless they explicitly narrowed to one
+        } else if (requestingUser.clinicId) {
+          // Fallback to clinic scope for users restricted to a single clinic
+          if (!effectiveClinicId) effectiveClinicId = requestingUser.clinicId.toString();
         }
-      } else if (requestingUser.clinicId) {
-        effectiveClinicId = requestingUser.clinicId.toString();
-      } else if (requestingUser.complexId) {
-        if (!effectiveClinicId) effectiveComplexId = requestingUser.complexId.toString();
-      } else if (requestingUser.subscriptionId) {
-        if (!effectiveClinicId && !effectiveComplexId) effectiveOrgId = requestingUser.subscriptionId.toString();
       }
 
       const userId = requestingUser.role !== 'owner'
@@ -775,7 +786,7 @@ export class EmployeeService {
           if (expandedClinicIds.length > 0) {
             effectiveClinicId = expandedClinicIds.map((id) => id.toString());
             effectiveComplexId = undefined;
-            effectiveOrgId = undefined;
+            // Note: we still keep effectiveOrgId for tenant isolation
           }
         }
       }
@@ -783,6 +794,11 @@ export class EmployeeService {
 
     // Build user filter
     const userFilter: any = {};
+
+    // 1. Mandatory Tenant Isolation — ALWAYS applied for non-super_admins
+    if (effectiveOrgId) {
+      userFilter.subscriptionId = new Types.ObjectId(effectiveOrgId);
+    }
 
     // ROLE-BASED RESTRICTION: Doctors can ONLY see themselves
     if (requestingUser && requestingUser.role === 'doctor') {
@@ -799,6 +815,7 @@ export class EmployeeService {
     if (email) userFilter.email = { $regex: email, $options: 'i' };
     if (role) userFilter.role = role;
     if (isActive !== undefined) userFilter.isActive = isActive;
+
     if (effectiveClinicId) {
       if (Array.isArray(effectiveClinicId)) {
         userFilter.clinicId = {
@@ -815,8 +832,9 @@ export class EmployeeService {
         userFilter.clinicIds = { $in: ids.map((id) => new Types.ObjectId(id)) };
       }
     }
-    if (!effectiveClinicId && !clinicIds && effectiveComplexId) userFilter.complexId = new Types.ObjectId(effectiveComplexId);
-    if (!effectiveClinicId && !clinicIds && !effectiveComplexId && effectiveOrgId) userFilter.subscriptionId = new Types.ObjectId(effectiveOrgId);
+    if (!effectiveClinicId && !clinicIds && effectiveComplexId) {
+      userFilter.complexId = new Types.ObjectId(effectiveComplexId);
+    }
 
     // Search across multiple fields
     if (search) {

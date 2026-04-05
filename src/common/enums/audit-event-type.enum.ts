@@ -21,6 +21,10 @@ export enum AuditEventType {
   EMPLOYEE_UPDATED = 'employee_updated',
   EMPLOYEE_DELETED = 'employee_deleted',
   EMPLOYEE_TERMINATED = 'employee_terminated',
+  // Patient Management Events
+  PATIENT_CREATED = 'patient_created',
+  PATIENT_UPDATED = 'patient_updated',
+  PATIENT_DELETED = 'patient_deleted',
   // Doctor Management Events
   DOCTOR_DEACTIVATED = 'doctor_deactivated',
   APPOINTMENTS_TRANSFERRED = 'appointments_transferred',

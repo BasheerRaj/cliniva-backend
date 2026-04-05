@@ -53,6 +53,14 @@ export class OrganizationEmergencyContact {
   relationship?: string;
 }
 
+export class LegalItem {
+  @Prop()
+  title?: string;
+
+  @Prop()
+  content?: string;
+}
+
 // Social media links subdocument
 export class SocialMediaLinks {
   @Prop()
@@ -191,6 +199,28 @@ export class Organization extends Document {
 
   @Prop()
   privacyPolicyUrl?: string;
+
+  @Prop({
+    type: [
+      {
+        title: String,
+        content: String,
+      },
+    ],
+    default: [],
+  })
+  termsConditions?: LegalItem[];
+
+  @Prop({
+    type: [
+      {
+        title: String,
+        content: String,
+      },
+    ],
+    default: [],
+  })
+  privacyPolicy?: LegalItem[];
 
   // Soft delete
   @Prop()

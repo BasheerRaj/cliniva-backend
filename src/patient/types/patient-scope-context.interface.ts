@@ -20,5 +20,7 @@ export interface PatientScopeContext {
    * Always set for staff, doctor, manager — enforced in query.
    */
   clinicId: string | null;
+  clinicIds?: string[] | null;
   organizationId?: string | null;
+  subscriptionId?: string | null;
 }

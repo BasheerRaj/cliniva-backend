@@ -58,6 +58,22 @@ import * as SwaggerExamples from './examples/swagger-examples';
 export class PatientController {
   constructor(private readonly patientService: PatientService) { }
 
+  private buildScope(user: any): PatientScopeContext {
+    const clinicIds = Array.isArray(user?.clinicIds)
+      ? user.clinicIds.filter((id: any) => typeof id === 'string')
+      : [];
+
+    return {
+      requestingUserId: user?.userId,
+      role: user?.role as UserRole,
+      complexId: user?.complexId ?? null,
+      clinicId: user?.clinicId ?? null,
+      clinicIds: clinicIds.length > 0 ? clinicIds : null,
+      organizationId: user?.organizationId ?? null,
+      subscriptionId: user?.subscriptionId ?? null,
+    };
+  }
+
   /**
    * Create a new patient
    * POST /patients
@@ -131,13 +147,7 @@ export class PatientController {
     @Body(new ValidationPipe()) createPatientDto: CreatePatientDto,
     @Request() req: any,
   ) {
-    const scope: PatientScopeContext = {
-      requestingUserId: req.user?.userId,
-      role: req.user?.role,
-      complexId: req.user?.complexId ?? null,
-      clinicId: req.user?.clinicId ?? null,
-      organizationId: req.user?.organizationId ?? null,
-    };
+    const scope = this.buildScope(req.user);
     const patient = await this.patientService.createPatient(
       createPatientDto,
       req.user?.userId,
@@ -196,15 +206,7 @@ Scope is enforced by the caller's role:
     @Query(new ValidationPipe({ transform: true })) query: PatientListQueryDto,
     @Request() req: any,
   ) {
-    const user = req.user;
-
-    const scope: PatientScopeContext = {
-      requestingUserId: user.userId,
-      role:             user.role as UserRole,
-      complexId:        user.complexId  ?? null,
-      clinicId:         user.clinicId   ?? null,
-      organizationId:   user.organizationId ?? null,
-    };
+    const scope = this.buildScope(req.user);
 
     const result = await this.patientService.getPatients(query, scope);
 
@@ -248,14 +250,7 @@ Scope is enforced by the caller's role:
     @Query('hasBookableSession') hasBookableSession: string | undefined,
     @Request() req: any,
   ) {
-    const user = req.user;
-    const scope: PatientScopeContext = {
-      requestingUserId: user.userId,
-      role:             user.role as UserRole,
-      complexId:        user.complexId  ?? null,
-      clinicId:         user.clinicId   ?? null,
-      organizationId:   user.organizationId ?? null,
-    };
+    const scope = this.buildScope(req.user);
     const filterByInvoice = hasOutstandingInvoice === 'true';
     const filterByBookable = hasBookableSession === 'true';
     const patients = await this.patientService.getPatientsForDropdown(scope, search, filterByInvoice, filterByBookable);
@@ -310,14 +305,7 @@ Scope is enforced by the caller's role:
   })
   async getPatient(@Param('id') id: string, @Request() req: any) {
     try {
-      const user = req.user;
-      const scope: PatientScopeContext = {
-        requestingUserId: user.userId,
-        role:             user.role as UserRole,
-        complexId:        user.complexId   ?? null,
-        clinicId:         user.clinicId    ?? null,
-        organizationId:   user.organizationId ?? null,
-      };
+      const scope = this.buildScope(req.user);
       const patient = await this.patientService.getPatientById(id, scope);
 
       // Calculate age from dateOfBirth (Requirement 3.4)
@@ -725,15 +713,18 @@ Scope is enforced by the caller's role:
   async searchPatients(
     @Query('q') searchTerm: string,
     @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
+    @Request() req?: any,
   ) {
     try {
       if (!searchTerm || searchTerm.trim().length === 0) {
         throw new BadRequestException('Search term is required');
       }
 
+      const scope = this.buildScope(req?.user);
       const patients = await this.patientService.searchPatients(
         searchTerm,
         limit || 20,
+        scope,
       );
       return {
         success: true,
@@ -755,10 +746,14 @@ Scope is enforced by the caller's role:
    * GET /patients/number/:patientNumber
    */
   @Get('number/:patientNumber')
-  async getPatientByNumber(@Param('patientNumber') patientNumber: string) {
+  async getPatientByNumber(
+    @Param('patientNumber') patientNumber: string,
+    @Request() req: any,
+  ) {
     try {
+      const scope = this.buildScope(req.user);
       const patient =
-        await this.patientService.getPatientByNumber(patientNumber);
+        await this.patientService.getPatientByNumber(patientNumber, scope);
       return {
         success: true,
         message: 'Patient retrieved successfully',
@@ -813,14 +808,7 @@ Scope is enforced by the caller's role:
   @Get(':id/medical-history')
   async getMedicalHistory(@Param('id') id: string, @Request() req: any) {
     try {
-      const user = req.user;
-      const scope: PatientScopeContext = {
-        requestingUserId: user.userId,
-        role:             user.role as UserRole,
-        complexId:        user.complexId   ?? null,
-        clinicId:         user.clinicId    ?? null,
-        organizationId:   user.organizationId ?? null,
-      };
+      const scope = this.buildScope(req.user);
       const patient = await this.patientService.getPatientById(id, scope);
       const medicalHistory = {
         patientId: patient._id,
@@ -877,9 +865,10 @@ Scope is enforced by the caller's role:
       example: SwaggerExamples.PATIENT_STATS_RESPONSE_EXAMPLE,
     },
   })
-  async getPatientStats() {
+  async getPatientStats(@Request() req: any) {
     try {
-      const stats = await this.patientService.getPatientStats();
+      const scope = this.buildScope(req.user);
+      const stats = await this.patientService.getPatientStats(scope);
       return {
         success: true,
         message: 'Patient statistics retrieved successfully',
@@ -901,9 +890,11 @@ Scope is enforced by the caller's role:
   @Get('recent/list')
   async getRecentPatients(
     @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
+    @Request() req?: any,
   ) {
     try {
-      const patients = await this.patientService.getRecentPatients(limit || 10);
+      const scope = this.buildScope(req?.user);
+      const patients = await this.patientService.getRecentPatients(limit || 10, scope);
       return {
         success: true,
         message: 'Recent patients retrieved successfully',
@@ -926,10 +917,13 @@ Scope is enforced by the caller's role:
   @Get('birthdays/upcoming')
   async getUpcomingBirthdays(
     @Query('days', new ParseIntPipe({ optional: true })) days?: number,
+    @Request() req?: any,
   ) {
     try {
+      const scope = this.buildScope(req?.user);
       const patients = await this.patientService.getUpcomingBirthdays(
         days || 30,
+        scope,
       );
       return {
         success: true,
@@ -1011,14 +1005,7 @@ Scope is enforced by the caller's role:
   @Get(':id/emergency-contacts')
   async getEmergencyContacts(@Param('id') id: string, @Request() req: any) {
     try {
-      const user = req.user;
-      const scope: PatientScopeContext = {
-        requestingUserId: user.userId,
-        role:             user.role as UserRole,
-        complexId:        user.complexId   ?? null,
-        clinicId:         user.clinicId    ?? null,
-        organizationId:   user.organizationId ?? null,
-      };
+      const scope = this.buildScope(req.user);
       const patient = await this.patientService.getPatientById(id, scope);
       const emergencyContacts: Array<{
         name: string;

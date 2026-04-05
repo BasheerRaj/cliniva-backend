@@ -159,7 +159,7 @@ export class CreateOrganizationDto {
     example: '/uploads/logos/healthcare-logo.png',
     type: String,
   })
-  @IsUrl()
+  @IsString()
   @IsOptional()
   logoUrl?: string;
 
@@ -192,6 +192,15 @@ export class CreateOrganizationDto {
   @IsString()
   @IsOptional()
   vision?: string;
+
+  @ApiPropertyOptional({
+    description: 'Organization goals',
+    example: 'Expand specialty care and improve patient access',
+    type: String,
+  })
+  @IsString()
+  @IsOptional()
+  goals?: string;
 
   @ApiPropertyOptional({
     description: 'Name of the CEO or managing director',
@@ -237,6 +246,26 @@ export class CreateOrganizationDto {
   @ValidateNested()
   @Type(() => SocialMediaLinksDto)
   socialMediaLinks?: SocialMediaLinksDto;
+}
+
+export class LegalItemDto {
+  @ApiPropertyOptional({
+    description: 'Legal item title',
+    example: 'General Terms',
+    type: String,
+  })
+  @IsString()
+  @IsOptional()
+  title?: string;
+
+  @ApiPropertyOptional({
+    description: 'Legal item content',
+    example: 'By using this service, you agree to ...',
+    type: String,
+  })
+  @IsString()
+  @IsOptional()
+  content?: string;
 }
 
 export class UpdateOrganizationDto {
@@ -310,7 +339,7 @@ export class UpdateOrganizationDto {
     example: '/uploads/logos/healthcare-logo-updated.png',
     type: String,
   })
-  @IsUrl()
+  @IsString()
   @IsOptional()
   logoUrl?: string;
 
@@ -343,6 +372,15 @@ export class UpdateOrganizationDto {
   @IsString()
   @IsOptional()
   vision?: string;
+
+  @ApiPropertyOptional({
+    description: 'Organization goals',
+    example: 'Expand specialty care and improve patient access',
+    type: String,
+  })
+  @IsString()
+  @IsOptional()
+  goals?: string;
 
   @ApiPropertyOptional({
     description: 'Name of the CEO or managing director',
@@ -388,6 +426,24 @@ export class UpdateOrganizationDto {
   @ValidateNested()
   @Type(() => SocialMediaLinksDto)
   socialMediaLinks?: SocialMediaLinksDto;
+
+  @ApiPropertyOptional({
+    description: 'Terms and conditions entries',
+    type: [LegalItemDto],
+  })
+  @IsOptional()
+  @ValidateNested({ each: true })
+  @Type(() => LegalItemDto)
+  termsConditions?: LegalItemDto[];
+
+  @ApiPropertyOptional({
+    description: 'Privacy policy entries',
+    type: [LegalItemDto],
+  })
+  @IsOptional()
+  @ValidateNested({ each: true })
+  @Type(() => LegalItemDto)
+  privacyPolicy?: LegalItemDto[];
 }
 
 export class SetupLegalInfoDto {

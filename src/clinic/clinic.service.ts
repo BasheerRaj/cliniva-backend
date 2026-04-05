@@ -109,13 +109,28 @@ export class ClinicService {
 
     // PERMISSION-AWARE SCOPING: Resolve all clinics the user has access to
     if (requestingUser && requestingUser.role !== 'super_admin') {
-      // Enforce subscription-level tenant boundary
+      // 1. Mandatory subscription-level tenant isolation
       if (requestingUser.subscriptionId) {
         targetSubscriptionId = requestingUser.subscriptionId;
       }
 
+      // 2. Resolve role-based scope restrictions
+      if (requestingUser.role === 'owner') {
+        // Owners have subscription-level access — no further restrictions
+      } else {
+        // Higher-order scope resolution: Complex > Clinic
+        if (requestingUser.complexId) {
+          // If user has complex access, that is their primary scope
+          if (!targetComplexId) targetComplexId = requestingUser.complexId.toString();
+          // They can see all clinics within this complex
+        } else if (requestingUser.clinicId) {
+          // Fallback to clinic scope for users restricted to a single clinic
+          if (!targetClinicId) targetClinicId = requestingUser.clinicId.toString();
+        }
+      }
+
       // Try to resolve permitted clinics from UserAccess records
-      // Owners have subscription-level access — skip UserAccess scoping for them
+      // ... (rest of UserAccess logic remains same)
       const userId = requestingUser.role !== 'owner'
         ? (requestingUser.userId || requestingUser.id)
         : null;
@@ -163,46 +178,38 @@ export class ClinicService {
         }
       }
 
-      // Fallback: use single-clinic / complex / subscription from user profile
-      // Owners see all clinics in their subscription regardless of complexId on their profile
-      if (permittedClinicIds === null && requestingUser.role !== 'owner') {
-        if (requestingUser.complexId) {
-          targetComplexId = requestingUser.complexId;
-        }
-        // Doctor/Staff may be assigned to multiple clinics — use clinicIds array if available
-        if (
-          (requestingUser.role === 'doctor' || requestingUser.role === 'staff') &&
-          requestingUser.clinicIds?.length > 0
-        ) {
-          permittedClinicIds = requestingUser.clinicIds.map(
-            (id: string) => new Types.ObjectId(id),
-          );
-        } else if (requestingUser.clinicId) {
-          targetClinicId = requestingUser.clinicId.toString();
-        }
+      // Special handling for Doctor/Staff assigned to multiple clinics via profile array
+      if (
+        permittedClinicIds === null &&
+        (requestingUser.role === 'doctor' || requestingUser.role === 'staff') &&
+        requestingUser.clinicIds?.length > 0
+      ) {
+        permittedClinicIds = requestingUser.clinicIds.map(
+          (id: string) => new Types.ObjectId(id),
+        );
       }
     }
 
     // Build query
     const query: any = {};
 
-    if (permittedClinicIds !== null) {
-      // Use the explicit permission set (may be combined with subscription filter below)
-      query._id = { $in: permittedClinicIds };
-      if (targetSubscriptionId) {
-        query.subscriptionId = new Types.ObjectId(targetSubscriptionId);
-      }
-    } else if (targetClinicId) {
-      // Filtering by exact clinic _id — no need for subscriptionId/complexId on top
-      query._id = new Types.ObjectId(targetClinicId);
-    } else {
-      if (targetSubscriptionId) {
-        query.subscriptionId = new Types.ObjectId(targetSubscriptionId);
-      }
+    // 1. Mandatory Tenant Isolation — ALWAYS applied for non-super_admins
+    if (targetSubscriptionId) {
+      query.subscriptionId = new Types.ObjectId(targetSubscriptionId);
+    }
 
-      if (targetComplexId) {
-        query.complexId = new Types.ObjectId(targetComplexId);
-      }
+    // 2. Apply Scope Restrictions
+    if (permittedClinicIds !== null) {
+      // Use the explicit permission set (e.g. from UserAccess or clinicIds array)
+      query._id = { $in: permittedClinicIds };
+    } else if (targetClinicId) {
+      // Filtering by exact clinic _id
+      query._id = new Types.ObjectId(targetClinicId);
+    }
+
+    // 3. Apply Complex Filter (Can be combined with Clinic filter for defense-in-depth)
+    if (targetComplexId) {
+      query.complexId = new Types.ObjectId(targetComplexId);
     }
 
     query.deletedAt = { $exists: false };
@@ -411,10 +418,29 @@ export class ClinicService {
     }
   }
 
-  async createClinic(createClinicDto: CreateClinicDto): Promise<Clinic> {
+  async createClinic(createClinicDto: CreateClinicDto, requestingUser?: any): Promise<Clinic> {
+    // TENANT ISOLATION: Enforce subscription and owner based on requesting user
+    let resolvedSubscriptionId = createClinicDto.subscriptionId;
+    let resolvedOwnerId = createClinicDto.ownerId;
+
+    if (requestingUser && requestingUser.role !== 'super_admin') {
+      if (requestingUser.subscriptionId) {
+        resolvedSubscriptionId = requestingUser.subscriptionId;
+      }
+      
+      // If the creator is an owner, they are the ownerId.
+      if (requestingUser.role === 'owner') {
+        resolvedOwnerId = requestingUser.userId || requestingUser.id || resolvedOwnerId;
+      }
+    }
+
+    if (!resolvedSubscriptionId) {
+      throw new BadRequestException('Subscription ID is required');
+    }
+
     // Validate subscription is active
     const isActive = await this.subscriptionService.isSubscriptionActive(
-      createClinicDto.subscriptionId,
+      resolvedSubscriptionId,
     );
     if (!isActive) {
       throw new BadRequestException('Subscription is not active');
@@ -422,11 +448,11 @@ export class ClinicService {
 
     // Validate subscription limits
     const currentClinics = await this.clinicModel.countDocuments({
-      subscriptionId: new Types.ObjectId(createClinicDto.subscriptionId),
+      subscriptionId: new Types.ObjectId(resolvedSubscriptionId),
     });
 
     const { plan } = await this.subscriptionService.getSubscriptionWithPlan(
-      createClinicDto.subscriptionId,
+      resolvedSubscriptionId,
     );
     if (
       plan.maxClinics &&
@@ -438,11 +464,56 @@ export class ClinicService {
       );
     }
 
-    // Validate business profile for clinic-only plans
+    // Validate linked complex belongs to same subscription (if provided)
+    if (createClinicDto.complexId) {
+      if (!Types.ObjectId.isValid(createClinicDto.complexId)) {
+        throw new BadRequestException('Invalid complex ID format');
+      }
+
+      const complex = await this.complexModel
+        .findById(createClinicDto.complexId)
+        .select('_id subscriptionId')
+        .lean()
+        .exec();
+
+      if (!complex) {
+        throw new NotFoundException('Complex not found');
+      }
+
+      if (
+        complex.subscriptionId &&
+        complex.subscriptionId.toString() !== resolvedSubscriptionId
+      ) {
+        throw new ForbiddenException(
+          'Complex does not belong to your subscription',
+        );
+      }
+    }
+
     if (
-      !createClinicDto.complexDepartmentId &&
-      plan.name.toLowerCase() === 'clinic'
+      createClinicDto.complexDepartmentId &&
+      !Types.ObjectId.isValid(createClinicDto.complexDepartmentId)
     ) {
+      throw new BadRequestException('Invalid complex department ID format');
+    }
+
+    if (createClinicDto.email) {
+      const emailAvailable = await this.isEmailAvailable(createClinicDto.email);
+      if (!emailAvailable) {
+        throw new BadRequestException('Clinic email already exists');
+      }
+    }
+
+    if (createClinicDto.licenseNumber) {
+      const licenseAvailable = await this.isLicenseNumberAvailable(
+        createClinicDto.licenseNumber,
+      );
+      if (!licenseAvailable) {
+        throw new BadRequestException('Clinic license number already exists');
+      }
+    }
+
+    if (this.hasBusinessProfileData(createClinicDto)) {
       const businessProfileValidation = ValidationUtil.validateBusinessProfile({
         yearEstablished: createClinicDto.yearEstablished,
         mission: createClinicDto.mission,
@@ -457,30 +528,6 @@ export class ClinicService {
           `Validation failed: ${businessProfileValidation.errors.join(', ')}`,
         );
       }
-
-      // Apply schema defaults for capacity when not provided (e.g. from onboarding clinic/overview)
-      // ClinicOverviewDto intentionally omits capacity; schema defaults: maxPatients=1000, sessionDuration=30
-      if (createClinicDto.maxPatients == null || createClinicDto.maxPatients <= 0) {
-        createClinicDto.maxPatients = 1000;
-      }
-      if (createClinicDto.sessionDuration == null || createClinicDto.sessionDuration <= 0) {
-        createClinicDto.sessionDuration = 30;
-      }
-    }
-
-    // Validate contact information
-    if (
-      createClinicDto.email &&
-      !ValidationUtil.validateEmail(createClinicDto.email)
-    ) {
-      throw new BadRequestException('Invalid email format');
-    }
-
-    if (
-      createClinicDto.phone &&
-      !ValidationUtil.validatePhone(createClinicDto.phone)
-    ) {
-      throw new BadRequestException('Invalid phone number format');
     }
 
     const clinicData = {
@@ -491,8 +538,8 @@ export class ClinicService {
       complexId: createClinicDto.complexId
         ? new Types.ObjectId(createClinicDto.complexId)
         : null,
-      subscriptionId: new Types.ObjectId(createClinicDto.subscriptionId),
-      ownerId: new Types.ObjectId(createClinicDto.ownerId),
+      subscriptionId: new Types.ObjectId(resolvedSubscriptionId),
+      ownerId: resolvedOwnerId ? new Types.ObjectId(resolvedOwnerId) : null,
     };
 
     const clinic = new this.clinicModel(clinicData);

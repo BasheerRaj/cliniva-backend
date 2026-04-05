@@ -25,10 +25,48 @@ import {
   NOT_FOUND_ERRORS,
   AUTH_ERRORS,
 } from './constants/invoice-messages';
+import { assertSameTenant, TenantUser } from '../common/utils/tenant-scope.util';
 
 @Injectable()
 export class InvoiceService {
   private readonly logger = new Logger(InvoiceService.name);
+
+  private async assertClinicTenantAccess(
+    clinicId: string | Types.ObjectId,
+    requestingUser?: TenantUser,
+  ): Promise<void> {
+    if (!requestingUser || requestingUser.role === 'super_admin') {
+      return;
+    }
+
+    const clinic = await this.clinicModel
+      .findById(clinicId)
+      .select('_id subscriptionId')
+      .lean()
+      .exec();
+
+    if (!clinic) {
+      throw new NotFoundException(NOT_FOUND_ERRORS.CLINIC);
+    }
+
+    assertSameTenant((clinic as any).subscriptionId, requestingUser);
+  }
+
+  private async assertInvoiceTenantAccess(
+    invoice: any,
+    requestingUser?: TenantUser,
+  ): Promise<void> {
+    if (!requestingUser || requestingUser.role === 'super_admin') {
+      return;
+    }
+    if (!invoice?.clinicId) {
+      throw new ForbiddenException(AUTH_ERRORS.INSUFFICIENT_PERMISSIONS);
+    }
+    const clinicId =
+      (invoice.clinicId as any)?._id?.toString() ??
+      (invoice.clinicId as any)?.toString();
+    await this.assertClinicTenantAccess(clinicId, requestingUser);
+  }
 
   constructor(
     @InjectModel(Invoice.name) private invoiceModel: Model<Invoice>,
@@ -50,6 +88,7 @@ export class InvoiceService {
     userId: string,
     userRole: string,
     userClinicId?: string,
+    requestingUser?: TenantUser,
   ): Promise<InvoiceResponseDto> {
     // Validate clinic access for Staff/Doctor roles
     if (userRole === 'staff' || userRole === 'doctor') {
@@ -85,6 +124,7 @@ export class InvoiceService {
     if (!clinic) {
       throw new NotFoundException(NOT_FOUND_ERRORS.CLINIC);
     }
+    await this.assertClinicTenantAccess((clinic as any)._id, requestingUser);
     // 2. Derive organizationId from clinic
     const organizationId = clinic.organizationId;
 
@@ -95,6 +135,9 @@ export class InvoiceService {
     });
     if (!patient) {
       throw new NotFoundException(NOT_FOUND_ERRORS.PATIENT);
+    }
+    if (requestingUser && (patient as any).subscriptionId) {
+      assertSameTenant((patient as any).subscriptionId, requestingUser);
     }
 
     // 4. Validate issue date is not in the future (compare date-only, not datetime)
@@ -470,6 +513,7 @@ export class InvoiceService {
     userId: string,
     userRole: string,
     userClinicIds: string[],
+    requestingUser?: TenantUser,
   ): Promise<InvoiceResponseDto> {
     const invoice = await this.invoiceModel
       .findById(id)
@@ -484,6 +528,7 @@ export class InvoiceService {
     if (!invoice || invoice.deletedAt) {
       throw new NotFoundException(NOT_FOUND_ERRORS.INVOICE);
     }
+    await this.assertInvoiceTenantAccess(invoice, requestingUser);
 
     if (userRole === 'staff' || userRole === 'doctor' || userRole === 'admin' || userRole === 'manager') {
       // Extract clinic ID string correctly whether clinicId is populated (Document) or raw ObjectId
@@ -509,6 +554,7 @@ export class InvoiceService {
     userRole: string,
     userOrganizationId?: string,
     subscriptionId?: string,
+    requestingUser?: TenantUser,
   ): Promise<InvoiceResponseDto> {
     const query: any = {
       _id: new Types.ObjectId(id),
@@ -532,6 +578,7 @@ export class InvoiceService {
     if (!invoice || invoice.deletedAt) {
       throw new NotFoundException(NOT_FOUND_ERRORS.INVOICE);
     }
+    await this.assertInvoiceTenantAccess(invoice, requestingUser);
 
     if (invoice.invoiceStatus !== 'draft') {
       throw new BadRequestException(INVOICE_ERRORS.CANNOT_EDIT_NON_DRAFT);
@@ -792,6 +839,7 @@ export class InvoiceService {
     userId?: string,
     userRole?: string,
     userClinicId?: string,
+    requestingUser?: TenantUser,
   ): Promise<any> {
     const filter: any = {
       patientId: new Types.ObjectId(patientId),
@@ -834,6 +882,7 @@ export class InvoiceService {
         code: 'INVOICE_NOT_FOUND_FOR_BOOKING',
       });
     }
+    await this.assertInvoiceTenantAccess(invoice, requestingUser);
 
     // Return full invoice with sessions flattened for the booking UI
     return this.mapToResponseDto(invoice);
@@ -847,7 +896,10 @@ export class InvoiceService {
   async getPatientsWithBookableInvoices(
     clinicId: string,
     search?: string,
+    requestingUser?: TenantUser,
   ): Promise<{ _id: string; patientNumber: string; firstName: string; lastName: string; phone?: string; profilePicture?: string }[]> {
+    await this.assertClinicTenantAccess(clinicId, requestingUser);
+
     const invoices = await this.invoiceModel
       .find({
         clinicId: new Types.ObjectId(clinicId),
@@ -988,6 +1040,7 @@ export class InvoiceService {
     clinicId: string | undefined,
     userRole?: string,
     userClinicId?: string,
+    requestingUser?: TenantUser,
   ): Promise<any[]> {
     // Staff/doctor are always scoped to their own clinic via JWT
     const effectiveClinicId =
@@ -1006,6 +1059,7 @@ export class InvoiceService {
 
     // Only filter by clinic when known (allows admin/owner to see all clinics)
     if (effectiveClinicId) {
+      await this.assertClinicTenantAccess(effectiveClinicId, requestingUser);
       filter.clinicId = new Types.ObjectId(effectiveClinicId);
     }
 
@@ -1050,6 +1104,7 @@ export class InvoiceService {
     userRole: string,
     userOrganizationId?: string,
     subscriptionId?: string,
+    requestingUser?: TenantUser,
   ): Promise<void> {
     const query: any = {
       _id: new Types.ObjectId(id),
@@ -1073,6 +1128,7 @@ export class InvoiceService {
     if (!invoice || invoice.deletedAt) {
       throw new NotFoundException(NOT_FOUND_ERRORS.INVOICE);
     }
+    await this.assertInvoiceTenantAccess(invoice, requestingUser);
 
     if (invoice.paidAmount > 0) {
       throw new BadRequestException(INVOICE_ERRORS.HAS_PAYMENTS);
@@ -1095,12 +1151,17 @@ export class InvoiceService {
    * Rule BZR-0e1f2a3b: If all appointments for a patient are deleted, the associated invoice will be marked as Cancelled.
    * Also cancels all embedded sessions.
    */
-  async cancelInvoice(id: string, userId: string): Promise<InvoiceResponseDto> {
+  async cancelInvoice(
+    id: string,
+    userId: string,
+    requestingUser?: TenantUser,
+  ): Promise<InvoiceResponseDto> {
     const invoice = await this.invoiceModel.findById(id);
 
     if (!invoice || invoice.deletedAt) {
       throw new NotFoundException(NOT_FOUND_ERRORS.INVOICE);
     }
+    await this.assertInvoiceTenantAccess(invoice, requestingUser);
 
     // Only Draft or Posted invoices with no paidAmount can be cancelled
     if (invoice.paidAmount > 0) {
@@ -1140,7 +1201,12 @@ export class InvoiceService {
   /**
    * Get all payments for a specific invoice, paginated, sorted newest first.
    */
-  async getInvoicePayments(invoiceId: string, page = 1, limit = 20) {
+  async getInvoicePayments(
+    invoiceId: string,
+    page = 1,
+    limit = 20,
+    requestingUser?: TenantUser,
+  ) {
     const invoice = await this.invoiceModel.findOne({
       _id: invoiceId,
       deletedAt: { $exists: false },
@@ -1148,6 +1214,7 @@ export class InvoiceService {
     if (!invoice) {
       throw new NotFoundException(NOT_FOUND_ERRORS.INVOICE);
     }
+    await this.assertInvoiceTenantAccess(invoice, requestingUser);
 
     const objectId = new Types.ObjectId(invoiceId);
     const filter = {

@@ -458,6 +458,7 @@ export class AppointmentService {
       patientId: new Types.ObjectId(createAppointmentDto.patientId),
       doctorId: new Types.ObjectId(createAppointmentDto.doctorId),
       clinicId: new Types.ObjectId(createAppointmentDto.clinicId),
+      subscriptionId: clinic.subscriptionId, // M1 Fix: Inherit subscription from clinic
       serviceId: new Types.ObjectId(createAppointmentDto.serviceId),
       departmentId: createAppointmentDto.departmentId
         ? new Types.ObjectId(createAppointmentDto.departmentId)
@@ -737,6 +738,11 @@ export class AppointmentService {
     const filter: any = {
       deletedAt: { $exists: false },
     };
+
+    // 1. Mandatory subscription-level tenant isolation (M1 Fix)
+    if (userRole !== 'super_admin' && subscriptionId) {
+      filter.subscriptionId = new Types.ObjectId(subscriptionId);
+    }
 
     // Individual field filters
     if (patientId) filter.patientId = new Types.ObjectId(patientId);

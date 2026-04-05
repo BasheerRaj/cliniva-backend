@@ -295,9 +295,15 @@ export class ClinicController {
     description: 'Unauthorized - JWT token required',
   })
   @HttpCode(HttpStatus.CREATED)
-  async createClinic(@Body() createClinicDto: CreateClinicDto) {
+  async createClinic(
+    @Body() createClinicDto: CreateClinicDto,
+    @Request() req: any,
+  ) {
     try {
-      const clinic = await this.clinicService.createClinic(createClinicDto);
+      const clinic = await this.clinicService.createClinic(
+        createClinicDto,
+        req.user,
+      );
       return {
         success: true,
         message: 'Clinic created successfully',

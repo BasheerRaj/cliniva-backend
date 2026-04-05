@@ -125,6 +125,7 @@ export class PaymentController {
       const payment = await this.paymentService.createPayment(
         createPaymentDto,
         userId,
+        req.user,
       );
 
       return {
@@ -376,13 +377,18 @@ export class PaymentController {
       // Extract user details for role-based access control
       const userId = user.id || user.userId || user.sub;
       const userRole = user.role;
-      const userClinicIds = user.clinicId ? [user.clinicId] : [];
+      const userClinicIds = Array.isArray(user?.clinicIds)
+        ? user.clinicIds.map(String)
+        : user.clinicId
+        ? [String(user.clinicId)]
+        : [];
 
       const payment = await this.paymentService.getPaymentById(
         id,
         userId,
         userRole,
         userClinicIds,
+        user,
       );
 
       if (!payment) {
@@ -484,6 +490,7 @@ export class PaymentController {
         updatePaymentDto,
         userId,
         userRole,
+        user,
       );
 
       return {
@@ -557,7 +564,7 @@ export class PaymentController {
         });
       }
 
-      await this.paymentService.deletePayment(id, userId, userRole);
+      await this.paymentService.deletePayment(id, userId, userRole, req.user);
 
       return {
         success: true,

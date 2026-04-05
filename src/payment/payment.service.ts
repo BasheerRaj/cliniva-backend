@@ -23,6 +23,7 @@ import {
   NOT_FOUND_ERRORS,
   AUTH_ERRORS,
 } from './constants/payment-messages';
+import { assertSameTenant, TenantUser } from '../common/utils/tenant-scope.util';
 
 /**
  * Payment Service - M7 Billing & Payments MVP
@@ -32,6 +33,63 @@ import {
 @Injectable()
 export class PaymentService {
   private readonly logger = new Logger(PaymentService.name);
+
+  private async assertInvoiceTenantAccess(
+    invoice: any,
+    requestingUser?: TenantUser,
+  ): Promise<void> {
+    if (!requestingUser || requestingUser.role === 'super_admin') {
+      return;
+    }
+
+    const clinicId =
+      (invoice?.clinicId as any)?._id?.toString() ??
+      (invoice?.clinicId as any)?.toString();
+
+    if (!clinicId) {
+      throw new ForbiddenException(AUTH_ERRORS.INSUFFICIENT_PERMISSIONS);
+    }
+
+    const clinic = await this.clinicModel
+      .findById(clinicId)
+      .select('_id subscriptionId')
+      .lean()
+      .exec();
+
+    if (!clinic) {
+      throw new NotFoundException(NOT_FOUND_ERRORS.CLINIC);
+    }
+
+    assertSameTenant((clinic as any).subscriptionId, requestingUser);
+  }
+
+  private async assertPaymentTenantAccess(
+    payment: any,
+    requestingUser?: TenantUser,
+  ): Promise<void> {
+    if (!requestingUser || requestingUser.role === 'super_admin') {
+      return;
+    }
+
+    const clinicId =
+      (payment?.clinicId as any)?._id?.toString() ??
+      (payment?.clinicId as any)?.toString();
+    if (!clinicId) {
+      throw new ForbiddenException(AUTH_ERRORS.INSUFFICIENT_PERMISSIONS);
+    }
+
+    const clinic = await this.clinicModel
+      .findById(clinicId)
+      .select('_id subscriptionId')
+      .lean()
+      .exec();
+
+    if (!clinic) {
+      throw new NotFoundException(NOT_FOUND_ERRORS.CLINIC);
+    }
+
+    assertSameTenant((clinic as any).subscriptionId, requestingUser);
+  }
 
   constructor(
     @InjectModel(Payment.name) private paymentModel: Model<Payment>,
@@ -49,15 +107,16 @@ export class PaymentService {
   async createPayment(
     createPaymentDto: CreatePaymentDto,
     userId: string,
+    requestingUser?: TenantUser,
   ): Promise<PaymentResponseDto> {
     const isMultiInvoice =
       createPaymentDto.invoiceAllocations &&
       createPaymentDto.invoiceAllocations.length > 0;
 
     if (isMultiInvoice) {
-      return this.createMultiInvoicePayment(createPaymentDto, userId);
+      return this.createMultiInvoicePayment(createPaymentDto, userId, requestingUser);
     }
-    return this.createSingleInvoicePayment(createPaymentDto, userId);
+    return this.createSingleInvoicePayment(createPaymentDto, userId, requestingUser);
   }
 
   /**
@@ -67,6 +126,7 @@ export class PaymentService {
   private async createMultiInvoicePayment(
     createPaymentDto: CreatePaymentDto,
     userId: string,
+    requestingUser?: TenantUser,
   ): Promise<PaymentResponseDto> {
     const allocations = createPaymentDto.invoiceAllocations!;
 
@@ -92,6 +152,7 @@ export class PaymentService {
       if (invoice.patientId.toString() !== createPaymentDto.patientId) {
         throw new BadRequestException(PAYMENT_ERRORS.PATIENT_MISMATCH);
       }
+      await this.assertInvoiceTenantAccess(invoice, requestingUser);
       const outstanding = Math.max(0, invoice.totalAmount - invoice.paidAmount);
       if (alloc.amount > outstanding + 0.001) {
         throw new BadRequestException(PAYMENT_ERRORS.AMOUNT_EXCEEDS_BALANCE);
@@ -241,6 +302,7 @@ export class PaymentService {
   private async createSingleInvoicePayment(
     createPaymentDto: CreatePaymentDto,
     userId: string,
+    requestingUser?: TenantUser,
   ): Promise<PaymentResponseDto> {
     if (!createPaymentDto.invoiceId) {
       throw new BadRequestException({
@@ -260,6 +322,7 @@ export class PaymentService {
     if (invoice.invoiceStatus !== 'posted') {
       throw new BadRequestException(PAYMENT_ERRORS.INVOICE_NOT_POSTED);
     }
+    await this.assertInvoiceTenantAccess(invoice, requestingUser);
 
     // Validate payment amount > 0
     if (createPaymentDto.amount <= 0) {
@@ -611,6 +674,7 @@ export class PaymentService {
     userId: string,
     userRole: string,
     userClinicIds: string[],
+    requestingUser?: TenantUser,
   ): Promise<PaymentResponseDto> {
     const payment = await this.paymentModel
       .findById(id)
@@ -633,6 +697,7 @@ export class PaymentService {
     if (!payment) {
       throw new NotFoundException(NOT_FOUND_ERRORS.PAYMENT);
     }
+    await this.assertPaymentTenantAccess(payment, requestingUser);
 
     if (userRole === 'staff' || userRole === 'doctor' || userRole === 'admin' || userRole === 'manager') {
       // Extract clinic ID string correctly whether clinicId is populated (Document) or raw ObjectId
@@ -656,12 +721,14 @@ export class PaymentService {
     updatePaymentDto: UpdatePaymentDto,
     userId: string,
     userRole: string,
+    requestingUser?: TenantUser,
   ): Promise<PaymentResponseDto> {
     const payment = await this.paymentModel.findById(id);
 
     if (!payment) {
       throw new NotFoundException(NOT_FOUND_ERRORS.PAYMENT);
     }
+    await this.assertPaymentTenantAccess(payment, requestingUser);
 
     if (userRole === 'staff' || userRole === 'doctor') {
       if (payment.addedBy.toString() !== userId) {
@@ -755,12 +822,14 @@ export class PaymentService {
     id: string,
     userId: string,
     userRole: string,
+    requestingUser?: TenantUser,
   ): Promise<void> {
     const payment = await this.paymentModel.findById(id);
 
     if (!payment) {
       throw new NotFoundException(NOT_FOUND_ERRORS.PAYMENT);
     }
+    await this.assertPaymentTenantAccess(payment, requestingUser);
 
     if (userRole === 'staff' || userRole === 'doctor') {
       throw new ForbiddenException(AUTH_ERRORS.INSUFFICIENT_PERMISSIONS);

@@ -274,9 +274,9 @@ export class ServiceController {
     example: '507f1f77bcf86cd799439011',
   })
   @Get(':id')
-  async getServiceById(@Param('id') id: string): Promise<any> {
+  async getServiceById(@Param('id') id: string, @Request() req: any): Promise<any> {
     const [service, assignedDoctors, { bySession, byDoctor }] = await Promise.all([
-      this.serviceService.getService(id),
+      this.serviceService.getService(id, req.user),
       this.serviceService.getAssignedDoctors(id),
       this.serviceService.getAppointmentMaps(id),
     ]);
@@ -413,8 +413,13 @@ export class ServiceController {
     @Param('id') id: string,
     @Body(new ValidationPipe({ transform: true, whitelist: true }))
     updateServiceDto: UpdateServiceWithSessionsDto,
+    @Request() req?: any,
   ): Promise<any> {
-    const service = await this.serviceService.updateService(id, updateServiceDto);
+    const service = await this.serviceService.updateService(
+      id,
+      updateServiceDto,
+      req?.user,
+    );
     return this.enrichServiceResponse(service);
   }
 
@@ -556,8 +561,8 @@ export class ServiceController {
     message: { ar: string; en: string };
     deletedAt: Date;
   }> {
-    const userId = req?.user?.id;
-    await this.serviceService.deleteService(id, userId);
+    const userId = req?.user?.id || req?.user?.userId;
+    await this.serviceService.deleteService(id, userId, req?.user);
     return {
       success: true,
       message: {
@@ -918,11 +923,13 @@ export class ServiceController {
   async getServicesOwnedByClinic(
     @Param('clinicId') clinicId: string,
     @Query() paginationQuery: ServicePaginationQuery,
+    @Request() req?: any,
   ): Promise<PaginatedServiceResponse> {
     const pagination = this.parsePaginationQuery(paginationQuery);
     const services = await this.serviceService.getServicesOwnedByClinicPaginated(
       clinicId,
       pagination,
+      req?.user,
     );
 
     return this.enrichPaginatedServiceResponse(services);
@@ -977,11 +984,13 @@ export class ServiceController {
   async getServicesForClinic(
     @Query('complexId') complexId?: string,
     @Query() paginationQuery?: ServicePaginationQuery,
+    @Request() req?: any,
   ): Promise<PaginatedServiceResponse> {
     const pagination = this.parsePaginationQuery(paginationQuery);
     const services = await this.serviceService.getServicesForClinicPaginated(
       complexId,
       pagination,
+      req?.user,
     );
 
     return this.enrichPaginatedServiceResponse(services);
@@ -1042,11 +1051,13 @@ export class ServiceController {
   async getServicesForClinicWithComplex(
     @Param('complexId') complexId: string,
     @Query() paginationQuery: ServicePaginationQuery,
+    @Request() req?: any,
   ): Promise<PaginatedServiceResponse> {
     const pagination = this.parsePaginationQuery(paginationQuery);
     const services = await this.serviceService.getServicesForClinicPaginated(
       complexId,
       pagination,
+      req?.user,
     );
 
     return this.enrichPaginatedServiceResponse(services);
@@ -1273,8 +1284,11 @@ export class ServiceController {
     example: '507f1f77bcf86cd799439011',
   })
   @Get(':id/status-history')
-  async getStatusHistory(@Param('id') id: string): Promise<any[]> {
-    return this.serviceService.getStatusHistory(id);
+  async getStatusHistory(
+    @Param('id') id: string,
+    @Request() req?: any,
+  ): Promise<any[]> {
+    return this.serviceService.getStatusHistory(id, req?.user);
   }
 
   /**
@@ -1338,12 +1352,14 @@ export class ServiceController {
     @Query('complexId') complexId?: string,
     @Query('clinicId') clinicId?: string,
     @Query() paginationQuery?: ServicePaginationQuery,
+    @Request() req?: any,
   ): Promise<PaginatedServiceResponse> {
     const pagination = this.parsePaginationQuery(paginationQuery);
     const services = await this.serviceService.getActiveServicesPaginated(
       complexId,
       clinicId,
       pagination,
+      req?.user,
     );
 
     return this.enrichPaginatedServiceResponse(services);
@@ -1523,8 +1539,11 @@ export class ServiceController {
     description: 'Statistics retrieved successfully',
   })
   @ApiResponse({ status: 404, description: 'Service not found' })
-  async getServiceStats(@Param('id') serviceId: string): Promise<any> {
-    const stats = await this.serviceService.getServiceStats(serviceId);
+  async getServiceStats(
+    @Param('id') serviceId: string,
+    @Request() req?: any,
+  ): Promise<any> {
+    const stats = await this.serviceService.getServiceStats(serviceId, req?.user);
     return ResponseBuilder.success(stats, {
       ar: 'تم استرجاع إحصائيات الخدمة بنجاح',
       en: 'Service statistics retrieved successfully',

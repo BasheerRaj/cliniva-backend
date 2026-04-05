@@ -643,9 +643,14 @@ export class ServiceService {
   async getServicesForClinicPaginated(
     complexId?: string,
     options?: PaginationOptions,
+    requestingUser?: TenantUser,
   ): Promise<PaginatedResult<Service>> {
     try {
-      const query: any = {};
+      const tenantFilter = requestingUser ? buildTenantFilter(requestingUser) : {};
+      const query: any = {
+        ...tenantFilter,
+        deletedAt: { $exists: false },
+      };
 
       if (complexId) {
         query.complexId = new Types.ObjectId(complexId);
@@ -762,19 +767,26 @@ export class ServiceService {
   async getServicesOwnedByClinicPaginated(
     clinicId: string,
     options?: PaginationOptions,
+    requestingUser?: TenantUser,
   ): Promise<PaginatedResult<Service>> {
+    const tenantFilter = requestingUser ? buildTenantFilter(requestingUser) : {};
     return this.getPaginatedServicesByQuery(
       {
+        ...tenantFilter,
         clinicId: new Types.ObjectId(clinicId),
+        deletedAt: { $exists: false },
       },
       options,
     );
   }
 
-  async getService(serviceId: string): Promise<Service> {
+  async getService(serviceId: string, requestingUser?: TenantUser): Promise<Service> {
+    const tenantFilter = requestingUser ? buildTenantFilter(requestingUser) : {};
     const service = await this.serviceModel
       .findOne({
+        ...tenantFilter,
         _id: new Types.ObjectId(serviceId),
+        deletedAt: { $exists: false },
       })
       .exec();
     if (!service) {
@@ -1016,8 +1028,11 @@ export class ServiceService {
   async updateService(
     serviceId: string,
     updateDto: UpdateServiceWithSessionsDto,
+    requestingUser?: TenantUser,
   ): Promise<Service> {
+    const tenantFilter = requestingUser ? buildTenantFilter(requestingUser) : {};
     const service = await this.serviceModel.findOne({
+      ...tenantFilter,
       _id: new Types.ObjectId(serviceId),
       deletedAt: { $exists: false },
     });
@@ -1435,8 +1450,14 @@ export class ServiceService {
     );
   }
 
-  async deleteService(serviceId: string, userId?: string): Promise<void> {
+  async deleteService(
+    serviceId: string,
+    userId?: string,
+    requestingUser?: TenantUser,
+  ): Promise<void> {
+    const tenantFilter = requestingUser ? buildTenantFilter(requestingUser) : {};
     const service = await this.serviceModel.findOne({
+      ...tenantFilter,
       _id: new Types.ObjectId(serviceId),
       deletedAt: { $exists: false },
     });
@@ -1758,8 +1779,11 @@ export class ServiceService {
     complexId?: string,
     clinicId?: string,
     options?: PaginationOptions,
+    requestingUser?: TenantUser,
   ): Promise<PaginatedResult<any>> {
+    const tenantFilter = requestingUser ? buildTenantFilter(requestingUser) : {};
     const query: any = {
+      ...tenantFilter,
       isActive: true,
       deletedAt: { $exists: false },
     };
@@ -2254,8 +2278,17 @@ export class ServiceService {
    * Note: This requires a separate StatusHistory schema for full audit trail.
    * For now, returns basic information from service document.
    */
-  async getStatusHistory(serviceId: string): Promise<any[]> {
-    const service = await this.serviceModel.findById(serviceId).exec();
+  async getStatusHistory(
+    serviceId: string,
+    requestingUser?: TenantUser,
+  ): Promise<any[]> {
+    const tenantFilter = requestingUser ? buildTenantFilter(requestingUser) : {};
+    const service = await this.serviceModel
+      .findOne({
+        ...tenantFilter,
+        _id: new Types.ObjectId(serviceId),
+      })
+      .exec();
 
     if (!service) {
       throw new NotFoundException({
@@ -2303,8 +2336,12 @@ export class ServiceService {
    * Get comprehensive statistics for a specific service based on appointment history
    * Requirements: Utilization metrics, Operational details
    */
-  async getServiceStats(serviceId: string): Promise<any> {
-    const service = await this.serviceModel.findById(serviceId);
+  async getServiceStats(serviceId: string, requestingUser?: TenantUser): Promise<any> {
+    const tenantFilter = requestingUser ? buildTenantFilter(requestingUser) : {};
+    const service = await this.serviceModel.findOne({
+      ...tenantFilter,
+      _id: new Types.ObjectId(serviceId),
+    });
     if (!service) {
       throw new NotFoundException({
         message: {

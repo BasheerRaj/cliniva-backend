@@ -181,6 +181,7 @@ export class PatientService {
       ...(scope?.clinicId ? { clinicId: new Types.ObjectId(scope.clinicId) } : {}),
       ...(scope?.complexId ? { complexId: new Types.ObjectId(scope.complexId) } : {}),
       ...(scope?.organizationId ? { organizationId: new Types.ObjectId(scope.organizationId) } : {}),
+      ...(scope?.subscriptionId ? { subscriptionId: new Types.ObjectId(scope.subscriptionId) } : {}),
     };
 
     const patient = new this.patientModel(patientData);
@@ -188,7 +189,7 @@ export class PatientService {
 
     if (createdByUserId) {
       await this.auditService.logSecurityEvent({
-        eventType: 'PATIENT_CREATED',
+        eventType: 'patient_created',
         userId: createdByUserId,
         actorId: createdByUserId,
         ipAddress: '0.0.0.0',
@@ -318,7 +319,12 @@ export class PatientService {
       deletedAt: { $exists: false },
     };
 
-    // Apply complexId scope — mandatory for all except owner without explicit complexId
+    // 1. Mandatory subscription-level tenant isolation (M1 Fix)
+    if (scope.role !== UserRole.SUPER_ADMIN && scope.subscriptionId) {
+      filter.subscriptionId = new Types.ObjectId(scope.subscriptionId);
+    }
+
+    // 2. Apply complexId scope — mandatory for all except owner without explicit complexId
     if (resolvedComplexId) {
       filter.complexId = new Types.ObjectId(resolvedComplexId);
     } else if (scope.role === UserRole.OWNER) {
@@ -327,21 +333,21 @@ export class PatientService {
       } else if (scope.clinicId) {
         // clinic-plan owner: scope to their single clinic
         filter.clinicId = new Types.ObjectId(scope.clinicId);
-      } else {
-        // owner with no identifiable scope — safety net
-        return { patients: [], total: 0, page, limit, totalPages: 0 };
       }
     }
 
-    // Clinic sub-scope: staff/doctor/manager/admin are always locked to JWT clinicId
+    // Clinic sub-scope: staff/doctor/manager/admin are locked to JWT clinic scope
     if (
       scope.role === UserRole.STAFF ||
       scope.role === UserRole.DOCTOR ||
       scope.role === UserRole.MANAGER ||
       scope.role === UserRole.ADMIN
     ) {
-      if (scope.clinicId) {
-        filter.clinicId = new Types.ObjectId(scope.clinicId);
+      const scopedClinicIds = this.getScopedClinicIds(scope);
+      if (scopedClinicIds.length === 1) {
+        filter.clinicId = scopedClinicIds[0];
+      } else if (scopedClinicIds.length > 1) {
+        filter.clinicId = { $in: scopedClinicIds };
       }
     } else if (
       query.clinicId &&
@@ -437,7 +443,13 @@ export class PatientService {
     const filter: FilterQuery<Patient> = { deletedAt: { $exists: false }, status: 'Active' };
 
     // Scope resolution (reuse same logic as getPatients)
-    const { role, complexId: jwtComplexId, organizationId, clinicId } = scope;
+    const { role, complexId: jwtComplexId, organizationId, clinicId, subscriptionId } = scope;
+    const scopedClinicIds = this.getScopedClinicIds(scope);
+
+    // 1. Mandatory subscription-level tenant isolation (M1 Fix)
+    if (role !== UserRole.SUPER_ADMIN && subscriptionId) {
+      filter.subscriptionId = new Types.ObjectId(subscriptionId);
+    }
 
     if (role === UserRole.SUPER_ADMIN) {
       // super_admin without a complexId → return empty to avoid unbounded scan
@@ -447,15 +459,19 @@ export class PatientService {
       } else if (clinicId) {
         // clinic-plan owner: scope to their single clinic
         filter.clinicId = new Types.ObjectId(clinicId);
-      } else {
+      } else if (!subscriptionId) {
         // owner with no scope — safety net
         return [];
       }
     } else {
       // admin / manager / doctor / staff — scoped to JWT complexId, then clinic
       if (jwtComplexId) filter.complexId = new Types.ObjectId(jwtComplexId);
-      if ((role === UserRole.STAFF || role === UserRole.DOCTOR || role === UserRole.MANAGER || role === UserRole.ADMIN) && clinicId) {
-        filter.clinicId = new Types.ObjectId(clinicId);
+      if (role === UserRole.STAFF || role === UserRole.DOCTOR || role === UserRole.MANAGER || role === UserRole.ADMIN) {
+        if (scopedClinicIds.length === 1) {
+          filter.clinicId = scopedClinicIds[0];
+        } else if (scopedClinicIds.length > 1) {
+          filter.clinicId = { $in: scopedClinicIds };
+        }
       }
     }
 
@@ -467,7 +483,11 @@ export class PatientService {
         invoiceStatus: 'posted',
         paymentStatus: { $in: ['unpaid', 'partially_paid'] },
       };
-      if (clinicId && Types.ObjectId.isValid(clinicId)) {
+      if (scopedClinicIds.length === 1) {
+        invoiceFilter.clinicId = scopedClinicIds[0];
+      } else if (scopedClinicIds.length > 1) {
+        invoiceFilter.clinicId = { $in: scopedClinicIds };
+      } else if (clinicId && Types.ObjectId.isValid(clinicId)) {
         invoiceFilter.clinicId = new Types.ObjectId(clinicId);
       }
       const invoiceDocs = await this.invoiceModel
@@ -486,7 +506,11 @@ export class PatientService {
         invoiceStatus: { $in: ['draft', 'posted'] },
         paymentStatus: { $ne: 'paid' },
       };
-      if (clinicId && Types.ObjectId.isValid(clinicId)) {
+      if (scopedClinicIds.length === 1) {
+        invoiceFilter.clinicId = scopedClinicIds[0];
+      } else if (scopedClinicIds.length > 1) {
+        invoiceFilter.clinicId = { $in: scopedClinicIds };
+      } else if (clinicId && Types.ObjectId.isValid(clinicId)) {
         invoiceFilter.clinicId = new Types.ObjectId(clinicId);
       }
       const invoiceDocs = await this.invoiceModel.find(invoiceFilter).lean();
@@ -633,6 +657,72 @@ export class PatientService {
     return age;
   }
 
+  private getScopedClinicIds(scope?: PatientScopeContext): Types.ObjectId[] {
+    if (!scope) {
+      return [];
+    }
+
+    const ids = new Set<string>();
+    if (scope.clinicId && Types.ObjectId.isValid(scope.clinicId)) {
+      ids.add(scope.clinicId);
+    }
+    if (Array.isArray(scope.clinicIds)) {
+      for (const clinicId of scope.clinicIds) {
+        if (clinicId && Types.ObjectId.isValid(clinicId)) {
+          ids.add(clinicId);
+        }
+      }
+    }
+
+    return Array.from(ids).map((clinicId) => new Types.ObjectId(clinicId));
+  }
+
+  private applyScopeFilter(
+    filter: FilterQuery<Patient>,
+    scope?: PatientScopeContext,
+  ): FilterQuery<Patient> {
+    if (!scope || scope.role === UserRole.SUPER_ADMIN) {
+      return filter;
+    }
+
+    if (scope.subscriptionId) {
+      filter.subscriptionId = new Types.ObjectId(scope.subscriptionId);
+    }
+
+    if (scope.role === UserRole.OWNER) {
+      if (scope.organizationId) {
+        filter.organizationId = new Types.ObjectId(scope.organizationId);
+      } else {
+        const scopedClinicIds = this.getScopedClinicIds(scope);
+        if (scopedClinicIds.length === 1) {
+          filter.clinicId = scopedClinicIds[0];
+        } else if (scopedClinicIds.length > 1) {
+          filter.clinicId = { $in: scopedClinicIds };
+        } else if (scope.clinicId) {
+          filter.clinicId = new Types.ObjectId(scope.clinicId);
+        } else if (scope.complexId) {
+          filter.complexId = new Types.ObjectId(scope.complexId);
+        }
+      }
+      return filter;
+    }
+
+    const scopedClinicIds = this.getScopedClinicIds(scope);
+    if (scopedClinicIds.length === 1) {
+      filter.clinicId = scopedClinicIds[0];
+    } else if (scopedClinicIds.length > 1) {
+      filter.clinicId = { $in: scopedClinicIds };
+    } else if (scope.clinicId) {
+      filter.clinicId = new Types.ObjectId(scope.clinicId);
+    } else if (scope.complexId) {
+      filter.complexId = new Types.ObjectId(scope.complexId);
+    } else if (scope.organizationId) {
+      filter.organizationId = new Types.ObjectId(scope.organizationId);
+    }
+
+    return filter;
+  }
+
   /**
    * Get patient by ID
    */
@@ -647,15 +737,7 @@ export class PatientService {
     };
 
     // Tenant isolation: scope patient lookup when caller context is provided
-    if (scope && scope.role !== UserRole.SUPER_ADMIN) {
-      if (scope.clinicId) {
-        query.clinicId = new Types.ObjectId(scope.clinicId);
-      } else if (scope.complexId) {
-        query.complexId = new Types.ObjectId(scope.complexId);
-      } else if (scope.organizationId) {
-        query.organizationId = new Types.ObjectId(scope.organizationId);
-      }
-    }
+    this.applyScopeFilter(query, scope);
 
     const patient = await this.patientModel
       .findOne(query)
@@ -671,13 +753,17 @@ export class PatientService {
   /**
    * Get patient by patient number
    */
-  async getPatientByNumber(patientNumber: string): Promise<Patient> {
-    const patient = await this.patientModel
-      .findOne({
-        patientNumber,
-        deletedAt: { $exists: false },
-      })
-      .exec();
+  async getPatientByNumber(
+    patientNumber: string,
+    scope?: PatientScopeContext,
+  ): Promise<Patient> {
+    const filter: FilterQuery<Patient> = {
+      patientNumber,
+      deletedAt: { $exists: false },
+    };
+    this.applyScopeFilter(filter, scope);
+
+    const patient = await this.patientModel.findOne(filter).exec();
 
     if (!patient) {
       throw new NotFoundException(ERROR_MESSAGES.PATIENT_NOT_FOUND);
@@ -739,7 +825,7 @@ export class PatientService {
 
     if (updatedByUserId) {
       await this.auditService.logSecurityEvent({
-        eventType: 'PATIENT_UPDATED',
+        eventType: 'patient_updated',
         userId: patientId,
         actorId: updatedByUserId,
         ipAddress: '0.0.0.0',
@@ -975,7 +1061,7 @@ export class PatientService {
 
     if (deletedByUserId) {
       await this.auditService.logSecurityEvent({
-        eventType: 'PATIENT_DELETED',
+        eventType: 'patient_deleted',
         userId: patientId,
         actorId: deletedByUserId,
         ipAddress: '0.0.0.0',
@@ -1029,12 +1115,13 @@ export class PatientService {
    * Get patient statistics
    * Requirements: 10.1, 10.2, 10.3, 10.4, 10.5, 10.6
    */
-  async getPatientStats(): Promise<PatientStatsDto> {
+  async getPatientStats(scope?: PatientScopeContext): Promise<PatientStatsDto> {
     const now = new Date();
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
     // Base filter to exclude soft-deleted patients (Requirement 10.6)
-    const baseFilter = { deletedAt: { $exists: false } };
+    const baseFilter: FilterQuery<Patient> = { deletedAt: { $exists: false } };
+    this.applyScopeFilter(baseFilter, scope);
 
     const [
       totalPatients,
@@ -1144,6 +1231,7 @@ export class PatientService {
   async searchPatients(
     searchTerm: string,
     limit: number = 20,
+    scope?: PatientScopeContext,
   ): Promise<Patient[]> {
     if (!searchTerm || searchTerm.trim().length === 0) {
       return [];
@@ -1151,26 +1239,29 @@ export class PatientService {
 
     const searchRegex = new RegExp(searchTerm.trim(), 'i');
 
-    return await this.patientModel
-      .find({
-        deletedAt: { $exists: false },
-        $or: [
-          { firstName: searchRegex },
-          { lastName: searchRegex },
-          { phone: searchRegex },
-          { email: searchRegex },
-          { patientNumber: searchRegex },
-          {
-            $expr: {
-              $regexMatch: {
-                input: { $concat: ['$firstName', ' ', '$lastName'] },
-                regex: searchTerm.trim(),
-                options: 'i',
-              },
+    const filter: FilterQuery<Patient> = {
+      deletedAt: { $exists: false },
+      $or: [
+        { firstName: searchRegex },
+        { lastName: searchRegex },
+        { phone: searchRegex },
+        { email: searchRegex },
+        { patientNumber: searchRegex },
+        {
+          $expr: {
+            $regexMatch: {
+              input: { $concat: ['$firstName', ' ', '$lastName'] },
+              regex: searchTerm.trim(),
+              options: 'i',
             },
           },
-        ],
-      })
+        },
+      ],
+    };
+    this.applyScopeFilter(filter, scope);
+
+    return await this.patientModel
+      .find(filter)
       .sort({ firstName: 1, lastName: 1 })
       .limit(Math.min(limit, 50)) // Max 50 results
       .exec();
@@ -1179,9 +1270,15 @@ export class PatientService {
   /**
    * Get recent patients
    */
-  async getRecentPatients(limit: number = 10): Promise<Patient[]> {
+  async getRecentPatients(
+    limit: number = 10,
+    scope?: PatientScopeContext,
+  ): Promise<Patient[]> {
+    const filter: FilterQuery<Patient> = { deletedAt: { $exists: false } };
+    this.applyScopeFilter(filter, scope);
+
     return await this.patientModel
-      .find({ deletedAt: { $exists: false } })
+      .find(filter)
       .sort({ createdAt: -1 })
       .limit(Math.min(limit, 50))
       .exec();
@@ -1218,17 +1315,23 @@ export class PatientService {
   /**
    * Get patients with upcoming birthdays (within next 30 days)
    */
-  async getUpcomingBirthdays(days: number = 30): Promise<Patient[]> {
+  async getUpcomingBirthdays(
+    days: number = 30,
+    scope?: PatientScopeContext,
+  ): Promise<Patient[]> {
     const today = new Date();
     const currentMonth = today.getMonth() + 1;
     const currentDay = today.getDate();
 
     // This is a simplified version - for production, you'd need more complex date logic
+    const filter: FilterQuery<Patient> = {
+      deletedAt: { $exists: false },
+      dateOfBirth: { $exists: true },
+    };
+    this.applyScopeFilter(filter, scope);
+
     return await this.patientModel
-      .find({
-        deletedAt: { $exists: false },
-        dateOfBirth: { $exists: true },
-      })
+      .find(filter)
       .exec()
       .then((patients) => {
         return patients.filter((patient) => {

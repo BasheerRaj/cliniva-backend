@@ -19,6 +19,9 @@ export class Patient extends Document {
   @Prop({ type: Types.ObjectId, ref: 'Organization' })
   organizationId?: Types.ObjectId; // Denormalized from Clinic.organizationId for traceability
 
+  @Prop({ type: Types.ObjectId, ref: 'Subscription', required: true })
+  subscriptionId: Types.ObjectId; // Mandatory top-level tenant isolation (UC-010)
+
   @Prop({ required: true, unique: true })
   patientNumber: string;
 
@@ -169,6 +172,7 @@ PatientSchema.index({ deletedAt: 1 });
 // UC-3at2c5: Complex-scoped patient list indexes
 PatientSchema.index({ complexId: 1 });
 PatientSchema.index({ clinicId: 1 });
+PatientSchema.index({ subscriptionId: 1 });
 PatientSchema.index({ organizationId: 1 });
 PatientSchema.index({ complexId: 1, deletedAt: 1 });
 PatientSchema.index({ complexId: 1, status: 1, deletedAt: 1 });

@@ -133,6 +133,7 @@ export class InvoiceController {
       userId,
       userRole,
       userClinicId,
+      req.user,
     );
 
     return {
@@ -315,6 +316,7 @@ export class InvoiceController {
       req.user?.userId || req.user?.id || req.user?.sub,
       req.user?.role,
       req.user?.clinicId,
+      req.user,
     );
 
     return {
@@ -368,6 +370,7 @@ export class InvoiceController {
       clinicId,
       req.user?.role,
       req.user?.clinicId,
+      req.user,
     );
 
     return {
@@ -394,6 +397,7 @@ export class InvoiceController {
   async getPatientsWithBookableInvoices(
     @Query('clinicId') clinicId: string,
     @Query('search') search?: string,
+    @Request() req?: any,
   ) {
     if (!clinicId) {
       throw new BadRequestException({
@@ -401,7 +405,11 @@ export class InvoiceController {
         code: 'MISSING_CLINIC_ID',
       });
     }
-    const patients = await this.invoiceService.getPatientsWithBookableInvoices(clinicId, search);
+    const patients = await this.invoiceService.getPatientsWithBookableInvoices(
+      clinicId,
+      search,
+      req?.user,
+    );
     return {
       success: true,
       message: { ar: 'تم استرجاع المرضى بنجاح', en: 'Patients retrieved successfully' },
@@ -500,7 +508,7 @@ export class InvoiceController {
       });
     }
 
-    const invoice = await this.invoiceService.cancelInvoice(id, userId);
+    const invoice = await this.invoiceService.cancelInvoice(id, userId, req.user);
 
     return {
       success: true,
@@ -533,7 +541,26 @@ export class InvoiceController {
   @ApiParam({ name: 'id', description: 'Invoice ID (MongoDB ObjectId)', example: '507f1f77bcf86cd799439014' })
   @ApiResponse({ status: 200, description: 'PDF file returned as binary stream' })
   @ApiResponse({ status: 404, description: 'Invoice not found' })
-  async exportInvoicePdf(@Param('id') id: string, @Res() res: Response): Promise<void> {
+  async exportInvoicePdf(
+    @Param('id') id: string,
+    @Request() req: any,
+    @Res() res: Response,
+  ): Promise<void> {
+    const user = req.user;
+    const userId = user?.id || user?.userId || user?.sub;
+    const userRole = user?.role;
+    const userClinicIds = Array.isArray(user?.clinicIds)
+      ? user.clinicIds.map(String)
+      : user?.clinicId
+      ? [String(user.clinicId)]
+      : [];
+    await this.invoiceService.getInvoiceById(
+      id,
+      userId,
+      userRole,
+      userClinicIds,
+      user,
+    );
     const { buffer, filename } = await this.invoicePdfService.generateInvoicePdf(id);
 
     res.set({
@@ -571,8 +598,9 @@ export class InvoiceController {
     @Param('id') id: string,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
+    @Request() req?: any,
   ) {
-    return this.invoiceService.getInvoicePayments(id, page, limit);
+    return this.invoiceService.getInvoicePayments(id, page, limit, req?.user);
   }
 
   /**
@@ -657,13 +685,18 @@ export class InvoiceController {
     // Extract user details for role-based access control
     const userId = user.id || user.userId || user.sub;
     const userRole = user.role;
-    const userClinicIds = user.clinicId ? [user.clinicId] : [];
+    const userClinicIds = Array.isArray(user?.clinicIds)
+      ? user.clinicIds.map(String)
+      : user.clinicId
+      ? [String(user.clinicId)]
+      : [];
 
     const invoice = await this.invoiceService.getInvoiceById(
       id,
       userId,
       userRole,
       userClinicIds,
+      user,
     );
 
     if (!invoice) {
@@ -763,6 +796,7 @@ export class InvoiceController {
       userRole,
       userOrganizationId,
       user.subscriptionId,
+      user,
     );
 
     return {
@@ -836,7 +870,14 @@ export class InvoiceController {
     }
 
     const userOrganizationId = req.user?.organizationId;
-    await this.invoiceService.deleteInvoice(id, userId, userRole, userOrganizationId, req.user?.subscriptionId);
+    await this.invoiceService.deleteInvoice(
+      id,
+      userId,
+      userRole,
+      userOrganizationId,
+      req.user?.subscriptionId,
+      req.user,
+    );
 
     return {
       success: true,

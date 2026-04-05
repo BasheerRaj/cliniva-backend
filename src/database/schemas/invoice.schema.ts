@@ -34,6 +34,9 @@ export class Invoice extends Document {
   @Prop({ type: Types.ObjectId, ref: 'Clinic', required: true, index: true })
   clinicId: Types.ObjectId;
 
+  @Prop({ type: Types.ObjectId, ref: 'Subscription', required: true, index: true })
+  subscriptionId: Types.ObjectId; // Mandatory top-level tenant isolation (M1 Fix)
+
   // ==================== Services (embedded line items) ====================
 
   @Prop({
