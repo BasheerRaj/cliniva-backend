@@ -30,7 +30,9 @@ export class SpecialtyService {
   ) {}
 
   async createSpecialty(createDto: CreateSpecialtyDto, creatingUser: TenantUser): Promise<Specialty> {
+    const tenantFilter = buildTenantFilter(creatingUser);
     const existing = await this.specialtyModel.findOne({
+      ...tenantFilter,
       name: { $regex: new RegExp(`^${createDto.name}$`, 'i') },
     });
 
