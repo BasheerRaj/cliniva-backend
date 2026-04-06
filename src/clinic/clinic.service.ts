@@ -40,13 +40,21 @@ export class ClinicService {
     private readonly subscriptionService: SubscriptionService,
   ) { }
 
+  private buildSubscriptionMatch(subscriptionId?: string): any {
+    if (!subscriptionId) return undefined;
+    if (!Types.ObjectId.isValid(subscriptionId)) {
+      return subscriptionId;
+    }
+    return { $in: [new Types.ObjectId(subscriptionId), subscriptionId] };
+  }
+
   async findClinicBySubscription(
     subscriptionId: string,
   ): Promise<Clinic | null> {
     try {
       return await this.clinicModel
         .findOne({
-          subscriptionId: new Types.ObjectId(subscriptionId),
+          subscriptionId: this.buildSubscriptionMatch(subscriptionId),
         })
         .exec();
     } catch (error) {
@@ -195,7 +203,7 @@ export class ClinicService {
 
     // 1. Mandatory Tenant Isolation — ALWAYS applied for non-super_admins
     if (targetSubscriptionId) {
-      query.subscriptionId = new Types.ObjectId(targetSubscriptionId);
+      query.subscriptionId = this.buildSubscriptionMatch(targetSubscriptionId);
     }
 
     // 2. Apply Scope Restrictions
@@ -405,7 +413,24 @@ export class ClinicService {
 
   async findClinicByUser(userId: string): Promise<Clinic | null> {
     try {
-      // First get user's subscription
+      const user: any = await this.userModel
+        .findById(userId)
+        .select('_id clinicId')
+        .lean()
+        .exec();
+
+      if (user?.clinicId) {
+        const clinic = await this.clinicModel
+          .findOne({
+            _id: new Types.ObjectId(user.clinicId.toString()),
+            deletedAt: { $exists: false },
+          })
+          .exec();
+        if (clinic) {
+          return clinic;
+        }
+      }
+
       const subscription =
         await this.subscriptionService.getSubscriptionByUser(userId);
       if (!subscription) {
@@ -450,7 +475,7 @@ export class ClinicService {
 
     // Validate subscription limits
     const currentClinics = await this.clinicModel.countDocuments({
-      subscriptionId: new Types.ObjectId(resolvedSubscriptionId),
+      subscriptionId: this.buildSubscriptionMatch(resolvedSubscriptionId),
     });
 
     const { plan } = await this.subscriptionService.getSubscriptionWithPlan(
@@ -885,13 +910,17 @@ export class ClinicService {
     // TENANT ISOLATION: scope to requesting user's subscription/clinic
     if (requestingUser && requestingUser.role !== 'super_admin') {
       if (requestingUser.role === 'owner' && requestingUser.subscriptionId) {
-        query.subscriptionId = new Types.ObjectId(requestingUser.subscriptionId.toString());
+        query.subscriptionId = this.buildSubscriptionMatch(
+          requestingUser.subscriptionId.toString(),
+        );
       } else if (requestingUser.clinicId) {
         query._id = new Types.ObjectId(requestingUser.clinicId.toString());
       } else if (requestingUser.complexId) {
         query.complexId = new Types.ObjectId(requestingUser.complexId.toString());
       } else if (requestingUser.subscriptionId) {
-        query.subscriptionId = new Types.ObjectId(requestingUser.subscriptionId.toString());
+        query.subscriptionId = this.buildSubscriptionMatch(
+          requestingUser.subscriptionId.toString(),
+        );
       }
     }
 
@@ -913,7 +942,7 @@ export class ClinicService {
     subscriptionId: string,
   ): Promise<Clinic | null> {
     return await this.clinicModel
-      .findOne({ subscriptionId: new Types.ObjectId(subscriptionId) })
+      .findOne({ subscriptionId: this.buildSubscriptionMatch(subscriptionId) })
       .exec();
   }
 

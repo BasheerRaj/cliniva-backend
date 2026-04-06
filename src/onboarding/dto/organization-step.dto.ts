@@ -118,6 +118,15 @@ export class OrganizationOverviewDto {
 
 // Organization contact form - extends standardized contact structure
 export class OrganizationContactDto extends ContactInfoDto {
+  @ApiPropertyOptional({
+    description: 'Organization website URL',
+    example: 'https://alzahra-healthcare.com',
+    type: String,
+  })
+  @IsString()
+  @IsOptional()
+  website?: string;
+
   // Inherits all contact fields: phoneNumbers, email, address, emergencyContact, socialMediaLinks
 }
 

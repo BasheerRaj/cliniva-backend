@@ -37,6 +37,14 @@ export class ComplexService {
     private readonly departmentService: DepartmentService,
   ) { }
 
+  private buildSubscriptionMatch(subscriptionId?: string): any {
+    if (!subscriptionId) return undefined;
+    if (!Types.ObjectId.isValid(subscriptionId)) {
+      return subscriptionId;
+    }
+    return { $in: [new Types.ObjectId(subscriptionId), subscriptionId] };
+  }
+
   /**
    * List complexes with pagination, filters, and optional counts
    *
@@ -76,7 +84,7 @@ export class ComplexService {
 
     // Filter by subscriptionId
     if (targetSubscriptionId) {
-      filter.subscriptionId = new Types.ObjectId(targetSubscriptionId);
+      filter.subscriptionId = this.buildSubscriptionMatch(targetSubscriptionId);
     }
 
     // Filter by status
@@ -253,7 +261,9 @@ export class ComplexService {
 
     // Validate subscription limits
     const currentComplexes = await this.complexModel.countDocuments({
-      subscriptionId: new Types.ObjectId(createComplexDto.subscriptionId),
+      subscriptionId: this.buildSubscriptionMatch(
+        createComplexDto.subscriptionId,
+      ),
     });
 
     const { plan } = await this.subscriptionService.getSubscriptionWithPlan(
@@ -742,7 +752,7 @@ export class ComplexService {
     }
 
     return await this.complexModel
-      .findOne({ subscriptionId: new Types.ObjectId(subscriptionId) })
+      .findOne({ subscriptionId: this.buildSubscriptionMatch(subscriptionId) })
       .exec();
   }
 

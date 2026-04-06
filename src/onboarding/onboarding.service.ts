@@ -1302,6 +1302,84 @@ export class OnboardingService {
     return userComplex;
   }
 
+  private normalizeEntityName(value?: string): string {
+    if (!value) return '';
+    return value.trim().toLowerCase().replace(/\s+/g, ' ');
+  }
+
+  private async resolveClinicForOnboarding(
+    userId: string,
+    options?: {
+      clinicName?: string;
+      subscriptionId?: string;
+      complexId?: string;
+    },
+  ): Promise<any | null> {
+    const user = await this.userModel
+      .findById(userId)
+      .select('_id clinicId')
+      .lean()
+      .exec();
+
+    if (user?.clinicId) {
+      try {
+        return await this.clinicService.getClinic(user.clinicId.toString());
+      } catch (error) {
+        console.warn(
+          `Could not resolve clinic from user.clinicId for user ${userId}:`,
+          error.message,
+        );
+      }
+    }
+
+    const subscriptionId =
+      options?.subscriptionId ||
+      ((await this.subscriptionService.getSubscriptionByUser(userId))?._id as any)?.toString();
+
+    if (!subscriptionId) {
+      return null;
+    }
+
+    const scopedComplexId =
+      options?.complexId || (await this.findUserComplex(userId))?._id?.toString();
+
+    const clinicsResult = await this.clinicService.getClinics({
+      subscriptionId,
+      complexId: scopedComplexId,
+      page: 1,
+      limit: 200,
+      sortBy: 'createdAt',
+      sortOrder: 'desc',
+    });
+
+    const clinics = clinicsResult?.data || [];
+    if (!clinics.length) {
+      return null;
+    }
+
+    const requestedName = this.normalizeEntityName(options?.clinicName);
+    const matchedByName = requestedName
+      ? clinics.find(
+          (clinic: any) =>
+            this.normalizeEntityName(clinic?.name) === requestedName,
+        )
+      : null;
+
+    const matchedByOwner = clinics.find(
+      (clinic: any) => clinic?.ownerId?.toString() === userId,
+    );
+
+    const resolvedClinic = matchedByName || matchedByOwner || clinics[0];
+
+    if (resolvedClinic?._id) {
+      await this.userModel.findByIdAndUpdate(userId, {
+        $set: { clinicId: resolvedClinic._id },
+      });
+    }
+
+    return resolvedClinic || null;
+  }
+
   async saveComplexOverview(userId: string, dto: ComplexOverviewDto) {
     try {
       // Check if user already has a complex
@@ -1363,7 +1441,13 @@ export class OnboardingService {
         console.log('📝 Updating existing complex:', existingComplex._id);
         complex = await this.complexService.updateComplex(
           existingComplex._id.toString(),
-          complexData,
+          {
+            ...complexData,
+            ownerId: new Types.ObjectId(userId),
+            subscriptionId: new Types.ObjectId(
+              (subscription._id as any).toString(),
+            ),
+          } as any,
         );
       } else {
         // Create new complex
@@ -1718,9 +1802,6 @@ export class OnboardingService {
     dto: ClinicOverviewDto,
   ): Promise<StepSaveResponseDto> {
     try {
-      // Find existing clinic or create new one
-      const existingClinic: any = null;
-
       const subscription =
         await this.subscriptionService.getSubscriptionByUser(userId);
       if (!subscription) {
@@ -1749,6 +1830,12 @@ export class OnboardingService {
           'ℹ️  No complex found - this is expected for clinic-only plans',
         );
       }
+
+      const existingClinic: any = await this.resolveClinicForOnboarding(userId, {
+        clinicName: dto.name,
+        subscriptionId: (subscription._id as any).toString(),
+        complexId: userComplex?._id?.toString(),
+      });
 
       // Enhanced logo inheritance and validation logic
       let logoUrl = dto.logoUrl;
@@ -2032,12 +2119,22 @@ export class OnboardingService {
         console.log('🔄 Updating existing clinic:', existingClinic._id);
         clinic = await this.clinicService.updateClinic(
           existingClinic._id.toString(),
-          clinicData,
+          {
+            ...clinicData,
+            ownerId: new Types.ObjectId(userId),
+            subscriptionId: new Types.ObjectId(
+              (subscription._id as any).toString(),
+            ),
+          } as any,
         );
       } else {
         console.log('✨ Creating new clinic');
         clinic = await this.clinicService.createClinic(clinicData);
       }
+
+      await this.userModel.findByIdAndUpdate(userId, {
+        $set: { clinicId: clinic._id },
+      });
 
       // Process services if provided in the DTO
       const createdServiceIds: string[] = [];
@@ -2201,8 +2298,7 @@ export class OnboardingService {
     try {
       console.log('🔍 saveClinicContact called with:', { userId, dto });
 
-      // Find clinic by user
-      const userClinic = await this.clinicService.findClinicByUser(userId);
+      const userClinic = await this.resolveClinicForOnboarding(userId);
 
       if (!userClinic) {
         console.error('❌ Clinic not found for user:', userId);
@@ -2289,8 +2385,7 @@ export class OnboardingService {
         dto,
       });
 
-      // Find clinic by user
-      const userClinic = await this.clinicService.findClinicByUser(userId);
+      const userClinic = await this.resolveClinicForOnboarding(userId);
 
       if (!userClinic) {
         console.error('❌ Clinic not found for user:', userId);
@@ -2428,8 +2523,7 @@ export class OnboardingService {
     dto: ClinicLegalInfoDto,
   ): Promise<StepSaveResponseDto> {
     try {
-      // Find clinic by user
-      const userClinic = await this.clinicService.findClinicByUser(userId);
+      const userClinic = await this.resolveClinicForOnboarding(userId);
 
       if (!userClinic) {
         throw new BadRequestException(
@@ -2483,8 +2577,7 @@ export class OnboardingService {
     parentComplexId?: string;
   }> {
     try {
-      // Find clinic by user
-      const userClinic = await this.clinicService.findClinicByUser(userId);
+      const userClinic = await this.resolveClinicForOnboarding(userId);
 
       if (!userClinic) {
         throw new BadRequestException({
@@ -2689,8 +2782,7 @@ export class OnboardingService {
     try {
       console.log('🏁 Starting clinic setup completion for user:', userId);
 
-      // Find the user's clinic
-      const userClinic = await this.clinicService.findClinicByUser(userId);
+      const userClinic = await this.resolveClinicForOnboarding(userId);
 
       if (!userClinic) {
         throw new NotFoundException('No clinic found for user');
