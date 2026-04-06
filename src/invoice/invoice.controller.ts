@@ -257,6 +257,9 @@ export class InvoiceController {
       req.user?.role,
       req.user?.subscriptionId,
       req.user?.clinicId,
+      Array.isArray(req.user?.clinicIds)
+        ? req.user.clinicIds.map(String)
+        : undefined,
       req.user?.organizationId,
     );
 
@@ -438,6 +441,9 @@ export class InvoiceController {
       search,
       req?.user?.role,
       req?.user?.clinicId,
+      Array.isArray(req?.user?.clinicIds)
+        ? req.user.clinicIds.map(String)
+        : undefined,
       req?.user?.subscriptionId,
     );
     return {

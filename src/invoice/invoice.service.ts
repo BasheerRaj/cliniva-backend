@@ -4,6 +4,7 @@ import {
   BadRequestException,
   ForbiddenException,
   Logger,
+  OnModuleInit,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -28,8 +29,29 @@ import {
 import { assertSameTenant, TenantUser } from '../common/utils/tenant-scope.util';
 
 @Injectable()
-export class InvoiceService {
+export class InvoiceService implements OnModuleInit {
   private readonly logger = new Logger(InvoiceService.name);
+
+  async onModuleInit(): Promise<void> {
+    try {
+      const indexes = await this.invoiceModel.collection.indexes();
+      const legacyUniqueIdx = indexes.find(
+        (idx: any) =>
+          idx?.name === 'organizationId_1_invoiceNumber_1' && idx?.unique === true,
+      );
+
+      if (legacyUniqueIdx) {
+        await this.invoiceModel.collection.dropIndex('organizationId_1_invoiceNumber_1');
+        this.logger.warn(
+          'Dropped legacy unique index organizationId_1_invoiceNumber_1 from invoices collection',
+        );
+      }
+    } catch (error: any) {
+      this.logger.warn(
+        `Invoice index migration check skipped: ${error?.message ?? 'unknown error'}`,
+      );
+    }
+  }
 
   private async assertClinicTenantAccess(
     clinicId: string | Types.ObjectId,
@@ -60,6 +82,10 @@ export class InvoiceService {
       return;
     }
     if (!invoice?.clinicId) {
+      if ((invoice as any)?.subscriptionId) {
+        assertSameTenant((invoice as any).subscriptionId, requestingUser);
+        return;
+      }
       throw new ForbiddenException(AUTH_ERRORS.INSUFFICIENT_PERMISSIONS);
     }
     const clinicId =
@@ -78,6 +104,142 @@ export class InvoiceService {
     private invoiceNumberService: InvoiceNumberService,
   ) {}
 
+  private assertServiceMatchesClinic(service: any, clinicId: string): void {
+    const clinicIds = Array.isArray(service?.clinicIds)
+      ? service.clinicIds.map((id: any) => id?.toString?.() ?? String(id))
+      : [];
+
+    // If service has explicit clinic assignments, enforce clinic match.
+    if (clinicIds.length > 0 && !clinicIds.includes(clinicId)) {
+      throw new BadRequestException({
+        message: {
+          ar: `الخدمة "${service?.name ?? ''}" غير متوفرة في هذه العيادة`,
+          en: `Service "${service?.name ?? ''}" is not provided by this clinic`,
+        },
+        code: 'SERVICE_CLINIC_MISMATCH',
+        serviceId: service?._id?.toString?.(),
+        clinicId,
+      });
+    }
+  }
+
+  private getAssignedClinicIds(
+    userClinicId?: string,
+    requestingUser?: TenantUser,
+  ): string[] {
+    const fromUser = Array.isArray((requestingUser as any)?.clinicIds)
+      ? (requestingUser as any).clinicIds.map(String).filter(Boolean)
+      : [];
+    if (fromUser.length > 0) return Array.from(new Set(fromUser));
+    return userClinicId ? [String(userClinicId)] : [];
+  }
+
+  private getScopedClinicObjectIds(
+    userClinicId?: string,
+    userClinicIds?: string[],
+  ): Types.ObjectId[] {
+    const fromArray = Array.isArray(userClinicIds)
+      ? userClinicIds.map(String).filter(Boolean)
+      : [];
+    const merged = fromArray.length > 0
+      ? fromArray
+      : userClinicId
+      ? [String(userClinicId)]
+      : [];
+
+    return Array.from(new Set(merged))
+      .filter((id) => Types.ObjectId.isValid(id))
+      .map((id) => new Types.ObjectId(id));
+  }
+
+  private isServiceAvailableInClinic(service: any, clinicId: string): boolean {
+    const clinicIds = Array.isArray(service?.clinicIds)
+      ? service.clinicIds.map((id: any) => id?.toString?.() ?? String(id))
+      : [];
+    if (clinicIds.length === 0) return true;
+    return clinicIds.includes(clinicId);
+  }
+
+  private async filterInvoicesCompatibleWithClinic<T extends { clinicId?: any; services?: any[] }>(
+    invoices: T[],
+    clinicId: string,
+  ): Promise<T[]> {
+    if (!clinicId || invoices.length === 0) return invoices;
+
+    const explicit: T[] = [];
+    const withoutClinic: T[] = [];
+
+    for (const inv of invoices) {
+      const invoiceClinicId =
+        (inv as any).clinicId?._id?.toString?.() ??
+        (inv as any).clinicId?.toString?.();
+      if (invoiceClinicId) {
+        if (invoiceClinicId === clinicId) explicit.push(inv);
+      } else {
+        withoutClinic.push(inv);
+      }
+    }
+
+    if (withoutClinic.length === 0) return explicit;
+
+    const serviceIds = Array.from(
+      new Set(
+        withoutClinic.flatMap((inv: any) =>
+          (inv.services ?? [])
+            .map((svc: any) => svc?.serviceId?.toString?.() ?? String(svc?.serviceId))
+            .filter((id: string) => Types.ObjectId.isValid(id)),
+        ),
+      ),
+    );
+
+    if (serviceIds.length === 0) return explicit;
+
+    const services = await this.serviceModel
+      .find({
+        _id: { $in: serviceIds.map((id) => new Types.ObjectId(id)) },
+        deletedAt: { $exists: false },
+      })
+      .select('_id clinicIds')
+      .lean();
+
+    const serviceMap = new Map<string, any>(
+      services.map((s: any) => [s._id.toString(), s]),
+    );
+
+    const compatible: T[] = [];
+    for (const inv of withoutClinic as any[]) {
+      const ok = (inv.services ?? []).some((svc: any) => {
+        const sid = svc?.serviceId?.toString?.() ?? String(svc?.serviceId);
+        const service = serviceMap.get(sid);
+        return service ? this.isServiceAvailableInClinic(service, clinicId) : false;
+      });
+      if (ok) compatible.push(inv);
+    }
+
+    return [...explicit, ...compatible];
+  }
+
+  private async hasInvoiceAccessByClinicScope(
+    invoice: any,
+    clinicIds: string[],
+  ): Promise<boolean> {
+    const uniqueClinicIds = Array.from(new Set((clinicIds ?? []).map(String).filter(Boolean)));
+    if (uniqueClinicIds.length === 0) return false;
+
+    const invoiceClinicIdStr =
+      (invoice?.clinicId as any)?._id?.toString?.() ??
+      (invoice?.clinicId as any)?.toString?.();
+    if (invoiceClinicIdStr) {
+      return uniqueClinicIds.includes(invoiceClinicIdStr);
+    }
+
+    for (const clinicId of uniqueClinicIds) {
+      const compatible = await this.filterInvoicesCompatibleWithClinic([invoice], clinicId);
+      if (compatible.length > 0) return true;
+    }
+    return false;
+  }
+
   /**
    * Create a new invoice
    * M7 redesign: supports multiple services, each with multiple sessions.
@@ -90,9 +252,15 @@ export class InvoiceService {
     userClinicId?: string,
     requestingUser?: TenantUser,
   ): Promise<InvoiceResponseDto> {
+    const assignedClinicIds = this.getAssignedClinicIds(userClinicId, requestingUser);
+
     // Validate clinic access for Staff/Doctor roles
     if (userRole === 'staff' || userRole === 'doctor') {
-      if (!userClinicId || (createInvoiceDto.clinicId && userClinicId !== createInvoiceDto.clinicId)) {
+      if (
+        assignedClinicIds.length === 0 ||
+        (createInvoiceDto.clinicId &&
+          !assignedClinicIds.includes(createInvoiceDto.clinicId))
+      ) {
         throw new ForbiddenException({
           message: {
             ar: 'لا يمكنك إنشاء فاتورة لعيادة غير مخصصة لك',
@@ -103,30 +271,33 @@ export class InvoiceService {
       }
     }
 
-    // 1. Resolve clinicId: prefer DTO, fall back to caller's assigned clinic
-    const resolvedClinicId = createInvoiceDto.clinicId || userClinicId;
+    // 1. Resolve clinicId:
+    // - staff/doctor with one assigned clinic -> auto-resolve that clinic
+    // - staff/doctor with multiple clinics -> use DTO clinic when provided
+    // - other roles -> optional DTO clinic
+    let resolvedClinicId =
+      userRole === 'staff' || userRole === 'doctor'
+        ? (createInvoiceDto.clinicId ||
+          (assignedClinicIds.length === 1 ? assignedClinicIds[0] : undefined))
+        : createInvoiceDto.clinicId;
 
-    if (!resolvedClinicId) {
-      throw new BadRequestException({
-        message: {
-          ar: 'معرف العيادة مطلوب',
-          en: 'clinicId is required',
-        },
-        code: 'CLINIC_ID_REQUIRED',
+    let clinic: any = null;
+    if (resolvedClinicId) {
+      clinic = await this.clinicModel.findOne({
+        _id: new Types.ObjectId(resolvedClinicId),
+        deletedAt: { $exists: false },
       });
+      if (!clinic) {
+        throw new NotFoundException(NOT_FOUND_ERRORS.CLINIC);
+      }
+      await this.assertClinicTenantAccess((clinic as any)._id, requestingUser);
     }
+    // 2. Derive organization/subscription context
+    const organizationId = clinic?.organizationId || requestingUser?.organizationId;
+    let subscriptionId =
+      clinic?.subscriptionId?.toString?.() ||
+      requestingUser?.subscriptionId;
 
-    // Find clinic (validate exists, not deleted)
-    const clinic = await this.clinicModel.findOne({
-      _id: new Types.ObjectId(resolvedClinicId),
-      deletedAt: { $exists: false },
-    });
-    if (!clinic) {
-      throw new NotFoundException(NOT_FOUND_ERRORS.CLINIC);
-    }
-    await this.assertClinicTenantAccess((clinic as any)._id, requestingUser);
-    // 2. Derive organizationId from clinic
-    const organizationId = clinic.organizationId;
 
     // 3. Find patient by dto.patientId (validate exists, not deleted)
     const patient = await this.patientModel.findOne({
@@ -167,6 +338,40 @@ export class InvoiceService {
       }
       if (!service.isActive) {
         throw new BadRequestException(INVOICE_ERRORS.SERVICE_NOT_ACTIVE);
+      }
+      if (resolvedClinicId) {
+        this.assertServiceMatchesClinic(service, resolvedClinicId);
+      } else if (userRole === 'staff' || userRole === 'doctor') {
+        const serviceClinicIds = Array.isArray((service as any).clinicIds)
+          ? (service as any).clinicIds
+              .map((id: any) => id?.toString?.() ?? String(id))
+              .filter(Boolean)
+          : [];
+
+        const hasAssignedClinicAccess =
+          serviceClinicIds.length === 0 ||
+          serviceClinicIds.some((id: string) => assignedClinicIds.includes(id));
+
+        if (!hasAssignedClinicAccess) {
+          throw new ForbiddenException({
+            message: {
+              ar: 'لا يمكنك إنشاء فاتورة لخدمة خارج عياداتك المخصصة',
+              en: 'You cannot create an invoice for a service outside your assigned clinics',
+            },
+            code: 'INVOICE_SERVICE_CLINIC_ACCESS_DENIED',
+          });
+        }
+      }
+
+      if (!resolvedClinicId && userRole !== 'staff' && userRole !== 'doctor') {
+        const serviceClinicIds = Array.isArray((service as any).clinicIds)
+          ? (service as any).clinicIds
+              .map((id: any) => id?.toString?.() ?? String(id))
+              .filter(Boolean)
+          : [];
+        if (serviceClinicIds.length === 1) {
+          resolvedClinicId = serviceClinicIds[0];
+        }
       }
 
       // Price comes directly from the service definition — no manual entry required
@@ -228,7 +433,42 @@ export class InvoiceService {
         totalServicePrice: +(lineTotalPerSession * totalSessions).toFixed(2),
         sessions: invoiceSessions,
       } as any);
+    }
+
+    if (!clinic && resolvedClinicId) {
+      clinic = await this.clinicModel.findOne({
+        _id: new Types.ObjectId(resolvedClinicId),
+        deletedAt: { $exists: false },
+      });
+      if (!clinic) {
+        throw new NotFoundException(NOT_FOUND_ERRORS.CLINIC);
       }
+      await this.assertClinicTenantAccess((clinic as any)._id, requestingUser);
+      if (!subscriptionId) {
+        subscriptionId = (clinic as any).subscriptionId?.toString?.();
+      }
+    }
+
+    if (!subscriptionId && builtServices.length > 0) {
+      const firstServiceId = (builtServices[0] as any).serviceId?.toString?.();
+      if (firstServiceId) {
+        const firstService = await this.serviceModel
+          .findById(firstServiceId)
+          .select('subscriptionId')
+          .lean();
+        subscriptionId =
+          (firstService as any)?.subscriptionId?.toString?.() || subscriptionId;
+      }
+    }
+    if (!subscriptionId) {
+      throw new BadRequestException({
+        message: {
+          ar: 'لا يمكن تحديد الاشتراك المرتبط بالفاتورة',
+          en: 'Unable to resolve invoice subscription',
+        },
+        code: 'SUBSCRIPTION_REQUIRED',
+      });
+    }
     subtotal = +subtotal.toFixed(2);
     totalDiscount = +Math.min(totalDiscount, subtotal).toFixed(2); // Cap to prevent negative totalAmount from rounding
     totalTax = +totalTax.toFixed(2);
@@ -236,16 +476,18 @@ export class InvoiceService {
 
     // 6. Generate draft number via counterModel (atomic)
     const invoiceNumber = await this.invoiceNumberService.generateDraftNumber(
-      organizationId ? organizationId.toString() : resolvedClinicId,
+      organizationId ? organizationId.toString() : resolvedClinicId || subscriptionId,
     );
 
-    // 7. Create invoice
-    const invoice = new this.invoiceModel({
-      invoiceNumber,
+    // 7. Create invoice (retry on invoice number collision)
+    const invoiceBase: any = {
       invoiceTitle: createInvoiceDto.invoiceTitle,
       patientId: new Types.ObjectId(createInvoiceDto.patientId),
-      clinicId: new Types.ObjectId(resolvedClinicId),
+      ...(resolvedClinicId
+        ? { clinicId: new Types.ObjectId(resolvedClinicId) }
+        : {}),
       organizationId: organizationId ?? undefined,
+      subscriptionId: new Types.ObjectId(subscriptionId),
       services: builtServices,
       subtotal,
       discountAmount: totalDiscount,
@@ -257,9 +499,37 @@ export class InvoiceService {
       issueDate,
       notes: createInvoiceDto.notes,
       createdBy: new Types.ObjectId(userId),
+    };
+
+    let invoice = new this.invoiceModel({
+      ...invoiceBase,
+      invoiceNumber,
     });
 
-    await invoice.save();
+    let saved = false;
+    let retries = 0;
+    while (!saved) {
+      try {
+        await invoice.save();
+        saved = true;
+      } catch (err: any) {
+        if (err.code === 11000 && err.keyPattern?.invoiceNumber && retries < 10) {
+          retries++;
+          const nextInvoiceNumber = await this.invoiceNumberService.generateDraftNumber(
+            organizationId ? organizationId.toString() : resolvedClinicId || subscriptionId,
+          );
+          invoice = new this.invoiceModel({
+            ...invoiceBase,
+            invoiceNumber: nextInvoiceNumber,
+          });
+          this.logger.warn(
+            `Draft invoice number collision, retrying with ${nextInvoiceNumber} (attempt ${retries})`,
+          );
+        } else {
+          throw err;
+        }
+      }
+    }
 
     this.logger.log(
       `Invoice created: ${invoiceNumber} by user ${userId} for patient ${patient._id}`,
@@ -284,6 +554,7 @@ export class InvoiceService {
     userRole?: string,
     subscriptionId?: string,
     userClinicId?: string,
+    userClinicIds?: string[],
     userOrganizationId?: string,
   ): Promise<{ data: InvoiceResponseDto[]; meta: any }> {
     // Build query filter
@@ -291,11 +562,37 @@ export class InvoiceService {
 
     // Service-level scoping for clinic-bound roles (admin, manager, staff, doctor)
     // Applied directly from req.user to bypass guard→DTO validation chain issues
-    if (
-      (userRole === 'admin' || userRole === 'manager' || userRole === 'staff' || userRole === 'doctor') &&
-      userClinicId && Types.ObjectId.isValid(userClinicId)
-    ) {
-      filter.clinicId = new Types.ObjectId(userClinicId);
+    const isClinicBoundRole =
+      userRole === 'admin' ||
+      userRole === 'manager' ||
+      userRole === 'staff' ||
+      userRole === 'doctor';
+    const scopedClinicIds = this.getScopedClinicObjectIds(
+      userClinicId,
+      userClinicIds,
+    );
+    if (isClinicBoundRole) {
+      if (queryDto.clinicId) {
+        const requestedClinicId = new Types.ObjectId(queryDto.clinicId);
+        const hasAccess = scopedClinicIds.some(
+          (clinicObjectId) =>
+            clinicObjectId.toString() === requestedClinicId.toString(),
+        );
+        if (!hasAccess) {
+          filter._id = new Types.ObjectId('000000000000000000000000');
+        } else {
+          filter.clinicId = requestedClinicId;
+        }
+      } else if (scopedClinicIds.length >= 1) {
+        // Include legacy invoices without clinicId so newly created multi-clinic draft invoices
+        // remain visible before a clinic is selected in appointment flow.
+        filter.$or = [
+          { clinicId: { $in: scopedClinicIds } },
+          { clinicId: { $exists: false } },
+        ];
+      } else {
+        filter._id = new Types.ObjectId('000000000000000000000000');
+      }
     } else if (queryDto.clinicId) {
       // Fall back to query param (for owner/super_admin with explicit filter)
       filter.clinicId = new Types.ObjectId(queryDto.clinicId);
@@ -530,11 +827,8 @@ export class InvoiceService {
     }
     await this.assertInvoiceTenantAccess(invoice, requestingUser);
 
-    if (userRole === 'staff' || userRole === 'doctor' || userRole === 'admin' || userRole === 'manager') {
-      // Extract clinic ID string correctly whether clinicId is populated (Document) or raw ObjectId
-      const invoiceClinicIdStr =
-        (invoice.clinicId as any)?._id?.toString() ?? (invoice.clinicId as any)?.toString();
-      const hasAccess = userClinicIds.some((clinicId) => clinicId === invoiceClinicIdStr);
+    if (userRole === 'staff' || userRole === 'doctor') {
+      const hasAccess = await this.hasInvoiceAccessByClinicScope(invoice, userClinicIds);
       if (!hasAccess) {
         throw new ForbiddenException(AUTH_ERRORS.INSUFFICIENT_PERMISSIONS);
       }
@@ -624,6 +918,9 @@ export class InvoiceService {
         }
         if (!service.isActive) {
           throw new BadRequestException(INVOICE_ERRORS.SERVICE_NOT_ACTIVE);
+        }
+        if (invoice.clinicId) {
+          this.assertServiceMatchesClinic(service, invoice.clinicId.toString());
         }
 
         // Price comes from the service definition — no manual entry required
@@ -841,37 +1138,67 @@ export class InvoiceService {
     userClinicId?: string,
     requestingUser?: TenantUser,
   ): Promise<any> {
-    const filter: any = {
-      patientId: new Types.ObjectId(patientId),
-      clinicId: new Types.ObjectId(clinicId),
-      invoiceStatus: 'posted',
-      paymentStatus: { $ne: 'paid' },
-      deletedAt: { $exists: false },
-    };
+    const assignedClinicIds = this.getAssignedClinicIds(userClinicId, requestingUser);
+    const isClinicBoundRole = userRole && ['staff', 'doctor'].includes(userRole);
+    let effectiveClinicId = clinicId;
 
-    // For staff role: enforce clinic scope
-    if (userRole && ['staff'].includes(userRole) && userClinicId) {
-      if (clinicId && clinicId !== userClinicId) {
+    if (isClinicBoundRole) {
+      if (assignedClinicIds.length === 0) {
+        throw new ForbiddenException({
+          message: { ar: 'لا تملك صلاحية الوصول إلى أي عيادة', en: 'No assigned clinic access' },
+          code: 'INVOICE_CLINIC_ACCESS_DENIED',
+        });
+      }
+      if (clinicId && !assignedClinicIds.includes(clinicId)) {
         throw new ForbiddenException({
           message: { ar: 'ليس لديك صلاحية الوصول إلى فواتير هذه العيادة', en: 'You do not have access to invoices for this clinic' },
           code: 'INVOICE_CLINIC_ACCESS_DENIED',
         });
       }
-      // Force clinicId to staff's clinic
-      filter.clinicId = new Types.ObjectId(userClinicId);
+      if (!effectiveClinicId && assignedClinicIds.length === 1) {
+        effectiveClinicId = assignedClinicIds[0];
+      }
     }
+
+    if (!effectiveClinicId) {
+      throw new BadRequestException({
+        message: { ar: 'معرف العيادة مطلوب', en: 'clinicId is required' },
+        code: 'CLINIC_ID_REQUIRED',
+      });
+    }
+
+    await this.assertClinicTenantAccess(effectiveClinicId, requestingUser);
+
+    const filter: any = {
+      patientId: new Types.ObjectId(patientId),
+      invoiceStatus: 'posted',
+      paymentStatus: { $ne: 'paid' },
+      deletedAt: { $exists: false },
+      $or: [
+        { clinicId: new Types.ObjectId(effectiveClinicId) },
+        { clinicId: { $exists: false } },
+      ],
+    };
+
 
     if (invoiceId) {
       filter._id = new Types.ObjectId(invoiceId);
     }
 
-    const invoice = await this.invoiceModel
-      .findOne(filter)
+    const invoices = await this.invoiceModel
+      .find(filter)
+      .sort({ createdAt: -1 })
       .populate([
         { path: 'patientId', select: 'firstName lastName patientNumber' },
         { path: 'clinicId', select: 'name' },
       ])
       .exec();
+
+    const compatible = await this.filterInvoicesCompatibleWithClinic(
+      invoices as any[],
+      effectiveClinicId,
+    );
+    const invoice = compatible[0];
 
     if (!invoice) {
       throw new NotFoundException({
@@ -902,17 +1229,25 @@ export class InvoiceService {
 
     const invoices = await this.invoiceModel
       .find({
-        clinicId: new Types.ObjectId(clinicId),
         invoiceStatus: { $in: ['draft', 'posted'] },
         paymentStatus: { $ne: 'paid' },
         deletedAt: { $exists: false },
+        $or: [
+          { clinicId: new Types.ObjectId(clinicId) },
+          { clinicId: { $exists: false } },
+        ],
       })
       .populate('patientId', 'firstName lastName patientNumber phone profilePicture status')
       .lean()
       .exec();
 
+    const clinicCompatible = await this.filterInvoicesCompatibleWithClinic(
+      invoices as any[],
+      clinicId,
+    );
+
     // Keep only invoices that have at least one service with remaining capacity
-    const bookable = invoices.filter((inv: any) =>
+    const bookable = clinicCompatible.filter((inv: any) =>
       (inv.services ?? []).some((svc: any) => {
         const active = (svc.sessions ?? []).filter((s: any) =>
           ['booked', 'in_progress', 'completed'].includes(s.sessionStatus),
@@ -965,6 +1300,7 @@ export class InvoiceService {
     search?: string,
     userRole?: string,
     userClinicId?: string,
+    userClinicIds?: string[],
     subscriptionId?: string,
   ): Promise<{ _id: string; patientNumber: string; firstName: string; lastName: string; phone?: string; profilePicture?: string }[]> {
     const invoiceFilter: any = {
@@ -973,12 +1309,26 @@ export class InvoiceService {
       deletedAt: { $exists: false },
     };
 
-    // Scope to clinic for clinic-bound roles
-    if (
-      (userRole === 'admin' || userRole === 'manager' || userRole === 'staff' || userRole === 'doctor') &&
-      userClinicId && Types.ObjectId.isValid(userClinicId)
-    ) {
-      invoiceFilter.clinicId = new Types.ObjectId(userClinicId);
+    // Scope to clinic(s) for clinic-bound roles
+    const isClinicBoundRole =
+      userRole === 'admin' ||
+      userRole === 'manager' ||
+      userRole === 'staff' ||
+      userRole === 'doctor';
+    const scopedClinicIds = this.getScopedClinicObjectIds(
+      userClinicId,
+      userClinicIds,
+    );
+    if (isClinicBoundRole) {
+      if (scopedClinicIds.length >= 1) {
+        // Include legacy/transition invoices without clinicId.
+        invoiceFilter.$or = [
+          { clinicId: { $in: scopedClinicIds } },
+          { clinicId: { $exists: false } },
+        ];
+      } else {
+        invoiceFilter._id = new Types.ObjectId('000000000000000000000000');
+      }
     } else if (userRole === 'owner' && subscriptionId && Types.ObjectId.isValid(subscriptionId)) {
       const ownerClinics = await this.clinicModel
         .find({ subscriptionId: new Types.ObjectId(subscriptionId), deletedAt: { $exists: false } })
@@ -1042,11 +1392,32 @@ export class InvoiceService {
     userClinicId?: string,
     requestingUser?: TenantUser,
   ): Promise<any[]> {
-    // Staff/doctor are always scoped to their own clinic via JWT
-    const effectiveClinicId =
-      userRole && ['staff', 'doctor'].includes(userRole) && userClinicId
-        ? userClinicId
-        : clinicId;
+    const assignedClinicIds = this.getAssignedClinicIds(userClinicId, requestingUser);
+    const isClinicBoundRole = userRole && ['staff', 'doctor'].includes(userRole);
+    let effectiveClinicId = clinicId;
+
+    if (isClinicBoundRole) {
+      if (assignedClinicIds.length === 0) {
+        throw new ForbiddenException({
+          message: { ar: 'لا تملك صلاحية الوصول إلى أي عيادة', en: 'No assigned clinic access' },
+          code: 'INVOICE_CLINIC_ACCESS_DENIED',
+        });
+      }
+      if (clinicId && !assignedClinicIds.includes(clinicId)) {
+        throw new ForbiddenException({
+          message: { ar: 'ليس لديك صلاحية الوصول إلى فواتير هذه العيادة', en: 'You do not have access to invoices for this clinic' },
+          code: 'INVOICE_CLINIC_ACCESS_DENIED',
+        });
+      }
+      if (!clinicId && assignedClinicIds.length === 1) {
+        effectiveClinicId = assignedClinicIds[0];
+      } else if (!clinicId && assignedClinicIds.length > 1) {
+        throw new BadRequestException({
+          message: { ar: 'يجب تحديد العيادة عند امتلاك أكثر من عيادة', en: 'clinicId is required when you have multiple assigned clinics' },
+          code: 'CLINIC_ID_REQUIRED',
+        });
+      }
+    }
 
     // Include 'draft' invoices so first-time booking auto-posts them;
     // exclude fully paid and cancelled invoices
@@ -1060,7 +1431,10 @@ export class InvoiceService {
     // Only filter by clinic when known (allows admin/owner to see all clinics)
     if (effectiveClinicId) {
       await this.assertClinicTenantAccess(effectiveClinicId, requestingUser);
-      filter.clinicId = new Types.ObjectId(effectiveClinicId);
+      filter.$or = [
+        { clinicId: new Types.ObjectId(effectiveClinicId) },
+        { clinicId: { $exists: false } },
+      ];
     }
 
     const invoices = await this.invoiceModel
@@ -1076,7 +1450,14 @@ export class InvoiceService {
     // A session is bookable if:
     // 1. There are already populated sessions with status 'pending' or 'cancelled'.
     // 2. OR the service has not yet reached its totalSessions limit (meaning new sessions can be created).
-    const bookableInvoices = invoices.filter((inv: any) =>
+    const clinicCompatible = effectiveClinicId
+      ? await this.filterInvoicesCompatibleWithClinic(
+          invoices as any[],
+          effectiveClinicId,
+        )
+      : invoices;
+
+    const bookableInvoices = clinicCompatible.filter((inv: any) =>
       (inv.services ?? []).some((svc: any) => {
         // Condition 1: existing available sessions
         const hasExistingAvailable = (svc.sessions ?? []).some((sess: any) =>

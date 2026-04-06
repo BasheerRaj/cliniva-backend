@@ -772,9 +772,9 @@ export class AppointmentService {
     // Role-based scoping (Priority: Roles > subscription/complex)
     if (userRole === 'doctor' && userId) {
       filter.doctorId = new Types.ObjectId(userId);
-    } else if (userRole === 'staff' && userClinicId) {
+    } else if (userRole === 'staff' && userClinicId && !clinicIds) {
       filter.clinicId = new Types.ObjectId(userClinicId);
-    } else if (userRole === 'admin' && userClinicId) {
+    } else if (userRole === 'admin' && userClinicId && !clinicIds) {
       filter.clinicId = new Types.ObjectId(userClinicId);
     } else if (userRole === 'owner' || userRole === 'manager') {
       // Owner/Manager scoping: must be restricted to their subscription/complex
@@ -812,7 +812,9 @@ export class AppointmentService {
       }
     } else if (userRole !== 'super_admin') {
         // Fallback for any other non-super-admin roles: ensure some form of scoping
-        if (userClinicId) {
+        if (filter.clinicId) {
+            // Already scoped from explicit/multi clinic filters
+        } else if (userClinicId) {
             filter.clinicId = new Types.ObjectId(userClinicId);
         } else {
             // If no identifier available and not super_admin, return nothing (safety)

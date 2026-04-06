@@ -11,6 +11,7 @@ import { Payment } from '../database/schemas/payment.schema';
 import { Invoice } from '../database/schemas/invoice.schema';
 import { Patient } from '../database/schemas/patient.schema';
 import { Clinic } from '../database/schemas/clinic.schema';
+import { Service } from '../database/schemas/service.schema';
 import { Counter } from '../database/schemas/counter.schema';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { UpdatePaymentDto } from './dto/update-payment.dto';
@@ -34,6 +35,24 @@ import { assertSameTenant, TenantUser } from '../common/utils/tenant-scope.util'
 export class PaymentService {
   private readonly logger = new Logger(PaymentService.name);
 
+  private getScopedClinicObjectIds(
+    userClinicId?: string | null,
+    userClinicIds?: string[],
+  ): Types.ObjectId[] {
+    const fromArray = Array.isArray(userClinicIds)
+      ? userClinicIds.map(String).filter(Boolean)
+      : [];
+    const merged = fromArray.length > 0
+      ? fromArray
+      : userClinicId
+      ? [String(userClinicId)]
+      : [];
+
+    return Array.from(new Set(merged))
+      .filter((id) => Types.ObjectId.isValid(id))
+      .map((id) => new Types.ObjectId(id));
+  }
+
   private async assertInvoiceTenantAccess(
     invoice: any,
     requestingUser?: TenantUser,
@@ -47,6 +66,11 @@ export class PaymentService {
       (invoice?.clinicId as any)?.toString();
 
     if (!clinicId) {
+      const invoiceSubscriptionId = (invoice as any)?.subscriptionId;
+      if (invoiceSubscriptionId) {
+        assertSameTenant(invoiceSubscriptionId, requestingUser);
+        return;
+      }
       throw new ForbiddenException(AUTH_ERRORS.INSUFFICIENT_PERMISSIONS);
     }
 
@@ -75,6 +99,20 @@ export class PaymentService {
       (payment?.clinicId as any)?._id?.toString() ??
       (payment?.clinicId as any)?.toString();
     if (!clinicId) {
+      const invoiceId =
+        (payment?.invoiceId as any)?._id?.toString?.() ??
+        (payment?.invoiceId as any)?.toString?.();
+      if (invoiceId && Types.ObjectId.isValid(invoiceId)) {
+        const invoice = await this.invoiceModel
+          .findById(invoiceId)
+          .select('subscriptionId')
+          .lean()
+          .exec();
+        if ((invoice as any)?.subscriptionId) {
+          assertSameTenant((invoice as any).subscriptionId, requestingUser);
+          return;
+        }
+      }
       throw new ForbiddenException(AUTH_ERRORS.INSUFFICIENT_PERMISSIONS);
     }
 
@@ -96,9 +134,124 @@ export class PaymentService {
     @InjectModel(Invoice.name) private invoiceModel: Model<Invoice>,
     @InjectModel(Patient.name) private patientModel: Model<Patient>,
     @InjectModel(Clinic.name) private clinicModel: Model<Clinic>,
+    @InjectModel(Service.name) private serviceModel: Model<Service>,
     @InjectModel(Counter.name) private counterModel: Model<Counter>,
     private paymentBalanceService: PaymentBalanceService,
   ) {}
+
+  private getRequestingUserClinicIds(requestingUser?: TenantUser): string[] {
+    const userAny = requestingUser as any;
+    const clinicIds = Array.isArray(userAny?.clinicIds)
+      ? userAny.clinicIds.map(String).filter(Boolean)
+      : [];
+    if (clinicIds.length > 0) return Array.from(new Set(clinicIds));
+    if (userAny?.clinicId) return [String(userAny.clinicId)];
+    return [];
+  }
+
+  private async resolveInvoiceClinicContext(
+    invoice: any,
+    requestingUser?: TenantUser,
+  ): Promise<{ clinicId: Types.ObjectId; organizationId?: Types.ObjectId }> {
+    const explicitClinicId =
+      (invoice?.clinicId as any)?._id?.toString?.() ??
+      (invoice?.clinicId as any)?.toString?.();
+
+    if (explicitClinicId && Types.ObjectId.isValid(explicitClinicId)) {
+      const clinic = await this.clinicModel
+        .findById(explicitClinicId)
+        .select('_id organizationId subscriptionId')
+        .lean()
+        .exec();
+      if (!clinic) {
+        throw new NotFoundException(NOT_FOUND_ERRORS.CLINIC);
+      }
+      if (requestingUser) {
+        assertSameTenant((clinic as any).subscriptionId, requestingUser);
+      }
+      return {
+        clinicId: new Types.ObjectId(explicitClinicId),
+        organizationId: (clinic as any).organizationId,
+      };
+    }
+
+    const serviceIds = Array.from(
+      new Set(
+        ((invoice?.services ?? []) as any[])
+          .map((svc: any) => svc?.serviceId?.toString?.() ?? String(svc?.serviceId))
+          .filter((id: string) => Types.ObjectId.isValid(id)),
+      ),
+    );
+
+    const candidateClinicIds = new Set<string>();
+    if (serviceIds.length > 0) {
+      const services = await this.serviceModel
+        .find({
+          _id: { $in: serviceIds.map((id) => new Types.ObjectId(id)) },
+          deletedAt: { $exists: false },
+        })
+        .select('_id clinicId clinicIds')
+        .lean()
+        .exec();
+
+      for (const service of services as any[]) {
+        const directClinicId = service?.clinicId?.toString?.();
+        if (directClinicId && Types.ObjectId.isValid(directClinicId)) {
+          candidateClinicIds.add(directClinicId);
+        }
+        const mappedClinicIds = Array.isArray(service?.clinicIds)
+          ? service.clinicIds.map((id: any) => id?.toString?.()).filter(Boolean)
+          : [];
+        for (const clinicId of mappedClinicIds) {
+          if (Types.ObjectId.isValid(clinicId)) {
+            candidateClinicIds.add(clinicId);
+          }
+        }
+      }
+    }
+
+    const userClinicIds = this.getRequestingUserClinicIds(requestingUser);
+    let resolvedClinicId: string | undefined;
+
+    if (candidateClinicIds.size > 0) {
+      const candidates = Array.from(candidateClinicIds);
+      const scopedCandidates =
+        userClinicIds.length > 0
+          ? candidates.filter((id) => userClinicIds.includes(id))
+          : candidates;
+      if (scopedCandidates.length === 1) {
+        resolvedClinicId = scopedCandidates[0];
+      }
+    } else if (userClinicIds.length === 1) {
+      resolvedClinicId = userClinicIds[0];
+    }
+
+    if (!resolvedClinicId) {
+      throw new BadRequestException({
+        message: {
+          ar: 'تعذر تحديد العيادة لهذه الفاتورة. يرجى اختيار عيادة للفواتير الجديدة أولاً',
+          en: 'Unable to resolve clinic for this invoice. Please set/select clinic for new invoices first',
+        },
+        code: 'INVOICE_CLINIC_UNRESOLVED',
+      });
+    }
+
+    const clinic = await this.clinicModel
+      .findById(resolvedClinicId)
+      .select('_id organizationId subscriptionId')
+      .lean()
+      .exec();
+    if (!clinic) {
+      throw new NotFoundException(NOT_FOUND_ERRORS.CLINIC);
+    }
+    if (requestingUser) {
+      assertSameTenant((clinic as any).subscriptionId, requestingUser);
+    }
+    return {
+      clinicId: new Types.ObjectId(resolvedClinicId),
+      organizationId: (clinic as any).organizationId,
+    };
+  }
 
   /**
    * Create a new payment (single-invoice or multi-invoice)
@@ -160,6 +313,26 @@ export class PaymentService {
       invoiceDocs.push(invoice);
     }
 
+    const invoiceClinicContexts: Array<{ clinicId: Types.ObjectId; organizationId?: Types.ObjectId }> = [];
+    for (const invoice of invoiceDocs) {
+      invoiceClinicContexts.push(
+        await this.resolveInvoiceClinicContext(invoice, requestingUser),
+      );
+    }
+    const uniqueClinicIds = Array.from(
+      new Set(invoiceClinicContexts.map((ctx) => ctx.clinicId.toString())),
+    );
+    if (uniqueClinicIds.length > 1) {
+      throw new BadRequestException({
+        message: {
+          ar: 'لا يمكن تسجيل دفعة واحدة لفواتير من عيادات مختلفة',
+          en: 'Cannot create a single payment for invoices from different clinics',
+        },
+        code: 'MULTI_INVOICE_CLINIC_MISMATCH',
+      });
+    }
+    const primaryClinicContext = invoiceClinicContexts[0];
+
     // Validate total matches
     const allocTotal = allocations.reduce((s, a) => s + a.amount, 0);
     if (Math.abs(allocTotal - createPaymentDto.amount) > 0.01) {
@@ -193,8 +366,9 @@ export class PaymentService {
         amount: a.amount,
       })),
       patientId: new Types.ObjectId(createPaymentDto.patientId),
-      clinicId: firstInvoice.clinicId,
-      organizationId: (firstInvoice as any).organizationId,
+      clinicId: primaryClinicContext.clinicId,
+      organizationId:
+        (firstInvoice as any).organizationId ?? primaryClinicContext.organizationId,
       amount: createPaymentDto.amount,
       paymentMethod: createPaymentDto.paymentMethod,
       paymentDate,
@@ -323,6 +497,10 @@ export class PaymentService {
       throw new BadRequestException(PAYMENT_ERRORS.INVOICE_NOT_POSTED);
     }
     await this.assertInvoiceTenantAccess(invoice, requestingUser);
+    const invoiceClinicContext = await this.resolveInvoiceClinicContext(
+      invoice,
+      requestingUser,
+    );
 
     // Validate payment amount > 0
     if (createPaymentDto.amount <= 0) {
@@ -397,8 +575,9 @@ export class PaymentService {
         { invoiceId: new Types.ObjectId(createPaymentDto.invoiceId), amount: createPaymentDto.amount },
       ],
       patientId: new Types.ObjectId(createPaymentDto.patientId),
-      clinicId: invoice.clinicId,
-      organizationId: (invoice as any).organizationId,
+      clinicId: invoiceClinicContext.clinicId,
+      organizationId:
+        (invoice as any).organizationId ?? invoiceClinicContext.organizationId,
       amount: createPaymentDto.amount,
       paymentMethod: createPaymentDto.paymentMethod,
       paymentDate,
@@ -539,6 +718,7 @@ export class PaymentService {
     userId: string,
     userRole: string,
     userClinicId: string | null,
+    userClinicIds: string[] | undefined,
     userOrganizationId: string | null,
     userComplexId?: string | null,
     subscriptionId?: string | null,
@@ -547,15 +727,35 @@ export class PaymentService {
 
     // Clinic scoping — applied directly from req.user, not from query params,
     // to prevent privilege escalation via query param injection.
-    if (
-      (userRole === 'staff' || userRole === 'doctor' || userRole === 'admin' || userRole === 'manager') &&
-      userClinicId && Types.ObjectId.isValid(userClinicId)
-    ) {
-      // Hard-lock to user's assigned clinic
-      filter.clinicId = new Types.ObjectId(userClinicId);
-    } else if (userRole === 'staff' || userRole === 'doctor' || userRole === 'admin' || userRole === 'manager') {
-      // Scoped role with no clinic assigned — deny all
-      filter._id = new Types.ObjectId('000000000000000000000000');
+    const isClinicBoundRole =
+      userRole === 'staff' ||
+      userRole === 'doctor' ||
+      userRole === 'admin' ||
+      userRole === 'manager';
+    const scopedClinicIds = this.getScopedClinicObjectIds(
+      userClinicId,
+      userClinicIds,
+    );
+    if (isClinicBoundRole) {
+      if (queryDto.clinicId && Types.ObjectId.isValid(queryDto.clinicId)) {
+        const requestedClinicId = new Types.ObjectId(queryDto.clinicId);
+        const hasAccess = scopedClinicIds.some(
+          (clinicObjectId) =>
+            clinicObjectId.toString() === requestedClinicId.toString(),
+        );
+        if (!hasAccess) {
+          filter._id = new Types.ObjectId('000000000000000000000000');
+        } else {
+          filter.clinicId = requestedClinicId;
+        }
+      } else if (scopedClinicIds.length === 1) {
+        filter.clinicId = scopedClinicIds[0];
+      } else if (scopedClinicIds.length > 1) {
+        filter.clinicId = { $in: scopedClinicIds };
+      } else {
+        // Scoped role with no clinic assigned — deny all
+        filter._id = new Types.ObjectId('000000000000000000000000');
+      }
     } else if (userRole === 'owner' && userOrganizationId && Types.ObjectId.isValid(userOrganizationId)) {
       // Company-plan owner: use $or to catch payments for clinics missing organizationId
       if (subscriptionId && Types.ObjectId.isValid(subscriptionId)) {

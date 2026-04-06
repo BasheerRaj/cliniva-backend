@@ -515,6 +515,26 @@ export class ClinicService {
       }
     }
 
+    const normalizedLegacyPhone = this.normalizePhoneValue(createClinicDto.phone);
+    if (
+      normalizedLegacyPhone &&
+      !ValidationUtil.validatePhone(normalizedLegacyPhone)
+    ) {
+      throw new BadRequestException('Invalid phone number format');
+    }
+
+    const normalizedCreatePhoneNumbers = this.normalizePhoneNumbers(
+      (createClinicDto as any).phone,
+      (createClinicDto as any).phoneNumbers,
+    );
+    if (
+      normalizedCreatePhoneNumbers.some(
+        (entry) => !ValidationUtil.validatePhone(entry.number),
+      )
+    ) {
+      throw new BadRequestException('Invalid phone number format');
+    }
+
     if (this.hasBusinessProfileData(createClinicDto)) {
       const businessProfileValidation = ValidationUtil.validateBusinessProfile({
         yearEstablished: createClinicDto.yearEstablished,
@@ -542,7 +562,10 @@ export class ClinicService {
         : null,
       subscriptionId: new Types.ObjectId(resolvedSubscriptionId),
       ownerId: resolvedOwnerId ? new Types.ObjectId(resolvedOwnerId) : null,
+      phoneNumbers: normalizedCreatePhoneNumbers,
     };
+
+    delete (clinicData as any).phone;
 
     const clinic = new this.clinicModel(clinicData);
     return await clinic.save();
@@ -919,17 +942,25 @@ export class ClinicService {
     }
 
     // Handle phoneNumbers array (preferred) or legacy single phone string
-    if (Array.isArray((updateClinicDto as any).phoneNumbers)) {
-      const phones: string[] = (updateClinicDto as any).phoneNumbers;
-      clinic.phoneNumbers = phones
-        .filter(Boolean)
-        .map((n) => ({ number: n, type: 'primary' }) as any);
+    if (
+      (updateClinicDto as any).phoneNumbers !== undefined ||
+      (updateClinicDto as any).phone !== undefined
+    ) {
+      const normalizedUpdatePhoneNumbers = this.normalizePhoneNumbers(
+        (updateClinicDto as any).phone,
+        (updateClinicDto as any).phoneNumbers,
+      );
+
+      if (
+        normalizedUpdatePhoneNumbers.some(
+          (entry) => !ValidationUtil.validatePhone(entry.number),
+        )
+      ) {
+        throw new BadRequestException('Invalid phone number format');
+      }
+
+      clinic.phoneNumbers = normalizedUpdatePhoneNumbers as any;
       delete (updateClinicDto as any).phoneNumbers;
-    } else if ((updateClinicDto as any).phone !== undefined) {
-      const phoneStr = (updateClinicDto as any).phone;
-      clinic.phoneNumbers = phoneStr
-        ? [{ number: phoneStr, type: 'primary' } as any]
-        : [];
       delete (updateClinicDto as any).phone;
     }
 
@@ -1001,6 +1032,49 @@ export class ClinicService {
       data.vatNumber ||
       data.crNumber
     );
+  }
+
+  private normalizePhoneNumbers(
+    legacyPhone?: string,
+    phoneNumbersInput?: any[],
+  ): Array<{ number: string; type: 'primary'; label: string }> {
+    const extracted =
+      phoneNumbersInput !== undefined
+        ? this.extractPhoneNumberStrings(phoneNumbersInput)
+        : this.extractPhoneNumberStrings(legacyPhone ? [legacyPhone] : []);
+
+    const unique = Array.from(new Set(extracted));
+    return unique.map((number) => ({ number, type: 'primary', label: 'Main' }));
+  }
+
+  private extractPhoneNumberStrings(values?: any[]): string[] {
+    if (!Array.isArray(values)) {
+      return [];
+    }
+
+    return values
+      .map((value) => {
+        if (typeof value === 'string') return this.normalizePhoneValue(value);
+        if (value && typeof value === 'object' && typeof value.number === 'string') {
+          return this.normalizePhoneValue(value.number);
+        }
+        return '';
+      })
+      .filter(Boolean);
+  }
+
+  private normalizePhoneValue(value?: string): string {
+    if (!value) return '';
+    const trimmed = value.trim();
+    if (!trimmed) return '';
+    if (trimmed.startsWith('+')) return trimmed;
+
+    const cleaned = trimmed.replace(/[\s-]/g, '');
+    if (/^\d+$/.test(cleaned)) {
+      return `+${cleaned}`;
+    }
+
+    return trimmed;
   }
 
   /**

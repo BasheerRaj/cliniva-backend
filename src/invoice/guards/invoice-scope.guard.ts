@@ -67,62 +67,88 @@ export class InvoiceScopeGuard implements CanActivate {
 
   /**
    * Apply staff/doctor scope restriction
-   * 
-   * Security: Staff/Doctor can ONLY view invoices for their assigned clinic
-   * Override any clinicId provided in query to prevent privilege escalation
+   *
+   * Security: Staff/Doctor can ONLY view invoices for assigned clinics.
    */
   private applyStaffScope(request: any, user: any): void {
-    if (!user.clinicId) {
+    const allowedClinicIds = this.getAllowedClinicIds(user);
+    if (allowedClinicIds.length === 0) {
       this.logger.warn(
-        `Staff/Doctor user ${user.id} has no assigned clinic - denying access`,
+        `Staff/Doctor user ${user.id} has no assigned clinics - denying access`,
       );
-      // Staff without clinic assignment cannot view any invoices
       request.query.clinicId = 'none';
       return;
     }
 
-    const originalClinicId = request.query.clinicId;
+    const requestedClinicId =
+      typeof request.query.clinicId === 'string' ? request.query.clinicId : undefined;
 
-    // Force clinicId to be the staff's assigned clinic
-    request.query.clinicId = user.clinicId.toString();
-
-    if (originalClinicId && originalClinicId !== user.clinicId.toString()) {
-      this.logger.warn(
-        `Staff/Doctor ${user.id} attempted to access invoices for clinic ${originalClinicId} - request blocked`,
-      );
+    if (requestedClinicId) {
+      if (!allowedClinicIds.includes(requestedClinicId)) {
+        this.logger.warn(
+          `Staff/Doctor ${user.id} attempted to access invoices for unauthorized clinic ${requestedClinicId}`,
+        );
+        request.query.clinicId = 'none';
+        return;
+      }
+      request.query.clinicId = requestedClinicId;
+      return;
     }
 
-    this.logger.debug(
-      `Applied staff scope: clinicId=${user.clinicId} for user ${user.id}`,
-    );
+    if (allowedClinicIds.length === 1) {
+      request.query.clinicId = allowedClinicIds[0];
+    } else {
+      delete request.query.clinicId;
+    }
+
+    this.logger.debug(`Applied staff scope for user ${user.id} with clinics=${allowedClinicIds.join(',')}`);
   }
 
   /**
    * Apply admin/manager scope restriction
    *
-   * Admins and Managers are scoped to their assigned clinic.
-   * Override any clinicId provided in query to prevent cross-clinic access.
+   * Admins and Managers are scoped to their assigned clinics.
    */
   private applyAdminScope(request: any, user: any): void {
-    if (!user.clinicId) {
+    const allowedClinicIds = this.getAllowedClinicIds(user);
+    if (allowedClinicIds.length === 0) {
       this.logger.warn(
-        `Admin/Manager user ${user.id} has no assigned clinic - denying access`,
+        `Admin/Manager user ${user.id} has no assigned clinics - denying access`,
       );
       request.query.clinicId = 'none';
       return;
     }
 
-    const originalClinicId = request.query.clinicId;
-    request.query.clinicId = user.clinicId.toString();
-
-    if (originalClinicId && originalClinicId !== user.clinicId.toString()) {
-      this.logger.warn(
-        `Admin/Manager ${user.id} attempted to access invoices for clinic ${originalClinicId} - request blocked`,
-      );
+    const requestedClinicId =
+      typeof request.query.clinicId === 'string' ? request.query.clinicId : undefined;
+    if (requestedClinicId) {
+      if (!allowedClinicIds.includes(requestedClinicId)) {
+        this.logger.warn(
+          `Admin/Manager ${user.id} attempted to access invoices for unauthorized clinic ${requestedClinicId}`,
+        );
+        request.query.clinicId = 'none';
+        return;
+      }
+      request.query.clinicId = requestedClinicId;
+      return;
     }
 
-    this.logger.debug(
-      `Applied admin scope: clinicId=${user.clinicId} for user ${user.id}`,
-    );
+    if (allowedClinicIds.length === 1) {
+      request.query.clinicId = allowedClinicIds[0];
+    } else {
+      delete request.query.clinicId;
+    }
+
+    this.logger.debug(`Applied admin scope for user ${user.id} with clinics=${allowedClinicIds.join(',')}`);
+  }
+
+  private getAllowedClinicIds(user: any): string[] {
+    const clinicIds = Array.isArray(user?.clinicIds)
+      ? user.clinicIds.map(String).filter(Boolean)
+      : [];
+    if (clinicIds.length > 0) {
+      return Array.from(new Set(clinicIds));
+    }
+    return user?.clinicId ? [String(user.clinicId)] : [];
   }
 }

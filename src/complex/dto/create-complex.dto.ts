@@ -118,6 +118,15 @@ export class CreateComplexDto {
   phone?: string;
 
   @ApiPropertyOptional({
+    description: 'Complex phone numbers',
+    example: ['+966501234567', '+966501234568'],
+    type: [String],
+  })
+  @IsArray()
+  @IsOptional()
+  phoneNumbers?: any[];
+
+  @ApiPropertyOptional({
     description: 'Primary email address',
     example: 'info@centralmedical.com',
     type: String,
@@ -276,6 +285,15 @@ export class UpdateComplexDto {
   @IsString()
   @IsOptional()
   phone?: string;
+
+  @ApiPropertyOptional({
+    description: 'Complex phone numbers',
+    example: ['+966501234567', '+966501234568'],
+    type: [String],
+  })
+  @IsArray()
+  @IsOptional()
+  phoneNumbers?: any[];
 
   @ApiPropertyOptional({
     description: 'Primary email address',

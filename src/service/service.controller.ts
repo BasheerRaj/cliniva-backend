@@ -227,7 +227,12 @@ export class ServiceController {
       subscriptionId: req?.user?.subscriptionId,
       complexId: req?.user?.complexId,
       clinicId: req?.user?.clinicId,
+      clinicIds: Array.isArray(req?.user?.clinicIds)
+        ? req.user.clinicIds.map(String)
+        : [],
       role: req?.user?.role,
+      userId: req?.user?.id || req?.user?.userId || req?.user?.sub,
+      id: req?.user?.id || req?.user?.userId || req?.user?.sub,
     };
     const result = await this.serviceService.getHeaderFilter(ids, userScope, clinicId);
     return ResponseBuilder.success(result, {

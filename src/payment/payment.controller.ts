@@ -265,6 +265,9 @@ export class PaymentController {
       const userId = user.id || user.userId || user.sub;
       const userRole = user.role;
       const userClinicId = user.clinicId || null;
+      const userClinicIds = Array.isArray(user?.clinicIds)
+        ? user.clinicIds.map(String)
+        : undefined;
       const userOrganizationId = user.organizationId || null;
       const userComplexId = user.complexId || null;
 
@@ -273,6 +276,7 @@ export class PaymentController {
         userId,
         userRole,
         userClinicId,
+        userClinicIds,
         userOrganizationId,
         userComplexId,
         user.subscriptionId || null,

@@ -5,6 +5,7 @@ import {
   IsEmail,
   IsUrl,
   IsNumber,
+  IsArray,
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
@@ -126,6 +127,15 @@ export class CreateOrganizationDto {
   @IsString()
   @IsOptional()
   phone?: string;
+
+  @ApiPropertyOptional({
+    description: 'Organization contact phone numbers',
+    example: ['+966501234567', '+966501234568'],
+    type: [String],
+  })
+  @IsArray()
+  @IsOptional()
+  phoneNumbers?: any[];
 
   @ApiPropertyOptional({
     description: 'Organization contact email (must be unique)',
@@ -306,6 +316,15 @@ export class UpdateOrganizationDto {
   @IsString()
   @IsOptional()
   phone?: string;
+
+  @ApiPropertyOptional({
+    description: 'Organization contact phone numbers',
+    example: ['+966501234567', '+966501234568'],
+    type: [String],
+  })
+  @IsArray()
+  @IsOptional()
+  phoneNumbers?: any[];
 
   @ApiPropertyOptional({
     description: 'Organization contact email (must be unique)',

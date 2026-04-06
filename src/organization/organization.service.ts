@@ -124,12 +124,7 @@ export class OrganizationService {
       throw new BadRequestException('Please provide a valid email address');
     }
 
-    if (
-      createOrganizationDto.phone &&
-      !ValidationUtil.validatePhone(createOrganizationDto.phone)
-    ) {
-      throw new BadRequestException('Please provide a valid phone number');
-    }
+    this.validateAndNormalizePhoneInputs(createOrganizationDto as any);
 
     if (
       createOrganizationDto.googleLocation &&
@@ -309,12 +304,7 @@ export class OrganizationService {
       throw new BadRequestException('Invalid email format');
     }
 
-    if (
-      updateOrganizationDto.phone &&
-      !ValidationUtil.validatePhone(updateOrganizationDto.phone)
-    ) {
-      throw new BadRequestException('Invalid phone number format');
-    }
+    this.validateAndNormalizePhoneInputs(updateOrganizationDto as any);
 
     if (
       updateOrganizationDto.googleLocation &&
@@ -433,10 +423,11 @@ export class OrganizationService {
       errors.push('Invalid email format');
     }
 
-    if (
-      organizationData.phone &&
-      !ValidationUtil.validatePhone(organizationData.phone)
-    ) {
+    const phoneNumbers = this.extractPhoneNumberStrings(organizationData.phoneNumbers);
+    if (organizationData.phone && !ValidationUtil.validatePhone(organizationData.phone)) {
+      errors.push('Invalid phone number format');
+    }
+    if (phoneNumbers.some((phone) => !ValidationUtil.validatePhone(phone))) {
       errors.push('Invalid phone number format');
     }
 
@@ -461,6 +452,15 @@ export class OrganizationService {
   private prepareOrganizationUpdatePayload(dto: any): Record<string, any> {
     const payload = { ...dto };
 
+    const normalizedPhoneNumbers = this.normalizePhoneNumbers(
+      payload.phone,
+      payload.phoneNumbers,
+    );
+    if (normalizedPhoneNumbers !== undefined) {
+      payload.phoneNumbers = normalizedPhoneNumbers;
+    }
+    delete payload.phone;
+
     // Schema expects address as object { street, city, state, postalCode, country, googleLocation }
     // DTO may send address as string - transform for schema compatibility
     if (payload.address !== undefined) {
@@ -482,6 +482,69 @@ export class OrganizationService {
     }
 
     return payload;
+  }
+
+  private validateAndNormalizePhoneInputs(dto: any): void {
+    const normalizedPhoneNumbers = this.normalizePhoneNumbers(
+      dto.phone,
+      dto.phoneNumbers,
+    );
+
+    if (normalizedPhoneNumbers !== undefined) {
+      dto.phoneNumbers = normalizedPhoneNumbers;
+    }
+
+    const numbersToValidate = normalizedPhoneNumbers ?? [];
+    if (numbersToValidate.some((phone) => !ValidationUtil.validatePhone(phone.number))) {
+      throw new BadRequestException('Please provide a valid phone number');
+    }
+  }
+
+  private normalizePhoneNumbers(
+    legacyPhone?: string,
+    phoneNumbersInput?: any[],
+  ): Array<{ number: string; type: 'primary'; label: string }> | undefined {
+    if (phoneNumbersInput === undefined && legacyPhone === undefined) {
+      return undefined;
+    }
+
+    const extracted =
+      phoneNumbersInput !== undefined
+        ? this.extractPhoneNumberStrings(phoneNumbersInput)
+        : this.extractPhoneNumberStrings(legacyPhone ? [legacyPhone] : []);
+
+    const unique = Array.from(new Set(extracted));
+    return unique.map((number) => ({ number, type: 'primary', label: 'Main' }));
+  }
+
+  private extractPhoneNumberStrings(values?: any[]): string[] {
+    if (!Array.isArray(values)) {
+      return [];
+    }
+
+    return values
+      .map((value) => {
+        if (typeof value === 'string') return this.normalizePhoneValue(value);
+        if (value && typeof value === 'object' && typeof value.number === 'string') {
+          return this.normalizePhoneValue(value.number);
+        }
+        return '';
+      })
+      .filter(Boolean);
+  }
+
+  private normalizePhoneValue(value?: string): string {
+    if (!value) return '';
+    const trimmed = value.trim();
+    if (!trimmed) return '';
+    if (trimmed.startsWith('+')) return trimmed;
+
+    const cleaned = trimmed.replace(/[\s-]/g, '');
+    if (/^\d+$/.test(cleaned)) {
+      return `+${cleaned}`;
+    }
+
+    return trimmed;
   }
 
   // ======== VALIDATION METHODS ========

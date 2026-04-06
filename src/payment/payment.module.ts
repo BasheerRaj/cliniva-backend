@@ -8,6 +8,7 @@ import { Invoice, InvoiceSchema } from '../database/schemas/invoice.schema';
 import { Patient, PatientSchema } from '../database/schemas/patient.schema';
 import { Clinic, ClinicSchema } from '../database/schemas/clinic.schema';
 import { Counter, CounterSchema } from '../database/schemas/counter.schema';
+import { Service, ServiceSchema } from '../database/schemas/service.schema';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { Counter, CounterSchema } from '../database/schemas/counter.schema';
       { name: Patient.name, schema: PatientSchema },
       { name: Clinic.name, schema: ClinicSchema },
       { name: Counter.name, schema: CounterSchema },
+      { name: Service.name, schema: ServiceSchema },
     ]),
   ],
   controllers: [PaymentController],

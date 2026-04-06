@@ -2000,6 +2000,7 @@ export class ServiceService {
       subscriptionId?: string;
       complexId?: string;
       clinicId?: string;
+      clinicIds?: string[];
       role?: string;
       userId?: string;
       id?: string;
@@ -2022,7 +2023,14 @@ export class ServiceService {
       }
     } else {
       // admin, manager, doctor, staff — scope to the most specific identifier available
-      if (userScope.clinicId && Types.ObjectId.isValid(userScope.clinicId)) {
+      const scopedClinicIds = Array.isArray(userScope.clinicIds)
+        ? userScope.clinicIds.filter((id) => Types.ObjectId.isValid(id))
+        : [];
+      if (scopedClinicIds.length > 0) {
+        clinicScopeFilter._id = {
+          $in: scopedClinicIds.map((id) => new Types.ObjectId(id)),
+        };
+      } else if (userScope.clinicId && Types.ObjectId.isValid(userScope.clinicId)) {
         clinicScopeFilter._id = new Types.ObjectId(userScope.clinicId);
       } else if (userScope.complexId && Types.ObjectId.isValid(userScope.complexId)) {
         clinicScopeFilter.complexId = new Types.ObjectId(userScope.complexId);
@@ -2034,7 +2042,15 @@ export class ServiceService {
     // If a specific clinicId is requested from the frontend, ensure it's within the allowed scope
     if (clinicIdParam && Types.ObjectId.isValid(clinicIdParam)) {
       const requestedClinicId = new Types.ObjectId(clinicIdParam);
-      if (clinicScopeFilter._id) {
+      if (clinicScopeFilter._id && clinicScopeFilter._id.$in) {
+        const allowed = clinicScopeFilter._id.$in.some(
+          (id: any) => id.toString() === requestedClinicId.toString(),
+        );
+        if (!allowed) {
+          return { clinicIds: [], doctorIds: [] };
+        }
+        clinicScopeFilter._id = requestedClinicId;
+      } else if (clinicScopeFilter._id) {
         // If already scoped to a clinic, it MUST match
         if (clinicScopeFilter._id.toString() !== requestedClinicId.toString()) {
           return { clinicIds: [], doctorIds: [] };
@@ -2054,7 +2070,12 @@ export class ServiceService {
       return { clinicIds: [], doctorIds: [] };
     }
 
-    const serviceObjectIds = serviceIds.map((id) => new Types.ObjectId(id));
+    const validServiceIds = serviceIds.filter((id) => Types.ObjectId.isValid(id));
+    if (validServiceIds.length === 0) {
+      return { clinicIds: [], doctorIds: [] };
+    }
+
+    const serviceObjectIds = validServiceIds.map((id) => new Types.ObjectId(id));
 
     const junctionFilter = {
       serviceId: { $in: serviceObjectIds },
@@ -2124,9 +2145,10 @@ export class ServiceService {
     // Similarly for clinics
     let isAnyServiceClinicPermissive = false;
     for (const sId of serviceObjectIds) {
+      // Must be global per service (not limited to allowedClinics) to stay
+      // consistent with appointment validation logic.
       const count = await this.clinicServiceModel.countDocuments({
         serviceId: sId,
-        clinicId: { $in: allowedClinics },
         isActive: true,
       });
       if (count === 0) {
@@ -2137,6 +2159,11 @@ export class ServiceService {
 
     if (isAnyServiceClinicPermissive) {
       finalClinicIds = allowedClinics;
+    }
+
+    // If no clinics are valid for selected services, doctors list must also be empty.
+    if (!finalClinicIds.length) {
+      finalDoctorIds = [];
     }
 
     return { clinicIds: finalClinicIds, doctorIds: finalDoctorIds };

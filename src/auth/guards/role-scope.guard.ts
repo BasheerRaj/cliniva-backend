@@ -128,28 +128,66 @@ export class RoleScopeGuard implements CanActivate {
    * Override any clinicId provided in query to prevent privilege escalation
    */
   private applyStaffScope(request: any, user: any): void {
-    if (!user.clinicId) {
+    const assignedClinicIds: string[] = Array.isArray(user?.clinicIds)
+      ? user.clinicIds.map((id: any) => String(id)).filter(Boolean)
+      : user?.clinicId
+      ? [String(user.clinicId)]
+      : [];
+
+    if (assignedClinicIds.length === 0) {
       this.logger.warn(
         `Staff user ${user.id} has no assigned clinic - denying access`,
       );
       // Staff without clinic assignment cannot view any appointments
       request.query.clinicId = 'none';
+      request.query.clinicIds = 'none';
       return;
     }
 
     const originalClinicId = request.query.clinicId;
+    const originalClinicIds = String(request.query.clinicIds || '')
+      .split(',')
+      .map((id: string) => id.trim())
+      .filter(Boolean);
 
-    // Force clinicId to be the staff's assigned clinic
-    request.query.clinicId = user.clinicId.toString();
+    if (originalClinicId) {
+      if (assignedClinicIds.includes(String(originalClinicId))) {
+        request.query.clinicId = String(originalClinicId);
+        request.query.clinicIds = String(originalClinicId);
+      } else {
+        request.query.clinicId = 'none';
+        request.query.clinicIds = 'none';
+      }
+      return;
+    }
 
-    if (originalClinicId && originalClinicId !== user.clinicId.toString()) {
+    const scopedClinicIds =
+      originalClinicIds.length > 0
+        ? originalClinicIds.filter((id: string) => assignedClinicIds.includes(id))
+        : assignedClinicIds;
+
+    if (scopedClinicIds.length === 0) {
+      request.query.clinicId = 'none';
+      request.query.clinicIds = 'none';
+      return;
+    }
+
+    if (scopedClinicIds.length === 1) {
+      request.query.clinicId = scopedClinicIds[0];
+      request.query.clinicIds = scopedClinicIds[0];
+    } else {
+      delete request.query.clinicId;
+      request.query.clinicIds = scopedClinicIds.join(',');
+    }
+
+    if (originalClinicId && !assignedClinicIds.includes(String(originalClinicId))) {
       this.logger.warn(
         `Staff ${user.id} attempted to access appointments for clinic ${originalClinicId} - request blocked`,
       );
     }
 
     this.logger.debug(
-      `Applied staff scope: clinicId=${user.clinicId} for user ${user.id}`,
+      `Applied staff scope: clinics=${(request.query.clinicIds || request.query.clinicId) as string} for user ${user.id}`,
     );
   }
 }

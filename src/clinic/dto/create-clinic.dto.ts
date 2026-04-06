@@ -111,6 +111,15 @@ export class CreateClinicDto {
   phone?: string;
 
   @ApiPropertyOptional({
+    description: 'Clinic phone numbers',
+    example: ['+966501234567', '+966501234568'],
+    type: [String],
+  })
+  @IsArray()
+  @IsOptional()
+  phoneNumbers?: any[];
+
+  @ApiPropertyOptional({
     description: 'Clinic email address',
     example: 'cardiology@example.com',
     type: String,

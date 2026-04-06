@@ -302,9 +302,12 @@ export class ComplexService {
       });
     }
 
+    const normalizedCreateLegacyPhone = this.normalizePhoneValue(
+      createComplexDto.phone,
+    );
     if (
-      createComplexDto.phone &&
-      !ValidationUtil.validatePhone(createComplexDto.phone)
+      normalizedCreateLegacyPhone &&
+      !ValidationUtil.validatePhone(normalizedCreateLegacyPhone)
     ) {
       throw new BadRequestException({
         code: 'COMPLEX_010',
@@ -312,7 +315,28 @@ export class ComplexService {
       });
     }
 
-    const { phone, googleLocation, departmentIds: createDepartmentIds, newDepartmentNames, ...restDto } = createComplexDto as any;
+    const normalizedCreatePhoneNumbers = this.normalizePhoneNumbers(
+      (createComplexDto as any).phone,
+      (createComplexDto as any).phoneNumbers,
+    );
+    if (
+      normalizedCreatePhoneNumbers.some(
+        (entry) => !ValidationUtil.validatePhone(entry.number),
+      )
+    ) {
+      throw new BadRequestException({
+        code: 'COMPLEX_010',
+        message: ERROR_CODES.COMPLEX_010.message,
+      });
+    }
+
+    const {
+      phone,
+      googleLocation,
+      departmentIds: createDepartmentIds,
+      newDepartmentNames,
+      ...restDto
+    } = createComplexDto as any;
 
     const complexData: any = {
       ...restDto,
@@ -324,8 +348,8 @@ export class ComplexService {
       status: 'active',
     };
 
-    if (phone) {
-      complexData.phoneNumbers = [{ number: phone, type: 'primary' }];
+    if (normalizedCreatePhoneNumbers.length > 0) {
+      complexData.phoneNumbers = normalizedCreatePhoneNumbers;
     }
 
     if (googleLocation) {
@@ -816,12 +840,33 @@ export class ComplexService {
 
     // Validate phone format if provided (Requirement 4.7)
     if (updateComplexDto.phone) {
-      if (!ValidationUtil.validatePhone(updateComplexDto.phone)) {
+      const normalizedUpdateLegacyPhone = this.normalizePhoneValue(
+        updateComplexDto.phone,
+      );
+      if (
+        normalizedUpdateLegacyPhone &&
+        !ValidationUtil.validatePhone(normalizedUpdateLegacyPhone)
+      ) {
         throw new BadRequestException({
           code: 'COMPLEX_010',
           message: ERROR_CODES.COMPLEX_010.message,
         });
       }
+    }
+
+    const normalizedUpdatePhoneNumbers = this.normalizePhoneNumbers(
+      (updateComplexDto as any).phone,
+      (updateComplexDto as any).phoneNumbers,
+    );
+    if (
+      normalizedUpdatePhoneNumbers.some(
+        (entry) => !ValidationUtil.validatePhone(entry.number),
+      )
+    ) {
+      throw new BadRequestException({
+        code: 'COMPLEX_010',
+        message: ERROR_CODES.COMPLEX_010.message,
+      });
     }
 
     // Validate business profile data if provided
@@ -846,10 +891,16 @@ export class ComplexService {
     }
 
     // Update complex fields (excluding departmentIds as it's not a direct field)
-    const { departmentIds, phone: updatePhone, googleLocation: updateGoogleLocation, ...updateData } = updateComplexDto as any;
+    const {
+      departmentIds,
+      phone: updatePhone,
+      phoneNumbers: updatePhoneNumbers,
+      googleLocation: updateGoogleLocation,
+      ...updateData
+    } = updateComplexDto as any;
 
-    if (updatePhone) {
-      (updateData as any).phoneNumbers = [{ number: updatePhone, type: 'primary' }];
+    if (updatePhone !== undefined || updatePhoneNumbers !== undefined) {
+      (updateData as any).phoneNumbers = normalizedUpdatePhoneNumbers;
     }
 
     if (updateGoogleLocation) {
@@ -2254,6 +2305,49 @@ export class ComplexService {
     }
 
     return conflicts;
+  }
+
+  private normalizePhoneNumbers(
+    legacyPhone?: string,
+    phoneNumbersInput?: any[],
+  ): Array<{ number: string; type: 'primary'; label: string }> {
+    const extracted =
+      phoneNumbersInput !== undefined
+        ? this.extractPhoneNumberStrings(phoneNumbersInput)
+        : this.extractPhoneNumberStrings(legacyPhone ? [legacyPhone] : []);
+
+    const unique = Array.from(new Set(extracted));
+    return unique.map((number) => ({ number, type: 'primary', label: 'Main' }));
+  }
+
+  private extractPhoneNumberStrings(values?: any[]): string[] {
+    if (!Array.isArray(values)) {
+      return [];
+    }
+
+    return values
+      .map((value) => {
+        if (typeof value === 'string') return this.normalizePhoneValue(value);
+        if (value && typeof value === 'object' && typeof value.number === 'string') {
+          return this.normalizePhoneValue(value.number);
+        }
+        return '';
+      })
+      .filter(Boolean);
+  }
+
+  private normalizePhoneValue(value?: string): string {
+    if (!value) return '';
+    const trimmed = value.trim();
+    if (!trimmed) return '';
+    if (trimmed.startsWith('+')) return trimmed;
+
+    const cleaned = trimmed.replace(/[\s-]/g, '');
+    if (/^\d+$/.test(cleaned)) {
+      return `+${cleaned}`;
+    }
+
+    return trimmed;
   }
 
   /**

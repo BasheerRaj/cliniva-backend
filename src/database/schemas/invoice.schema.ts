@@ -31,8 +31,8 @@ export class Invoice extends Document {
   @Prop({ type: Types.ObjectId, ref: 'Organization', index: true })
   organizationId?: Types.ObjectId; // Optional: absent for clinic-plan tenants
 
-  @Prop({ type: Types.ObjectId, ref: 'Clinic', required: true, index: true })
-  clinicId: Types.ObjectId;
+  @Prop({ type: Types.ObjectId, ref: 'Clinic', required: false, index: true })
+  clinicId?: Types.ObjectId;
 
   @Prop({ type: Types.ObjectId, ref: 'Subscription', required: true, index: true })
   subscriptionId: Types.ObjectId; // Mandatory top-level tenant isolation (M1 Fix)
@@ -226,8 +226,22 @@ InvoiceSchema.index({ createdAt: -1 });
 // Soft delete filtering
 InvoiceSchema.index({ deletedAt: 1 });
 
-// Unique invoice number per clinic (works for all plan types including clinic-plan with no org)
-InvoiceSchema.index({ clinicId: 1, invoiceNumber: 1 }, { unique: true });
+// Unique invoice number per clinic when clinic is present
+InvoiceSchema.index(
+  { clinicId: 1, invoiceNumber: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { clinicId: { $exists: true, $ne: null } },
+  },
+);
+// Unique invoice number per subscription for invoices without clinic
+InvoiceSchema.index(
+  { subscriptionId: 1, invoiceNumber: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { clinicId: { $exists: false } },
+  },
+);
 InvoiceSchema.index({ organizationId: 1, invoiceStatus: 1 });
 InvoiceSchema.index({ 'services.sessions.appointmentId': 1 });
 InvoiceSchema.index({ 'services.sessions.invoiceItemId': 1 });
