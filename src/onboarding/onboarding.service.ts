@@ -2104,13 +2104,41 @@ export class OnboardingService {
         clinicData = this.inheritDataFromOrganization(
           userComplex,
           clinicData,
-          dto.inheritanceSettings,
+          {
+            ...dto.inheritanceSettings,
+            fieldsToInherit: [
+              'logoUrl',
+              'yearEstablished',
+              'mission',
+              'vision',
+              'overview',
+              'goals',
+              'website',
+              'ceoName',
+              'vatNumber',
+              'crNumber',
+            ],
+          },
         ); // Complex has same structure as org
       } else if (userOrg) {
         clinicData = this.inheritDataFromOrganization(
           userOrg,
           clinicData,
-          dto.inheritanceSettings,
+          {
+            ...dto.inheritanceSettings,
+            fieldsToInherit: [
+              'logoUrl',
+              'yearEstablished',
+              'mission',
+              'vision',
+              'overview',
+              'goals',
+              'website',
+              'ceoName',
+              'vatNumber',
+              'crNumber',
+            ],
+          },
         );
       }
 
