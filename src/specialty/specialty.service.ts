@@ -114,7 +114,18 @@ export class SpecialtyService {
         { description: { $regex: search, $options: 'i' } },
       ];
     }
-    if (isActive !== undefined) filter.isActive = isActive;
+    const canSeeInactiveByDefault = ['super_admin', 'owner', 'admin'].includes(
+      String(requestingUser?.role || '').toLowerCase(),
+    );
+    // Status visibility:
+    // - explicit isActive always wins
+    // - admin/owner/super_admin can see both by default
+    // - other roles default to active only
+    if (isActive !== undefined) {
+      filter.isActive = isActive;
+    } else if (!canSeeInactiveByDefault) {
+      filter.isActive = true;
+    }
     if (complexId && Types.ObjectId.isValid(complexId)) {
       filter.complexId = new Types.ObjectId(complexId);
     }

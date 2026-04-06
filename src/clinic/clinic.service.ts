@@ -198,6 +198,10 @@ export class ClinicService {
       }
     }
 
+    const canSeeInactiveByDefault = ['super_admin', 'owner', 'admin'].includes(
+      String(requestingUser?.role || '').toLowerCase(),
+    );
+
     // Build query
     const query: any = {};
 
@@ -222,8 +226,14 @@ export class ClinicService {
 
     query.deletedAt = { $exists: false };
 
+    // Status visibility:
+    // - explicit status always wins
+    // - admin/owner/super_admin can see both by default
+    // - other roles default to active only
     if (status) {
       query.status = status;
+    } else if (!canSeeInactiveByDefault) {
+      query.status = 'active';
     }
 
     if (search) {
@@ -875,8 +885,14 @@ export class ClinicService {
     const tenantFilter = requestingUser ? buildTenantFilter(requestingUser) : {};
     const query: any = { ...tenantFilter, complexId: new Types.ObjectId(complexId), deletedAt: { $exists: false } };
 
+    const canSeeInactiveByDefault = ['super_admin', 'owner', 'admin'].includes(
+      String(requestingUser?.role || '').toLowerCase(),
+    );
+
     if (filters?.isActive !== undefined) {
       query.isActive = filters.isActive;
+    } else if (!canSeeInactiveByDefault) {
+      query.status = 'active';
     }
 
     // Build sort
@@ -905,7 +921,11 @@ export class ClinicService {
    * @returns Standardized response with active clinics
    */
   async getClinicsForDropdown(filters?: { complexId?: string }, requestingUser?: any) {
-    const query: any = { isActive: true, deletedAt: { $exists: false } };
+    const query: any = {
+      isActive: true,
+      status: 'active',
+      deletedAt: { $exists: false },
+    };
 
     // TENANT ISOLATION: scope to requesting user's subscription/clinic
     if (requestingUser && requestingUser.role !== 'super_admin') {

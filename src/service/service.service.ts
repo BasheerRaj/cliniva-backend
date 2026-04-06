@@ -84,6 +84,12 @@ export class ServiceService {
     private readonly sessionManagerService: SessionManagerService,
   ) {}
 
+  private canSeeInactiveByDefault(requestingUser?: TenantUser): boolean {
+    return ['super_admin', 'owner', 'admin'].includes(
+      String((requestingUser as any)?.role || '').toLowerCase(),
+    );
+  }
+
   async createService(createDto: CreateServiceWithSessionsDto, creatingUser?: TenantUser): Promise<Service> {
     // Validate service name length
     if (createDto.name.trim().length < 2) {
@@ -449,10 +455,12 @@ export class ServiceService {
     requestingUser?: TenantUser,
   ): Promise<Service[]> {
     const tenantFilter = requestingUser ? buildTenantFilter(requestingUser) : {};
+    const canSeeInactive = this.canSeeInactiveByDefault(requestingUser);
     return this.serviceModel
       .find({
         ...tenantFilter,
         complexId: new Types.ObjectId(complexId),
+        ...(canSeeInactive ? {} : { isActive: true }),
         deletedAt: { $exists: false },
       })
       .exec();
@@ -461,10 +469,13 @@ export class ServiceService {
   async getServicesByComplexPaginated(
     complexId: string,
     options?: PaginationOptions,
+    requestingUser?: TenantUser,
   ): Promise<PaginatedResult<Service>> {
+    const canSeeInactive = this.canSeeInactiveByDefault(requestingUser);
     return this.getPaginatedServicesByQuery(
       {
         complexId: new Types.ObjectId(complexId),
+        ...(canSeeInactive ? {} : { isActive: true }),
         deletedAt: { $exists: false },
       },
       options,
@@ -473,6 +484,7 @@ export class ServiceService {
 
   async getAllServices(complexId?: string): Promise<Service[]> {
     const query: any = {
+      isActive: true,
       deletedAt: { $exists: false },
     };
 
@@ -493,9 +505,11 @@ export class ServiceService {
     requestingUser?: TenantUser,
   ): Promise<PaginatedResult<Service>> {
     const tenantFilter = requestingUser ? buildTenantFilter(requestingUser) : {};
+    const canSeeInactive = this.canSeeInactiveByDefault(requestingUser);
     const query: any = {
       ...tenantFilter,
       deletedAt: { $exists: false },
+      ...(canSeeInactive ? {} : { isActive: true }),
     };
 
     if (complexIdParam && Types.ObjectId.isValid(complexIdParam)) {
@@ -625,7 +639,10 @@ export class ServiceService {
   // New method: Get all services for a clinic (including complex services)
   async getServicesForClinic(complexId?: string): Promise<Service[]> {
     try {
-      const query: any = {};
+      const query: any = {
+        isActive: true,
+        deletedAt: { $exists: false },
+      };
 
       if (complexId) {
         query.complexId = new Types.ObjectId(complexId);
@@ -647,9 +664,11 @@ export class ServiceService {
   ): Promise<PaginatedResult<Service>> {
     try {
       const tenantFilter = requestingUser ? buildTenantFilter(requestingUser) : {};
+      const canSeeInactive = this.canSeeInactiveByDefault(requestingUser);
       const query: any = {
         ...tenantFilter,
         deletedAt: { $exists: false },
+        ...(canSeeInactive ? {} : { isActive: true }),
       };
 
       if (complexId) {
@@ -709,18 +728,26 @@ export class ServiceService {
         clinicId: new Types.ObjectId(clinicId),
         isActive: true,
       })
-      .populate('serviceId', 'name serviceCategory price isActive description')
+      .populate({
+        path: 'serviceId',
+        select: 'name serviceCategory price isActive description',
+        match: { isActive: true, deletedAt: { $exists: false } },
+      })
       .exec();
 
-    return clinicServices.map((cs) => cs.serviceId as unknown as Service);
+    return clinicServices
+      .map((cs) => cs.serviceId as unknown as Service)
+      .filter(Boolean);
   }
 
   async getServicesByClinicPaginated(
     clinicId: string,
     options?: PaginationOptions,
     subscriptionId?: string,
+    requestingUser?: TenantUser,
   ): Promise<PaginatedResult<Service>> {
     const { page, limit, skip } = this.normalizePaginationOptions(options);
+    const canSeeInactive = this.canSeeInactiveByDefault(requestingUser);
 
     const clinicQuery: any = {
       clinicId: new Types.ObjectId(clinicId),
@@ -733,7 +760,13 @@ export class ServiceService {
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
-        .populate('serviceId', 'name serviceCategory price isActive description subscriptionId')
+        .populate({
+          path: 'serviceId',
+          select: 'name serviceCategory price isActive description subscriptionId',
+          match: canSeeInactive
+            ? { deletedAt: { $exists: false } }
+            : { isActive: true, deletedAt: { $exists: false } },
+        })
         .exec(),
       this.clinicServiceModel.countDocuments(clinicQuery),
     ]);
@@ -760,6 +793,8 @@ export class ServiceService {
     return this.serviceModel
       .find({
         clinicId: new Types.ObjectId(clinicId),
+        isActive: true,
+        deletedAt: { $exists: false },
       })
       .exec();
   }
@@ -770,10 +805,12 @@ export class ServiceService {
     requestingUser?: TenantUser,
   ): Promise<PaginatedResult<Service>> {
     const tenantFilter = requestingUser ? buildTenantFilter(requestingUser) : {};
+    const canSeeInactive = this.canSeeInactiveByDefault(requestingUser);
     return this.getPaginatedServicesByQuery(
       {
         ...tenantFilter,
         clinicId: new Types.ObjectId(clinicId),
+        ...(canSeeInactive ? {} : { isActive: true }),
         deletedAt: { $exists: false },
       },
       options,

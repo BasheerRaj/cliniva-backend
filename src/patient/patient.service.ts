@@ -358,7 +358,20 @@ export class PatientService {
     }
 
     // Optional filters
-    if (status)          filter.status = status;
+    const canSeeInactiveByDefault = [
+      UserRole.SUPER_ADMIN,
+      UserRole.OWNER,
+      UserRole.ADMIN,
+    ].includes(scope.role as UserRole);
+    // Status visibility:
+    // - explicit status always wins
+    // - admin/owner/super_admin can see both by default
+    // - other roles default to Active only
+    if (status) {
+      filter.status = status;
+    } else if (!canSeeInactiveByDefault) {
+      filter.status = 'Active';
+    }
     if (insuranceStatus) filter.insuranceStatus = insuranceStatus;
     if (gender)          filter.gender = gender;
 
@@ -614,7 +627,8 @@ export class PatientService {
     if (phone) filter.phone = { $regex: phone, $options: 'i' };
     if (email) filter.email = { $regex: email, $options: 'i' };
     if (gender) filter.gender = gender;
-    if (status) filter.status = status;
+    // Default list visibility: return active patients unless explicitly filtered
+    filter.status = status || 'Active';
     if (bloodType) filter.bloodType = bloodType;
     if (insuranceCompany)
       filter.insuranceCompany = { $regex: insuranceCompany, $options: 'i' };

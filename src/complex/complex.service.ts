@@ -87,9 +87,17 @@ export class ComplexService {
       filter.subscriptionId = this.buildSubscriptionMatch(targetSubscriptionId);
     }
 
-    // Filter by status
+    // Status visibility:
+    // - explicit query.status always wins
+    // - admin/owner/super_admin can see both active/inactive by default
+    // - other roles default to active only
+    const canSeeInactiveByDefault = ['super_admin', 'owner', 'admin'].includes(
+      String(requestingUser?.role || '').toLowerCase(),
+    );
     if (query.status) {
       filter.status = query.status;
+    } else if (!canSeeInactiveByDefault) {
+      filter.status = 'active';
     }
 
     // Search by name (case-insensitive)
@@ -640,12 +648,14 @@ export class ComplexService {
   }
 
   async getComplexesForDropdown(requestingUser?: any): Promise<any> {
-    const filter: any = { deletedAt: null };
+    const filter: any = { deletedAt: null, status: 'active' };
 
     // TENANT ISOLATION (ISSUE-009)
     if (requestingUser && requestingUser.role !== 'super_admin') {
       if (requestingUser.subscriptionId) {
-        filter.subscriptionId = new Types.ObjectId(requestingUser.subscriptionId);
+        filter.subscriptionId = this.buildSubscriptionMatch(
+          requestingUser.subscriptionId.toString(),
+        );
       }
 
       if (requestingUser.organizationId) {

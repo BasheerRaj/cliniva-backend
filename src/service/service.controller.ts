@@ -726,11 +726,13 @@ export class ServiceController {
   async getServicesByComplex(
     @Param('complexId') complexId: string,
     @Query() paginationQuery: ServicePaginationQuery,
+    @Request() req?: any,
   ): Promise<PaginatedServiceResponse> {
     const pagination = this.parsePaginationQuery(paginationQuery);
     const services = await this.serviceService.getServicesByComplexPaginated(
       complexId,
       pagination,
+      req?.user,
     );
 
     return this.enrichPaginatedServiceResponse(services);
@@ -868,6 +870,7 @@ export class ServiceController {
       clinicId,
       pagination,
       subscriptionId,
+      req?.user,
     );
 
     return this.enrichPaginatedServiceResponse(services);
