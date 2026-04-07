@@ -152,6 +152,34 @@ export class InvoiceService implements OnModuleInit {
       .map((id) => new Types.ObjectId(id));
   }
 
+  private buildLegacyCliniclessInvoiceClause(
+    subscriptionId?: string,
+  ): Record<string, any> | null {
+    if (!subscriptionId || !Types.ObjectId.isValid(subscriptionId)) {
+      return null;
+    }
+
+    return {
+      clinicId: { $exists: false },
+      subscriptionId: new Types.ObjectId(subscriptionId),
+    };
+  }
+
+  private buildClinicScopedInvoiceFilter(
+    clinicCondition: Record<string, any> | Types.ObjectId,
+    subscriptionId?: string,
+  ): Record<string, any>[] {
+    const clauses: Record<string, any>[] = [{ clinicId: clinicCondition }];
+    const legacyCliniclessClause =
+      this.buildLegacyCliniclessInvoiceClause(subscriptionId);
+
+    if (legacyCliniclessClause) {
+      clauses.push(legacyCliniclessClause);
+    }
+
+    return clauses;
+  }
+
   private isServiceAvailableInClinic(service: any, clinicId: string): boolean {
     const clinicIds = Array.isArray(service?.clinicIds)
       ? service.clinicIds.map((id: any) => id?.toString?.() ?? String(id))
@@ -584,12 +612,11 @@ export class InvoiceService implements OnModuleInit {
           filter.clinicId = requestedClinicId;
         }
       } else if (scopedClinicIds.length >= 1) {
-        // Include legacy invoices without clinicId so newly created multi-clinic draft invoices
-        // remain visible before a clinic is selected in appointment flow.
-        filter.$or = [
-          { clinicId: { $in: scopedClinicIds } },
-          { clinicId: { $exists: false } },
-        ];
+        // Only include clinic-less invoices when they still belong to the same tenant.
+        filter.$or = this.buildClinicScopedInvoiceFilter(
+          { $in: scopedClinicIds },
+          subscriptionId,
+        );
       } else {
         filter._id = new Types.ObjectId('000000000000000000000000');
       }
@@ -1177,10 +1204,10 @@ export class InvoiceService implements OnModuleInit {
       invoiceStatus: 'posted',
       paymentStatus: { $ne: 'paid' },
       deletedAt: { $exists: false },
-      $or: [
-        { clinicId: new Types.ObjectId(effectiveClinicId) },
-        { clinicId: { $exists: false } },
-      ],
+      $or: this.buildClinicScopedInvoiceFilter(
+        new Types.ObjectId(effectiveClinicId),
+        requestingUser?.subscriptionId,
+      ),
     };
 
 
@@ -1235,10 +1262,10 @@ export class InvoiceService implements OnModuleInit {
         invoiceStatus: { $in: ['draft', 'posted'] },
         paymentStatus: { $ne: 'paid' },
         deletedAt: { $exists: false },
-        $or: [
-          { clinicId: new Types.ObjectId(clinicId) },
-          { clinicId: { $exists: false } },
-        ],
+        $or: this.buildClinicScopedInvoiceFilter(
+          new Types.ObjectId(clinicId),
+          requestingUser?.subscriptionId,
+        ),
       })
       .populate('patientId', 'firstName lastName patientNumber phone profilePicture status')
       .lean()
@@ -1324,11 +1351,10 @@ export class InvoiceService implements OnModuleInit {
     );
     if (isClinicBoundRole) {
       if (scopedClinicIds.length >= 1) {
-        // Include legacy/transition invoices without clinicId.
-        invoiceFilter.$or = [
-          { clinicId: { $in: scopedClinicIds } },
-          { clinicId: { $exists: false } },
-        ];
+        invoiceFilter.$or = this.buildClinicScopedInvoiceFilter(
+          { $in: scopedClinicIds },
+          subscriptionId,
+        );
       } else {
         invoiceFilter._id = new Types.ObjectId('000000000000000000000000');
       }
@@ -1446,10 +1472,10 @@ export class InvoiceService implements OnModuleInit {
     // Only filter by clinic when known (allows admin/owner to see all clinics)
     if (effectiveClinicId) {
       await this.assertClinicTenantAccess(effectiveClinicId, requestingUser);
-      filter.$or = [
-        { clinicId: new Types.ObjectId(effectiveClinicId) },
-        { clinicId: { $exists: false } },
-      ];
+      filter.$or = this.buildClinicScopedInvoiceFilter(
+        new Types.ObjectId(effectiveClinicId),
+        requestingUser?.subscriptionId,
+      );
     }
 
     const invoices = await this.invoiceModel
