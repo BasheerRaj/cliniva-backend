@@ -17,6 +17,7 @@ import {
   UploadedFile,
   UseInterceptors,
   BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -47,11 +48,12 @@ import { TransferAppointmentsDto } from './dto/transfer-appointments.dto';
 import { GetUsersFilterDto } from './dto/get-users-filter.dto';
 import { CreateUserDto } from './dto/create-user.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { AdminGuard } from '../auth/guards/admin.guard';
+import { AdminGuard, SkipAdminGuard } from '../auth/guards/admin.guard';
 import { AuthService } from '../auth/auth.service';
 import * as EXAMPLES from './constants/swagger-examples';
 import * as crypto from 'crypto';
 import { User } from '../database/schemas/user.schema';
+import { UserRole } from '../common/enums/user-role.enum';
 
 @ApiTags('Users')
 @Controller('users')
@@ -70,6 +72,86 @@ export class UserController {
     private readonly userDropdownService: UserDropdownService,
     private readonly authService: AuthService,
   ) { }
+
+  private getScopedClinicIds(user: any): string[] {
+    return Array.from(
+      new Set(
+        [
+          ...(Array.isArray(user?.clinicIds) ? user.clinicIds : []),
+          user?.clinicId,
+        ]
+          .filter(Boolean)
+          .map((clinicId: any) => clinicId.toString()),
+      ),
+    );
+  }
+
+  private assertStaffReadOnlyRoleAccess(
+    requestingUser: any,
+    role?: string,
+  ): void {
+    if (requestingUser?.role !== UserRole.STAFF) {
+      return;
+    }
+
+    if (!role || ![UserRole.STAFF, UserRole.DOCTOR].includes(role as UserRole)) {
+      throw new ForbiddenException({
+        message: {
+          ar: 'يمكنك فقط عرض قوائم الأطباء أو الموظفين',
+          en: 'You can only view doctor or staff lists',
+        },
+        code: 'INSUFFICIENT_PERMISSIONS',
+      });
+    }
+  }
+
+  private assertStaffReadOnlyTargetAccess(
+    requestingUser: any,
+    targetUser: any,
+  ): void {
+    if (requestingUser?.role !== UserRole.STAFF) {
+      return;
+    }
+
+    if (
+      !targetUser ||
+      ![UserRole.STAFF, UserRole.DOCTOR].includes(targetUser.role)
+    ) {
+      throw new ForbiddenException({
+        message: {
+          ar: 'يمكنك فقط عرض بيانات الأطباء أو الموظفين',
+          en: 'You can only view doctor or staff details',
+        },
+        code: 'INSUFFICIENT_PERMISSIONS',
+      });
+    }
+
+    const actorClinicIds = new Set(this.getScopedClinicIds(requestingUser));
+    if (actorClinicIds.size === 0) {
+      throw new ForbiddenException({
+        message: {
+          ar: 'ليس لديك صلاحية للوصول إلى هذا المستخدم',
+          en: 'You do not have permission to access this user',
+        },
+        code: 'INSUFFICIENT_PERMISSIONS',
+      });
+    }
+
+    const targetClinicIds = new Set(this.getScopedClinicIds(targetUser));
+    const sharedClinic = [...targetClinicIds].some((clinicId) =>
+      actorClinicIds.has(clinicId),
+    );
+
+    if (!sharedClinic) {
+      throw new ForbiddenException({
+        message: {
+          ar: 'يمكنك فقط عرض المستخدمين من نفس العيادة',
+          en: 'You can only view users from your clinic',
+        },
+        code: 'INSUFFICIENT_PERMISSIONS',
+      });
+    }
+  }
 
   @ApiOperation({
     summary: 'Get paginated list of users',
@@ -91,8 +173,11 @@ export class UserController {
   @ApiBearerAuth()
   @Get()
   @UseGuards(AdminGuard)
+  @SkipAdminGuard()
   async getUsers(@Query() filterDto: GetUsersFilterDto, @Request() req: any) {
     try {
+      this.assertStaffReadOnlyRoleAccess(req.user, filterDto.role);
+
       const result = await this.userService.getUsers(filterDto, req.user);
       return {
         success: true,
@@ -1508,6 +1593,7 @@ export class UserController {
   })
   @Get('dropdown')
   @UseGuards(JwtAuthGuard, AdminGuard)
+  @SkipAdminGuard()
   @HttpCode(HttpStatus.OK)
   async getUsersForDropdown(
     @Query('role') role?: string,
@@ -1518,18 +1604,28 @@ export class UserController {
     @Request() req?: any,
   ) {
     try {
+      this.assertStaffReadOnlyRoleAccess(req?.user, role);
+
       // Parse includeDeactivated as boolean
       const includeDeactivatedBool = includeDeactivated === 'true';
       const clinicIds = this.parseClinicIdsQuery(clinicIdsQuery);
+
+      const effectiveClinicId =
+        req?.user?.role === UserRole.STAFF ? req?.user?.clinicId : clinicId;
+      const effectiveClinicIds =
+        req?.user?.role === UserRole.STAFF
+          ? this.getScopedClinicIds(req?.user)
+          : clinicIds;
 
       // Create cache key from query parameters (include subscriptionId for tenant isolation)
       const cacheKey = JSON.stringify({
         role,
         complexId,
-        clinicId,
-        clinicIds,
+        clinicId: effectiveClinicId,
+        clinicIds: effectiveClinicIds,
         includeDeactivated: includeDeactivatedBool,
         subscriptionId: req?.user?.subscriptionId,
+        requesterRole: req?.user?.role,
       });
 
       // Check cache
@@ -1543,7 +1639,13 @@ export class UserController {
 
       // Call UserDropdownService.getUsersForDropdown()
       const users = await this.userDropdownService.getUsersForDropdown(
-        { role, complexId, clinicId, clinicIds, includeDeactivated: includeDeactivatedBool },
+        {
+          role,
+          complexId,
+          clinicId: effectiveClinicId,
+          clinicIds: effectiveClinicIds,
+          includeDeactivated: includeDeactivatedBool,
+        },
         req?.user,
       );
 
@@ -1680,11 +1782,13 @@ export class UserController {
   })
   @Get(':id')
   @UseGuards(AdminGuard)
+  @SkipAdminGuard()
   @HttpCode(HttpStatus.OK)
   async getUserById(@Param('id') userId: string, @Request() req: any) {
     try {
       // Get user details with populated entities
       const user = await this.userService.getUserDetailById(userId, req.user);
+      this.assertStaffReadOnlyTargetAccess(req.user, user);
 
       // Transform and return response
       return {
