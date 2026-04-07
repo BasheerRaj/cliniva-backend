@@ -756,43 +756,76 @@ export class PaymentService {
         // Scoped role with no clinic assigned — deny all
         filter._id = new Types.ObjectId('000000000000000000000000');
       }
-    } else if (userRole === 'owner' && userOrganizationId && Types.ObjectId.isValid(userOrganizationId)) {
-      // Company-plan owner: use $or to catch payments for clinics missing organizationId
+    } else if (userRole === 'owner') {
+      // Owner scope: gather clinics from every available owner context to avoid
+      // dropping valid payments due to partial clinic/org/subscription linkage.
+      const ownerClinicIdSet = new Set<string>();
+
+      if (userClinicId && Types.ObjectId.isValid(userClinicId)) {
+        ownerClinicIdSet.add(String(userClinicId));
+      }
+
       if (subscriptionId && Types.ObjectId.isValid(subscriptionId)) {
-        const ownerClinics = await this.clinicModel
-          .find({ subscriptionId: new Types.ObjectId(subscriptionId), deletedAt: { $exists: false } })
-          .select('_id').lean();
-        const ownerClinicIds = ownerClinics.map((c: any) => c._id);
-        if (ownerClinicIds.length > 0) {
-          filter.$or = [
-            { organizationId: new Types.ObjectId(userOrganizationId) },
-            { clinicId: { $in: ownerClinicIds } },
-          ];
-        } else {
-          filter.organizationId = new Types.ObjectId(userOrganizationId);
+        const clinicsBySubscription = await this.clinicModel
+          .find({
+            subscriptionId: new Types.ObjectId(subscriptionId),
+            deletedAt: { $exists: false },
+          })
+          .select('_id')
+          .lean();
+        clinicsBySubscription.forEach((c: any) =>
+          ownerClinicIdSet.add(String(c._id)),
+        );
+      }
+
+      if (userOrganizationId && Types.ObjectId.isValid(userOrganizationId)) {
+        const clinicsByOrganization = await this.clinicModel
+          .find({
+            organizationId: new Types.ObjectId(userOrganizationId),
+            deletedAt: { $exists: false },
+          })
+          .select('_id')
+          .lean();
+        clinicsByOrganization.forEach((c: any) =>
+          ownerClinicIdSet.add(String(c._id)),
+        );
+      }
+
+      if (userComplexId && Types.ObjectId.isValid(userComplexId)) {
+        const clinicsByComplex = await this.clinicModel
+          .find({
+            complexId: new Types.ObjectId(userComplexId),
+            deletedAt: { $exists: false },
+          })
+          .select('_id')
+          .lean();
+        clinicsByComplex.forEach((c: any) =>
+          ownerClinicIdSet.add(String(c._id)),
+        );
+      }
+
+      const ownerClinicIds = Array.from(ownerClinicIdSet)
+        .filter((id) => Types.ObjectId.isValid(id))
+        .map((id) => new Types.ObjectId(id));
+
+      const ownerScopeOr: any[] = [];
+      if (ownerClinicIds.length > 0) {
+        ownerScopeOr.push({ clinicId: { $in: ownerClinicIds } });
+      }
+      if (userOrganizationId && Types.ObjectId.isValid(userOrganizationId)) {
+        ownerScopeOr.push({
+          organizationId: new Types.ObjectId(userOrganizationId),
+        });
+      }
+
+      if (ownerScopeOr.length > 0) {
+        filter.$or = ownerScopeOr;
+        if (queryDto.clinicId && Types.ObjectId.isValid(queryDto.clinicId)) {
+          filter.clinicId = new Types.ObjectId(queryDto.clinicId);
         }
       } else {
-        filter.organizationId = new Types.ObjectId(userOrganizationId);
+        filter._id = new Types.ObjectId('000000000000000000000000');
       }
-      // Then optionally narrow to a specific clinic
-      if (queryDto.clinicId && Types.ObjectId.isValid(queryDto.clinicId)) {
-        filter.clinicId = new Types.ObjectId(queryDto.clinicId);
-      }
-    } else if (userRole === 'owner' && userComplexId && Types.ObjectId.isValid(userComplexId)) {
-      // Complex-plan owner: resolve to clinic IDs under their complex.
-      // Always apply $in filter — even if empty (0 clinics = 0 payments).
-      const complexClinics = await this.clinicModel
-        .find({ complexId: new Types.ObjectId(userComplexId), deletedAt: { $exists: false } })
-        .select('_id')
-        .lean();
-      const complexClinicIds = complexClinics.map((c: any) => c._id);
-      filter.clinicId = { $in: complexClinicIds };
-    } else if (userRole === 'owner' && userClinicId && Types.ObjectId.isValid(userClinicId)) {
-      // Clinic-plan owner: scope to their single assigned clinic
-      filter.clinicId = new Types.ObjectId(userClinicId);
-    } else if (userRole === 'owner') {
-      // Owner with no scope information — deny all to prevent data leak
-      filter._id = new Types.ObjectId('000000000000000000000000');
     } else if (userRole === 'super_admin' && queryDto.clinicId && Types.ObjectId.isValid(queryDto.clinicId)) {
       // super_admin: can optionally filter by clinicId; otherwise sees all tenants (intentional)
       filter.clinicId = new Types.ObjectId(queryDto.clinicId);

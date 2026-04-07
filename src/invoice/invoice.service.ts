@@ -598,34 +598,37 @@ export class InvoiceService implements OnModuleInit {
       filter.clinicId = new Types.ObjectId(queryDto.clinicId);
     }
 
-    // Owner role scoping: scope to their organization/clinics to prevent cross-tenant data leak
+    // Owner role scoping: scope to tenant subscription first, with organization/clinic
+    // fallbacks for legacy data that may have incomplete linkage.
     if (userRole === 'owner') {
       if (subscriptionId && Types.ObjectId.isValid(subscriptionId)) {
+        const ownerScopeOr: any[] = [
+          { subscriptionId: new Types.ObjectId(subscriptionId) },
+        ];
+
         // Derive all clinics for this owner via subscriptionId (covers clinics missing organizationId)
         const ownerClinics = await this.clinicModel
           .find({ subscriptionId: new Types.ObjectId(subscriptionId), deletedAt: { $exists: false } })
           .select('_id')
           .lean();
         const ownerClinicIds = ownerClinics.map((c: any) => c._id);
+
+        if (userOrganizationId && Types.ObjectId.isValid(userOrganizationId)) {
+          ownerScopeOr.push({ organizationId: new Types.ObjectId(userOrganizationId) });
+        }
+
         if (ownerClinicIds.length > 0) {
-          if (userOrganizationId && Types.ObjectId.isValid(userOrganizationId)) {
-            // $or: invoices tagged with org OR invoices for any owner clinic (handles clinics with missing organizationId)
-            filter.$or = [
-              { organizationId: new Types.ObjectId(userOrganizationId) },
-              { clinicId: { $in: ownerClinicIds } },
-            ];
-          } else {
-            filter.clinicId = { $in: ownerClinicIds };
-          }
-        } else if (userOrganizationId && Types.ObjectId.isValid(userOrganizationId)) {
-          // No clinics yet — fall back to org scope
-          filter.organizationId = new Types.ObjectId(userOrganizationId);
+          ownerScopeOr.push({ clinicId: { $in: ownerClinicIds } });
+        }
+
+        if (filter.$or) {
+          filter.$and = [{ $or: filter.$or }, { $or: ownerScopeOr }];
+          delete filter.$or;
         } else {
-          // No clinics and no org — deny all to prevent unscoped access
-          filter._id = new Types.ObjectId('000000000000000000000000');
+          filter.$or = ownerScopeOr;
         }
       } else if (userOrganizationId && Types.ObjectId.isValid(userOrganizationId)) {
-        // No subscriptionId — use org scope directly
+        // No valid subscriptionId — use org scope directly
         filter.organizationId = new Types.ObjectId(userOrganizationId);
       }
     }
@@ -1330,12 +1333,24 @@ export class InvoiceService implements OnModuleInit {
         invoiceFilter._id = new Types.ObjectId('000000000000000000000000');
       }
     } else if (userRole === 'owner' && subscriptionId && Types.ObjectId.isValid(subscriptionId)) {
+      const ownerScopeOr: any[] = [
+        { subscriptionId: new Types.ObjectId(subscriptionId) },
+      ];
+
       const ownerClinics = await this.clinicModel
         .find({ subscriptionId: new Types.ObjectId(subscriptionId), deletedAt: { $exists: false } })
         .select('_id').lean();
       const ownerClinicIds = ownerClinics.map((c: any) => c._id);
+
       if (ownerClinicIds.length > 0) {
-        invoiceFilter.clinicId = { $in: ownerClinicIds };
+        ownerScopeOr.push({ clinicId: { $in: ownerClinicIds } });
+      }
+
+      if (invoiceFilter.$or) {
+        invoiceFilter.$and = [{ $or: invoiceFilter.$or }, { $or: ownerScopeOr }];
+        delete invoiceFilter.$or;
+      } else {
+        invoiceFilter.$or = ownerScopeOr;
       }
     }
 
