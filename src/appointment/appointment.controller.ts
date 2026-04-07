@@ -779,6 +779,80 @@ export class AppointmentController {
     }
   }
 
+  @ApiOperation({
+    summary: 'Get doctor dashboard statistics',
+    description:
+      'Returns lightweight status counts for doctor dashboard cards within a date range.',
+  })
+  @ApiQuery({
+    name: 'dateFrom',
+    required: true,
+    type: String,
+    description: 'Start date (YYYY-MM-DD)',
+    example: '2026-04-01',
+  })
+  @ApiQuery({
+    name: 'dateTo',
+    required: true,
+    type: String,
+    description: 'End date (YYYY-MM-DD)',
+    example: '2026-04-30',
+  })
+  @ApiQuery({
+    name: 'doctorId',
+    required: false,
+    type: String,
+    description: 'Optional doctorId for admin roles',
+  })
+  @ApiQuery({
+    name: 'clinicId',
+    required: false,
+    type: String,
+    description: 'Optional clinic filter',
+  })
+  @Get('stats/doctor')
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.OWNER,
+    UserRole.ADMIN,
+    UserRole.MANAGER,
+    UserRole.DOCTOR,
+  )
+  async getDoctorDashboardStats(
+    @Request() req: any,
+    @Query('dateFrom') dateFrom: string,
+    @Query('dateTo') dateTo: string,
+    @Query('doctorId') doctorId?: string,
+    @Query('clinicId') clinicId?: string,
+  ) {
+    try {
+      if (!dateFrom || !dateTo) {
+        throw new BadRequestException('dateFrom and dateTo are required');
+      }
+
+      const stats = await this.appointmentService.getDoctorDashboardStats(
+        req.user?.userId,
+        req.user?.role,
+        dateFrom,
+        dateTo,
+        doctorId,
+        clinicId,
+      );
+
+      return {
+        success: true,
+        message: 'Doctor dashboard statistics retrieved successfully',
+        data: stats,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: 'Failed to retrieve doctor dashboard statistics',
+        error: error.message,
+      };
+    }
+  }
+
   /**
    * Get appointment by ID
    * GET /appointments/:id

@@ -54,6 +54,20 @@ export class SessionProgressItemDto {
   appointmentTime?: string;
 
   @ApiProperty({
+    description: 'Appointment duration in minutes',
+    example: 45,
+    required: false,
+  })
+  durationMinutes?: number;
+
+  @ApiProperty({
+    description: 'Completion notes saved on the appointment',
+    example: 'Patient tolerated the session well.',
+    required: false,
+  })
+  completionNotes?: string;
+
+  @ApiProperty({
     description: 'Whether the session is completed',
     example: true,
   })

@@ -2090,6 +2090,80 @@ export class AppointmentService {
     };
   }
 
+  async getDoctorDashboardStats(
+    userId: string | undefined,
+    userRole: string | undefined,
+    dateFrom: string,
+    dateTo: string,
+    requestedDoctorId?: string,
+    requestedClinicId?: string,
+  ): Promise<{
+    total: number;
+    scheduled: number;
+    completed: number;
+    cancelled: number;
+    missed: number;
+  }> {
+    const from = new Date(`${dateFrom}T00:00:00.000Z`);
+    const to = new Date(`${dateTo}T23:59:59.999Z`);
+
+    if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
+      throw new BadRequestException('Invalid dateFrom/dateTo format. Expected YYYY-MM-DD');
+    }
+
+    const match: any = {
+      appointmentDate: { $gte: from, $lte: to },
+      deletedAt: { $exists: false },
+      isDeleted: { $ne: true },
+    };
+
+    // Doctors can only see their own stats regardless of doctorId query.
+    if (userRole === 'doctor') {
+      if (!userId || !Types.ObjectId.isValid(userId)) {
+        throw new BadRequestException('Invalid authenticated doctor ID');
+      }
+      match.doctorId = new Types.ObjectId(userId);
+    } else if (requestedDoctorId && Types.ObjectId.isValid(requestedDoctorId)) {
+      match.doctorId = new Types.ObjectId(requestedDoctorId);
+    }
+
+    if (requestedClinicId && Types.ObjectId.isValid(requestedClinicId)) {
+      match.clinicId = new Types.ObjectId(requestedClinicId);
+    }
+
+    const grouped = await this.appointmentModel.aggregate([
+      { $match: match },
+      { $group: { _id: '$status', count: { $sum: 1 } } },
+    ]);
+
+    let total = 0;
+    let scheduled = 0;
+    let completed = 0;
+    let cancelled = 0;
+    let missed = 0;
+
+    for (const item of grouped) {
+      total += item.count;
+      if (item._id === 'scheduled' || item._id === 'confirmed') {
+        scheduled += item.count;
+      } else if (item._id === 'completed') {
+        completed += item.count;
+      } else if (item._id === 'cancelled') {
+        cancelled += item.count;
+      } else if (item._id === 'no_show') {
+        missed += item.count;
+      }
+    }
+
+    return {
+      total,
+      scheduled,
+      completed,
+      cancelled,
+      missed,
+    };
+  }
+
   /**
    * Get today's appointments
    */

@@ -443,6 +443,8 @@ export class AppointmentSessionService {
           status: appt ? appt.status : 'not_booked',
           appointmentDate: appt?.appointmentDate,
           appointmentTime: appt?.appointmentTime,
+          durationMinutes: appt?.durationMinutes,
+          completionNotes: appt?.completionNotes,
           isCompleted: appt?.status === 'completed',
         };
       },
