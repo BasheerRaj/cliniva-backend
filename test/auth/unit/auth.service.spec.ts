@@ -29,6 +29,8 @@ const realCrypto = jest.requireActual('crypto');
 import { AuthService } from '../../../src/auth/auth.service';
 import { User } from '../../../src/database/schemas/user.schema';
 import { AuditLog } from '../../../src/database/schemas/audit-log.schema';
+import { Clinic } from '../../../src/database/schemas/clinic.schema';
+import { Complex } from '../../../src/database/schemas/complex.schema';
 import { LoginDto, RegisterDto } from '../../../src/auth/dto';
 import { UserRole } from '../../../src/common/enums/user-role.enum';
 import { mockUser, mockUserModel, mockJwtService } from '../mocks/auth.mocks';
@@ -36,6 +38,8 @@ import { RateLimitService } from '../../../src/auth/rate-limit.service';
 import { AuditService } from '../../../src/auth/audit.service';
 import { SessionService } from '../../../src/auth/session.service';
 import { SubscriptionService } from '../../../src/subscription/subscription.service';
+import { EmailService } from '../../../src/auth/email.service';
+import { WorkingHoursService } from '../../../src/working-hours/working-hours.service';
 
 describe('AuthService', () => {
   let service: AuthService;
@@ -55,6 +59,7 @@ describe('AuthService', () => {
   const mockAuditService = {
     logPasswordResetRequest: jest.fn(),
     logPasswordChange: jest.fn(),
+    logPasswordResetComplete: jest.fn(),
   };
 
   const mockSessionService = {
@@ -64,6 +69,13 @@ describe('AuthService', () => {
   const mockSubscriptionService = {
     getSubscriptionById: jest.fn(),
   };
+
+  const mockEmailService = {
+    sendPasswordResetEmail: jest.fn(),
+    sendPasswordChangedNotification: jest.fn(),
+  };
+
+  const mockWorkingHoursService = {};
 
   const mockAuditLogModel = {
     create: jest.fn(),
@@ -107,6 +119,14 @@ describe('AuthService', () => {
           useValue: mockAuditLogModel,
         },
         {
+          provide: getModelToken(Clinic.name),
+          useValue: {},
+        },
+        {
+          provide: getModelToken(Complex.name),
+          useValue: {},
+        },
+        {
           provide: JwtService,
           useValue: mockJwtService,
         },
@@ -125,6 +145,14 @@ describe('AuthService', () => {
         {
           provide: SubscriptionService,
           useValue: mockSubscriptionService,
+        },
+        {
+          provide: EmailService,
+          useValue: mockEmailService,
+        },
+        {
+          provide: WorkingHoursService,
+          useValue: mockWorkingHoursService,
         },
       ],
     }).compile();
@@ -612,6 +640,7 @@ describe('AuthService', () => {
       };
       mockRateLimitService.checkPasswordResetLimit.mockResolvedValue(true);
       mockUserModel.findOne.mockResolvedValue(userWithSave);
+      mockEmailService.sendPasswordResetEmail.mockResolvedValue(undefined);
 
       // Act
       await service.forgotPassword(email, ipAddress);
@@ -659,11 +688,18 @@ describe('AuthService', () => {
       mockRateLimitService.checkPasswordResetLimit.mockResolvedValue(true);
       mockUserModel.findOne.mockResolvedValue(userWithSave);
       mockAuditService.logPasswordResetRequest.mockResolvedValue(undefined);
+      mockEmailService.sendPasswordResetEmail.mockResolvedValue(undefined);
 
       // Act
       await service.forgotPassword(email, ipAddress);
 
       // Assert
+      expect(mockEmailService.sendPasswordResetEmail).toHaveBeenCalledWith(
+        mockUser.email,
+        mockUser.firstName,
+        expect.any(String),
+        mockUser.preferredLanguage || 'en',
+      );
       expect(mockAuditService.logPasswordResetRequest).toHaveBeenCalledWith(
         email,
         ipAddress,
@@ -749,6 +785,9 @@ describe('AuthService', () => {
       };
       mockUserModel.findOne.mockResolvedValue(userWithSave);
       mockSessionService.invalidateUserSessions.mockResolvedValue(undefined);
+      mockEmailService.sendPasswordChangedNotification.mockResolvedValue(
+        undefined,
+      );
 
       // Act
       const result = await service.resetPassword(resetToken, newPassword);
@@ -770,6 +809,13 @@ describe('AuthService', () => {
       expect(mockAuditService.logPasswordResetComplete).toHaveBeenCalledWith(
         '507f1f77bcf86cd799439011',
         actualHashedToken,
+      );
+      expect(
+        mockEmailService.sendPasswordChangedNotification,
+      ).toHaveBeenCalledWith(
+        mockUser.email,
+        mockUser.firstName,
+        mockUser.preferredLanguage || 'en',
       );
       expect(result.success).toBe(true);
       expect(result.message).toHaveProperty('ar');

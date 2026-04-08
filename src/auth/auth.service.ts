@@ -1624,16 +1624,11 @@ export class AuthService {
 
         this.logger.log(`Password reset requested for user ${user.email}`);
 
-        // TODO: Call EmailService to send reset email with token - Requirement 2.6
-        // This will be implemented when EmailService is available (Task 7)
-        // await this.emailService.sendPasswordResetEmail(
-        //   user.email,
-        //   user.firstName,
-        //   resetToken,
-        //   user.preferredLanguage || 'en'
-        // );
-        this.logger.log(
-          `Password reset email needed for ${user.email} with token: ${resetToken}`,
+        await this.emailService.sendPasswordResetEmail(
+          user.email,
+          user.firstName,
+          resetToken,
+          user.preferredLanguage || 'en',
         );
 
         // Call AuditService to log reset request
@@ -1756,15 +1751,10 @@ export class AuthService {
       // Call AuditService to log password reset completion
       await this.auditService.logPasswordResetComplete(userId, hashedToken);
 
-      // TODO: Call EmailService to send confirmation - Requirement 4.4
-      // This will be implemented when EmailService is available (Task 7)
-      // await this.emailService.sendPasswordChangedNotification(
-      //   user.email,
-      //   user.firstName,
-      //   user.preferredLanguage || 'en'
-      // );
-      this.logger.log(
-        `Password reset confirmation email needed for ${user.email}`,
+      await this.emailService.sendPasswordChangedNotification(
+        user.email,
+        user.firstName,
+        user.preferredLanguage || 'en',
       );
 
       // Return success response
@@ -1991,16 +1981,11 @@ export class AuthService {
         `Admin ${adminId} initiated password reset for user ${userId}`,
       );
 
-      // TODO: Call EmailService to send reset email - Requirement 2.6
-      // This will be implemented when EmailService is available (Task 7)
-      // await this.emailService.sendPasswordResetEmail(
-      //   user.email,
-      //   user.firstName,
-      //   resetToken,
-      //   user.preferredLanguage || 'en'
-      // );
-      this.logger.log(
-        `Password reset email needed for ${user.email} with token: ${resetToken}`,
+      await this.emailService.sendPasswordResetEmail(
+        user.email,
+        user.firstName,
+        resetToken,
+        user.preferredLanguage || 'en',
       );
 
       // Call AuditService to log admin-initiated reset

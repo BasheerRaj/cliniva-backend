@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { google } from 'googleapis';
 import { ClientSession } from 'mongoose';
 
 /**
@@ -15,6 +16,107 @@ import { ClientSession } from 'mongoose';
 @Injectable()
 export class EmailService {
   private readonly logger = new Logger(EmailService.name);
+  private gmailClient: ReturnType<typeof google.gmail> | null = null;
+
+  private getErrorMessage(error: unknown): string {
+    return error instanceof Error ? error.message : String(error);
+  }
+
+  private getErrorStack(error: unknown): string | undefined {
+    return error instanceof Error ? error.stack : undefined;
+  }
+
+  private getSenderEmail(): string {
+    return (
+      process.env.GOOGLE_EMAIL ||
+      process.env.MAIL_FROM ||
+      process.env.SMTP_USER ||
+      ''
+    );
+  }
+
+  private getFrontendBaseUrl(): string {
+    return (
+      process.env.FRONTEND_URL ||
+      process.env.CLIENT_URL ||
+      'http://localhost:5173'
+    ).replace(/\/$/, '');
+  }
+
+  private getDisplayName(firstName?: string): string {
+    return firstName?.trim() || 'Cliniva user';
+  }
+
+  private toBase64Url(value: string): string {
+    return Buffer.from(value)
+      .toString('base64')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/g, '');
+  }
+
+  private createRawEmail(params: {
+    to: string;
+    subject: string;
+    html: string;
+    text: string;
+  }): string {
+    const from = this.getSenderEmail();
+    const headers = [
+      `From: Cliniva <${from}>`,
+      `To: ${params.to}`,
+      'MIME-Version: 1.0',
+      'Content-Type: text/html; charset=utf-8',
+      `Subject: ${params.subject}`,
+      '',
+      `${params.html}<br /><br /><hr /><p style="font-family: Arial, sans-serif; color: #6b7280; white-space: pre-line;">${params.text}</p>`,
+    ];
+
+    return this.toBase64Url(headers.join('\r\n'));
+  }
+
+  private getGmailClient() {
+    if (this.gmailClient) {
+      return this.gmailClient;
+    }
+
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+    const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+    const refreshToken = process.env.GOOGLE_REFRESH_TOKEN;
+    const senderEmail = this.getSenderEmail();
+
+    if (!clientId || !clientSecret || !refreshToken || !senderEmail) {
+      throw new Error(
+        'Google email configuration is incomplete. Required: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REFRESH_TOKEN, and GOOGLE_EMAIL.',
+      );
+    }
+
+    const oauth2Client = new google.auth.OAuth2(
+      clientId,
+      clientSecret,
+      process.env.GOOGLE_REDIRECT_URI,
+    );
+    oauth2Client.setCredentials({ refresh_token: refreshToken });
+    this.gmailClient = google.gmail({ version: 'v1', auth: oauth2Client });
+
+    return this.gmailClient;
+  }
+
+  private async sendEmail(params: {
+    to: string;
+    subject: string;
+    html: string;
+    text: string;
+  }): Promise<void> {
+    const gmail = this.getGmailClient();
+
+    await gmail.users.messages.send({
+      userId: 'me',
+      requestBody: {
+        raw: this.createRawEmail(params),
+      },
+    });
+  }
 
   /**
    * Send password reset email
@@ -33,21 +135,48 @@ export class EmailService {
     language: 'ar' | 'en',
   ): Promise<void> {
     try {
-      this.logger.log(
-        `Sending password reset email to ${email} in ${language}`,
-      );
+      const recipientName = this.getDisplayName(firstName);
+      const resetLink = `${this.getFrontendBaseUrl()}/auth/reset-password?token=${encodeURIComponent(resetToken)}`;
+      const subject =
+        language === 'ar'
+          ? 'إعادة تعيين كلمة المرور - Cliniva'
+          : 'Reset your Cliniva password';
+      const html = `
+        <div style="font-family: Arial, sans-serif; color: #111827; line-height: 1.6;">
+          <p>${language === 'ar' ? `مرحباً ${recipientName}` : `Hello ${recipientName},`}</p>
+          <p>
+            ${
+              language === 'ar'
+                ? 'تلقينا طلباً لإعادة تعيين كلمة المرور الخاصة بحسابك. استخدم الزر التالي لإكمال العملية. صلاحية الرابط 24 ساعة ويُستخدم مرة واحدة فقط.'
+                : 'We received a request to reset your account password. Use the button below to complete the process. The link is valid for 24 hours and can only be used once.'
+            }
+          </p>
+          <p style="margin: 24px 0;">
+            <a href="${resetLink}" style="background: #00B48D; color: #ffffff; text-decoration: none; padding: 12px 20px; border-radius: 8px; display: inline-block;">
+              ${language === 'ar' ? 'إعادة تعيين كلمة المرور' : 'Reset password'}
+            </a>
+          </p>
+          <p>
+            ${
+              language === 'ar'
+                ? 'إذا لم تقم بهذا الطلب، يمكنك تجاهل هذه الرسالة بأمان.'
+                : 'If you did not request this, you can safely ignore this email.'
+            }
+          </p>
+          <p style="font-size: 12px; color: #6b7280;">${resetLink}</p>
+        </div>
+      `;
+      const text =
+        language === 'ar'
+          ? `مرحباً ${recipientName}\n\nاستخدم هذا الرابط لإعادة تعيين كلمة المرور:\n${resetLink}\n\nصلاحية الرابط 24 ساعة. إذا لم تطلب ذلك، تجاهل هذه الرسالة.`
+          : `Hello ${recipientName},\n\nUse this link to reset your password:\n${resetLink}\n\nThis link expires in 24 hours. If you did not request this, ignore this email.`;
 
-      // TODO: Implement actual email sending with templates
-      // For now, just log the action
-      this.logger.debug(`Password reset email would be sent to ${email}`);
-      this.logger.debug(`Reset token: ${resetToken.substring(0, 8)}...`);
-
-      // Simulate email sending
-      // In production, this would use a service like SendGrid, AWS SES, etc.
+      await this.sendEmail({ to: email, subject, html, text });
+      this.logger.log(`Password reset email sent to ${email}`);
     } catch (error) {
       this.logger.error(
-        `Failed to send password reset email to ${email}: ${error.message}`,
-        error.stack,
+        `Failed to send password reset email to ${email}: ${this.getErrorMessage(error)}`,
+        this.getErrorStack(error),
       );
       throw new Error('Failed to send password reset email');
     }
@@ -68,18 +197,34 @@ export class EmailService {
     language: 'ar' | 'en',
   ): Promise<void> {
     try {
-      this.logger.log(
-        `Sending password changed notification to ${email} in ${language}`,
-      );
+      const recipientName = this.getDisplayName(firstName);
+      const subject =
+        language === 'ar'
+          ? 'تم تغيير كلمة المرور - Cliniva'
+          : 'Your Cliniva password was changed';
+      const html = `
+        <div style="font-family: Arial, sans-serif; color: #111827; line-height: 1.6;">
+          <p>${language === 'ar' ? `مرحباً ${recipientName}` : `Hello ${recipientName},`}</p>
+          <p>
+            ${
+              language === 'ar'
+                ? 'تم تغيير كلمة المرور الخاصة بحسابك بنجاح. إذا لم تقم بهذا التغيير، يرجى التواصل مع الدعم فوراً.'
+                : 'Your account password was changed successfully. If you did not make this change, contact support immediately.'
+            }
+          </p>
+        </div>
+      `;
+      const text =
+        language === 'ar'
+          ? `مرحباً ${recipientName}\n\nتم تغيير كلمة المرور الخاصة بحسابك بنجاح. إذا لم تقم بهذا التغيير، تواصل مع الدعم فوراً.`
+          : `Hello ${recipientName},\n\nYour account password was changed successfully. If you did not make this change, contact support immediately.`;
 
-      // TODO: Implement actual email sending with templates
-      this.logger.debug(
-        `Password changed notification would be sent to ${email}`,
-      );
+      await this.sendEmail({ to: email, subject, html, text });
+      this.logger.log(`Password changed notification sent to ${email}`);
     } catch (error) {
       this.logger.error(
-        `Failed to send password changed notification to ${email}: ${error.message}`,
-        error.stack,
+        `Failed to send password changed notification to ${email}: ${this.getErrorMessage(error)}`,
+        this.getErrorStack(error),
       );
       // Don't throw - email failure shouldn't block the operation
     }
@@ -114,8 +259,8 @@ export class EmailService {
       this.logger.debug(`Old email: ${oldEmail}`);
     } catch (error) {
       this.logger.error(
-        `Failed to send username changed notification to ${newEmail}: ${error.message}`,
-        error.stack,
+        `Failed to send username changed notification to ${newEmail}: ${this.getErrorMessage(error)}`,
+        this.getErrorStack(error),
       );
       // Don't throw - email failure shouldn't block the operation
     }
@@ -150,8 +295,8 @@ export class EmailService {
       this.logger.debug(`Old role: ${oldRole}, New role: ${newRole}`);
     } catch (error) {
       this.logger.error(
-        `Failed to send role changed notification to ${email}: ${error.message}`,
-        error.stack,
+        `Failed to send role changed notification to ${email}: ${this.getErrorMessage(error)}`,
+        this.getErrorStack(error),
       );
       // Don't throw - email failure shouldn't block the operation
     }
@@ -185,8 +330,8 @@ export class EmailService {
       this.logger.debug(`Reason: ${reason}`);
     } catch (error) {
       this.logger.error(
-        `Failed to send session invalidated notification to ${email}: ${error.message}`,
-        error.stack,
+        `Failed to send session invalidated notification to ${email}: ${this.getErrorMessage(error)}`,
+        this.getErrorStack(error),
       );
       // Don't throw - email failure shouldn't block the operation
     }
@@ -222,8 +367,8 @@ export class EmailService {
       );
     } catch (error) {
       this.logger.error(
-        `Failed to send email change verification to ${newEmail}: ${error.message}`,
-        error.stack,
+        `Failed to send email change verification to ${newEmail}: ${this.getErrorMessage(error)}`,
+        this.getErrorStack(error),
       );
       throw new Error('Failed to send email change verification');
     }
@@ -266,8 +411,8 @@ export class EmailService {
       this.logger.debug(`Appointment data:`, appointmentData);
     } catch (error) {
       this.logger.error(
-        `Failed to send appointment ${type} notification to ${email}: ${error.message}`,
-        error.stack,
+        `Failed to send appointment ${type} notification to ${email}: ${this.getErrorMessage(error)}`,
+        this.getErrorStack(error),
       );
       // Don't throw - email failure shouldn't block the operation
     }
