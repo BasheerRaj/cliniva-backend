@@ -571,6 +571,9 @@ export class AppointmentController {
         time,
         clinicCollectionId,
         req.user?.clinicId,
+        Array.isArray(req.user?.clinicIds)
+          ? req.user.clinicIds.map(String)
+          : undefined,
         req.user?.organizationId,
         req.user?.role,
         serviceId,

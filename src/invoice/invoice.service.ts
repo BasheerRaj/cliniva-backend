@@ -1436,6 +1436,7 @@ export class InvoiceService implements OnModuleInit {
     const assignedClinicIds = this.getAssignedClinicIds(userClinicId, requestingUser);
     const isClinicBoundRole = userRole && ['staff', 'doctor'].includes(userRole);
     let effectiveClinicId = clinicId;
+    let scopedClinicIds: string[] = [];
 
     if (isClinicBoundRole) {
       if (assignedClinicIds.length === 0) {
@@ -1453,10 +1454,7 @@ export class InvoiceService implements OnModuleInit {
       if (!clinicId && assignedClinicIds.length === 1) {
         effectiveClinicId = assignedClinicIds[0];
       } else if (!clinicId && assignedClinicIds.length > 1) {
-        throw new BadRequestException({
-          message: { ar: 'يجب تحديد العيادة عند امتلاك أكثر من عيادة', en: 'clinicId is required when you have multiple assigned clinics' },
-          code: 'CLINIC_ID_REQUIRED',
-        });
+        scopedClinicIds = assignedClinicIds;
       }
     }
 
@@ -1474,6 +1472,22 @@ export class InvoiceService implements OnModuleInit {
       await this.assertClinicTenantAccess(effectiveClinicId, requestingUser);
       filter.$or = this.buildClinicScopedInvoiceFilter(
         new Types.ObjectId(effectiveClinicId),
+        requestingUser?.subscriptionId,
+      );
+    } else if (scopedClinicIds.length > 0) {
+      const scopedClinicObjectIds = scopedClinicIds
+        .filter((id) => Types.ObjectId.isValid(id))
+        .map((id) => new Types.ObjectId(id));
+
+      if (scopedClinicObjectIds.length === 0) {
+        throw new ForbiddenException({
+          message: { ar: 'لا تملك صلاحية الوصول إلى أي عيادة', en: 'No assigned clinic access' },
+          code: 'INVOICE_CLINIC_ACCESS_DENIED',
+        });
+      }
+
+      filter.$or = this.buildClinicScopedInvoiceFilter(
+        { $in: scopedClinicObjectIds },
         requestingUser?.subscriptionId,
       );
     }

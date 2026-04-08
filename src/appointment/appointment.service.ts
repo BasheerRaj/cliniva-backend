@@ -3052,6 +3052,7 @@ export class AppointmentService {
     time: string,
     clinicCollectionId?: string,
     userClinicId?: string,
+    userClinicIds?: string[],
     userOrganizationId?: string,
     userRole?: string,
     serviceId?: string,
@@ -3070,8 +3071,22 @@ export class AppointmentService {
     // Owners see all clinics within their subscription (+ complex if set).
     // super_admin sees everything.
     const clinicScopedRoles = ['staff', 'doctor', 'admin', 'manager'];
-    if (userClinicId && clinicScopedRoles.includes(userRole ?? '')) {
-      clinicFilter._id = new Types.ObjectId(userClinicId);
+    if (clinicScopedRoles.includes(userRole ?? '')) {
+      const scopedClinicIds = Array.isArray(userClinicIds)
+        ? Array.from(
+            new Set(
+              userClinicIds.filter((id) => Types.ObjectId.isValid(id)).map(String),
+            ),
+          )
+        : [];
+
+      if (scopedClinicIds.length > 0) {
+        clinicFilter._id = {
+          $in: scopedClinicIds.map((id) => new Types.ObjectId(id)),
+        };
+      } else if (userClinicId && Types.ObjectId.isValid(userClinicId)) {
+        clinicFilter._id = new Types.ObjectId(userClinicId);
+      }
     } else if (userRole && !['super_admin'].includes(userRole)) {
       // Owner: scope by subscriptionId (primary tenant boundary) + complexId if set
       if (userSubscriptionId) {
