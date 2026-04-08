@@ -74,6 +74,80 @@ export class SessionProgressItemDto {
   isCompleted: boolean;
 }
 
+export class SessionAttemptHistoryItemDto {
+  @ApiProperty({
+    description: 'Appointment ID for this session attempt',
+    example: '507f1f77bcf86cd799439020',
+  })
+  appointmentId: string;
+
+  @ApiProperty({
+    description: 'Session ID when available from the service or invoice session record',
+    example: '507f1f77bcf86cd799439011',
+    required: false,
+  })
+  sessionId?: string;
+
+  @ApiProperty({
+    description: 'Session name for this attempt',
+    example: 'Diagnosis',
+  })
+  sessionName: string;
+
+  @ApiProperty({
+    description: 'Session order number for this attempt',
+    example: 1,
+  })
+  sessionOrder: number;
+
+  @ApiProperty({
+    description: 'Appointment status for this attempt',
+    example: 'cancelled',
+    enum: ['scheduled', 'confirmed', 'in_progress', 'completed', 'cancelled', 'no_show'],
+  })
+  status: string;
+
+  @ApiProperty({
+    description: 'Appointment date for this attempt',
+    example: '2024-03-15T00:00:00.000Z',
+  })
+  appointmentDate: Date;
+
+  @ApiProperty({
+    description: 'Appointment time for this attempt',
+    example: '14:30',
+    required: false,
+  })
+  appointmentTime?: string;
+
+  @ApiProperty({
+    description: 'Appointment duration in minutes',
+    example: 45,
+    required: false,
+  })
+  durationMinutes?: number;
+
+  @ApiProperty({
+    description: 'Appointment creation timestamp',
+    example: '2024-03-15T09:00:00.000Z',
+    required: false,
+  })
+  createdAt?: Date;
+
+  @ApiProperty({
+    description: 'Completion notes or doctor notes saved on the appointment',
+    example: 'Patient tolerated the session well.',
+    required: false,
+  })
+  completionNotes?: string;
+
+  @ApiProperty({
+    description: 'Whether this attempt ended as completed',
+    example: false,
+  })
+  isCompleted: boolean;
+}
+
 /**
  * DTO for session progress tracking
  * Requirements: 10.1, 10.2, 10.3, 10.4
@@ -125,4 +199,10 @@ export class SessionProgressDto {
     type: [SessionProgressItemDto],
   })
   sessions: SessionProgressItemDto[];
+
+  @ApiProperty({
+    description: 'All booked appointment attempts mapped to service session order, including repeated attempts of the same session',
+    type: [SessionAttemptHistoryItemDto],
+  })
+  appointmentHistory: SessionAttemptHistoryItemDto[];
 }

@@ -12,6 +12,7 @@ import { CompleteAppointmentDto } from '../dto/complete-appointment.dto';
 import { RescheduleDto } from '../dto/reschedule.dto';
 import { AppointmentConflictService } from '../appointment-conflict.service';
 import { AppointmentWorkingHoursService } from './appointment-working-hours.service';
+import { getAppointmentEditLockReason } from '../utils/appointment-editability.util';
 
 /**
  * Service for managing appointment lifecycle operations
@@ -80,6 +81,19 @@ export class AppointmentLifecycleService {
           en: 'Appointment not found',
         },
         code: 'APPOINTMENT_NOT_FOUND',
+      });
+    }
+
+    const editLockReason = getAppointmentEditLockReason(appointment);
+
+    if (editLockReason === 'terminal_status') {
+      throw new BadRequestException({
+        message: {
+          ar: 'لا يمكن تعديل الموعد إذا كانت حالته ملغاة أو مكتملة أو فائتة',
+          en: 'Cannot edit cancelled, completed, or missed appointments',
+        },
+        code: 'APPOINTMENT_READ_ONLY_STATUS',
+        currentStatus: appointment.status,
       });
     }
 
@@ -232,6 +246,19 @@ export class AppointmentLifecycleService {
       });
     }
 
+    const cancelLockReason = getAppointmentEditLockReason(appointment);
+
+    if (cancelLockReason === 'terminal_status') {
+      throw new BadRequestException({
+        message: {
+          ar: 'لا يمكن تعديل الموعد إذا كانت حالته ملغاة أو مكتملة أو فائتة',
+          en: 'Cannot edit cancelled, completed, or missed appointments',
+        },
+        code: 'APPOINTMENT_READ_ONLY_STATUS',
+        currentStatus: appointment.status,
+      });
+    }
+
     // Requirement 10.7: Validate appointment status is not "completed"
     if (appointment.status === AppointmentStatus.COMPLETED) {
       throw new BadRequestException({
@@ -355,6 +382,19 @@ export class AppointmentLifecycleService {
           en: 'Appointment not found',
         },
         code: 'APPOINTMENT_NOT_FOUND',
+      });
+    }
+
+    const rescheduleLockReason = getAppointmentEditLockReason(appointment);
+
+    if (rescheduleLockReason === 'terminal_status') {
+      throw new BadRequestException({
+        message: {
+          ar: 'لا يمكن تعديل الموعد إذا كانت حالته ملغاة أو مكتملة أو فائتة',
+          en: 'Cannot edit cancelled, completed, or missed appointments',
+        },
+        code: 'APPOINTMENT_READ_ONLY_STATUS',
+        currentStatus: appointment.status,
       });
     }
 

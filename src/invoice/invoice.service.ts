@@ -1730,8 +1730,22 @@ export class InvoiceService implements OnModuleInit {
         const remainingCount = (svc.totalSessions || 1) - activeSessions.length;
         
         if (bookable.length === 0 && remainingCount > 0) {
+          const usedOrders = new Set(
+            sessions
+              .map((sess: any) => sess.sessionOrder)
+              .filter((order: any) => Number.isFinite(order)),
+          );
+          const missingOrders: number[] = [];
+          for (let order = 1; order <= (svc.totalSessions || 1); order += 1) {
+            if (!usedOrders.has(order)) {
+              missingOrders.push(order);
+            }
+          }
+
           for (let i = 1; i <= remainingCount; i++) {
-            const nextOrder = activeSessions.length + i;
+            const nextOrder =
+              missingOrders[i - 1] ||
+              sessions.length + i;
             bookable.push({
               sessionName: `Session ${nextOrder} (New)`,
               sessionOrder: nextOrder,

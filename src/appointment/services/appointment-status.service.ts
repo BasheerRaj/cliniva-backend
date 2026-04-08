@@ -6,6 +6,7 @@ import {
   AppointmentStatus,
   isValidStatusTransition,
 } from '../constants/appointment-status.enum';
+import { getAppointmentEditLockReason } from '../utils/appointment-editability.util';
 
 /**
  * Service for managing appointment status transitions and validations
@@ -120,6 +121,19 @@ export class AppointmentStatusService {
           en: 'Appointment not found',
         },
         code: 'APPOINTMENT_NOT_FOUND',
+      });
+    }
+
+    const editLockReason = getAppointmentEditLockReason(appointment);
+
+    if (editLockReason === 'terminal_status') {
+      throw new BadRequestException({
+        message: {
+          ar: 'لا يمكن تعديل الموعد إذا كانت حالته ملغاة أو مكتملة أو فائتة',
+          en: 'Cannot edit cancelled, completed, or missed appointments',
+        },
+        code: 'APPOINTMENT_READ_ONLY_STATUS',
+        currentStatus: appointment.status,
       });
     }
 

@@ -61,6 +61,7 @@ describe('AppointmentSessionService', () => {
     db: { startSession: jest.Mock };
   };
   let mockServiceModel: { findById: jest.Mock };
+  let mockInvoiceModel: { find: jest.Mock };
 
   beforeEach(async () => {
     mockAppointmentModel = {
@@ -70,17 +71,31 @@ describe('AppointmentSessionService', () => {
       db: { startSession: jest.fn() },
     };
     mockServiceModel = { findById: jest.fn() };
+    mockInvoiceModel = {
+      find: jest.fn().mockReturnValue({
+        select: jest.fn().mockReturnThis(),
+        lean: jest.fn().mockResolvedValue([]),
+      }),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AppointmentSessionService,
         { provide: getModelToken('Appointment'), useValue: mockAppointmentModel },
         { provide: getModelToken('Service'), useValue: mockServiceModel },
+        { provide: getModelToken('Invoice'), useValue: mockInvoiceModel },
       ],
     }).compile();
 
     service = module.get<AppointmentSessionService>(AppointmentSessionService);
   });
+
+  function mockInvoiceFindResult(result: any[]) {
+    mockInvoiceModel.find.mockReturnValue({
+      select: jest.fn().mockReturnThis(),
+      lean: jest.fn().mockResolvedValue(result),
+    });
+  }
 
   it('should be defined', () => {
     expect(service).toBeDefined();
@@ -726,7 +741,7 @@ describe('AppointmentSessionService', () => {
       await service.batchBookSessions(buildBatchDto([buildBooking(s1Id)]), createdByUserId);
 
       const insertArgs = mockAppointmentModel.insertMany.mock.calls[0][0];
-      expect(insertArgs[0].duration).toBe(45);
+      expect(insertArgs[0].durationMinutes).toBe(45);
     });
 
     it('should fall back to service durationMinutes when session has no explicit duration', async () => {
@@ -741,7 +756,7 @@ describe('AppointmentSessionService', () => {
       await service.batchBookSessions(buildBatchDto([buildBooking(s1Id)]), createdByUserId);
 
       const insertArgs = mockAppointmentModel.insertMany.mock.calls[0][0];
-      expect(insertArgs[0].duration).toBe(30); // service.durationMinutes
+      expect(insertArgs[0].durationMinutes).toBe(30); // service.durationMinutes
     });
 
     it('should set status = scheduled on all created appointments', async () => {
@@ -876,6 +891,7 @@ describe('AppointmentSessionService', () => {
       const s2 = buildSession(id(), 'Treatment', 2);
       mockServiceModel.findById.mockResolvedValue(buildServiceWithSessions([s1, s2]));
       mockAppointmentModel.find.mockResolvedValue([]);
+      mockInvoiceFindResult([]);
 
       const result: SessionProgressDto = await service.getSessionProgress(patientId, serviceId);
 
@@ -896,6 +912,7 @@ describe('AppointmentSessionService', () => {
         buildApptForSession(s1Id, 'completed'),
         buildApptForSession(s2Id, 'completed'),
       ]);
+      mockInvoiceFindResult([]);
 
       const result = await service.getSessionProgress(patientId, serviceId);
 
@@ -915,6 +932,7 @@ describe('AppointmentSessionService', () => {
         buildApptForSession(s1Id, 'completed'),
         buildApptForSession(s2Id, 'scheduled'),
       ]);
+      mockInvoiceFindResult([]);
 
       const result = await service.getSessionProgress(patientId, serviceId);
 
@@ -929,6 +947,7 @@ describe('AppointmentSessionService', () => {
       mockAppointmentModel.find.mockResolvedValue([
         buildApptForSession(ids[0], 'completed'),
       ]);
+      mockInvoiceFindResult([]);
 
       const result = await service.getSessionProgress(patientId, serviceId);
 
@@ -946,6 +965,7 @@ describe('AppointmentSessionService', () => {
       mockAppointmentModel.find.mockResolvedValue([
         buildApptForSession(s1Id, 'completed'),
       ]);
+      mockInvoiceFindResult([]);
 
       const result = await service.getSessionProgress(patientId, serviceId);
 
@@ -962,6 +982,7 @@ describe('AppointmentSessionService', () => {
       mockAppointmentModel.find.mockResolvedValue([
         buildApptForSession(s1Id, 'cancelled'),
       ]);
+      mockInvoiceFindResult([]);
 
       const result = await service.getSessionProgress(patientId, serviceId);
 
@@ -978,6 +999,7 @@ describe('AppointmentSessionService', () => {
       mockAppointmentModel.find.mockResolvedValue([
         buildApptForSession(s1Id, 'no_show'),
       ]);
+      mockInvoiceFindResult([]);
 
       const result = await service.getSessionProgress(patientId, serviceId);
 
@@ -999,6 +1021,7 @@ describe('AppointmentSessionService', () => {
       ];
       mockServiceModel.findById.mockResolvedValue(buildServiceWithSessions(sessions));
       mockAppointmentModel.find.mockResolvedValue([]);
+      mockInvoiceFindResult([]);
 
       const result = await service.getSessionProgress(patientId, serviceId);
 
@@ -1019,6 +1042,7 @@ describe('AppointmentSessionService', () => {
       });
       mockServiceModel.findById.mockResolvedValue(buildServiceWithSessions([s1]));
       mockAppointmentModel.find.mockResolvedValue([appt]);
+      mockInvoiceFindResult([]);
 
       const result = await service.getSessionProgress(patientId, serviceId);
 
@@ -1033,6 +1057,7 @@ describe('AppointmentSessionService', () => {
       const s1 = buildSession(id(), 'Diagnosis', 1);
       mockServiceModel.findById.mockResolvedValue(buildServiceWithSessions([s1]));
       mockAppointmentModel.find.mockResolvedValue([]);
+      mockInvoiceFindResult([]);
 
       const result = await service.getSessionProgress(patientId, serviceId);
 
@@ -1048,6 +1073,7 @@ describe('AppointmentSessionService', () => {
       const scheduledAppt = buildApptForSession(s1Id, 'scheduled');
       mockServiceModel.findById.mockResolvedValue(buildServiceWithSessions([s1]));
       mockAppointmentModel.find.mockResolvedValue([scheduledAppt, completedAppt]);
+      mockInvoiceFindResult([]);
 
       const result = await service.getSessionProgress(patientId, serviceId);
 
@@ -1063,10 +1089,171 @@ describe('AppointmentSessionService', () => {
       mockAppointmentModel.find.mockResolvedValue([
         buildApptForSession(ids[0], 'completed'),
       ]);
+      mockInvoiceFindResult([]);
 
       const result = await service.getSessionProgress(patientId, serviceId);
 
       expect(result.completionPercentage).toBe(33);
+    });
+
+    it('should map invoice-backed appointments with null sessionId to the correct service session', async () => {
+      const s1Id = id();
+      const s2Id = id();
+      const s1 = buildSession(s1Id, 'Diagnosis', 1);
+      const s2 = buildSession(s2Id, 'Treatment', 2);
+      const invoiceId = new Types.ObjectId();
+      const invoiceBackedAppointment = buildAppointment({
+        _id: new Types.ObjectId(),
+        invoiceId,
+        sessionId: undefined,
+        status: 'completed',
+        appointmentDate: new Date('2024-04-01'),
+      });
+
+      mockServiceModel.findById.mockResolvedValue(buildServiceWithSessions([s1, s2]));
+      mockAppointmentModel.find.mockResolvedValue([invoiceBackedAppointment]);
+      mockInvoiceFindResult([
+        {
+          _id: invoiceId,
+          services: [
+            {
+              serviceId,
+              sessions: [
+                {
+                  appointmentId: invoiceBackedAppointment._id,
+                  sessionId: s1Id,
+                  sessionName: 'Diagnosis',
+                  sessionOrder: 1,
+                },
+              ],
+            },
+          ],
+        },
+      ]);
+
+      const result = await service.getSessionProgress(patientId, serviceId);
+
+      expect(result.sessions[0].status).toBe('completed');
+      expect(result.sessions[0].appointmentId).toBe(
+        invoiceBackedAppointment._id.toString(),
+      );
+      expect(result.completedSessions).toBe(1);
+    });
+
+    it('should include cancelled and no_show attempts in appointmentHistory for repeated same-session bookings', async () => {
+      const s1Id = id();
+      const s2Id = id();
+      const s1 = buildSession(s1Id, 'Diagnosis', 1);
+      const s2 = buildSession(s2Id, 'Treatment', 2);
+      const invoiceId = new Types.ObjectId();
+      const cancelledAttempt = buildAppointment({
+        _id: new Types.ObjectId(),
+        invoiceId,
+        sessionId: undefined,
+        status: 'cancelled',
+        appointmentDate: new Date('2024-04-01'),
+        appointmentTime: '09:00',
+      });
+      const currentAttempt = buildAppointment({
+        _id: new Types.ObjectId(),
+        invoiceId,
+        sessionId: undefined,
+        status: 'scheduled',
+        appointmentDate: new Date('2024-04-02'),
+        appointmentTime: '10:00',
+      });
+
+      mockServiceModel.findById.mockResolvedValue(buildServiceWithSessions([s1, s2]));
+      mockAppointmentModel.find.mockResolvedValue([cancelledAttempt, currentAttempt]);
+      mockInvoiceFindResult([
+        {
+          _id: invoiceId,
+          services: [
+            {
+              serviceId,
+              sessions: [
+                {
+                  appointmentId: cancelledAttempt._id,
+                  sessionId: s1Id,
+                  sessionName: 'Diagnosis',
+                  sessionOrder: 1,
+                },
+                {
+                  appointmentId: currentAttempt._id,
+                  sessionId: s1Id,
+                  sessionName: 'Diagnosis',
+                  sessionOrder: 1,
+                },
+              ],
+            },
+          ],
+        },
+      ]);
+
+      const result = await service.getSessionProgress(patientId, serviceId);
+
+      expect(result.sessions[0].status).toBe('scheduled');
+      expect(result.appointmentHistory).toHaveLength(2);
+      expect(result.appointmentHistory[0].status).toBe('cancelled');
+      expect(result.appointmentHistory[1].status).toBe('scheduled');
+      expect(result.appointmentHistory.every((item) => item.sessionOrder === 1)).toBe(true);
+    });
+
+    it('should scope progress to the requested invoice when the patient has the same service on multiple invoices', async () => {
+      const s1Id = id();
+      const s2Id = id();
+      const s1 = buildSession(s1Id, 'Diagnosis', 1);
+      const s2 = buildSession(s2Id, 'Treatment', 2);
+      const invoiceA = new Types.ObjectId();
+      const invoiceB = new Types.ObjectId();
+      const appointmentA = buildAppointment({
+        _id: new Types.ObjectId(),
+        invoiceId: invoiceA,
+        sessionId: undefined,
+        status: 'completed',
+        appointmentDate: new Date('2024-04-01'),
+      });
+      const appointmentB = buildAppointment({
+        _id: new Types.ObjectId(),
+        invoiceId: invoiceB,
+        sessionId: undefined,
+        status: 'scheduled',
+        appointmentDate: new Date('2024-04-02'),
+      });
+
+      mockServiceModel.findById.mockResolvedValue(buildServiceWithSessions([s1, s2]));
+      mockAppointmentModel.find.mockResolvedValue([appointmentA]);
+      mockInvoiceFindResult([
+        {
+          _id: invoiceA,
+          services: [
+            {
+              serviceId,
+              sessions: [
+                {
+                  appointmentId: appointmentA._id,
+                  sessionId: s1Id,
+                  sessionName: 'Diagnosis',
+                  sessionOrder: 1,
+                },
+              ],
+            },
+          ],
+        },
+      ]);
+
+      const result = await service.getSessionProgress(patientId, serviceId, invoiceA.toString());
+
+      expect(mockAppointmentModel.find).toHaveBeenCalledWith(
+        expect.objectContaining({
+          patientId: expect.any(Types.ObjectId),
+          serviceId: expect.any(Types.ObjectId),
+          invoiceId: expect.any(Types.ObjectId),
+        }),
+      );
+      expect(result.appointmentHistory).toHaveLength(1);
+      expect(result.appointmentHistory[0].appointmentId).toBe(appointmentA._id.toString());
+      expect(result.appointmentHistory[0].appointmentId).not.toBe(appointmentB._id.toString());
     });
   });
 

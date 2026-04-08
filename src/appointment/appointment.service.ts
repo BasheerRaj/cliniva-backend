@@ -54,6 +54,7 @@ import {
   transformAppointmentList,
   TransformedAppointment,
 } from './utils/appointment-transformer.util';
+import { getAppointmentEditLockReason } from './utils/appointment-editability.util';
 
 @Injectable()
 export class AppointmentService {
@@ -595,20 +596,29 @@ export class AppointmentService {
           } else {
             // No sessions or all already booked/completed? 
             // Check if we can add a new one (only for legacy invoices where sessions weren't pre-populated)
+            const existingSessionKeys = new Set(
+              (svcItem.sessions || []).map((s: any) => s.sessionId?.toString() || `order:${s.sessionOrder}`),
+            );
+            const nextServiceSession = (service.sessions || [])
+              .slice()
+              .sort((a: any, b: any) => a.order - b.order)
+              .find((session: any) => !existingSessionKeys.has(session._id?.toString()));
+
             const activeSessions = (svcItem.sessions || []).filter(
               (s: any) => s.sessionStatus !== 'cancelled',
             );
             if (activeSessions.length < (svcItem.totalSessions || 1)) {
-              const sessionNumber = activeSessions.length + 1;
+              const sessionNumber = nextServiceSession?.order || (activeSessions.length + 1);
               await this.invoiceModel.updateOne(
                 { _id: validatedInvoice._id, deletedAt: { $exists: false } },
                 {
                   $push: {
                     [`services.${serviceIndex}.sessions`]: {
                       invoiceItemId: new Types.ObjectId(),
+                      sessionId: nextServiceSession?._id,
                       sessionStatus: 'booked',
                       sessionOrder: sessionNumber,
-                      sessionName: `Session ${sessionNumber}`,
+                      sessionName: nextServiceSession?.name || `Session ${sessionNumber}`,
                       doctorId: new Types.ObjectId(createAppointmentDto.doctorId),
                       unitPrice,
                       discountPercent,
@@ -1113,6 +1123,32 @@ export class AppointmentService {
           code: 'DOCTOR_NOT_ASSIGNED',
         });
       }
+    }
+
+    const editLockReason = getAppointmentEditLockReason(existingAppointment);
+
+    if (editLockReason === 'terminal_status') {
+      throw new BadRequestException({
+        message: {
+          ar: 'لا يمكن تعديل الموعد إذا كانت حالته ملغاة أو مكتملة أو فائتة',
+          en: 'Cannot edit cancelled, completed, or missed appointments',
+        },
+        code: 'APPOINTMENT_READ_ONLY_STATUS',
+        appointmentId,
+        currentStatus: existingAppointment.status,
+      });
+    }
+
+    if (editLockReason === 'past_two_days') {
+      throw new BadRequestException({
+        message: {
+          ar: 'لا يمكن تعديل الموعد بعد مرور أكثر من يومين على موعده',
+          en: 'Cannot edit appointment more than 2 days after its scheduled time',
+        },
+        code: 'APPOINTMENT_EDIT_WINDOW_EXPIRED',
+        appointmentId,
+        currentStatus: existingAppointment.status,
+      });
     }
 
     // UC-b6d5c4e Precondition: Cannot edit completed appointments

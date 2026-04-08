@@ -248,11 +248,13 @@ export class AppointmentController {
   async getSessionProgress(
     @Param('patientId') patientId: string,
     @Param('serviceId') serviceId: string,
+    @Query('invoiceId') invoiceId?: string,
   ) {
     try {
       const progress = await this.appointmentSessionService.getSessionProgress(
         patientId,
         serviceId,
+        invoiceId,
       );
       return {
         success: true,

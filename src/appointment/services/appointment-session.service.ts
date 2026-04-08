@@ -9,6 +9,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Appointment } from '../../database/schemas/appointment.schema';
 import { Service } from '../../database/schemas/service.schema';
+import { Invoice } from '../../database/schemas/invoice.schema';
 import { ProcessedSession } from '../../service/interfaces/processed-session.interface';
 import {
   AppointmentWithSession,
@@ -18,6 +19,7 @@ import { SESSION_ERROR_MESSAGES } from '../constants/session-error-messages.cons
 import {
   SessionProgressDto,
   SessionProgressItemDto,
+  SessionAttemptHistoryItemDto,
 } from '../dto/session-progress.dto';
 import { BatchBookSessionsDto } from '../dto/batch-book-sessions.dto';
 import {
@@ -46,6 +48,8 @@ export class AppointmentSessionService {
     private readonly appointmentModel: Model<Appointment>,
     @InjectModel('Service')
     private readonly serviceModel: Model<Service>,
+    @InjectModel('Invoice')
+    private readonly invoiceModel: Model<Invoice>,
   ) {}
 
   // =========================================================================
@@ -374,6 +378,7 @@ export class AppointmentSessionService {
   async getSessionProgress(
     patientId: string,
     serviceId: string,
+    invoiceId?: string,
   ): Promise<SessionProgressDto> {
     this.logger.debug(
       `Getting session progress: patient=${patientId}, service=${serviceId}`,
@@ -395,11 +400,54 @@ export class AppointmentSessionService {
       });
     }
 
-    const appointments = await this.appointmentModel.find({
+    const appointmentQuery: any = {
       patientId: new Types.ObjectId(patientId),
       serviceId: new Types.ObjectId(serviceId),
       isDeleted: { $ne: true },
-    });
+    };
+
+    if (invoiceId && Types.ObjectId.isValid(invoiceId)) {
+      appointmentQuery.invoiceId = new Types.ObjectId(invoiceId);
+    }
+
+    const appointments = await this.appointmentModel.find(appointmentQuery);
+
+    const invoiceIds = Array.from(
+      new Set(
+        appointments
+          .map((appt: any) => appt.invoiceId?.toString())
+          .filter((invoiceId): invoiceId is string => Boolean(invoiceId)),
+      ),
+    );
+
+    const invoices = invoiceIds.length
+      ? await this.invoiceModel
+          .find({
+            _id: { $in: invoiceIds.map((invoiceId) => new Types.ObjectId(invoiceId)) },
+          })
+          .select('services.serviceId services.sessions')
+          .lean()
+      : [];
+
+    const invoiceSessionMap = new Map<
+      string,
+      { sessionId?: string; sessionName?: string; sessionOrder?: number }
+    >();
+
+    for (const invoice of invoices as any[]) {
+      for (const invoiceService of invoice.services || []) {
+        if (invoiceService.serviceId?.toString() !== serviceId) continue;
+        for (const invoiceSession of invoiceService.sessions || []) {
+          const appointmentId = invoiceSession.appointmentId?.toString();
+          if (!appointmentId) continue;
+          invoiceSessionMap.set(appointmentId, {
+            sessionId: invoiceSession.sessionId,
+            sessionName: invoiceSession.sessionName,
+            sessionOrder: invoiceSession.sessionOrder,
+          });
+        }
+      }
+    }
 
     // Status priority: higher number wins when a session has multiple appointments
     const STATUS_PRIORITY: Record<string, number> = {
@@ -411,32 +459,43 @@ export class AppointmentSessionService {
       cancelled: 1,
     };
 
+    const serviceSessions = service.sessions ?? [];
     const appointmentMap = new Map<string, Appointment>();
     for (const appt of appointments) {
-      if (!appt.sessionId) continue;
-      const existing = appointmentMap.get(appt.sessionId);
+      const invoiceSession = invoiceSessionMap.get((appt._id as Types.ObjectId).toString());
+      const resolvedSessionId =
+        appt.sessionId ||
+        invoiceSession?.sessionId ||
+        serviceSessions.find((s) => s.order === invoiceSession?.sessionOrder)?._id;
+
+      if (!resolvedSessionId) continue;
+
+      const existing = appointmentMap.get(resolvedSessionId);
       if (!existing) {
-        appointmentMap.set(appt.sessionId, appt);
+        appointmentMap.set(resolvedSessionId, appt);
       } else {
         const newPriority = STATUS_PRIORITY[appt.status] ?? 0;
         const existingPriority = STATUS_PRIORITY[existing.status] ?? 0;
         if (newPriority > existingPriority) {
-          appointmentMap.set(appt.sessionId, appt);
+          appointmentMap.set(resolvedSessionId, appt);
         }
       }
     }
 
-    const sortedSessions = [...service.sessions].sort(
+    const sortedSessions = [...serviceSessions].sort(
       (a, b) => a.order - b.order,
     );
 
     const sessionItems: SessionProgressItemDto[] = sortedSessions.map(
       (session) => {
         const appt = appointmentMap.get(session._id);
+        const invoiceSession = appt
+          ? invoiceSessionMap.get((appt._id as Types.ObjectId).toString())
+          : undefined;
         return {
           sessionId: session._id,
-          sessionName: session.name,
-          sessionOrder: session.order,
+          sessionName: invoiceSession?.sessionName || session.name,
+          sessionOrder: invoiceSession?.sessionOrder || session.order,
           appointmentId: appt
             ? (appt._id as Types.ObjectId).toString()
             : undefined,
@@ -457,6 +516,58 @@ export class AppointmentSessionService {
         ? Math.round((completedSessions / totalSessions) * 100)
         : 0;
 
+    const appointmentHistory: SessionAttemptHistoryItemDto[] = [];
+    for (const appt of appointments) {
+        const appointmentId = (appt._id as Types.ObjectId).toString();
+        const invoiceSession = invoiceSessionMap.get(appointmentId);
+        const resolvedSession =
+          (appt.sessionId
+            ? serviceSessions.find((session) => session._id === appt.sessionId)
+            : undefined) ||
+          (invoiceSession?.sessionId
+            ? serviceSessions.find((session) => session._id === invoiceSession.sessionId)
+            : undefined) ||
+          (invoiceSession?.sessionOrder
+            ? serviceSessions.find((session) => session.order === invoiceSession.sessionOrder)
+            : undefined);
+
+        if (!resolvedSession && !invoiceSession?.sessionOrder && !invoiceSession?.sessionName) {
+          continue;
+        }
+
+        appointmentHistory.push({
+          appointmentId,
+          sessionId: resolvedSession?._id || invoiceSession?.sessionId,
+          sessionName:
+            invoiceSession?.sessionName ||
+            resolvedSession?.name ||
+            `Session ${invoiceSession?.sessionOrder || 1}`,
+          sessionOrder:
+            invoiceSession?.sessionOrder ||
+            resolvedSession?.order ||
+            1,
+          status: appt.status,
+          appointmentDate: appt.appointmentDate,
+          appointmentTime: appt.appointmentTime,
+          durationMinutes: appt.durationMinutes,
+          createdAt: (appt as any).createdAt,
+          completionNotes: appt.completionNotes,
+          isCompleted: appt.status === 'completed',
+        });
+    }
+    appointmentHistory.sort((a, b) => {
+      const dateDiff =
+        new Date(a.appointmentDate).getTime() - new Date(b.appointmentDate).getTime();
+      if (dateDiff !== 0) return dateDiff;
+      const timeA = a.appointmentTime || '';
+      const timeB = b.appointmentTime || '';
+      if (timeA !== timeB) return timeA.localeCompare(timeB);
+      const createdDiff =
+        new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime();
+      if (createdDiff !== 0) return createdDiff;
+      return a.sessionOrder - b.sessionOrder;
+    });
+
     this.logger.debug(
       `Session progress: ${completedSessions}/${totalSessions} (${completionPercentage}%)`,
     );
@@ -469,6 +580,7 @@ export class AppointmentSessionService {
       completedSessions,
       completionPercentage,
       sessions: sessionItems,
+      appointmentHistory,
     };
   }
 
