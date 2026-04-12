@@ -2593,6 +2593,11 @@ export class AppointmentService {
       clinic: string;
       patient: string;
     } | null;
+    total: number;
+    completed: number;
+    cancelled: number;
+    missed: number;
+    scheduled: number;
   }>> {
     const from = new Date(`${dateFrom}T00:00:00.000Z`);
     const to = new Date(`${dateTo}T23:59:59.999Z`);
@@ -2676,12 +2681,11 @@ export class AppointmentService {
               ],
             },
           },
-          hasInProgress: {
-            $sum: { $cond: [{ $eq: ['$status', 'in_progress'] }, 1, 0] },
-          },
-          hasScheduled: {
-            $sum: { $cond: [{ $in: ['$status', ['scheduled', 'confirmed']] }, 1, 0] },
-          },
+          total: { $sum: 1 },
+          completed_count: { $sum: { $cond: [{ $eq: ['$status', 'completed'] }, 1, 0] } },
+          cancelled_count: { $sum: { $cond: [{ $eq: ['$status', 'cancelled'] }, 1, 0] } },
+          missed_count: { $sum: { $cond: [{ $eq: ['$status', 'no_show'] }, 1, 0] } },
+          scheduled_count: { $sum: { $cond: [{ $in: ['$status', ['scheduled', 'confirmed']] }, 1, 0] } },
         },
       },
     ]);
@@ -2689,6 +2693,31 @@ export class AppointmentService {
     const statsMap = new Map(hoursAgg.map((item) => [String(item._id), item]));
 
     const now = new Date();
+    const todayStr = now.toISOString().split('T')[0];
+    const todayStart = new Date(`${todayStr}T00:00:00.000Z`);
+    const todayEnd   = new Date(`${todayStr}T23:59:59.999Z`);
+
+    // Live status: fetch today's non-terminal appointments and check time overlap
+    const todayActiveMatch: any = {
+      deletedAt: { $exists: false },
+      isDeleted: { $ne: true },
+      appointmentDate: { $gte: todayStart, $lte: todayEnd },
+      status: { $in: ['scheduled', 'confirmed', 'in_progress'] },
+    };
+    if (effectiveClinicObjectIds.length > 0) todayActiveMatch.clinicId = { $in: effectiveClinicObjectIds };
+
+    const todayActiveAppts = await this.appointmentModel
+      .find(todayActiveMatch)
+      .select('doctorId appointmentDate appointmentTime durationMinutes status')
+      .lean();
+
+    // Unavailable = current time is between appointment start and end
+    const unavailableSet = new Set<string>();
+    for (const appt of todayActiveAppts) {
+      if (this.isAppointmentEffectivelyInProgress(appt as any, now)) {
+        unavailableSet.add(String(appt.doctorId));
+      }
+    }
 
     const results = await Promise.all(
       allDoctors.map(async (doctor: any) => {
@@ -2696,11 +2725,10 @@ export class AppointmentService {
         const doctorName = [doctor.firstName, doctor.lastName].filter(Boolean).join(' ') || 'Unknown Doctor';
         const stats = statsMap.get(String(doctorId));
 
-        let liveStatus: 'Busy' | 'Available' | 'Unavailable' = 'Unavailable';
-        if ((stats?.hasInProgress ?? 0) > 0) {
-          liveStatus = 'Busy';
-        } else if ((stats?.hasScheduled ?? 0) > 0) {
-          liveStatus = 'Available';
+        const doctorIdStr = String(doctorId);
+        let liveStatus: 'Busy' | 'Available' | 'Unavailable' = 'Available';
+        if (unavailableSet.has(doctorIdStr)) {
+          liveStatus = 'Unavailable';
         }
 
         // Find next upcoming appointment (not limited by date range — find the actual next one)
@@ -2746,6 +2774,11 @@ export class AppointmentService {
           status: liveStatus,
           completedHours: Math.round((stats?.completedHours ?? 0) * 10) / 10,
           totalHours: Math.round((stats?.totalHours ?? 0) * 10) / 10,
+          total: stats?.total ?? 0,
+          completed: stats?.completed_count ?? 0,
+          cancelled: stats?.cancelled_count ?? 0,
+          missed: stats?.missed_count ?? 0,
+          scheduled: stats?.scheduled_count ?? 0,
           nextAppointment,
         };
       }),
