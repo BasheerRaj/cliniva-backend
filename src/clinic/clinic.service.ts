@@ -933,6 +933,9 @@ export class ClinicService {
         query.subscriptionId = this.buildSubscriptionMatch(
           requestingUser.subscriptionId.toString(),
         );
+      } else if (Array.isArray(requestingUser.clinicIds) && requestingUser.clinicIds.length > 1) {
+        // Multi-clinic users (e.g. staff assigned to multiple clinics): scope to all assigned clinics
+        query._id = { $in: requestingUser.clinicIds.map((id: string) => new Types.ObjectId(id.toString())) };
       } else if (requestingUser.clinicId) {
         query._id = new Types.ObjectId(requestingUser.clinicId.toString());
       } else if (requestingUser.complexId) {

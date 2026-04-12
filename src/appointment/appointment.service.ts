@@ -783,6 +783,7 @@ export class AppointmentService {
     userClinicId?: string,
     subscriptionId?: string,
     complexId?: string,
+    userClinicIds?: string[],
   ): Promise<{
     appointments: TransformedAppointment[];
     total: number;
@@ -839,6 +840,29 @@ export class AppointmentService {
         filter.doctorId = new Types.ObjectId(ids[0]);
       } else if (ids.length > 1) {
         filter.doctorId = { $in: ids.map((id) => new Types.ObjectId(id)) };
+      }
+    }
+
+    // Staff multi-clinic scoping: validate provided clinicIds against JWT clinicIds,
+    // then drop the subscriptionId appointment filter (clinic ownership is sufficient for isolation).
+    if (userRole === 'staff' && clinicIds) {
+      const allowedIds = Array.isArray(userClinicIds)
+        ? userClinicIds.map(String)
+        : userClinicId
+        ? [userClinicId]
+        : [];
+      const requestedIds = String(clinicIds).split(',').filter(Boolean);
+      const intersected = allowedIds.length > 0
+        ? requestedIds.filter((id) => allowedIds.includes(id))
+        : requestedIds; // no allowedIds on JWT → pass through (subscription filter still active)
+      if (intersected.length > 0) {
+        filter.clinicId = intersected.length === 1
+          ? new Types.ObjectId(intersected[0])
+          : { $in: intersected.map((id) => new Types.ObjectId(id)) };
+        delete filter.subscriptionId; // clinic-level scope is sufficient tenant isolation
+      } else {
+        filter.clinicId = { $in: [] };
+        delete filter.subscriptionId;
       }
     }
 
@@ -2290,6 +2314,442 @@ export class AppointmentService {
     };
   }
 
+  private async resolveDashboardClinicScope(params: {
+    userRole?: string;
+    userClinicId?: string;
+    userClinicIds?: string[];
+    userComplexId?: string;
+    userSubscriptionId?: string;
+    userOrganizationId?: string;
+    clinicIds?: string[];
+  }): Promise<Types.ObjectId[]> {
+    const {
+      userRole,
+      userClinicId,
+      userClinicIds,
+      userComplexId,
+      userSubscriptionId,
+      userOrganizationId,
+      clinicIds,
+    } = params;
+
+    const requestedIds = (clinicIds ?? []).filter((id) => Types.ObjectId.isValid(id));
+    let effectiveIds = [...requestedIds];
+
+    // Staff is restricted to assigned clinicIds only; requested clinicIds must be intersected.
+    if (userRole === 'staff') {
+      const scopedIds = Array.isArray(userClinicIds)
+        ? userClinicIds.filter((id) => Types.ObjectId.isValid(id))
+        : [];
+
+      if (scopedIds.length === 0 && userClinicId && Types.ObjectId.isValid(userClinicId)) {
+        scopedIds.push(userClinicId);
+      }
+
+      effectiveIds = requestedIds.length > 0
+        ? scopedIds.filter((id) => requestedIds.includes(id))
+        : scopedIds;
+    } else if (
+      (userRole === 'admin' || userRole === 'doctor') &&
+      userClinicId &&
+      Types.ObjectId.isValid(userClinicId)
+    ) {
+      effectiveIds = requestedIds.length > 0
+        ? requestedIds.filter((id) => id === userClinicId)
+        : [userClinicId];
+    }
+
+    const clinicFilter: any = {
+      deletedAt: { $exists: false },
+      isActive: true,
+    };
+
+    if (userComplexId && Types.ObjectId.isValid(userComplexId)) {
+      clinicFilter.complexId = new Types.ObjectId(userComplexId);
+    }
+
+    // Mandatory tenant boundary for non-super-admin users.
+    if (userRole !== 'super_admin') {
+      if (userSubscriptionId && Types.ObjectId.isValid(userSubscriptionId)) {
+        clinicFilter.subscriptionId = new Types.ObjectId(userSubscriptionId);
+      } else if (userOrganizationId && Types.ObjectId.isValid(userOrganizationId)) {
+        clinicFilter.organizationId = new Types.ObjectId(userOrganizationId);
+      } else {
+        return [];
+      }
+    }
+
+    if (effectiveIds.length > 0) {
+      clinicFilter._id = { $in: effectiveIds.map((id) => new Types.ObjectId(id)) };
+    }
+
+    const clinics = await this.clinicModel.find(clinicFilter).select('_id').lean();
+    return clinics.map((clinic: any) => clinic._id as Types.ObjectId);
+  }
+
+  /**
+   * Get staff dashboard statistics
+   */
+  async getStaffDashboardStats(
+    userId: string | undefined,
+    userRole: string | undefined,
+    userClinicId: string | undefined,
+    userClinicIds: string[] | undefined,
+    userComplexId: string | undefined,
+    userSubscriptionId: string | undefined,
+    userOrganizationId: string | undefined,
+    dateFrom: string,
+    dateTo: string,
+    clinicIds?: string[],
+  ): Promise<{
+    stats: { total: number; scheduled: number; completed: number; cancelled: number; missed: number };
+    clinicBreakdown: Array<{
+      clinicId: string;
+      clinicName: string;
+      total: number;
+      completed: number;
+      cancelled: number;
+      appointmentHours: number;
+    }>;
+    peakHours: Array<{ hour: string; count: number }>;
+  }> {
+    const from = new Date(`${dateFrom}T00:00:00.000Z`);
+    const to = new Date(`${dateTo}T23:59:59.999Z`);
+
+    if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
+      throw new BadRequestException('Invalid dateFrom/dateTo format. Expected YYYY-MM-DD');
+    }
+
+    const match: any = {
+      appointmentDate: { $gte: from, $lte: to },
+      deletedAt: { $exists: false },
+      isDeleted: { $ne: true },
+    };
+
+    const effectiveClinicObjectIds = await this.resolveDashboardClinicScope({
+      userRole,
+      userClinicId,
+      userClinicIds,
+      userComplexId,
+      userSubscriptionId,
+      userOrganizationId,
+      clinicIds,
+    });
+
+    if (effectiveClinicObjectIds.length > 0) {
+      match.clinicId = { $in: effectiveClinicObjectIds };
+    } else if (userRole !== 'super_admin') {
+      // Non-super-admin users must never escape clinic scope.
+      match.clinicId = { $in: [] };
+    }
+
+    const doctorScopeQuery: any = {
+      role: 'doctor',
+      isActive: true,
+      deletedAt: { $exists: false },
+    };
+    if (userRole !== 'super_admin') {
+      if (userSubscriptionId && Types.ObjectId.isValid(userSubscriptionId)) {
+        doctorScopeQuery.subscriptionId = new Types.ObjectId(userSubscriptionId);
+      } else if (userOrganizationId && Types.ObjectId.isValid(userOrganizationId)) {
+        doctorScopeQuery.organizationId = new Types.ObjectId(userOrganizationId);
+      } else {
+        doctorScopeQuery._id = { $in: [] };
+      }
+    }
+    if (effectiveClinicObjectIds.length > 0) {
+      doctorScopeQuery.$or = [
+        { clinicId: { $in: effectiveClinicObjectIds } },
+        { clinicIds: { $in: effectiveClinicObjectIds } },
+      ];
+    }
+    const activeDoctors = await this.userModel.find(doctorScopeQuery).select('_id').lean();
+    const activeDoctorIds = activeDoctors.map((doctor: any) => doctor._id);
+    match.doctorId = { $in: activeDoctorIds };
+
+    // Stats aggregate
+    const grouped = await this.appointmentModel.aggregate([
+      { $match: match },
+      { $group: { _id: '$status', count: { $sum: 1 } } },
+    ]);
+
+    let total = 0;
+    let scheduled = 0;
+    let completed = 0;
+    let cancelled = 0;
+    let missed = 0;
+
+    for (const item of grouped) {
+      total += item.count;
+      if (item._id === 'scheduled' || item._id === 'confirmed') {
+        scheduled += item.count;
+      } else if (item._id === 'completed') {
+        completed += item.count;
+      } else if (item._id === 'cancelled') {
+        cancelled += item.count;
+      } else if (item._id === 'no_show') {
+        missed += item.count;
+      }
+    }
+
+    // Fetch ALL clinics in scope (not just those with appointments in range)
+    const allClinicDocs = await this.clinicModel
+      .find({ _id: { $in: effectiveClinicObjectIds }, deletedAt: { $exists: false }, isActive: true })
+      .select('_id name')
+      .lean();
+
+    // Aggregate appointment stats per clinic for the date range only
+    const clinicAgg = await this.appointmentModel.aggregate([
+      { $match: match },
+      {
+        $group: {
+          _id: '$clinicId',
+          total: { $sum: 1 },
+          completed: {
+            $sum: { $cond: [{ $eq: ['$status', 'completed'] }, 1, 0] },
+          },
+          cancelled: {
+            $sum: { $cond: [{ $eq: ['$status', 'cancelled'] }, 1, 0] },
+          },
+          appointmentHours: {
+            $sum: {
+              $cond: [
+                { $ne: ['$status', 'cancelled'] },
+                { $divide: [{ $ifNull: ['$durationMinutes', 0] }, 60] },
+                0,
+              ],
+            },
+          },
+        },
+      },
+    ]);
+
+    const clinicStatsMap = new Map(clinicAgg.map((item) => [String(item._id), item]));
+
+    const clinicBreakdown = allClinicDocs.map((clinic: any) => {
+      const s = clinicStatsMap.get(String(clinic._id));
+      return {
+        clinicId: String(clinic._id),
+        clinicName: clinic.name,
+        total: s?.total ?? 0,
+        completed: s?.completed ?? 0,
+        cancelled: s?.cancelled ?? 0,
+        appointmentHours: Math.round((s?.appointmentHours ?? 0) * 10) / 10,
+      };
+    });
+
+    // Peak hours (08-20) — use appointmentTime "HH:mm" string since appointmentDate stores midnight only
+    const peakAgg = await this.appointmentModel.aggregate([
+      { $match: match },
+      {
+        $group: {
+          _id: { $toInt: { $substr: ['$appointmentTime', 0, 2] } },
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+
+    const peakMap = new Map<number, number>(peakAgg.map((item) => [item._id, item.count]));
+    const peakHours: Array<{ hour: string; count: number }> = [];
+    for (let h = 8; h <= 20; h++) {
+      peakHours.push({ hour: `${String(h).padStart(2, '0')}:00`, count: peakMap.get(h) ?? 0 });
+    }
+
+    return { stats: { total, scheduled, completed, cancelled, missed }, clinicBreakdown, peakHours };
+  }
+
+  /**
+   * Get doctors overview for staff dashboard
+   * Shows ALL doctors in the clinic/complex scope (not limited to those with appointments in date range).
+   * Appointment hours/status are computed for the selected date range.
+   */
+  async getDoctorsOverview(
+    userId: string | undefined,
+    userRole: string | undefined,
+    userClinicId: string | undefined,
+    userClinicIds: string[] | undefined,
+    userComplexId: string | undefined,
+    userSubscriptionId: string | undefined,
+    userOrganizationId: string | undefined,
+    dateFrom: string,
+    dateTo: string,
+    clinicIds?: string[],
+  ): Promise<Array<{
+    doctorId: string;
+    doctorName: string;
+    status: 'Busy' | 'Available' | 'Unavailable';
+    completedHours: number;
+    totalHours: number;
+    nextAppointment: {
+      service: string;
+      sessionName: string | null;
+      sessionNumber: number | null;
+      totalSessions: number | null;
+      datetime: string;
+      clinic: string;
+      patient: string;
+    } | null;
+  }>> {
+    const from = new Date(`${dateFrom}T00:00:00.000Z`);
+    const to = new Date(`${dateTo}T23:59:59.999Z`);
+
+    if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
+      throw new BadRequestException('Invalid dateFrom/dateTo format. Expected YYYY-MM-DD');
+    }
+
+    // Compute effective clinic ObjectIds
+    const effectiveClinicObjectIds = await this.resolveDashboardClinicScope({
+      userRole,
+      userClinicId,
+      userClinicIds,
+      userComplexId,
+      userSubscriptionId,
+      userOrganizationId,
+      clinicIds,
+    });
+
+    // Fetch ALL doctors assigned to any of the effective clinics (not just those with appointments)
+    const doctorQuery: any = { role: 'doctor', isActive: true, deletedAt: { $exists: false } };
+    if (userRole !== 'super_admin') {
+      if (userSubscriptionId && Types.ObjectId.isValid(userSubscriptionId)) {
+        doctorQuery.subscriptionId = new Types.ObjectId(userSubscriptionId);
+      } else if (userOrganizationId && Types.ObjectId.isValid(userOrganizationId)) {
+        doctorQuery.organizationId = new Types.ObjectId(userOrganizationId);
+      } else {
+        return [];
+      }
+    }
+    if (effectiveClinicObjectIds.length > 0) {
+      doctorQuery.$or = [
+        { clinicId: { $in: effectiveClinicObjectIds } },
+        { clinicIds: { $in: effectiveClinicObjectIds } },
+      ];
+    } else if (userRole !== 'super_admin') {
+      return [];
+    }
+
+    const allDoctors = await this.userModel
+      .find(doctorQuery)
+      .select('_id firstName lastName clinicId clinicIds')
+      .lean();
+
+    if (allDoctors.length === 0) return [];
+
+    const allDoctorIds = allDoctors.map((d: any) => d._id);
+
+    // Build appointment match for the date range (to compute stats)
+    const appointmentMatch: any = {
+      appointmentDate: { $gte: from, $lte: to },
+      deletedAt: { $exists: false },
+      isDeleted: { $ne: true },
+      doctorId: { $in: allDoctorIds },
+    };
+    if (effectiveClinicObjectIds.length > 0) {
+      appointmentMatch.clinicId = { $in: effectiveClinicObjectIds };
+    }
+
+    // Aggregate appointment stats per doctor for the selected date range
+    const hoursAgg = await this.appointmentModel.aggregate([
+      { $match: appointmentMatch },
+      {
+        $group: {
+          _id: '$doctorId',
+          completedHours: {
+            $sum: {
+              $cond: [
+                { $eq: ['$status', 'completed'] },
+                { $divide: [{ $ifNull: ['$durationMinutes', 0] }, 60] },
+                0,
+              ],
+            },
+          },
+          totalHours: {
+            $sum: {
+              $cond: [
+                { $in: ['$status', ['completed', 'scheduled', 'confirmed', 'in_progress']] },
+                { $divide: [{ $ifNull: ['$durationMinutes', 0] }, 60] },
+                0,
+              ],
+            },
+          },
+          hasInProgress: {
+            $sum: { $cond: [{ $eq: ['$status', 'in_progress'] }, 1, 0] },
+          },
+          hasScheduled: {
+            $sum: { $cond: [{ $in: ['$status', ['scheduled', 'confirmed']] }, 1, 0] },
+          },
+        },
+      },
+    ]);
+
+    const statsMap = new Map(hoursAgg.map((item) => [String(item._id), item]));
+
+    const now = new Date();
+
+    const results = await Promise.all(
+      allDoctors.map(async (doctor: any) => {
+        const doctorId = doctor._id;
+        const doctorName = [doctor.firstName, doctor.lastName].filter(Boolean).join(' ') || 'Unknown Doctor';
+        const stats = statsMap.get(String(doctorId));
+
+        let liveStatus: 'Busy' | 'Available' | 'Unavailable' = 'Unavailable';
+        if ((stats?.hasInProgress ?? 0) > 0) {
+          liveStatus = 'Busy';
+        } else if ((stats?.hasScheduled ?? 0) > 0) {
+          liveStatus = 'Available';
+        }
+
+        // Find next upcoming appointment (not limited by date range — find the actual next one)
+        const nextApptFilter: any = {
+          doctorId,
+          status: { $in: ['scheduled', 'confirmed'] },
+          appointmentDate: { $gte: now },
+          deletedAt: { $exists: false },
+          isDeleted: { $ne: true },
+        };
+        if (effectiveClinicObjectIds.length > 0) {
+          nextApptFilter.clinicId = { $in: effectiveClinicObjectIds };
+        }
+
+        const nextAppt = await this.appointmentModel
+          .findOne(nextApptFilter)
+          .sort({ appointmentDate: 1 })
+          .populate('clinicId', 'name')
+          .populate('patientId', 'firstName lastName')
+          .populate('serviceId', 'name')
+          .lean();
+
+        let nextAppointment: any = null;
+        if (nextAppt) {
+          const clinic: any = nextAppt.clinicId;
+          const patient: any = nextAppt.patientId;
+          const service: any = nextAppt.serviceId;
+          const apptDateTime = this.getAppointmentStartDateTime(nextAppt as any);
+          nextAppointment = {
+            service: service?.name ?? 'Unknown Service',
+            sessionName: null,
+            sessionNumber: null,
+            totalSessions: null,
+            datetime: apptDateTime ? apptDateTime.toISOString() : String(nextAppt.appointmentDate),
+            clinic: clinic?.name ?? 'Unknown Clinic',
+            patient: patient ? [patient.firstName, patient.lastName].filter(Boolean).join(' ') : 'Unknown Patient',
+          };
+        }
+
+        return {
+          doctorId: String(doctorId),
+          doctorName,
+          status: liveStatus,
+          completedHours: Math.round((stats?.completedHours ?? 0) * 10) / 10,
+          totalHours: Math.round((stats?.totalHours ?? 0) * 10) / 10,
+          nextAppointment,
+        };
+      }),
+    );
+
+    return results;
+  }
+
   /**
    * Get today's appointments
    */
@@ -3540,15 +4000,32 @@ export class AppointmentService {
     };
 
     const organizationId = requestingUser.organizationId;
+    const subscriptionId = requestingUser.subscriptionId;
     const complexId = requestingUser.complexId;
     const clinicId = requestingUser.clinicId;
+    const assignedClinicIds = Array.isArray(requestingUser.clinicIds)
+      ? requestingUser.clinicIds.filter((id: any) => Types.ObjectId.isValid(String(id)))
+      : [];
     const userId = requestingUser.userId;
     const userRole = requestingUser.role;
+    const tenantScopeFilter: any = { deletedAt: { $exists: false } };
+
+    if (subscriptionId && Types.ObjectId.isValid(subscriptionId)) {
+      tenantScopeFilter.subscriptionId = new Types.ObjectId(subscriptionId);
+    } else if (organizationId && Types.ObjectId.isValid(organizationId)) {
+      tenantScopeFilter.organizationId = new Types.ObjectId(organizationId);
+    }
 
     // Strict UI restriction: Doctors should only see themselves in the doctor filter
     if (userRole === 'doctor' && userId) {
       const doctor = await this.userModel
-        .findById(new Types.ObjectId(userId))
+        .findOne({
+          _id: new Types.ObjectId(userId),
+          role: 'doctor',
+          isActive: true,
+          deletedAt: { $exists: false },
+          ...tenantScopeFilter,
+        })
         .select('_id firstName lastName clinicId organizationId complexId')
         .lean()
         .exec();
@@ -3563,7 +4040,14 @@ export class AppointmentService {
 
         // Still need to populate clinics context for the doctor's dropdown
         if (doctor.clinicId) {
-          const clinic = await this.clinicModel.findById(doctor.clinicId).select('_id name').lean();
+          const clinic = await this.clinicModel
+            .findOne({
+              _id: doctor.clinicId,
+              isActive: true,
+              ...tenantScopeFilter,
+            })
+            .select('_id name')
+            .lean();
           if (clinic) {
             context.clinics = [{ _id: clinic._id.toString(), name: clinic.name }];
           }
@@ -3576,14 +4060,19 @@ export class AppointmentService {
       const orgObjId = new Types.ObjectId(organizationId);
       
       const complexes = await this.complexModel
-        .find({ organizationId: orgObjId, deletedAt: null })
+        .find({ ...tenantScopeFilter, organizationId: orgObjId, deletedAt: { $exists: false } })
         .select('_id name')
         .lean()
         .exec();
       context.complexes = complexes.map((c: any) => ({ _id: c._id.toString(), name: c.name }));
 
       const clinics = await this.clinicModel
-        .find({ organizationId: orgObjId, deletedAt: null })
+        .find({
+          ...tenantScopeFilter,
+          organizationId: orgObjId,
+          deletedAt: { $exists: false },
+          isActive: true,
+        })
         .select('_id name complexId')
         .lean()
         .exec();
@@ -3593,8 +4082,19 @@ export class AppointmentService {
         complexId: c.complexId?.toString(),
       }));
 
+      const contextClinicObjectIds = clinics.map((c: any) => c._id);
       const doctors = await this.userModel
-        .find({ organizationId: orgObjId, role: 'doctor', isActive: true })
+        .find({
+          ...tenantScopeFilter,
+          organizationId: orgObjId,
+          role: 'doctor',
+          isActive: true,
+          deletedAt: { $exists: false },
+          $or: [
+            { clinicId: { $in: contextClinicObjectIds } },
+            { clinicIds: { $in: contextClinicObjectIds } },
+          ],
+        })
         .select('_id firstName lastName clinicId')
         .lean()
         .exec();
@@ -3608,14 +4108,30 @@ export class AppointmentService {
       const compObjId = new Types.ObjectId(complexId);
       
       const clinics = await this.clinicModel
-        .find({ complexId: compObjId, deletedAt: null })
+        .find({
+          ...tenantScopeFilter,
+          complexId: compObjId,
+          deletedAt: { $exists: false },
+          isActive: true,
+        })
         .select('_id name')
         .lean()
         .exec();
       context.clinics = clinics.map((c: any) => ({ _id: c._id.toString(), name: c.name }));
 
+      const contextClinicObjectIds = clinics.map((c: any) => c._id);
       const doctors = await this.userModel
-        .find({ complexId: compObjId, role: 'doctor', isActive: true })
+        .find({
+          ...tenantScopeFilter,
+          complexId: compObjId,
+          role: 'doctor',
+          isActive: true,
+          deletedAt: { $exists: false },
+          $or: [
+            { clinicId: { $in: contextClinicObjectIds } },
+            { clinicIds: { $in: contextClinicObjectIds } },
+          ],
+        })
         .select('_id firstName lastName clinicId')
         .lean()
         .exec();
@@ -3629,7 +4145,11 @@ export class AppointmentService {
       const clObjId = new Types.ObjectId(clinicId);
       
       const clinic = await this.clinicModel
-        .findById(clObjId)
+        .findOne({
+          _id: clObjId,
+          isActive: true,
+          ...tenantScopeFilter,
+        })
         .select('_id name')
         .lean()
         .exec();
@@ -3638,7 +4158,16 @@ export class AppointmentService {
       }
 
       const doctors = await this.userModel
-        .find({ clinicId: clObjId, role: 'doctor', isActive: true })
+        .find({
+          ...tenantScopeFilter,
+          role: 'doctor',
+          isActive: true,
+          deletedAt: { $exists: false },
+          $or: [
+            { clinicId: clObjId },
+            { clinicIds: { $in: [clObjId] } },
+          ],
+        })
         .select('_id firstName lastName')
         .lean()
         .exec();
@@ -3646,6 +4175,41 @@ export class AppointmentService {
         _id: d._id.toString(),
         firstName: d.firstName,
         lastName: d.lastName,
+      }));
+    } else if (assignedClinicIds.length > 0) {
+      // Fallback for scoped users who only carry clinicIds and no single clinicId.
+      const clinicObjectIds = assignedClinicIds.map((id: string) => new Types.ObjectId(id));
+      const clinics = await this.clinicModel
+        .find({
+          ...tenantScopeFilter,
+          _id: { $in: clinicObjectIds },
+          deletedAt: { $exists: false },
+          isActive: true,
+        })
+        .select('_id name')
+        .lean()
+        .exec();
+      context.clinics = clinics.map((c: any) => ({ _id: c._id.toString(), name: c.name }));
+
+      const doctors = await this.userModel
+        .find({
+          ...tenantScopeFilter,
+          role: 'doctor',
+          isActive: true,
+          deletedAt: { $exists: false },
+          $or: [
+            { clinicId: { $in: clinicObjectIds } },
+            { clinicIds: { $in: clinicObjectIds } },
+          ],
+        })
+        .select('_id firstName lastName clinicId')
+        .lean()
+        .exec();
+      context.doctors = doctors.map((d: any) => ({
+        _id: d._id.toString(),
+        firstName: d.firstName,
+        lastName: d.lastName,
+        clinicId: d.clinicId?.toString(),
       }));
     }
 

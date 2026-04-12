@@ -461,6 +461,7 @@ export class AppointmentController {
         req.user?.clinicId,
         req.user?.subscriptionId,
         req.user?.complexId,
+        Array.isArray(req.user?.clinicIds) ? req.user.clinicIds.map(String) : undefined,
       );
       return {
         success: true,
@@ -855,6 +856,88 @@ export class AppointmentController {
         message: 'Failed to retrieve doctor dashboard statistics',
         error: error.message,
       };
+    }
+  }
+
+  /**
+   * Get staff dashboard statistics
+   * GET /appointments/stats/staff
+   */
+  @Get('stats/staff')
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.OWNER,
+    UserRole.ADMIN,
+    UserRole.MANAGER,
+    UserRole.STAFF,
+  )
+  async getStaffDashboardStats(
+    @Request() req: any,
+    @Query('dateFrom') dateFrom: string,
+    @Query('dateTo') dateTo: string,
+    @Query('clinicIds') clinicIdsRaw?: string,
+  ) {
+    try {
+      if (!dateFrom || !dateTo) {
+        throw new BadRequestException('dateFrom and dateTo are required');
+      }
+      const clinicIds = clinicIdsRaw?.split(',').filter(Boolean) ?? [];
+      const data = await this.appointmentService.getStaffDashboardStats(
+        req.user?.userId,
+        req.user?.role,
+        req.user?.clinicId,
+        Array.isArray(req.user?.clinicIds) ? req.user.clinicIds.map(String) : undefined,
+        req.user?.complexId ? String(req.user.complexId) : undefined,
+        req.user?.subscriptionId ? String(req.user.subscriptionId) : undefined,
+        req.user?.organizationId ? String(req.user.organizationId) : undefined,
+        dateFrom,
+        dateTo,
+        clinicIds,
+      );
+      return { success: true, data };
+    } catch (error) {
+      return { success: false, message: 'Failed to retrieve staff dashboard statistics', error: error.message };
+    }
+  }
+
+  /**
+   * Get doctors overview for staff dashboard
+   * GET /appointments/stats/doctors-overview
+   */
+  @Get('stats/doctors-overview')
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.OWNER,
+    UserRole.ADMIN,
+    UserRole.MANAGER,
+    UserRole.STAFF,
+  )
+  async getDoctorsOverview(
+    @Request() req: any,
+    @Query('dateFrom') dateFrom: string,
+    @Query('dateTo') dateTo: string,
+    @Query('clinicIds') clinicIdsRaw?: string,
+  ) {
+    try {
+      if (!dateFrom || !dateTo) {
+        throw new BadRequestException('dateFrom and dateTo are required');
+      }
+      const clinicIds = clinicIdsRaw?.split(',').filter(Boolean) ?? [];
+      const data = await this.appointmentService.getDoctorsOverview(
+        req.user?.userId,
+        req.user?.role,
+        req.user?.clinicId,
+        Array.isArray(req.user?.clinicIds) ? req.user.clinicIds.map(String) : undefined,
+        req.user?.complexId ? String(req.user.complexId) : undefined,
+        req.user?.subscriptionId ? String(req.user.subscriptionId) : undefined,
+        req.user?.organizationId ? String(req.user.organizationId) : undefined,
+        dateFrom,
+        dateTo,
+        clinicIds,
+      );
+      return { success: true, data };
+    } catch (error) {
+      return { success: false, message: 'Failed to retrieve doctors overview', error: error.message };
     }
   }
 
