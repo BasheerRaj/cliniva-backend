@@ -1030,7 +1030,10 @@ export class AppointmentService {
         .populate('doctorId', 'firstName lastName specialty phone email')
         .populate('clinicId', 'name')
         .populate('serviceId', 'name durationMinutes price description sessions._id sessions.name sessions.order')
-        .populate('invoiceId', 'paymentStatus')
+        .populate(
+          'invoiceId',
+          'paymentStatus services.serviceId services.sessions.appointmentId services.sessions.sessionName services.sessions.sessionOrder',
+        )
         .sort(sort)
         .skip(skip)
         .limit(pageSize)

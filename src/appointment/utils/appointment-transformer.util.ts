@@ -193,6 +193,29 @@ export function transformAppointment(doc: any): TransformedAppointment {
     }
   }
 
+  // Fallback: when appointment.sessionId is not set, resolve session name/order from linked invoice by appointmentId.
+  if (!sessionName && doc.invoiceId && typeof doc.invoiceId === 'object' && Array.isArray(doc.invoiceId.services)) {
+    const appointmentIdStr = doc._id?.toString?.();
+    if (appointmentIdStr) {
+      for (const invoiceService of doc.invoiceId.services) {
+        if (!Array.isArray(invoiceService?.sessions)) continue;
+        const matchedInvoiceSession = invoiceService.sessions.find((session: any) => {
+          const apptId = session?.appointmentId ? String(session.appointmentId) : null;
+          return apptId === appointmentIdStr;
+        });
+        if (matchedInvoiceSession) {
+          sessionName = matchedInvoiceSession.sessionName ?? null;
+          sessionOrder =
+            typeof matchedInvoiceSession.sessionOrder === 'number' &&
+            Number.isFinite(matchedInvoiceSession.sessionOrder)
+              ? matchedInvoiceSession.sessionOrder
+              : null;
+          break;
+        }
+      }
+    }
+  }
+
   const invoicePaymentStatus =
     doc.invoiceId && typeof doc.invoiceId === 'object'
       ? (doc.invoiceId.paymentStatus ?? null)
