@@ -672,6 +672,7 @@ export class ComplexController {
    * Requirements: 2.1, 2.9
    */
   @Get(':id')
+  @SkipAdminGuard()
   @ApiOperation({
     summary: 'Get detailed complex information',
     description: `
