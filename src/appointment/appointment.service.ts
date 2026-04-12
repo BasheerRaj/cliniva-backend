@@ -83,6 +83,69 @@ export class AppointmentService {
     private readonly appointmentWorkingHoursService: AppointmentWorkingHoursService,
   ) { }
 
+  private getAppointmentStartDateTime(appointment: {
+    appointmentDate?: Date | string | null;
+    appointmentTime?: string | null;
+  }): Date | null {
+    if (!appointment.appointmentDate || !appointment.appointmentTime) {
+      return null;
+    }
+
+    const appointmentDate = new Date(appointment.appointmentDate);
+    if (Number.isNaN(appointmentDate.getTime())) {
+      return null;
+    }
+
+    const [hours, minutes] = String(appointment.appointmentTime)
+      .split(':')
+      .map((value) => Number(value));
+
+    if (Number.isNaN(hours) || Number.isNaN(minutes)) {
+      return null;
+    }
+
+    return new Date(
+      appointmentDate.getFullYear(),
+      appointmentDate.getMonth(),
+      appointmentDate.getDate(),
+      hours,
+      minutes,
+      0,
+      0,
+    );
+  }
+
+  private isAppointmentEffectivelyInProgress(
+    appointment: {
+      status?: string | null;
+      appointmentDate?: Date | string | null;
+      appointmentTime?: string | null;
+      durationMinutes?: number | null;
+    },
+    now: Date = new Date(),
+  ): boolean {
+    if (appointment.status === 'in_progress') {
+      return true;
+    }
+
+    if (['completed', 'cancelled', 'no_show'].includes(String(appointment.status || ''))) {
+      return false;
+    }
+
+    const start = this.getAppointmentStartDateTime(appointment);
+    if (!start) {
+      return false;
+    }
+
+    const durationMinutes =
+      typeof appointment.durationMinutes === 'number' && appointment.durationMinutes > 0
+        ? appointment.durationMinutes
+        : 30;
+    const end = new Date(start.getTime() + durationMinutes * 60 * 1000);
+
+    return now >= start && now < end;
+  }
+
   /**
    * Check for appointment conflicts.
    *
@@ -1639,6 +1702,7 @@ export class AppointmentService {
   async deleteAppointment(
     appointmentId: string,
     deletedByUserId?: string,
+    requestingUser?: any,
   ): Promise<void> {
     if (!Types.ObjectId.isValid(appointmentId)) {
       throw new BadRequestException({
@@ -1667,12 +1731,15 @@ export class AppointmentService {
       });
     }
 
-    // Precondition: Cannot delete completed or in-progress appointments
-    if (['completed', 'in_progress'].includes(appointment.status)) {
+    // Precondition: Cannot delete completed or effectively in-progress appointments
+    if (
+      appointment.status === 'completed' ||
+      this.isAppointmentEffectivelyInProgress(appointment)
+    ) {
       throw new BadRequestException({
         message: {
           ar: 'لا يمكن حذف المواعيد المكتملة أو الجارية',
-          en: 'Cannot delete completed or in-progress appointments',
+          en: 'You cannot delete an appointment that is in progress or completed.',
         },
         code: 'APPOINTMENT_CANNOT_DELETE',
       });
@@ -1689,23 +1756,46 @@ export class AppointmentService {
 
     this.logger.log(`Appointment soft deleted successfully: ${appointmentId}`);
 
-    // Rule BZR-0e1f2a3b Implementation:
-    // If the appointment was linked to an invoice, check if there are any other active appointments for this invoice
     if (appointment.invoiceId) {
-      const remainingAppointments = await this.appointmentModel.countDocuments({
-        invoiceId: appointment.invoiceId,
-        deletedAt: { $exists: false },
-        status: { $nin: ['cancelled'] },
-      });
+      await this.invoiceModel.updateOne(
+        {
+          _id: appointment.invoiceId,
+          'services.sessions.appointmentId': appointment._id,
+        },
+        {
+          $set: {
+            'services.$[].sessions.$[session].appointmentId': null,
+            'services.$[].sessions.$[session].sessionStatus': 'pending',
+          },
+        },
+        {
+          arrayFilters: [
+            {
+              'session.appointmentId': appointment._id,
+            },
+          ],
+        },
+      );
+    }
 
-      if (remainingAppointments === 0) {
+    // Rule BZR-0e1f2a3b:
+    // If all appointments for the patient are deleted, mark the associated invoice as cancelled.
+    if (appointment.invoiceId && appointment.patientId) {
+      const remainingPatientAppointments =
+        await this.appointmentModel.countDocuments({
+          patientId: appointment.patientId,
+          deletedAt: { $exists: false },
+        });
+
+      if (remainingPatientAppointments === 0) {
         this.logger.log(
-          `No active appointments remaining for invoice ${appointment.invoiceId}. Cancelling invoice per rule BZR-0e1f2a3b.`,
+          `No undeleted appointments remain for patient ${appointment.patientId}. Cancelling invoice ${appointment.invoiceId} per rule BZR-0e1f2a3b.`,
         );
         try {
           await this.invoiceService.cancelInvoice(
             appointment.invoiceId.toString(),
             deletedByUserId || appointment.createdBy.toString(),
+            requestingUser,
           );
         } catch (error) {
           // Log error but don't fail the appointment deletion

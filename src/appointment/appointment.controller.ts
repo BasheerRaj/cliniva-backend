@@ -1063,7 +1063,11 @@ export class AppointmentController {
   @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.STAFF)
   @HttpCode(HttpStatus.OK)
   async deleteAppointment(@Param('id') id: string, @Request() req: any) {
-    await this.appointmentService.deleteAppointment(id, req.user?.userId);
+    await this.appointmentService.deleteAppointment(
+      id,
+      req.user?.userId,
+      req.user,
+    );
     return {
       success: true,
       message: {

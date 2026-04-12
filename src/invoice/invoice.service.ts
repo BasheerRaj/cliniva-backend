@@ -32,6 +32,67 @@ import { assertSameTenant, TenantUser } from '../common/utils/tenant-scope.util'
 export class InvoiceService implements OnModuleInit {
   private readonly logger = new Logger(InvoiceService.name);
 
+  private async sanitizeDeletedAppointmentSessions(invoice: any): Promise<any> {
+    const appointmentIds = Array.from(
+      new Set(
+        (invoice?.services || []).flatMap((svc: any) =>
+          (svc?.sessions || [])
+            .map((sess: any) => sess?.appointmentId?.toString?.() ?? sess?.appointmentId)
+            .filter((id: any) => !!id && Types.ObjectId.isValid(String(id))),
+        ),
+      ),
+    );
+
+    if (appointmentIds.length === 0) {
+      return invoice;
+    }
+
+    const activeAppointments = await this.invoiceModel.db
+      .collection('appointments')
+      .find(
+        {
+          _id: { $in: appointmentIds.map((id) => new Types.ObjectId(String(id))) },
+          deletedAt: { $exists: false },
+        },
+        { projection: { _id: 1 } },
+      )
+      .toArray();
+
+    const activeAppointmentIds = new Set(
+      activeAppointments.map((appointment: any) => appointment._id.toString()),
+    );
+
+    let hasChanges = false;
+    const sanitizedServices = (invoice.services || []).map((svc: any) => ({
+      ...svc,
+      sessions: (svc.sessions || []).map((sess: any) => {
+        const appointmentId =
+          sess?.appointmentId?.toString?.() ?? sess?.appointmentId ?? null;
+
+        if (!appointmentId || activeAppointmentIds.has(String(appointmentId))) {
+          return sess;
+        }
+
+        hasChanges = true;
+        return {
+          ...sess,
+          appointmentId: null,
+          sessionStatus:
+            sess?.sessionStatus === 'completed' ? 'completed' : 'pending',
+        };
+      }),
+    }));
+
+    if (!hasChanges) {
+      return invoice;
+    }
+
+    return {
+      ...invoice.toObject(),
+      services: sanitizedServices,
+    };
+  }
+
   async onModuleInit(): Promise<void> {
     try {
       const indexes = await this.invoiceModel.collection.indexes();
@@ -864,7 +925,8 @@ export class InvoiceService implements OnModuleInit {
       }
     }
 
-    return this.mapToResponseDto(invoice);
+    const sanitizedInvoice = await this.sanitizeDeletedAppointmentSessions(invoice);
+    return this.mapToResponseDto(sanitizedInvoice);
   }
 
   /**

@@ -641,7 +641,7 @@ export class AppointmentCrudService {
       throw new BadRequestException({
         message: {
           ar: 'لا يمكن حذف موعد قيد التقدم أو مكتمل',
-          en: 'Cannot delete an in-progress or completed appointment',
+          en: 'You cannot delete an appointment that is in progress or completed.',
         },
       });
     }
