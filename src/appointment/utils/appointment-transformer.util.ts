@@ -60,7 +60,10 @@ export interface TransformedAppointment {
   cancellationReason: string | null;
   completionNotes: string | null;
   invoiceId: string | null;
+  invoicePaymentStatus: string | null;
   sessionId: string | null;
+  sessionName: string | null;
+  sessionOrder: number | null;
   medicalReportId: string | null;
   isDocumented: boolean;
   createdAt: string | null;
@@ -172,6 +175,29 @@ export function transformAppointment(doc: any): TransformedAppointment {
     };
   }
 
+  // Session details (resolved from populated service sessions when available)
+  const rawSessionId = doc.sessionId ? String(doc.sessionId) : null;
+  let sessionName: string | null = null;
+  let sessionOrder: number | null = null;
+  if (rawSessionId && rawService && typeof rawService === 'object' && Array.isArray(rawService.sessions)) {
+    const matchedSession = rawService.sessions.find((session: any) => {
+      const sid = session?._id ? String(session._id) : null;
+      return sid === rawSessionId;
+    });
+    if (matchedSession) {
+      sessionName = matchedSession.name ?? null;
+      sessionOrder =
+        typeof matchedSession.order === 'number' && Number.isFinite(matchedSession.order)
+          ? matchedSession.order
+          : null;
+    }
+  }
+
+  const invoicePaymentStatus =
+    doc.invoiceId && typeof doc.invoiceId === 'object'
+      ? (doc.invoiceId.paymentStatus ?? null)
+      : null;
+
   return {
     _id: id,
     publicId: id ? `APPT-${id.slice(-5).toUpperCase()}` : '',
@@ -190,7 +216,10 @@ export function transformAppointment(doc: any): TransformedAppointment {
           ? doc.invoiceId._id.toString()
           : doc.invoiceId.toString())
       : null,
-    sessionId: doc.sessionId ?? null,
+    invoicePaymentStatus,
+    sessionId: rawSessionId,
+    sessionName,
+    sessionOrder,
     medicalReportId: doc.medicalReportId ? doc.medicalReportId.toString() : null,
     isDocumented: doc.isDocumented ?? false,
     createdAt: doc.createdAt ? new Date(doc.createdAt).toISOString() : null,
