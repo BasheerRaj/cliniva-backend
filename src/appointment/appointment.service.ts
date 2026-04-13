@@ -15,6 +15,7 @@ import { Clinic } from '../database/schemas/clinic.schema';
 import { Complex } from '../database/schemas/complex.schema';
 import { Service } from '../database/schemas/service.schema';
 import { Invoice } from '../database/schemas/invoice.schema';
+import { Payment } from '../database/schemas/payment.schema';
 import { MedicalReport } from '../database/schemas/medical-report.schema';
 import { WorkingHoursIntegrationService } from './services/working-hours-integration.service';
 import { AppointmentWorkingHoursService } from './services/appointment-working-hours.service';
@@ -71,6 +72,7 @@ export class AppointmentService {
     @InjectModel('Complex') private readonly complexModel: Model<Complex>,
     @InjectModel('Service') private readonly serviceModel: Model<Service>,
     @InjectModel('Invoice') private readonly invoiceModel: Model<Invoice>,
+    @InjectModel('Payment') private readonly paymentModel: Model<Payment>,
     @InjectModel('MedicalReport') private readonly medicalReportModel: Model<MedicalReport>,
     @InjectModel('ClinicService') private readonly clinicServiceModel: Model<ClinicService>,
     @InjectModel('DoctorService') private readonly doctorServiceModel: Model<DoctorService>,
@@ -2357,8 +2359,20 @@ export class AppointmentService {
       effectiveIds = requestedIds.length > 0
         ? scopedIds.filter((id) => requestedIds.includes(id))
         : scopedIds;
+    } else if (userRole === 'admin') {
+      const scopedIds = Array.isArray(userClinicIds)
+        ? userClinicIds.filter((id) => Types.ObjectId.isValid(id))
+        : [];
+
+      if (scopedIds.length === 0 && userClinicId && Types.ObjectId.isValid(userClinicId)) {
+        scopedIds.push(userClinicId);
+      }
+
+      effectiveIds = requestedIds.length > 0
+        ? scopedIds.filter((id) => requestedIds.includes(id))
+        : scopedIds;
     } else if (
-      (userRole === 'admin' || userRole === 'doctor') &&
+      userRole === 'doctor' &&
       userClinicId &&
       Types.ObjectId.isValid(userClinicId)
     ) {
@@ -2617,6 +2631,387 @@ export class AppointmentService {
     }
 
     return { stats: { total, scheduled, completed, cancelled, missed }, clinicBreakdown, peakHours };
+  }
+
+  /**
+   * Get owner/admin dashboard statistics.
+   * Revenue basis:
+   * - Actual: sum of payments in selected range
+   * - Expected: sum of invoice totals in selected range
+   */
+  async getAdminOwnerDashboardStats(
+    _userId: string | undefined,
+    userRole: string | undefined,
+    userClinicId: string | undefined,
+    userClinicIds: string[] | undefined,
+    userComplexId: string | undefined,
+    userSubscriptionId: string | undefined,
+    userOrganizationId: string | undefined,
+    dateFrom: string,
+    dateTo: string,
+    complexIds?: string[],
+    clinicIds?: string[],
+  ): Promise<{
+    stats: {
+      newPatients: { current: number; previous: number; trendPercent: number };
+      services: { activeCount: number };
+      revenue: { actual: number; expected: number };
+      occupancy: { percent: number; bookedHours: number; availableHours: number };
+    };
+    clinicRevenueRanking: Array<{
+      clinicId: string;
+      clinicName: string;
+      actual: number;
+      expected: number;
+      occupancy: number;
+      bookedHours: number;
+      availableHours: number;
+    }>;
+  }> {
+    const from = new Date(`${dateFrom}T00:00:00.000Z`);
+    const to = new Date(`${dateTo}T23:59:59.999Z`);
+
+    if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
+      throw new BadRequestException('Invalid dateFrom/dateTo format. Expected YYYY-MM-DD');
+    }
+
+    const requestedComplexIds = (complexIds ?? []).filter((id) => Types.ObjectId.isValid(id));
+    const requestedClinicIds = (clinicIds ?? []).filter((id) => Types.ObjectId.isValid(id));
+    const hasExplicitClinicFilter = requestedClinicIds.length > 0;
+    const effectiveClinicObjectIdsRaw = await this.resolveDashboardClinicScope({
+      userRole,
+      userClinicId,
+      userClinicIds,
+      userComplexId,
+      userSubscriptionId,
+      userOrganizationId,
+      clinicIds,
+    });
+
+    let effectiveClinicObjectIds = effectiveClinicObjectIdsRaw;
+    if (requestedComplexIds.length > 0 && effectiveClinicObjectIdsRaw.length > 0) {
+      const scopedClinicsByComplex = await this.clinicModel
+        .find({
+          _id: { $in: effectiveClinicObjectIdsRaw },
+          complexId: { $in: requestedComplexIds.map((id) => new Types.ObjectId(id)) },
+          deletedAt: { $exists: false },
+          isActive: true,
+        })
+        .select('_id')
+        .lean();
+
+      effectiveClinicObjectIds = scopedClinicsByComplex.map((clinic: any) => clinic._id as Types.ObjectId);
+    }
+
+    if (effectiveClinicObjectIds.length === 0 && userRole !== 'super_admin') {
+      return {
+        stats: {
+          newPatients: { current: 0, previous: 0, trendPercent: 0 },
+          services: { activeCount: 0 },
+          revenue: { actual: 0, expected: 0 },
+          occupancy: { percent: 0, bookedHours: 0, availableHours: 0 },
+        },
+        clinicRevenueRanking: [],
+      };
+    }
+
+    const clinicDocs = await this.clinicModel
+      .find({
+        _id: { $in: effectiveClinicObjectIds },
+        deletedAt: { $exists: false },
+        isActive: true,
+      })
+      .select('_id name complexId')
+      .lean();
+    const scopedClinicIds = clinicDocs.map((clinic: any) => clinic._id as Types.ObjectId);
+
+    if (scopedClinicIds.length === 0) {
+      return {
+        stats: {
+          newPatients: { current: 0, previous: 0, trendPercent: 0 },
+          services: { activeCount: 0 },
+          revenue: { actual: 0, expected: 0 },
+          occupancy: { percent: 0, bookedHours: 0, availableHours: 0 },
+        },
+        clinicRevenueRanking: [],
+      };
+    }
+
+    const selectedDays = Math.max(
+      Math.floor((to.getTime() - from.getTime()) / (24 * 60 * 60 * 1000)) + 1,
+      1,
+    );
+    const previousTo = new Date(from.getTime() - 1);
+    const previousFrom = new Date(previousTo);
+    previousFrom.setUTCDate(previousFrom.getUTCDate() - (selectedDays - 1));
+
+    const countNewPatientsInRange = async (
+      rangeFrom: Date,
+      rangeTo: Date,
+    ): Promise<number> => {
+      const patientsInRangeAgg = await this.appointmentModel.aggregate([
+        {
+          $match: {
+            appointmentDate: { $gte: rangeFrom, $lte: rangeTo },
+            clinicId: { $in: scopedClinicIds },
+            deletedAt: { $exists: false },
+            isDeleted: { $ne: true },
+          },
+        },
+        { $group: { _id: '$patientId' } },
+      ]);
+
+      const patientIds = patientsInRangeAgg
+        .map((row: any) => row._id)
+        .filter((id: unknown) => id instanceof Types.ObjectId);
+
+      if (patientIds.length === 0) return 0;
+
+      const firstAppointments = await this.appointmentModel.aggregate([
+        {
+          $match: {
+            patientId: { $in: patientIds },
+            clinicId: { $in: scopedClinicIds },
+            deletedAt: { $exists: false },
+            isDeleted: { $ne: true },
+          },
+        },
+        { $group: { _id: '$patientId', firstAppointmentDate: { $min: '$appointmentDate' } } },
+        { $match: { firstAppointmentDate: { $gte: rangeFrom, $lte: rangeTo } } },
+        { $count: 'count' },
+      ]);
+
+      return Number(firstAppointments[0]?.count ?? 0);
+    };
+
+    const [currentNewPatients, previousNewPatients] = await Promise.all([
+      countNewPatientsInRange(from, to),
+      countNewPatientsInRange(previousFrom, previousTo),
+    ]);
+
+    const newPatientsTrend =
+      previousNewPatients === 0
+        ? currentNewPatients === 0
+          ? 0
+          : 100
+        : ((currentNewPatients - previousNewPatients) / previousNewPatients) * 100;
+
+    const activeServicesScopeQuery: any = {
+      isActive: true,
+      deletedAt: { $exists: false },
+      $or: [
+        { clinicId: { $in: scopedClinicIds } },
+        { clinicIds: { $in: scopedClinicIds } },
+        { complexId: { $in: clinicDocs.map((clinic: any) => clinic.complexId).filter(Boolean) } },
+      ],
+    };
+    if (userRole !== 'super_admin') {
+      if (userSubscriptionId && Types.ObjectId.isValid(userSubscriptionId)) {
+        activeServicesScopeQuery.subscriptionId = new Types.ObjectId(userSubscriptionId);
+      } else if (userOrganizationId && Types.ObjectId.isValid(userOrganizationId)) {
+        activeServicesScopeQuery.organizationId = new Types.ObjectId(userOrganizationId);
+      } else {
+        activeServicesScopeQuery._id = { $in: [] };
+      }
+    }
+
+    const activeServicesCount = await this.serviceModel.countDocuments(activeServicesScopeQuery);
+
+    const rangedAppointments = await this.appointmentModel
+      .find({
+        appointmentDate: { $gte: from, $lte: to },
+        clinicId: { $in: scopedClinicIds },
+        deletedAt: { $exists: false },
+        isDeleted: { $ne: true },
+      })
+      .select('_id clinicId status durationMinutes')
+      .lean();
+
+    const bookedHoursByClinic = new Map<string, number>();
+
+    for (const appointment of rangedAppointments as any[]) {
+      const clinicId = String(appointment.clinicId);
+      const status = String(appointment.status ?? '');
+
+      if (status !== 'cancelled') {
+        const hours = Number(appointment.durationMinutes ?? 0) / 60;
+        bookedHoursByClinic.set(clinicId, (bookedHoursByClinic.get(clinicId) ?? 0) + (Number.isFinite(hours) ? hours : 0));
+      }
+    }
+
+    let actualRevenue = 0;
+    let expectedRevenue = 0;
+    const clinicActualRevenue = new Map<string, number>();
+    const clinicExpectedRevenue = new Map<string, number>();
+
+    const paymentsMatch: any = {
+      paymentDate: { $gte: from, $lte: to },
+      clinicId: { $in: scopedClinicIds },
+    };
+    if (userRole !== 'super_admin') {
+      if (userOrganizationId && Types.ObjectId.isValid(userOrganizationId)) {
+        paymentsMatch.organizationId = new Types.ObjectId(userOrganizationId);
+      }
+    }
+    const paymentTotals = await this.paymentModel.aggregate([
+      { $match: paymentsMatch },
+      {
+        $group: {
+          _id: '$clinicId',
+          amount: { $sum: { $ifNull: ['$amount', 0] } },
+        },
+      },
+    ]);
+    for (const row of paymentTotals) {
+      const clinicId = String(row._id);
+      const amount = Number(row.amount ?? 0);
+      if (!Number.isFinite(amount)) continue;
+      actualRevenue += amount;
+      clinicActualRevenue.set(clinicId, (clinicActualRevenue.get(clinicId) ?? 0) + amount);
+    }
+
+    const invoicesMatch: any = {
+      issueDate: { $gte: from, $lte: to },
+      deletedAt: { $exists: false },
+      invoiceStatus: { $ne: 'cancelled' },
+    };
+    const applyClinicConstraintForInvoices =
+      hasExplicitClinicFilter ||
+      !['owner', 'manager', 'super_admin'].includes(String(userRole ?? ''));
+    if (userRole !== 'super_admin') {
+      if (userSubscriptionId && Types.ObjectId.isValid(userSubscriptionId)) {
+        invoicesMatch.subscriptionId = new Types.ObjectId(userSubscriptionId);
+      } else if (userOrganizationId && Types.ObjectId.isValid(userOrganizationId)) {
+        invoicesMatch.organizationId = new Types.ObjectId(userOrganizationId);
+      } else {
+        invoicesMatch._id = { $in: [] };
+      }
+    }
+    const invoicesInRange = await this.invoiceModel
+      .find(invoicesMatch)
+      .select('_id clinicId totalAmount services.sessions.appointmentId')
+      .lean();
+    const scopedClinicIdSet = new Set(scopedClinicIds.map((id) => String(id)));
+
+    const invoiceAppointmentIds: Types.ObjectId[] = [];
+    for (const invoice of invoicesInRange as any[]) {
+      for (const service of invoice.services ?? []) {
+        for (const session of service.sessions ?? []) {
+          if (session?.appointmentId && Types.ObjectId.isValid(String(session.appointmentId))) {
+            invoiceAppointmentIds.push(new Types.ObjectId(String(session.appointmentId)));
+          }
+        }
+      }
+    }
+
+    const appointmentClinicMap = new Map<string, string>();
+    if (invoiceAppointmentIds.length > 0) {
+      const linkedAppointments = await this.appointmentModel
+        .find({
+          _id: { $in: invoiceAppointmentIds },
+          deletedAt: { $exists: false },
+          isDeleted: { $ne: true },
+        })
+        .select('_id clinicId')
+        .lean();
+
+      for (const appt of linkedAppointments as any[]) {
+        appointmentClinicMap.set(String(appt._id), String(appt.clinicId));
+      }
+    }
+
+    for (const invoice of invoicesInRange as any[]) {
+      const amount = Number(invoice.totalAmount ?? 0);
+      if (!Number.isFinite(amount) || amount <= 0) continue;
+
+      const clinicCandidates = new Set<string>();
+      if (invoice.clinicId && Types.ObjectId.isValid(String(invoice.clinicId))) {
+        clinicCandidates.add(String(invoice.clinicId));
+      }
+      for (const service of invoice.services ?? []) {
+        for (const session of service.sessions ?? []) {
+          const appointmentId = session?.appointmentId ? String(session.appointmentId) : '';
+          if (!appointmentId) continue;
+          const linkedClinicId = appointmentClinicMap.get(appointmentId);
+          if (linkedClinicId) clinicCandidates.add(linkedClinicId);
+        }
+      }
+
+      const inScopeClinics = Array.from(clinicCandidates).filter((id) => scopedClinicIdSet.has(id));
+      const includeInvoice = applyClinicConstraintForInvoices
+        ? inScopeClinics.length > 0
+        : true;
+      if (!includeInvoice) continue;
+
+      expectedRevenue += amount;
+
+      if (inScopeClinics.length > 0) {
+        const share = amount / inScopeClinics.length;
+        for (const clinicId of inScopeClinics) {
+          clinicExpectedRevenue.set(clinicId, (clinicExpectedRevenue.get(clinicId) ?? 0) + share);
+        }
+      }
+    }
+
+    const clinicAvailabilityEntries = await Promise.all(
+      clinicDocs.map(async (clinic: any) => {
+        const availableHours = await this.calculateWorkingHoursInRange(
+          dateFrom,
+          dateTo,
+          String(clinic._id),
+          'clinic',
+        );
+        return {
+          clinicId: String(clinic._id),
+          availableHours,
+        };
+      }),
+    );
+    const clinicAvailableHoursMap = new Map<string, number>(
+      clinicAvailabilityEntries.map((entry) => [entry.clinicId, entry.availableHours]),
+    );
+
+    const totalBookedHours = Array.from(bookedHoursByClinic.values()).reduce((sum, hours) => sum + hours, 0);
+    const totalAvailableHours = Array.from(clinicAvailableHoursMap.values()).reduce((sum, hours) => sum + hours, 0);
+    const occupancyPercent = totalAvailableHours > 0 ? (totalBookedHours / totalAvailableHours) * 100 : 0;
+
+    const clinicRevenueRanking = clinicDocs
+      .map((clinic: any) => {
+        const clinicId = String(clinic._id);
+        const bookedHours = bookedHoursByClinic.get(clinicId) ?? 0;
+        const availableHours = clinicAvailableHoursMap.get(clinicId) ?? 0;
+        return {
+          clinicId,
+          clinicName: String(clinic.name ?? 'Unknown Clinic'),
+          actual: Math.round((clinicActualRevenue.get(clinicId) ?? 0) * 100) / 100,
+          expected: Math.round((clinicExpectedRevenue.get(clinicId) ?? 0) * 100) / 100,
+          bookedHours: Math.round(bookedHours * 10) / 10,
+          availableHours: Math.round(availableHours * 10) / 10,
+          occupancy: availableHours > 0 ? Math.round(((bookedHours / availableHours) * 100) * 10) / 10 : 0,
+        };
+      })
+      .sort((a, b) => b.actual - a.actual);
+
+    return {
+      stats: {
+        newPatients: {
+          current: currentNewPatients,
+          previous: previousNewPatients,
+          trendPercent: Math.round(newPatientsTrend * 10) / 10,
+        },
+        services: { activeCount: activeServicesCount },
+        revenue: {
+          actual: Math.round(actualRevenue * 100) / 100,
+          expected: Math.round(expectedRevenue * 100) / 100,
+        },
+        occupancy: {
+          percent: Math.round(occupancyPercent * 10) / 10,
+          bookedHours: Math.round(totalBookedHours * 10) / 10,
+          availableHours: Math.round(totalAvailableHours * 10) / 10,
+        },
+      },
+      clinicRevenueRanking,
+    };
   }
 
   /**
@@ -4213,7 +4608,18 @@ export class AppointmentService {
   async getAppointmentPageContext(
     requestingUser: any,
   ): Promise<AppointmentPageContextResponseDto> {
-    const planType = requestingUser.planType || 'clinic';
+    const inferredPlanType =
+      requestingUser.planType ||
+      (requestingUser.organizationId
+        ? 'company'
+        : requestingUser.complexId
+          ? 'complex'
+          : Array.isArray(requestingUser.clinicIds) && requestingUser.clinicIds.length > 1
+            ? 'company'
+            : 'clinic');
+    const planType = ['company', 'complex', 'clinic'].includes(inferredPlanType)
+      ? inferredPlanType
+      : 'clinic';
     const context: AppointmentPageContextResponseDto = {
       planType,
       clinics: [],
@@ -4286,14 +4692,24 @@ export class AppointmentService {
         .lean()
         .exec();
       context.complexes = complexes.map((c: any) => ({ _id: c._id.toString(), name: c.name }));
+      const companyComplexObjectIds = complexes.map((complex: any) => complex._id);
+
+      const companyClinicFilter: any = {
+        ...tenantScopeFilter,
+        deletedAt: { $exists: false },
+        isActive: true,
+      };
+      if (companyComplexObjectIds.length > 0) {
+        companyClinicFilter.$or = [
+          { organizationId: orgObjId },
+          { complexId: { $in: companyComplexObjectIds } },
+        ];
+      } else {
+        companyClinicFilter.organizationId = orgObjId;
+      }
 
       const clinics = await this.clinicModel
-        .find({
-          ...tenantScopeFilter,
-          organizationId: orgObjId,
-          deletedAt: { $exists: false },
-          isActive: true,
-        })
+        .find(companyClinicFilter)
         .select('_id name complexId')
         .lean()
         .exec();
@@ -4307,7 +4723,6 @@ export class AppointmentService {
       const doctors = await this.userModel
         .find({
           ...tenantScopeFilter,
-          organizationId: orgObjId,
           role: 'doctor',
           isActive: true,
           deletedAt: { $exists: false },
@@ -4362,6 +4777,45 @@ export class AppointmentService {
         lastName: d.lastName,
         clinicId: d.clinicId?.toString(),
       }));
+    } else if (assignedClinicIds.length > 0) {
+      // Prefer explicit multi-clinic assignments when present.
+      const clinicObjectIds = assignedClinicIds.map((id: string) => new Types.ObjectId(id));
+      const clinics = await this.clinicModel
+        .find({
+          ...tenantScopeFilter,
+          _id: { $in: clinicObjectIds },
+          deletedAt: { $exists: false },
+          isActive: true,
+        })
+        .select('_id name complexId')
+        .lean()
+        .exec();
+      context.clinics = clinics.map((c: any) => ({
+        _id: c._id.toString(),
+        name: c.name,
+        complexId: c.complexId?.toString(),
+      }));
+
+      const doctors = await this.userModel
+        .find({
+          ...tenantScopeFilter,
+          role: 'doctor',
+          isActive: true,
+          deletedAt: { $exists: false },
+          $or: [
+            { clinicId: { $in: clinicObjectIds } },
+            { clinicIds: { $in: clinicObjectIds } },
+          ],
+        })
+        .select('_id firstName lastName clinicId')
+        .lean()
+        .exec();
+      context.doctors = doctors.map((d: any) => ({
+        _id: d._id.toString(),
+        firstName: d.firstName,
+        lastName: d.lastName,
+        clinicId: d.clinicId?.toString(),
+      }));
     } else if (clinicId) {
       const clObjId = new Types.ObjectId(clinicId);
       
@@ -4396,41 +4850,6 @@ export class AppointmentService {
         _id: d._id.toString(),
         firstName: d.firstName,
         lastName: d.lastName,
-      }));
-    } else if (assignedClinicIds.length > 0) {
-      // Fallback for scoped users who only carry clinicIds and no single clinicId.
-      const clinicObjectIds = assignedClinicIds.map((id: string) => new Types.ObjectId(id));
-      const clinics = await this.clinicModel
-        .find({
-          ...tenantScopeFilter,
-          _id: { $in: clinicObjectIds },
-          deletedAt: { $exists: false },
-          isActive: true,
-        })
-        .select('_id name')
-        .lean()
-        .exec();
-      context.clinics = clinics.map((c: any) => ({ _id: c._id.toString(), name: c.name }));
-
-      const doctors = await this.userModel
-        .find({
-          ...tenantScopeFilter,
-          role: 'doctor',
-          isActive: true,
-          deletedAt: { $exists: false },
-          $or: [
-            { clinicId: { $in: clinicObjectIds } },
-            { clinicIds: { $in: clinicObjectIds } },
-          ],
-        })
-        .select('_id firstName lastName clinicId')
-        .lean()
-        .exec();
-      context.doctors = doctors.map((d: any) => ({
-        _id: d._id.toString(),
-        firstName: d.firstName,
-        lastName: d.lastName,
-        clinicId: d.clinicId?.toString(),
       }));
     }
 

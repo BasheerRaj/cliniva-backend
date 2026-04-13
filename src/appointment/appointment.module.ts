@@ -11,6 +11,7 @@ import { ClinicSchema } from '../database/schemas/clinic.schema';
 import { ComplexSchema } from '../database/schemas/complex.schema';
 import { ServiceSchema } from '../database/schemas/service.schema';
 import { InvoiceSchema } from '../database/schemas/invoice.schema';
+import { PaymentSchema } from '../database/schemas/payment.schema';
 import { DepartmentSchema } from '../database/schemas/department.schema';
 import { MedicalReportSchema } from '../database/schemas/medical-report.schema';
 import { SubscriptionSchema } from '../database/schemas/subscription.schema';
@@ -44,6 +45,7 @@ import { AppointmentSessionService } from './services/appointment-session.servic
       { name: 'Complex', schema: ComplexSchema },
       { name: 'Service', schema: ServiceSchema },
       { name: 'Invoice', schema: InvoiceSchema },
+      { name: 'Payment', schema: PaymentSchema },
       { name: 'Department', schema: DepartmentSchema },
       { name: 'MedicalReport', schema: MedicalReportSchema },
       { name: 'Subscription', schema: SubscriptionSchema },

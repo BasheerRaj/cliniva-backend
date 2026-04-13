@@ -942,6 +942,56 @@ export class AppointmentController {
   }
 
   /**
+   * Get admin/owner dashboard statistics
+   * GET /appointments/stats/admin-owner
+   */
+  @Get('stats/admin-owner')
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.OWNER,
+    UserRole.ADMIN,
+    UserRole.MANAGER,
+  )
+  async getAdminOwnerDashboardStats(
+    @Request() req: any,
+    @Query('dateFrom') dateFrom: string,
+    @Query('dateTo') dateTo: string,
+    @Query('complexIds') complexIdsRaw?: string,
+    @Query('clinicIds') clinicIdsRaw?: string,
+  ) {
+    try {
+      if (!dateFrom || !dateTo) {
+        throw new BadRequestException('dateFrom and dateTo are required');
+      }
+
+      const complexIds = complexIdsRaw?.split(',').filter(Boolean) ?? [];
+      const clinicIds = clinicIdsRaw?.split(',').filter(Boolean) ?? [];
+
+      const data = await this.appointmentService.getAdminOwnerDashboardStats(
+        req.user?.userId,
+        req.user?.role,
+        req.user?.clinicId,
+        Array.isArray(req.user?.clinicIds) ? req.user.clinicIds.map(String) : undefined,
+        req.user?.complexId ? String(req.user.complexId) : undefined,
+        req.user?.subscriptionId ? String(req.user.subscriptionId) : undefined,
+        req.user?.organizationId ? String(req.user.organizationId) : undefined,
+        dateFrom,
+        dateTo,
+        complexIds,
+        clinicIds,
+      );
+
+      return { success: true, data };
+    } catch (error) {
+      return {
+        success: false,
+        message: 'Failed to retrieve admin/owner dashboard statistics',
+        error: error.message,
+      };
+    }
+  }
+
+  /**
    * Get appointment by ID
    * GET /appointments/:id
    */
