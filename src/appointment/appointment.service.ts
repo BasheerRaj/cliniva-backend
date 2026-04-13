@@ -49,6 +49,8 @@ import { SESSION_ERROR_MESSAGES } from './constants/session-error-messages.const
 import { InvoiceService } from '../invoice/invoice.service';
 import { ClinicService } from '../database/schemas/clinic-service.schema';
 import { DoctorService } from '../database/schemas/doctor-service.schema';
+import { EmployeeShift } from '../database/schemas/employee-shift.schema';
+import { WorkingHours } from '../database/schemas/working-hours.schema';
 import {
   transformAppointment,
   transformAppointmentList,
@@ -72,6 +74,8 @@ export class AppointmentService {
     @InjectModel('MedicalReport') private readonly medicalReportModel: Model<MedicalReport>,
     @InjectModel('ClinicService') private readonly clinicServiceModel: Model<ClinicService>,
     @InjectModel('DoctorService') private readonly doctorServiceModel: Model<DoctorService>,
+    @InjectModel(EmployeeShift.name) private readonly employeeShiftModel: Model<EmployeeShift>,
+    @InjectModel(WorkingHours.name) private readonly workingHoursModel: Model<WorkingHours>,
     private readonly workingHoursIntegrationService: WorkingHoursIntegrationService,
     private readonly appointmentValidationService: AppointmentValidationService,
     private readonly appointmentStatusService: AppointmentStatusService,
@@ -2414,6 +2418,8 @@ export class AppointmentService {
       completed: number;
       cancelled: number;
       appointmentHours: number;
+      workingHoursInRange: number;
+      isCurrentlyBusy: boolean;
     }>;
     peakHours: Array<{ hour: string; count: number }>;
   }> {
@@ -2530,7 +2536,7 @@ export class AppointmentService {
 
     const clinicStatsMap = new Map(clinicAgg.map((item) => [String(item._id), item]));
 
-    const clinicBreakdown = allClinicDocs.map((clinic: any) => {
+    const clinicBreakdownBase = allClinicDocs.map((clinic: any) => {
       const s = clinicStatsMap.get(String(clinic._id));
       return {
         clinicId: String(clinic._id),
@@ -2541,6 +2547,57 @@ export class AppointmentService {
         appointmentHours: Math.round((s?.appointmentHours ?? 0) * 10) / 10,
       };
     });
+
+    const now = new Date();
+    const todayStr = now.toISOString().split('T')[0];
+    const todayStart = new Date(`${todayStr}T00:00:00.000Z`);
+    const todayEnd = new Date(`${todayStr}T23:59:59.999Z`);
+
+    const liveClinicAppointments = await this.appointmentModel
+      .find({
+        clinicId: { $in: effectiveClinicObjectIds },
+        appointmentDate: { $gte: todayStart, $lte: todayEnd },
+        status: { $in: ['scheduled', 'confirmed', 'in_progress'] },
+        deletedAt: { $exists: false },
+        isDeleted: { $ne: true },
+      })
+      .select('clinicId appointmentDate appointmentTime status durationMinutes serviceId')
+      .populate('serviceId', 'duration')
+      .lean();
+
+    const busyClinicIds = new Set<string>();
+    for (const appt of liveClinicAppointments as any[]) {
+      const apptStart = this.getAppointmentStartDateTime(appt);
+      if (!apptStart) continue;
+
+      const serviceDuration =
+        typeof appt.serviceId?.duration === 'number' && appt.serviceId.duration > 0
+          ? appt.serviceId.duration
+          : null;
+      const durationMinutes =
+        serviceDuration ??
+        (typeof appt.durationMinutes === 'number' && appt.durationMinutes > 0
+          ? appt.durationMinutes
+          : 30);
+      const apptEnd = new Date(apptStart.getTime() + durationMinutes * 60 * 1000);
+
+      if (now >= apptStart && now < apptEnd) {
+        busyClinicIds.add(String(appt.clinicId));
+      }
+    }
+
+    const clinicBreakdown = await Promise.all(
+      clinicBreakdownBase.map(async (clinicEntry) => ({
+        ...clinicEntry,
+        workingHoursInRange: await this.calculateWorkingHoursInRange(
+          dateFrom,
+          dateTo,
+          clinicEntry.clinicId,
+          'clinic',
+        ),
+        isCurrentlyBusy: busyClinicIds.has(String(clinicEntry.clinicId)),
+      })),
+    );
 
     // Peak hours (08-20) — use appointmentTime "HH:mm" string since appointmentDate stores midnight only
     const peakAgg = await this.appointmentModel.aggregate([
@@ -2567,6 +2624,124 @@ export class AppointmentService {
    * Shows ALL doctors in the clinic/complex scope (not limited to those with appointments in date range).
    * Appointment hours/status are computed for the selected date range.
    */
+  private async calculateWorkingHoursInRange(
+    dateFrom: string,
+    dateTo: string,
+    entityId: string,
+    entityType: string,
+  ): Promise<number> {
+    const from = new Date(`${dateFrom}T00:00:00.000Z`);
+    const to = new Date(`${dateTo}T23:59:59.999Z`);
+    if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) return 0;
+    if (!Types.ObjectId.isValid(entityId)) return 0;
+
+    const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const dayCount = new Map<string, number>();
+
+    const cursor = new Date(from);
+    while (cursor <= to) {
+      const dayName = dayNames[cursor.getUTCDay()];
+      dayCount.set(dayName, (dayCount.get(dayName) ?? 0) + 1);
+      cursor.setUTCDate(cursor.getUTCDate() + 1);
+    }
+
+    const daysPresent = Array.from(dayCount.keys());
+    if (daysPresent.length === 0) return 0;
+
+    let totalMinutes = 0;
+
+    if (entityType === 'user') {
+      // Try employee shifts first
+      const shifts = await this.employeeShiftModel
+        .find({
+          userId: new Types.ObjectId(entityId),
+          dayOfWeek: { $in: daysPresent },
+          isActive: true,
+        })
+        .select('dayOfWeek startTime endTime breakDurationMinutes')
+        .lean();
+
+      for (const shift of shifts as any[]) {
+        if (!shift.startTime || !shift.endTime) continue;
+        const [startH, startM] = String(shift.startTime).split(':').map(Number);
+        const [endH, endM] = String(shift.endTime).split(':').map(Number);
+        if ([startH, startM, endH, endM].some((value) => Number.isNaN(value))) continue;
+
+        const shiftMinutes = (endH * 60 + endM) - (startH * 60 + startM) - (shift.breakDurationMinutes ?? 0);
+        if (shiftMinutes <= 0) continue;
+        totalMinutes += shiftMinutes * (dayCount.get(shift.dayOfWeek) ?? 0);
+      }
+
+      // Fall back to working_hours collection with entityType='user'
+      if (totalMinutes === 0) {
+        const entries = await this.workingHoursModel
+          .find({
+            entityType: 'user',
+            entityId: new Types.ObjectId(entityId),
+            dayOfWeek: { $in: daysPresent },
+            isWorkingDay: true,
+            isActive: true,
+          })
+          .select('dayOfWeek openingTime closingTime breakStartTime breakEndTime')
+          .lean();
+
+        for (const entry of entries as any[]) {
+          if (!entry.openingTime || !entry.closingTime) continue;
+          const [openH, openM] = String(entry.openingTime).split(':').map(Number);
+          const [closeH, closeM] = String(entry.closingTime).split(':').map(Number);
+          if ([openH, openM, closeH, closeM].some((v) => Number.isNaN(v))) continue;
+
+          let breakMins = 0;
+          if (entry.breakStartTime && entry.breakEndTime) {
+            const [bsh, bsm] = String(entry.breakStartTime).split(':').map(Number);
+            const [beh, bem] = String(entry.breakEndTime).split(':').map(Number);
+            if (![bsh, bsm, beh, bem].some((v) => Number.isNaN(v))) {
+              breakMins = Math.max(0, (beh * 60 + bem) - (bsh * 60 + bsm));
+            }
+          }
+
+          const entryMinutes = (closeH * 60 + closeM) - (openH * 60 + openM) - breakMins;
+          if (entryMinutes <= 0) continue;
+          totalMinutes += entryMinutes * (dayCount.get(entry.dayOfWeek) ?? 0);
+        }
+      }
+    } else {
+      const entries = await this.workingHoursModel
+        .find({
+          entityType: 'clinic',
+          entityId: new Types.ObjectId(entityId),
+          dayOfWeek: { $in: daysPresent },
+          isWorkingDay: true,
+          isActive: true,
+        })
+        .select('dayOfWeek openingTime closingTime breakStartTime breakEndTime')
+        .lean();
+
+      for (const entry of entries as any[]) {
+        if (!entry.openingTime || !entry.closingTime) continue;
+        const [openH, openM] = String(entry.openingTime).split(':').map(Number);
+        const [closeH, closeM] = String(entry.closingTime).split(':').map(Number);
+        if ([openH, openM, closeH, closeM].some((value) => Number.isNaN(value))) continue;
+
+        let breakMinutes = 0;
+        if (entry.breakStartTime && entry.breakEndTime) {
+          const [breakStartH, breakStartM] = String(entry.breakStartTime).split(':').map(Number);
+          const [breakEndH, breakEndM] = String(entry.breakEndTime).split(':').map(Number);
+          if (![breakStartH, breakStartM, breakEndH, breakEndM].some((value) => Number.isNaN(value))) {
+            breakMinutes = (breakEndH * 60 + breakEndM) - (breakStartH * 60 + breakStartM);
+            if (breakMinutes < 0) breakMinutes = 0;
+          }
+        }
+
+        const entryMinutes = (closeH * 60 + closeM) - (openH * 60 + openM) - breakMinutes;
+        if (entryMinutes <= 0) continue;
+        totalMinutes += entryMinutes * (dayCount.get(entry.dayOfWeek) ?? 0);
+      }
+    }
+
+    return Math.round((totalMinutes / 60) * 10) / 10;
+  }
+
   async getDoctorsOverview(
     userId: string | undefined,
     userRole: string | undefined,
@@ -2584,6 +2759,7 @@ export class AppointmentService {
     status: 'Busy' | 'Available' | 'Unavailable';
     completedHours: number;
     totalHours: number;
+    workingHoursInRange: number;
     nextAppointment: {
       service: string;
       sessionName: string | null;
@@ -2675,7 +2851,7 @@ export class AppointmentService {
           totalHours: {
             $sum: {
               $cond: [
-                { $in: ['$status', ['completed', 'scheduled', 'confirmed', 'in_progress']] },
+                { $in: ['$status', ['completed', 'scheduled']] },
                 { $divide: [{ $ifNull: ['$durationMinutes', 0] }, 60] },
                 0,
               ],
@@ -2731,6 +2907,13 @@ export class AppointmentService {
           liveStatus = 'Unavailable';
         }
 
+        const workingHoursInRange = await this.calculateWorkingHoursInRange(
+          dateFrom,
+          dateTo,
+          doctorId.toString(),
+          'user',
+        );
+
         // Find next upcoming appointment (not limited by date range — find the actual next one)
         const nextApptFilter: any = {
           doctorId,
@@ -2774,6 +2957,7 @@ export class AppointmentService {
           status: liveStatus,
           completedHours: Math.round((stats?.completedHours ?? 0) * 10) / 10,
           totalHours: Math.round((stats?.totalHours ?? 0) * 10) / 10,
+          workingHoursInRange,
           total: stats?.total ?? 0,
           completed: stats?.completed_count ?? 0,
           cancelled: stats?.cancelled_count ?? 0,

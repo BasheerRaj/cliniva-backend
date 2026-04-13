@@ -18,6 +18,8 @@ import { SubscriptionPlanSchema } from '../database/schemas/subscription-plan.sc
 import { ScheduleSchema } from '../database/schemas/schedule.schema';
 import { ClinicServiceSchema } from '../database/schemas/clinic-service.schema';
 import { DoctorServiceSchema } from '../database/schemas/doctor-service.schema';
+import { EmployeeShift, EmployeeShiftSchema } from '../database/schemas/employee-shift.schema';
+import { WorkingHours, WorkingHoursSchema } from '../database/schemas/working-hours.schema';
 import { SubscriptionModule } from '../subscription/subscription.module';
 import { PatientModule } from '../patient/patient.module';
 import { AuthModule } from '../auth/auth.module';
@@ -49,6 +51,8 @@ import { AppointmentSessionService } from './services/appointment-session.servic
       { name: 'Schedule', schema: ScheduleSchema },
       { name: 'ClinicService', schema: ClinicServiceSchema },
       { name: 'DoctorService', schema: DoctorServiceSchema },
+      { name: EmployeeShift.name, schema: EmployeeShiftSchema },
+      { name: WorkingHours.name, schema: WorkingHoursSchema },
     ]),
     SubscriptionModule,
     PatientModule,
