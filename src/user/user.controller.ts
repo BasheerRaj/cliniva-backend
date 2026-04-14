@@ -765,10 +765,20 @@ export class UserController {
       // Get current user to check for old profile picture
       const user = await this.userService.findById(userId);
       if (user && user.profilePictureUrl) {
-        // Delete old profile picture if it exists
-        const oldPath = `.${user.profilePictureUrl}`;
-        if (fs.existsSync(oldPath)) {
-          fs.unlinkSync(oldPath);
+        // Only delete the old file when no other record (EmployeeProfile or
+        // another User) still references it. This prevents a scenario where an
+        // admin uploads employee profile images via this endpoint and stores the
+        // URLs in EmployeeProfile records — a second upload would otherwise
+        // delete the first employee's file.
+        const stillInUse = await this.userService.isProfilePictureUrlInUse(
+          user.profilePictureUrl,
+          userId,
+        );
+        if (!stillInUse) {
+          const oldPath = `.${user.profilePictureUrl}`;
+          if (fs.existsSync(oldPath)) {
+            fs.unlinkSync(oldPath);
+          }
         }
       }
 
@@ -864,10 +874,16 @@ export class UserController {
       // Get current user to find profile picture
       const user = await this.userService.findById(userId);
       if (user && user.profilePictureUrl) {
-        // Delete profile picture file
-        const filePath = `.${user.profilePictureUrl}`;
-        if (fs.existsSync(filePath)) {
-          fs.unlinkSync(filePath);
+        // Only delete the file if no other record references it
+        const stillInUse = await this.userService.isProfilePictureUrlInUse(
+          user.profilePictureUrl,
+          userId,
+        );
+        if (!stillInUse) {
+          const filePath = `.${user.profilePictureUrl}`;
+          if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+          }
         }
 
         // Update user profile to remove picture URL

@@ -213,6 +213,9 @@ export class PaymentService {
     const userClinicIds = this.getRequestingUserClinicIds(requestingUser);
     let resolvedClinicId: string | undefined;
 
+    // Primary clinicId (singular) — used as tiebreaker / fallback below
+    const primaryClinicId = (requestingUser as any)?.clinicId?.toString?.() || undefined;
+
     if (candidateClinicIds.size > 0) {
       const candidates = Array.from(candidateClinicIds);
       const scopedCandidates =
@@ -221,9 +224,22 @@ export class PaymentService {
           : candidates;
       if (scopedCandidates.length === 1) {
         resolvedClinicId = scopedCandidates[0];
+      } else if (scopedCandidates.length > 1) {
+        // Multiple candidates — prefer user's primary clinic if it's among them
+        resolvedClinicId =
+          (primaryClinicId && scopedCandidates.includes(primaryClinicId))
+            ? primaryClinicId
+            : scopedCandidates[0];
       }
     } else if (userClinicIds.length === 1) {
       resolvedClinicId = userClinicIds[0];
+    } else if (userClinicIds.length > 1) {
+      // No clinic found from invoice or its services; fall back to user's primary clinic.
+      // The invoice is already tenant-scoped (subscriptionId), so this is safe.
+      resolvedClinicId =
+        (primaryClinicId && userClinicIds.includes(primaryClinicId))
+          ? primaryClinicId
+          : userClinicIds[0];
     }
 
     if (!resolvedClinicId) {

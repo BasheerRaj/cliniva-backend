@@ -524,6 +524,20 @@ export class InvoiceService implements OnModuleInit {
       } as any);
     }
 
+    // Final clinic fallback for admin/owner: if still unresolved, use the user's
+    // primary clinicId so the invoice always gets a clinic association and can be paid later.
+    if (!resolvedClinicId && userRole !== 'staff' && userRole !== 'doctor') {
+      const primaryClinicId = (requestingUser as any)?.clinicId?.toString?.();
+      if (primaryClinicId && Types.ObjectId.isValid(primaryClinicId)) {
+        resolvedClinicId = primaryClinicId;
+      } else {
+        const firstAssignedId = assignedClinicIds[0];
+        if (firstAssignedId && Types.ObjectId.isValid(firstAssignedId)) {
+          resolvedClinicId = firstAssignedId;
+        }
+      }
+    }
+
     if (!clinic && resolvedClinicId) {
       clinic = await this.clinicModel.findOne({
         _id: new Types.ObjectId(resolvedClinicId),

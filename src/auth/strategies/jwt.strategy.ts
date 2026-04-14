@@ -91,6 +91,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       complexId: (user.complexId as any)?.toString() || null,
       clinicId: (user.clinicId as any)?.toString() || null,
       clinicIds: user.clinicIds?.map((id: any) => id.toString()) || [],
+      planType: user.planType || null,
       permissions: [], // Will be populated by permissions system if needed
     };
   }

@@ -15,6 +15,7 @@ import { Clinic } from '../database/schemas/clinic.schema';
 import { Subscription } from '../database/schemas/subscription.schema';
 import { SubscriptionPlan } from '../database/schemas/subscription-plan.schema';
 import { Appointment } from '../database/schemas/appointment.schema';
+import { EmployeeProfile } from '../database/schemas/employee-profile.schema';
 import { UserEntitiesResponseDto } from './dto/check-user-entities.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UpdateUserStatusDto } from './dto/update-user-status.dto';
@@ -47,6 +48,8 @@ export class UserService {
     @InjectModel(SubscriptionPlan.name)
     private subscriptionPlanModel: Model<SubscriptionPlan>,
     @InjectModel(Appointment.name) private appointmentModel: Model<Appointment>,
+    @InjectModel(EmployeeProfile.name)
+    private employeeProfileModel: Model<EmployeeProfile>,
     @InjectConnection() private connection: Connection,
     private readonly sessionService: SessionService,
     private readonly emailService: EmailService,
@@ -1076,6 +1079,35 @@ export class UserService {
       this.logger.error(`Error finding user ${userId}:`, error);
       return null;
     }
+  }
+
+  /**
+   * Check whether a profile picture URL is still referenced by any EmployeeProfile
+   * or by a User other than the one uploading. Used to guard against deleting a file
+   * that is in use elsewhere (e.g. admin uploads employee profile pictures via the
+   * users/me/profile-picture endpoint, stores the URL in EmployeeProfile, then
+   * uploads a second time — without this check the first file would be deleted).
+   *
+   * @param url - The /uploads/… relative URL to check
+   * @param excludeUserId - Skip this User's own record when counting references
+   */
+  async isProfilePictureUrlInUse(
+    url: string,
+    excludeUserId?: string,
+  ): Promise<boolean> {
+    if (!url || !url.startsWith('/uploads/')) return false;
+
+    const userQuery: any = { profilePictureUrl: url };
+    if (excludeUserId && Types.ObjectId.isValid(excludeUserId)) {
+      userQuery._id = { $ne: new Types.ObjectId(excludeUserId) };
+    }
+
+    const [userCount, empCount] = await Promise.all([
+      this.userModel.countDocuments(userQuery).exec(),
+      this.employeeProfileModel.countDocuments({ profilePictureUrl: url }).exec(),
+    ]);
+
+    return userCount + empCount > 0;
   }
 
   /**

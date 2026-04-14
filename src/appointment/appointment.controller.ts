@@ -885,6 +885,7 @@ export class AppointmentController {
       const data = await this.appointmentService.getStaffDashboardStats(
         req.user?.userId,
         req.user?.role,
+        req.user?.planType ? String(req.user.planType) : undefined,
         req.user?.clinicId,
         Array.isArray(req.user?.clinicIds) ? req.user.clinicIds.map(String) : undefined,
         req.user?.complexId ? String(req.user.complexId) : undefined,
@@ -926,6 +927,7 @@ export class AppointmentController {
       const data = await this.appointmentService.getDoctorsOverview(
         req.user?.userId,
         req.user?.role,
+        req.user?.planType ? String(req.user.planType) : undefined,
         req.user?.clinicId,
         Array.isArray(req.user?.clinicIds) ? req.user.clinicIds.map(String) : undefined,
         req.user?.complexId ? String(req.user.complexId) : undefined,
@@ -970,6 +972,7 @@ export class AppointmentController {
       const data = await this.appointmentService.getAdminOwnerDashboardStats(
         req.user?.userId,
         req.user?.role,
+        req.user?.planType ? String(req.user.planType) : undefined,
         req.user?.clinicId,
         Array.isArray(req.user?.clinicIds) ? req.user.clinicIds.map(String) : undefined,
         req.user?.complexId ? String(req.user.complexId) : undefined,

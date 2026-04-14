@@ -2326,6 +2326,7 @@ export class AppointmentService {
 
   private async resolveDashboardClinicScope(params: {
     userRole?: string;
+    userPlanType?: string;
     userClinicId?: string;
     userClinicIds?: string[];
     userComplexId?: string;
@@ -2335,6 +2336,7 @@ export class AppointmentService {
   }): Promise<Types.ObjectId[]> {
     const {
       userRole,
+      userPlanType,
       userClinicId,
       userClinicIds,
       userComplexId,
@@ -2386,7 +2388,14 @@ export class AppointmentService {
       isActive: true,
     };
 
-    if (userComplexId && Types.ObjectId.isValid(userComplexId)) {
+    const normalizedPlanType = String(userPlanType ?? '').toLowerCase();
+    const shouldScopeByComplex =
+      !!userComplexId &&
+      Types.ObjectId.isValid(userComplexId) &&
+      // Company-plan users must see all clinics in tenant unless they explicitly filter by complex.
+      normalizedPlanType !== 'company';
+
+    if (shouldScopeByComplex) {
       clinicFilter.complexId = new Types.ObjectId(userComplexId);
     }
 
@@ -2415,6 +2424,7 @@ export class AppointmentService {
   async getStaffDashboardStats(
     userId: string | undefined,
     userRole: string | undefined,
+    userPlanType: string | undefined,
     userClinicId: string | undefined,
     userClinicIds: string[] | undefined,
     userComplexId: string | undefined,
@@ -2452,6 +2462,7 @@ export class AppointmentService {
 
     const effectiveClinicObjectIds = await this.resolveDashboardClinicScope({
       userRole,
+      userPlanType,
       userClinicId,
       userClinicIds,
       userComplexId,
@@ -2642,6 +2653,7 @@ export class AppointmentService {
   async getAdminOwnerDashboardStats(
     _userId: string | undefined,
     userRole: string | undefined,
+    userPlanType: string | undefined,
     userClinicId: string | undefined,
     userClinicIds: string[] | undefined,
     userComplexId: string | undefined,
@@ -2680,6 +2692,7 @@ export class AppointmentService {
     const hasExplicitClinicFilter = requestedClinicIds.length > 0;
     const effectiveClinicObjectIdsRaw = await this.resolveDashboardClinicScope({
       userRole,
+      userPlanType,
       userClinicId,
       userClinicIds,
       userComplexId,
@@ -2817,26 +2830,78 @@ export class AppointmentService {
 
     const activeServicesCount = await this.serviceModel.countDocuments(activeServicesScopeQuery);
 
-    const rangedAppointments = await this.appointmentModel
-      .find({
-        appointmentDate: { $gte: from, $lte: to },
-        clinicId: { $in: scopedClinicIds },
-        deletedAt: { $exists: false },
-        isDeleted: { $ne: true },
-      })
-      .select('_id clinicId status durationMinutes')
-      .lean();
+    // Remaining-capacity window: ignore past time in selected range.
+    const now = new Date();
+    const effectiveWindowStart = from > now ? from : now;
+    const hasRemainingWindow = effectiveWindowStart < to;
 
+    // Total remaining working capacity by clinic from now/rangeStart to rangeEnd.
+    const clinicRemainingCapacityEntries = await Promise.all(
+      clinicDocs.map(async (clinic: any) => {
+        const remainingCapacityHours = hasRemainingWindow
+          ? await this.calculateClinicWorkingHoursInWindow(
+              effectiveWindowStart,
+              to,
+              String(clinic._id),
+            )
+          : 0;
+
+        return {
+          clinicId: String(clinic._id),
+          remainingCapacityHours,
+        };
+      }),
+    );
+    const clinicRemainingCapacityMap = new Map<string, number>(
+      clinicRemainingCapacityEntries.map((entry) => [entry.clinicId, entry.remainingCapacityHours]),
+    );
+
+    // Future reserved hours by clinic (appointments consuming future capacity only).
     const bookedHoursByClinic = new Map<string, number>();
+    if (hasRemainingWindow) {
+      const futureAppointments = await this.appointmentModel
+        .find({
+          appointmentDate: {
+            $gte: new Date(`${effectiveWindowStart.toISOString().split('T')[0]}T00:00:00.000Z`),
+            $lte: to,
+          },
+          clinicId: { $in: scopedClinicIds },
+          status: { $in: ['scheduled', 'confirmed', 'in_progress'] },
+          deletedAt: { $exists: false },
+          isDeleted: { $ne: true },
+        })
+        .select('_id clinicId appointmentDate appointmentTime durationMinutes status')
+        .lean();
 
-    for (const appointment of rangedAppointments as any[]) {
-      const clinicId = String(appointment.clinicId);
-      const status = String(appointment.status ?? '');
+      for (const appointment of futureAppointments as any[]) {
+        const appointmentStart = this.getAppointmentStartDateTime(appointment);
+        if (!appointmentStart) continue;
 
-      if (status !== 'cancelled') {
-        const hours = Number(appointment.durationMinutes ?? 0) / 60;
-        bookedHoursByClinic.set(clinicId, (bookedHoursByClinic.get(clinicId) ?? 0) + (Number.isFinite(hours) ? hours : 0));
+        const durationMinutes =
+          typeof appointment.durationMinutes === 'number' && appointment.durationMinutes > 0
+            ? appointment.durationMinutes
+            : 0;
+        if (durationMinutes <= 0) continue;
+
+        const appointmentEnd = new Date(appointmentStart.getTime() + durationMinutes * 60 * 1000);
+        const overlapStart = appointmentStart > effectiveWindowStart ? appointmentStart : effectiveWindowStart;
+        const overlapEnd = appointmentEnd < to ? appointmentEnd : to;
+        const overlapMs = overlapEnd.getTime() - overlapStart.getTime();
+        if (overlapMs <= 0) continue;
+
+        const bookedHours = overlapMs / (60 * 60 * 1000);
+        const clinicId = String(appointment.clinicId);
+        bookedHoursByClinic.set(clinicId, (bookedHoursByClinic.get(clinicId) ?? 0) + bookedHours);
       }
+    }
+
+    // Remaining available = remaining capacity - future booked
+    const clinicAvailableHoursMap = new Map<string, number>();
+    for (const clinic of clinicDocs as any[]) {
+      const clinicId = String(clinic._id);
+      const capacityHours = clinicRemainingCapacityMap.get(clinicId) ?? 0;
+      const bookedHours = bookedHoursByClinic.get(clinicId) ?? 0;
+      clinicAvailableHoursMap.set(clinicId, Math.max(0, capacityHours - bookedHours));
     }
 
     let actualRevenue = 0;
@@ -2848,11 +2913,9 @@ export class AppointmentService {
       paymentDate: { $gte: from, $lte: to },
       clinicId: { $in: scopedClinicIds },
     };
-    if (userRole !== 'super_admin') {
-      if (userOrganizationId && Types.ObjectId.isValid(userOrganizationId)) {
-        paymentsMatch.organizationId = new Types.ObjectId(userOrganizationId);
-      }
-    }
+    // clinicId already scopes payments to the user's tenant (scopedClinicIds is filtered
+    // by subscriptionId), so no extra organizationId filter is needed — and adding one
+    // would silently drop payments that were created without organizationId set.
     const paymentTotals = await this.paymentModel.aggregate([
       { $match: paymentsMatch },
       {
@@ -2953,32 +3016,16 @@ export class AppointmentService {
       }
     }
 
-    const clinicAvailabilityEntries = await Promise.all(
-      clinicDocs.map(async (clinic: any) => {
-        const availableHours = await this.calculateWorkingHoursInRange(
-          dateFrom,
-          dateTo,
-          String(clinic._id),
-          'clinic',
-        );
-        return {
-          clinicId: String(clinic._id),
-          availableHours,
-        };
-      }),
-    );
-    const clinicAvailableHoursMap = new Map<string, number>(
-      clinicAvailabilityEntries.map((entry) => [entry.clinicId, entry.availableHours]),
-    );
-
     const totalBookedHours = Array.from(bookedHoursByClinic.values()).reduce((sum, hours) => sum + hours, 0);
     const totalAvailableHours = Array.from(clinicAvailableHoursMap.values()).reduce((sum, hours) => sum + hours, 0);
-    const occupancyPercent = totalAvailableHours > 0 ? (totalBookedHours / totalAvailableHours) * 100 : 0;
+    const totalRemainingCapacityHours = Array.from(clinicRemainingCapacityMap.values()).reduce((sum, hours) => sum + hours, 0);
+    const occupancyPercent = totalRemainingCapacityHours > 0 ? (totalBookedHours / totalRemainingCapacityHours) * 100 : 0;
 
     const clinicRevenueRanking = clinicDocs
       .map((clinic: any) => {
         const clinicId = String(clinic._id);
         const bookedHours = bookedHoursByClinic.get(clinicId) ?? 0;
+        const remainingCapacityHours = clinicRemainingCapacityMap.get(clinicId) ?? 0;
         const availableHours = clinicAvailableHoursMap.get(clinicId) ?? 0;
         return {
           clinicId,
@@ -2987,7 +3034,9 @@ export class AppointmentService {
           expected: Math.round((clinicExpectedRevenue.get(clinicId) ?? 0) * 100) / 100,
           bookedHours: Math.round(bookedHours * 10) / 10,
           availableHours: Math.round(availableHours * 10) / 10,
-          occupancy: availableHours > 0 ? Math.round(((bookedHours / availableHours) * 100) * 10) / 10 : 0,
+          occupancy: remainingCapacityHours > 0
+            ? Math.round(((bookedHours / remainingCapacityHours) * 100) * 10) / 10
+            : 0,
         };
       })
       .sort((a, b) => b.actual - a.actual);
@@ -3019,6 +3068,85 @@ export class AppointmentService {
    * Shows ALL doctors in the clinic/complex scope (not limited to those with appointments in date range).
    * Appointment hours/status are computed for the selected date range.
    */
+  private async calculateClinicWorkingHoursInWindow(
+    windowStart: Date,
+    windowEnd: Date,
+    clinicId: string,
+  ): Promise<number> {
+    if (!Types.ObjectId.isValid(clinicId)) return 0;
+    if (Number.isNaN(windowStart.getTime()) || Number.isNaN(windowEnd.getTime())) return 0;
+    if (windowStart >= windowEnd) return 0;
+
+    const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+
+    const entries = await this.workingHoursModel
+      .find({
+        entityType: 'clinic',
+        entityId: new Types.ObjectId(clinicId),
+        isWorkingDay: true,
+        isActive: true,
+      })
+      .select('dayOfWeek openingTime closingTime breakStartTime breakEndTime')
+      .lean();
+
+    const entriesByDay = new Map<string, any[]>();
+    for (const entry of entries as any[]) {
+      const day = String(entry.dayOfWeek ?? '').toLowerCase();
+      if (!entriesByDay.has(day)) entriesByDay.set(day, []);
+      entriesByDay.get(day)!.push(entry);
+    }
+
+    const overlapMinutes = (start: Date, end: Date): number => {
+      const left = start > windowStart ? start : windowStart;
+      const right = end < windowEnd ? end : windowEnd;
+      const ms = right.getTime() - left.getTime();
+      return ms > 0 ? ms / (60 * 1000) : 0;
+    };
+
+    const startDay = new Date(`${windowStart.toISOString().split('T')[0]}T00:00:00.000Z`);
+    const endDay = new Date(`${windowEnd.toISOString().split('T')[0]}T00:00:00.000Z`);
+
+    let totalMinutes = 0;
+    for (let cursor = new Date(startDay); cursor <= endDay; cursor.setUTCDate(cursor.getUTCDate() + 1)) {
+      const dayName = dayNames[cursor.getUTCDay()];
+      const dayEntries = entriesByDay.get(dayName) ?? [];
+      const dayStr = cursor.toISOString().split('T')[0];
+
+      for (const entry of dayEntries) {
+        if (!entry.openingTime || !entry.closingTime) continue;
+        const workStart = new Date(`${dayStr}T${String(entry.openingTime)}:00.000Z`);
+        const workEnd = new Date(`${dayStr}T${String(entry.closingTime)}:00.000Z`);
+        if (Number.isNaN(workStart.getTime()) || Number.isNaN(workEnd.getTime()) || workEnd <= workStart) {
+          continue;
+        }
+
+        // Handle break by splitting into two effective working intervals.
+        if (entry.breakStartTime && entry.breakEndTime) {
+          const breakStart = new Date(`${dayStr}T${String(entry.breakStartTime)}:00.000Z`);
+          const breakEnd = new Date(`${dayStr}T${String(entry.breakEndTime)}:00.000Z`);
+
+          if (
+            !Number.isNaN(breakStart.getTime()) &&
+            !Number.isNaN(breakEnd.getTime()) &&
+            breakEnd > breakStart
+          ) {
+            if (breakStart > workStart) {
+              totalMinutes += overlapMinutes(workStart, breakStart < workEnd ? breakStart : workEnd);
+            }
+            if (breakEnd < workEnd) {
+              totalMinutes += overlapMinutes(breakEnd > workStart ? breakEnd : workStart, workEnd);
+            }
+            continue;
+          }
+        }
+
+        totalMinutes += overlapMinutes(workStart, workEnd);
+      }
+    }
+
+    return Math.round((totalMinutes / 60) * 10) / 10;
+  }
+
   private async calculateWorkingHoursInRange(
     dateFrom: string,
     dateTo: string,
@@ -3140,6 +3268,7 @@ export class AppointmentService {
   async getDoctorsOverview(
     userId: string | undefined,
     userRole: string | undefined,
+    userPlanType: string | undefined,
     userClinicId: string | undefined,
     userClinicIds: string[] | undefined,
     userComplexId: string | undefined,
@@ -3180,6 +3309,7 @@ export class AppointmentService {
     // Compute effective clinic ObjectIds
     const effectiveClinicObjectIds = await this.resolveDashboardClinicScope({
       userRole,
+      userPlanType,
       userClinicId,
       userClinicIds,
       userComplexId,
