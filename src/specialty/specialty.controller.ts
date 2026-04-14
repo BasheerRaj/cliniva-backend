@@ -49,7 +49,7 @@ export class SpecialtyController {
    * Create a new specialty
    */
   @Post()
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.MANAGER)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create specialty', description: 'Create a new medical specialty' })
   @ApiResponse({
@@ -88,7 +88,7 @@ export class SpecialtyController {
    * Get all specialties with pagination and filters
    */
   @Get()
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.MANAGER)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({
     summary: 'List specialties',
     description: 'Get paginated list of specialties with optional search and filters',
@@ -212,7 +212,7 @@ export class SpecialtyController {
    * Get specialty statistics
    */
   @Get(':id/stats')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.MANAGER)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({
     summary: 'Get specialty statistics',
     description: 'Get statistics for a specialty including doctor and appointment counts',
@@ -235,7 +235,7 @@ export class SpecialtyController {
    * Toggle specialty status (activate/deactivate)
    */
   @Patch(':id/status')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.MANAGER)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({
     summary: 'Toggle specialty status',
     description: 'Activate or deactivate a specialty. Cannot deactivate if doctors are assigned.',
@@ -262,7 +262,7 @@ export class SpecialtyController {
    * Get specialty by ID with details
    */
   @Get(':id')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.MANAGER)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({
     summary: 'Get specialty details',
     description: 'Get specialty with assigned doctors and statistics',
@@ -299,7 +299,7 @@ export class SpecialtyController {
    * Update specialty
    */
   @Put(':id')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.MANAGER)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @ApiOperation({ summary: 'Update specialty', description: 'Update an existing specialty' })
   @ApiParam({ name: 'id', description: 'Specialty ID' })
   @ApiResponse({
@@ -323,7 +323,7 @@ export class SpecialtyController {
    * Delete specialty
    */
   @Delete(':id')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.MANAGER)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
     summary: 'Delete specialty',
