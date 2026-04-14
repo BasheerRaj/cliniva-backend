@@ -311,8 +311,13 @@ export class SpecialtyController {
     @Param('id') id: string,
     @Body(new ValidationPipe({ transform: true, whitelist: true }))
     updateSpecialtyDto: UpdateSpecialtyDto,
+    @Req() req: any,
   ) {
-    const specialty = await this.specialtyService.updateSpecialty(id, updateSpecialtyDto);
+    const specialty = await this.specialtyService.updateSpecialty(
+      id,
+      updateSpecialtyDto,
+      req.user,
+    );
     return ResponseBuilder.success(specialty, {
       ar: 'تم تحديث التخصص بنجاح',
       en: 'Specialty updated successfully',

@@ -4,6 +4,7 @@ import {
   BadRequestException,
   ConflictException,
   Logger,
+  OnModuleInit,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -19,7 +20,7 @@ import { ResponseBuilder } from '../common/utils/response-builder.util';
 import { buildTenantFilter, TenantUser } from '../common/utils/tenant-scope.util';
 
 @Injectable()
-export class SpecialtyService {
+export class SpecialtyService implements OnModuleInit {
   private readonly logger = new Logger(SpecialtyService.name);
 
   constructor(
@@ -28,6 +29,26 @@ export class SpecialtyService {
     private readonly doctorSpecialtyModel: Model<DoctorSpecialty>,
     @InjectModel('Complex') private readonly complexModel: Model<any>,
   ) {}
+
+  async onModuleInit(): Promise<void> {
+    try {
+      const indexes = await this.specialtyModel.collection.indexes();
+      const legacyGlobalNameIndex = indexes.find(
+        (idx: any) => idx?.name === 'name_1' && idx?.unique === true,
+      );
+
+      if (legacyGlobalNameIndex) {
+        await this.specialtyModel.collection.dropIndex('name_1');
+        this.logger.warn(
+          'Dropped legacy global unique index name_1 from specialties collection',
+        );
+      }
+    } catch (error: any) {
+      this.logger.warn(
+        `Specialty index migration check skipped: ${error?.message ?? 'unknown error'}`,
+      );
+    }
+  }
 
   async createSpecialty(createDto: CreateSpecialtyDto, creatingUser: TenantUser): Promise<Specialty> {
     const tenantFilter = buildTenantFilter(creatingUser);
@@ -57,7 +78,20 @@ export class SpecialtyService {
         ? new Types.ObjectId(creatingUser.subscriptionId)
         : undefined,
     });
-    return await specialty.save();
+    try {
+      return await specialty.save();
+    } catch (error: any) {
+      if (error?.code === 11000) {
+        throw new ConflictException({
+          message: {
+            ar: 'التخصص بهذا الاسم موجود بالفعل',
+            en: 'Specialty with this name already exists',
+          },
+          code: 'SPECIALTY_EXISTS',
+        });
+      }
+      throw error;
+    }
   }
 
   async getSpecialtiesForDropdown(filters?: {
@@ -448,9 +482,12 @@ export class SpecialtyService {
   async updateSpecialty(
     specialtyId: string,
     updateDto: UpdateSpecialtyDto,
+    updatingUser?: TenantUser,
   ): Promise<Specialty> {
     if (updateDto.name) {
+      const tenantFilter = buildTenantFilter(updatingUser ?? ({} as TenantUser));
       const existing = await this.specialtyModel.findOne({
+        ...tenantFilter,
         name: { $regex: new RegExp(`^${updateDto.name}$`, 'i') },
         _id: { $ne: specialtyId },
       });
@@ -470,11 +507,25 @@ export class SpecialtyService {
       await this.validateComplex(updateDto.complexId);
     }
 
-    const updated = await this.specialtyModel.findByIdAndUpdate(
-      specialtyId,
-      updateDto,
-      { new: true },
-    );
+    let updated: Specialty | null = null;
+    try {
+      updated = await this.specialtyModel.findByIdAndUpdate(
+        specialtyId,
+        updateDto,
+        { new: true },
+      );
+    } catch (error: any) {
+      if (error?.code === 11000) {
+        throw new ConflictException({
+          message: {
+            ar: 'التخصص بهذا الاسم موجود بالفعل',
+            en: 'Specialty with this name already exists',
+          },
+          code: 'SPECIALTY_EXISTS',
+        });
+      }
+      throw error;
+    }
 
     if (!updated) {
       throw new NotFoundException({
