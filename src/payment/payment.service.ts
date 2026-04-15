@@ -870,7 +870,32 @@ export class PaymentService {
         throw new BadRequestException({ message: { ar: 'النص المدخل طويل جداً', en: 'Search term too long' } });
       }
       const searchRegex = new RegExp(this.escapeRegex(queryDto.search), 'i');
-      filter.$or = [{ paymentId: searchRegex }];
+
+      // Find patients whose name or patientNumber matches the search
+      const matchingPatients = await this.patientModel
+        .find(
+          {
+            $or: [
+              { firstName: searchRegex },
+              { lastName: searchRegex },
+              { patientNumber: searchRegex },
+            ],
+          },
+          { _id: 1 },
+        )
+        .lean()
+        .exec();
+
+      const matchingPatientIds = matchingPatients.map(
+        (p) => new Types.ObjectId((p._id as any).toString()),
+      );
+
+      filter.$or = [
+        { paymentId: searchRegex },
+        ...(matchingPatientIds.length > 0
+          ? [{ patientId: { $in: matchingPatientIds } }]
+          : []),
+      ];
     }
 
     const page = queryDto.page || 1;

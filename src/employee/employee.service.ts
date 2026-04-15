@@ -836,13 +836,21 @@ export class EmployeeService {
       userFilter.complexId = new Types.ObjectId(effectiveComplexId);
     }
 
-    // Search across multiple fields
+    // Search across multiple fields (name, email, phone, employee ID, or partial _id)
     if (search) {
+      // Strip common display-ID prefixes so "US-A1B2" → "A1B2" matches the raw ObjectId string
+      const idTerm = search.replace(/^(US|EMP)-?/i, '').trim();
+
       userFilter.$or = [
         { firstName: { $regex: search, $options: 'i' } },
         { lastName: { $regex: search, $options: 'i' } },
         { email: { $regex: search, $options: 'i' } },
         { phone: { $regex: search, $options: 'i' } },
+        { 'employeeProfile.employeeNumber': { $regex: search, $options: 'i' } },
+        // Partial match on the ObjectId string (powers "US-XXXX" and raw suffix searches)
+        ...(idTerm.length > 0
+          ? [{ $expr: { $regexMatch: { input: { $toString: '$_id' }, regex: idTerm, options: 'i' } } }]
+          : []),
       ];
     }
 
@@ -892,19 +900,33 @@ export class EmployeeService {
         },
       },
       {
-        $match: {
-          ...userFilter,
-          // Include users with an active profile OR users with no profile yet
-          $or: [
+        $match: (() => {
+          // Build match stage carefully to avoid $or key collision.
+          // userFilter may already contain $or (from search), and the profile check
+          // also needs $or. Overwriting one with the other silently drops a condition.
+          // Solution: when both exist, combine them under $and.
+          const profileOr = [
             { 'employeeProfile.isActive': true },
             { 'employeeProfile._id': { $exists: false } },
-          ],
-          ...(Object.keys(profileFilter).length > 1 && {
-            $and: Object.entries(profileFilter).map(([key, value]) => ({
-              [`employeeProfile.${key}`]: value,
-            })),
-          }),
-        },
+          ];
+
+          const { $or: searchOr, ...restUserFilter } = userFilter;
+
+          const andConditions: any[] = [];
+          if (searchOr) andConditions.push({ $or: searchOr });
+          andConditions.push({ $or: profileOr });
+
+          if (Object.keys(profileFilter).length > 1) {
+            Object.entries(profileFilter).forEach(([key, value]) => {
+              andConditions.push({ [`employeeProfile.${key}`]: value });
+            });
+          }
+
+          return {
+            ...restUserFilter,
+            $and: andConditions,
+          };
+        })(),
       },
       {
         $lookup: {

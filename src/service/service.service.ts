@@ -34,6 +34,10 @@ import { buildTenantFilter, TenantUser } from '../common/utils/tenant-scope.util
 type PaginationOptions = {
   page?: number;
   limit?: number;
+  search?: string;
+  isActive?: boolean;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
 };
 
 type PaginationMeta = {
@@ -433,11 +437,23 @@ export class ServiceService {
     options?: PaginationOptions,
   ): Promise<PaginatedResult<Service>> {
     const { page, limit, skip } = this.normalizePaginationOptions(options);
+    const allowedSortFields = new Set([
+      'createdAt',
+      'updatedAt',
+      'name',
+      'serviceCategory',
+      'isActive',
+      'price',
+    ]);
+    const sortField = allowedSortFields.has(options?.sortBy || '')
+      ? String(options?.sortBy)
+      : 'createdAt';
+    const sortDirection = options?.sortOrder === 'asc' ? 1 : -1;
 
     const [data, total] = await Promise.all([
       this.serviceModel
         .find(query)
-        .sort({ createdAt: -1 })
+        .sort({ [sortField]: sortDirection })
         .skip(skip)
         .limit(limit)
         .exec(),
@@ -512,6 +528,10 @@ export class ServiceService {
       ...(canSeeInactive ? {} : { isActive: true }),
     };
 
+    if (typeof options?.isActive === 'boolean') {
+      query.isActive = options.isActive;
+    }
+
     if (complexIdParam && Types.ObjectId.isValid(complexIdParam)) {
       // Explicit complexId filter (e.g., owner narrowing to a specific complex)
       query.complexId = new Types.ObjectId(complexIdParam);
@@ -566,6 +586,28 @@ export class ServiceService {
       }
     }
     // super_admin / owner without subscription → unrestricted
+
+    if (options?.search?.trim()) {
+      const q = options.search.trim();
+      // Strip display-ID prefix so "SER-A1B2" → "A1B2" matches the raw ObjectId string
+      const idTerm = q.replace(/^SER-?/i, '').trim();
+
+      const searchOr: any[] = [
+        { name: { $regex: q, $options: 'i' } },
+        { serviceCategory: { $regex: q, $options: 'i' } },
+        // Partial match on ObjectId string (powers "SER-XXXX" and raw suffix searches)
+        ...(idTerm.length > 0
+          ? [{ $expr: { $regexMatch: { input: { $toString: '$_id' }, regex: idTerm, options: 'i' } } }]
+          : []),
+      ];
+
+      if (Array.isArray(query.$or) && query.$or.length > 0) {
+        query.$and = [...(query.$and || []), { $or: query.$or }, { $or: searchOr }];
+        delete query.$or;
+      } else {
+        query.$or = searchOr;
+      }
+    }
 
     return this.getPaginatedServicesByQuery(query, options);
   }

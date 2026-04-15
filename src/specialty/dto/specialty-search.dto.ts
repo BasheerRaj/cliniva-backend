@@ -75,4 +75,14 @@ export class SpecialtySearchDto {
   @IsOptional()
   @IsIn(['asc', 'desc'])
   sortOrder?: string = 'asc';
+
+  @ApiPropertyOptional({
+    description: 'Sort order alias (legacy)',
+    enum: ['asc', 'desc'],
+    required: false,
+  })
+  @IsString()
+  @IsOptional()
+  @IsIn(['asc', 'desc'])
+  order?: string;
 }

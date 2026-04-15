@@ -47,6 +47,11 @@ import { ResponseBuilder } from '../common/utils/response-builder.util';
 type ServicePaginationQuery = {
   page?: string;
   limit?: string;
+  search?: string;
+  isActive?: string;
+  sortBy?: string;
+  sortOrder?: string;
+  order?: string;
 };
 
 type ServicePaginationMeta = {
@@ -1140,6 +1145,10 @@ export class ServiceController {
   private parsePaginationQuery(query?: ServicePaginationQuery): {
     page: number;
     limit: number;
+    search?: string;
+    isActive?: boolean;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
   } {
     const pageValue = Number(query?.page);
     const limitValue = Number(query?.limit);
@@ -1151,7 +1160,24 @@ export class ServiceController {
       ? Math.max(1, Math.min(100, Math.floor(limitValue)))
       : 10;
 
-    return { page, limit };
+    const normalizedOrder = (query?.sortOrder || query?.order || '').toLowerCase();
+    const sortOrder: 'asc' | 'desc' | undefined =
+      normalizedOrder === 'asc' || normalizedOrder === 'desc'
+        ? (normalizedOrder as 'asc' | 'desc')
+        : undefined;
+
+    let isActive: boolean | undefined;
+    if (query?.isActive === 'true') isActive = true;
+    if (query?.isActive === 'false') isActive = false;
+
+    return {
+      page,
+      limit,
+      search: query?.search?.trim() || undefined,
+      isActive,
+      sortBy: query?.sortBy || undefined,
+      sortOrder,
+    };
   }
 
   private async enrichPaginatedServiceResponse(

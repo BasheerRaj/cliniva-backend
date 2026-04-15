@@ -138,6 +138,7 @@ export class SpecialtyService implements OnModuleInit {
       limit = '10',
       sortBy = 'name',
       sortOrder = 'asc',
+      order,
     } = query;
 
     const tenantFilter = buildTenantFilter(requestingUser ?? {} as TenantUser);
@@ -170,7 +171,8 @@ export class SpecialtyService implements OnModuleInit {
 
     const sortField =
       sortBy === 'assignedDoctorsCount' ? 'assignedDoctorsCount' : sortBy;
-    const sortDirection = sortOrder === 'asc' ? 1 : -1;
+    const effectiveSortOrder = (sortOrder || order || 'asc') === 'asc' ? 'asc' : 'desc';
+    const sortDirection = effectiveSortOrder === 'asc' ? 1 : -1;
 
     const pipeline: any[] = [
       { $match: filter },

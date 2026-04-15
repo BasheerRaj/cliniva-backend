@@ -149,11 +149,14 @@ export class ClinicController {
     @Query('limit') limit?: string,
     @Query('sortBy') sortBy?: string,
     @Query('sortOrder') sortOrder?: string,
+    @Query('order') order?: string,
   ) {
     try {
       const includeCountsBoolean = includeCounts === 'true';
       const pageNumber = page ? parseInt(page, 10) : 1;
       const limitNumber = limit ? parseInt(limit, 10) : 10;
+
+      const resolvedSortOrder = (sortOrder || order) as 'asc' | 'desc' | undefined;
 
       const result = await this.clinicService.getClinics({
         subscriptionId,
@@ -164,7 +167,7 @@ export class ClinicController {
         page: pageNumber,
         limit: limitNumber,
         sortBy,
-        sortOrder: sortOrder as 'asc' | 'desc',
+        sortOrder: resolvedSortOrder,
       }, req.user);
 
       return {
