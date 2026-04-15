@@ -14,6 +14,7 @@ import {
   ValidationPipe,
   ParseIntPipe,
   BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -50,6 +51,52 @@ import { EMPLOYEE_SWAGGER_EXAMPLES } from './constants/swagger-examples';
 @UseGuards(JwtAuthGuard)
 export class EmployeeController {
   constructor(private readonly employeeService: EmployeeService) {}
+
+  private async assertCanModifyEmployee(
+    requestUser: any,
+    employeeId: string,
+  ): Promise<any> {
+    const targetEmployee = await this.employeeService.getEmployeeById(
+      employeeId,
+      requestUser,
+    );
+
+    const actorRole = requestUser?.role;
+    const targetRole = String(
+      targetEmployee?.role || targetEmployee?.employeeType || '',
+    ).toLowerCase();
+    const isSelf = requestUser?.userId === employeeId || requestUser?.id === employeeId;
+
+    const hasFullAccess = [
+      UserRole.SUPER_ADMIN,
+      UserRole.OWNER,
+      UserRole.ADMIN,
+      UserRole.MANAGER,
+    ].includes(actorRole);
+
+    if (hasFullAccess) {
+      return targetEmployee;
+    }
+
+    if (actorRole === UserRole.DOCTOR && isSelf) {
+      return targetEmployee;
+    }
+
+    if (
+      actorRole === UserRole.STAFF &&
+      [UserRole.DOCTOR, UserRole.STAFF].includes(targetRole as UserRole)
+    ) {
+      return targetEmployee;
+    }
+
+    throw new ForbiddenException({
+      message: {
+        ar: 'ليس لديك صلاحية تعديل هذا الموظف',
+        en: 'You do not have permission to modify this employee',
+      },
+      code: 'EMPLOYEE_403',
+    });
+  }
 
   /**
    * Create a new employee
@@ -510,7 +557,14 @@ export class EmployeeController {
   })
   @ApiBody({ type: UpdateEmployeeDto })
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.MANAGER)
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.OWNER,
+    UserRole.ADMIN,
+    UserRole.MANAGER,
+    UserRole.DOCTOR,
+    UserRole.STAFF,
+  )
   @Put(':id')
   async updateEmployee(
     @Param('id') id: string,
@@ -518,6 +572,7 @@ export class EmployeeController {
     @Request() req: any,
   ) {
     try {
+      await this.assertCanModifyEmployee(req.user, id);
       const employee = await this.employeeService.updateEmployee(
         id,
         updateEmployeeDto,
@@ -1421,7 +1476,14 @@ export class EmployeeController {
   })
   @ApiBody({ type: CreateEmployeeDocumentDto })
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.MANAGER)
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.OWNER,
+    UserRole.ADMIN,
+    UserRole.MANAGER,
+    UserRole.DOCTOR,
+    UserRole.STAFF,
+  )
   @Post(':id/documents')
   async createEmployeeDocument(
     @Param('id') employeeId: string,
@@ -1429,6 +1491,7 @@ export class EmployeeController {
     @Request() req: any,
   ) {
     try {
+      await this.assertCanModifyEmployee(req.user, employeeId);
       // Ensure the document is for the correct employee
       createDocumentDto.userId = employeeId;
 

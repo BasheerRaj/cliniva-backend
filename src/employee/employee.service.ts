@@ -2099,6 +2099,42 @@ export class EmployeeService {
         ? new Date(createDocumentDto.expiryDate)
         : undefined,
     };
+    const existingDocuments = await this.employeeDocumentModel
+      .find({
+        userId: new Types.ObjectId(createDocumentDto.userId),
+        documentType: createDocumentDto.documentType,
+        isActive: true,
+      })
+      .sort({ updatedAt: -1, _id: -1 })
+      .exec();
+
+    const [primaryDocument, ...duplicateDocuments] = existingDocuments;
+
+    if (duplicateDocuments.length > 0) {
+      await this.employeeDocumentModel.updateMany(
+        {
+          _id: {
+            $in: duplicateDocuments.map((doc) => doc._id),
+          },
+        },
+        {
+          $set: {
+            isActive: false,
+            status: 'archived',
+          },
+        },
+      );
+    }
+
+    if (primaryDocument) {
+      return await this.employeeDocumentModel
+        .findByIdAndUpdate(
+          primaryDocument._id,
+          { $set: documentData },
+          { new: true, runValidators: true },
+        )
+        .exec();
+    }
 
     const document = new this.employeeDocumentModel(documentData);
     return await document.save();
