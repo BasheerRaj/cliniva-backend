@@ -360,15 +360,9 @@ export class InvoiceService implements OnModuleInit {
       }
     }
 
-    // 1. Resolve clinicId:
-    // - staff/doctor with one assigned clinic -> auto-resolve that clinic
-    // - staff/doctor with multiple clinics -> use DTO clinic when provided
-    // - other roles -> optional DTO clinic
-    let resolvedClinicId =
-      userRole === 'staff' || userRole === 'doctor'
-        ? (createInvoiceDto.clinicId ||
-          (assignedClinicIds.length === 1 ? assignedClinicIds[0] : undefined))
-        : createInvoiceDto.clinicId;
+    // 1. Resolve clinicId: only use what was explicitly provided in the request.
+    // Clinic association is deferred until the first appointment is booked.
+    let resolvedClinicId = createInvoiceDto.clinicId;
 
     let clinic: any = null;
     if (resolvedClinicId) {
@@ -452,17 +446,6 @@ export class InvoiceService implements OnModuleInit {
         }
       }
 
-      if (!resolvedClinicId && userRole !== 'staff' && userRole !== 'doctor') {
-        const serviceClinicIds = Array.isArray((service as any).clinicIds)
-          ? (service as any).clinicIds
-              .map((id: any) => id?.toString?.() ?? String(id))
-              .filter(Boolean)
-          : [];
-        if (serviceClinicIds.length === 1) {
-          resolvedClinicId = serviceClinicIds[0];
-        }
-      }
-
       // Price comes directly from the service definition — no manual entry required
       const totalSessions = (service as any).sessions?.length || 1;
       const totalPrice = service.price ?? 0;
@@ -524,20 +507,8 @@ export class InvoiceService implements OnModuleInit {
       } as any);
     }
 
-    // Final clinic fallback for admin/owner: if still unresolved, use the user's
-    // primary clinicId so the invoice always gets a clinic association and can be paid later.
-    if (!resolvedClinicId && userRole !== 'staff' && userRole !== 'doctor') {
-      const primaryClinicId = (requestingUser as any)?.clinicId?.toString?.();
-      if (primaryClinicId && Types.ObjectId.isValid(primaryClinicId)) {
-        resolvedClinicId = primaryClinicId;
-      } else {
-        const firstAssignedId = assignedClinicIds[0];
-        if (firstAssignedId && Types.ObjectId.isValid(firstAssignedId)) {
-          resolvedClinicId = firstAssignedId;
-        }
-      }
-    }
-
+    // Clinic association is deferred — only set if explicitly provided in the DTO.
+    // It will be attached to the invoice when the first appointment is booked.
     if (!clinic && resolvedClinicId) {
       clinic = await this.clinicModel.findOne({
         _id: new Types.ObjectId(resolvedClinicId),

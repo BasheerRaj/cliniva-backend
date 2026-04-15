@@ -218,10 +218,14 @@ export class PaymentService {
 
     if (candidateClinicIds.size > 0) {
       const candidates = Array.from(candidateClinicIds);
-      const scopedCandidates =
+      let scopedCandidates =
         userClinicIds.length > 0
           ? candidates.filter((id) => userClinicIds.includes(id))
           : candidates;
+      // If the user's JWT clinic scope doesn't overlap with the invoice's service clinics
+      // (e.g. stale clinicId in token for owner/admin), fall back to unscoped candidates.
+      // Tenant access is enforced by assertSameTenant below.
+      if (scopedCandidates.length === 0) scopedCandidates = candidates;
       if (scopedCandidates.length === 1) {
         resolvedClinicId = scopedCandidates[0];
       } else if (scopedCandidates.length > 1) {
