@@ -2458,12 +2458,17 @@ export class ServiceService {
     }
 
     const serviceObjectId = new Types.ObjectId(serviceId);
+    const appointmentTenantFilter =
+      tenantFilter.subscriptionId && Types.ObjectId.isValid(tenantFilter.subscriptionId)
+        ? { subscriptionId: new Types.ObjectId(tenantFilter.subscriptionId) }
+        : {};
 
     const statsResult = await this.appointmentModel.aggregate([
       {
         $match: {
           serviceId: serviceObjectId,
           isDeleted: { $ne: true },
+          ...appointmentTenantFilter,
         },
       },
       {
@@ -2575,7 +2580,7 @@ export class ServiceService {
           ],
         },
       },
-    ]);
+    ]).option({ maxTimeMS: 10000 });
 
     const data = statsResult[0];
     const utilization = data.utilization[0] || {};
