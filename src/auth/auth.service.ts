@@ -1434,9 +1434,12 @@ export class AuthService {
       // Hash new password with bcrypt (12 rounds)
       const hashedPassword = await this.hashPassword(newPassword);
 
-      // Update user: password, lastPasswordChange=now (Requirement 2.3)
+      // Update user: password, lastPasswordChange=now, clear first-login flag (Requirement 2.3)
       user.passwordHash = hashedPassword;
       user.lastPasswordChange = new Date();
+      if (user.isFirstLogin) {
+        user.isFirstLogin = false;
+      }
       await user.save();
 
       this.logger.log(`Password changed for user ${userId}`);

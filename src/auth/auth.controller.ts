@@ -515,13 +515,14 @@ export class AuthController {
    */
   @Post('change-password')
   @UseGuards(JwtAuthGuard, FirstLoginGuard, RateLimitGuard)
+  @SkipFirstLoginCheck()
   @RateLimit(RateLimitType.PASSWORD_CHANGE, 3, 3600) // 3 attempts per hour (3600 seconds)
   @HttpCode(HttpStatus.OK)
   @ApiBearerAuth()
   @ApiOperation({
     summary: 'Change password',
     description:
-      'Change password for authenticated users. Rate limited to 3 attempts per hour per user. Requires JWT authentication and completed first login.',
+      'Change password for authenticated users. Rate limited to 3 attempts per hour per user. Requires JWT authentication.',
   })
   @ApiBody({
     type: ChangePasswordDto,
