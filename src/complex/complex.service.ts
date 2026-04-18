@@ -525,6 +525,15 @@ export class ComplexService {
         complex.ownerId?.toString();
 
       const requestingUserId = requestingUser.userId || requestingUser.sub;
+      const requestingRole = String(requestingUser.role || '').toLowerCase();
+      const requestingComplexId =
+        requestingUser.complexId?.toString?.() ??
+        requestingUser.complexId ??
+        null;
+      const currentComplexId =
+        (complex as any)?._id?.toString?.() ??
+        (complex as any)?._id ??
+        null;
 
       const subscriptionMatch =
         !requestingUser.subscriptionId ||
@@ -535,8 +544,18 @@ export class ComplexService {
         complexOrganizationId === requestingUser.organizationId;
 
       const isOwnerOfComplex = complexOwnerId === requestingUserId;
+      const isAssignedDoctorOrStaff =
+        (requestingRole === 'doctor' || requestingRole === 'staff') &&
+        !!requestingComplexId &&
+        !!currentComplexId &&
+        currentComplexId.toString() === requestingComplexId.toString();
 
-      if (!subscriptionMatch && !organizationMatch && !isOwnerOfComplex) {
+      if (
+        !subscriptionMatch &&
+        !organizationMatch &&
+        !isOwnerOfComplex &&
+        !isAssignedDoctorOrStaff
+      ) {
         throw new ForbiddenException({
           message: {
             ar: 'ليس لديك صلاحية للوصول إلى هذا المجمع',
