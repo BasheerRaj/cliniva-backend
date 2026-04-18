@@ -127,7 +127,9 @@ export interface AssignedClinicSummary {
   no: number;
   clinicId: string;
   name: string;
+  PIC?: string | null;
   pic?: string | null;
+  personInCharge?: { name: string } | null;
   scheduledAppointmentsCount: number;
   doctors: number;
   status: string;

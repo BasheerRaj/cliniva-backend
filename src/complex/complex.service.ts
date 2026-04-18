@@ -1225,6 +1225,13 @@ export class ComplexService {
     }
 
     const clinicIds = clinics.map((clinic) => clinic._id);
+    const picUserIds = [
+      ...new Set(
+        clinics
+          .map((clinic) => clinic.personInChargeId?.toString())
+          .filter((id): id is string => !!id),
+      ),
+    ];
 
     const [appointmentsByClinic, doctorsByClinic, picUsers] =
       await Promise.all([
@@ -1235,7 +1242,7 @@ export class ComplexService {
               $match: {
                 clinicId: { $in: clinicIds },
                 status: { $in: ['scheduled', 'confirmed'] },
-                deletedAt: null,
+                deletedAt: { $exists: false },
               },
             },
             {
@@ -1264,17 +1271,20 @@ export class ComplexService {
             },
           ])
           .toArray(),
-        this.complexModel.db
-          .collection('users')
-          .find({
-            _id: {
-              $in: clinics
-                .map((clinic) => clinic.personInChargeId)
-                .filter((picId) => !!picId),
-            },
-          })
-          .project({ firstName: 1, lastName: 1 })
-          .toArray(),
+        picUserIds.length
+          ? this.complexModel.db
+              .collection('users')
+              .find({
+                _id: {
+                  $in: picUserIds.map((id) => new Types.ObjectId(id)),
+                },
+              })
+              .project({
+                firstName: 1,
+                lastName: 1,
+              })
+              .toArray()
+          : [],
       ]);
 
     const appointmentCountMap = new Map(
@@ -1283,26 +1293,37 @@ export class ComplexService {
     const doctorsCountMap = new Map(
       doctorsByClinic.map((item) => [item._id.toString(), item.count]),
     );
-    const picMap = new Map(
-      picUsers.map((user) => [
-        user._id.toString(),
-        `${user.firstName || ''} ${user.lastName || ''}`.trim() || null,
-      ]),
+    const picNameMap = new Map<string, string>(
+      picUsers.map(
+        (user): [string, string] => [
+          user._id.toString(),
+          `${user.firstName || ''} ${user.lastName || ''}`.trim(),
+        ],
+      ),
     );
 
-    return clinics.map((clinic, index) => ({
-      no: index + 1,
-      clinicId: clinic._id.toString(),
-      name: clinic.name,
-      pic: clinic.personInChargeId
-        ? picMap.get(clinic.personInChargeId.toString()) || null
-        : null,
-      scheduledAppointmentsCount:
-        appointmentCountMap.get(clinic._id.toString()) || 0,
-      doctors: doctorsCountMap.get(clinic._id.toString()) || 0,
-      status:
-        clinic.status || (clinic.isActive === false ? 'inactive' : 'active'),
-    }));
+    return clinics.map((clinic, index) => {
+      const picName =
+        (clinic.personInChargeId &&
+          picNameMap.get(clinic.personInChargeId.toString())) ||
+        clinic.ceoName ||
+        clinic.headDoctorName ||
+        null;
+
+      return {
+        no: index + 1,
+        clinicId: clinic._id.toString(),
+        name: clinic.name,
+        PIC: picName,
+        pic: picName,
+        personInCharge: picName ? { name: picName } : null,
+        scheduledAppointmentsCount:
+          appointmentCountMap.get(clinic._id.toString()) || 0,
+        doctors: doctorsCountMap.get(clinic._id.toString()) || 0,
+        status:
+          clinic.status || (clinic.isActive === false ? 'inactive' : 'active'),
+      };
+    });
   }
 
   private async getDoctorAndStaffList(
