@@ -420,11 +420,33 @@ export class AppointmentService {
       );
     }
 
-    const { sessionId } = createAppointmentDto;
-
-    // Enforce sessionId when service has sessions AND no invoice is used (Requirement 3.1)
-    // When an invoice is provided, sessions are tracked at the invoice level (M7 Integration)
+    const { sessionId: dtoSessionId } = createAppointmentDto;
     const hasInvoice = !!(createAppointmentDto as any).invoiceId;
+
+    // When booking via invoice, resolve sessionId from the invoice session record
+    let resolvedSessionId: string | undefined;
+    if (hasInvoice && validatedInvoice) {
+      const invoiceItemId = (createAppointmentDto as any).invoiceItemId;
+      const svc = (validatedInvoice.services as any[]).find(
+        (s: any) => s.serviceId.toString() === createAppointmentDto.serviceId,
+      );
+      if (svc) {
+        let invoiceSess: any = invoiceItemId
+          ? (svc.sessions || []).find((s: any) => s.invoiceItemId?.toString() === invoiceItemId)
+          : null;
+        if (!invoiceSess) {
+          invoiceSess = (svc.sessions || []).find((s: any) =>
+            ['pending', 'cancelled'].includes(s.sessionStatus),
+          );
+        }
+        if (invoiceSess?.sessionId) {
+          resolvedSessionId = invoiceSess.sessionId.toString();
+        }
+      }
+    }
+
+    const sessionId = dtoSessionId || resolvedSessionId;
+
     if (!hasInvoice && service.sessions && service.sessions.length > 0 && !sessionId) {
       throw new BadRequestException({
         message: SESSION_ERROR_MESSAGES.SESSION_ID_REQUIRED,

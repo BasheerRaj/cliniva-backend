@@ -911,6 +911,7 @@ export class ServiceService {
       .find({
         serviceId: new Types.ObjectId(serviceId),
         status: { $in: ['scheduled', 'confirmed', 'in_progress', 'completed'] },
+        deletedAt: { $exists: false },
       })
       .populate('patientId', 'firstName lastName patientNumber phone')
       .populate('doctorId', 'firstName lastName')
