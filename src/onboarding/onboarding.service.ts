@@ -987,6 +987,7 @@ export class OnboardingService {
       const updateData = {
         phoneNumbers: dto.phoneNumbers,
         email: dto.email,
+        website: dto.website,
         address: dto.address,
         emergencyContact: dto.emergencyContact,
         socialMediaLinks: dto.socialMediaLinks,
