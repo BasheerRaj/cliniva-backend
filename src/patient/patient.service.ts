@@ -11,6 +11,7 @@ import { Model, Types, FilterQuery } from 'mongoose';
 import { Patient } from '../database/schemas/patient.schema';
 import { Appointment } from '../database/schemas/appointment.schema';
 import { Invoice } from '../database/schemas/invoice.schema';
+import { Clinic } from '../database/schemas/clinic.schema';
 import { AuditService } from '../auth/audit.service';
 import { ERROR_MESSAGES } from '../common/utils/error-messages.constant';
 import {
@@ -36,6 +37,7 @@ export class PatientService {
     @InjectModel('Appointment')
     private readonly appointmentModel: Model<Appointment>,
     @InjectModel('Invoice') private readonly invoiceModel: Model<Invoice>,
+    @InjectModel('Clinic') private readonly clinicModel: Model<Clinic>,
     private readonly auditService: AuditService,
   ) {}
 
@@ -162,6 +164,20 @@ export class PatientService {
 
     const { patientNumber, _id } = this.generatePatientNumber();
 
+    // Derive complexId from the clinic record so it's always consistent,
+    // regardless of which complex the creating user's JWT points to.
+    const clinicId = scope?.clinicId ?? (createPatientDto as any).clinicId;
+    let resolvedComplexId = scope?.complexId ?? null;
+    if (clinicId && Types.ObjectId.isValid(clinicId)) {
+      const clinic = await this.clinicModel
+        .findById(new Types.ObjectId(clinicId))
+        .select('complexId')
+        .lean();
+      if (clinic?.complexId) {
+        resolvedComplexId = clinic.complexId.toString();
+      }
+    }
+
     const patientData = {
       _id,
       ...createPatientDto,
@@ -179,7 +195,7 @@ export class PatientService {
         ? new Types.ObjectId(createdByUserId)
         : undefined,
       ...(scope?.clinicId ? { clinicId: new Types.ObjectId(scope.clinicId) } : {}),
-      ...(scope?.complexId ? { complexId: new Types.ObjectId(scope.complexId) } : {}),
+      ...(resolvedComplexId ? { complexId: new Types.ObjectId(resolvedComplexId) } : {}),
       ...(scope?.organizationId ? { organizationId: new Types.ObjectId(scope.organizationId) } : {}),
       ...(scope?.subscriptionId ? { subscriptionId: new Types.ObjectId(scope.subscriptionId) } : {}),
     };
@@ -311,49 +327,24 @@ export class PatientService {
       sortOrder = 'desc',
     } = query;
 
-    // Scope resolution
-    const resolvedComplexId = this.resolveComplexId(scope, query);
-
     // Build filter
     const filter: FilterQuery<Patient> = {
       deletedAt: { $exists: false },
     };
 
-    // 1. Mandatory subscription-level tenant isolation (M1 Fix)
-    if (scope.role !== UserRole.SUPER_ADMIN && scope.subscriptionId) {
+    // Tenant isolation: patients are scoped to subscription only.
+    // All users (any role, complex, or clinic) within the same subscription see all patients.
+    if (scope.role === UserRole.SUPER_ADMIN) {
+      // super_admin must supply an explicit subscriptionId or complexId to narrow results
+      if (query.complexId) {
+        filter.complexId = new Types.ObjectId(query.complexId);
+      }
+    } else if (scope.subscriptionId) {
       filter.subscriptionId = new Types.ObjectId(scope.subscriptionId);
     }
 
-    // 2. Apply complexId scope — mandatory for all except owner without explicit complexId
-    if (resolvedComplexId) {
-      filter.complexId = new Types.ObjectId(resolvedComplexId);
-    } else if (scope.role === UserRole.OWNER) {
-      if (scope.organizationId) {
-        filter.organizationId = new Types.ObjectId(scope.organizationId);
-      } else if (scope.clinicId) {
-        // clinic-plan owner: scope to their single clinic
-        filter.clinicId = new Types.ObjectId(scope.clinicId);
-      }
-    }
-
-    // Clinic sub-scope: staff/doctor/manager/admin are locked to JWT clinic scope
-    if (
-      scope.role === UserRole.STAFF ||
-      scope.role === UserRole.DOCTOR ||
-      scope.role === UserRole.MANAGER ||
-      scope.role === UserRole.ADMIN
-    ) {
-      const scopedClinicIds = this.getScopedClinicIds(scope);
-      if (scopedClinicIds.length === 1) {
-        filter.clinicId = scopedClinicIds[0];
-      } else if (scopedClinicIds.length > 1) {
-        filter.clinicId = { $in: scopedClinicIds };
-      }
-    } else if (
-      query.clinicId &&
-      (scope.role === UserRole.OWNER ||
-        scope.role === UserRole.SUPER_ADMIN)
-    ) {
+    // Optional clinic filter — callers may narrow to a specific clinic via query.clinicId.
+    if (query.clinicId) {
       filter.clinicId = new Types.ObjectId(query.clinicId);
     }
 
@@ -455,53 +446,29 @@ export class PatientService {
   ): Promise<{ _id: string; patientNumber: string; firstName: string; lastName: string; phone?: string; profilePicture?: string }[]> {
     const filter: FilterQuery<Patient> = { deletedAt: { $exists: false }, status: 'Active' };
 
-    // Scope resolution (reuse same logic as getPatients)
-    const { role, complexId: jwtComplexId, organizationId, clinicId, subscriptionId } = scope;
-    const scopedClinicIds = this.getScopedClinicIds(scope);
-
-    // 1. Mandatory subscription-level tenant isolation (M1 Fix)
-    if (role !== UserRole.SUPER_ADMIN && subscriptionId) {
-      filter.subscriptionId = new Types.ObjectId(subscriptionId);
-    }
+    // Tenant isolation: patients are scoped to subscription only.
+    const { role, subscriptionId } = scope;
 
     if (role === UserRole.SUPER_ADMIN) {
-      // super_admin without a complexId → return empty to avoid unbounded scan
-    } else if (role === UserRole.OWNER) {
-      if (organizationId) {
-        filter.organizationId = new Types.ObjectId(organizationId);
-      } else if (clinicId) {
-        // clinic-plan owner: scope to their single clinic
-        filter.clinicId = new Types.ObjectId(clinicId);
-      } else if (!subscriptionId) {
-        // owner with no scope — safety net
-        return [];
-      }
+      // super_admin without explicit scope → return empty to avoid unbounded scan
+      return [];
+    } else if (subscriptionId) {
+      filter.subscriptionId = new Types.ObjectId(subscriptionId);
     } else {
-      // admin / manager / doctor / staff — scoped to JWT complexId, then clinic
-      if (jwtComplexId) filter.complexId = new Types.ObjectId(jwtComplexId);
-      if (role === UserRole.STAFF || role === UserRole.DOCTOR || role === UserRole.MANAGER || role === UserRole.ADMIN) {
-        if (scopedClinicIds.length === 1) {
-          filter.clinicId = scopedClinicIds[0];
-        } else if (scopedClinicIds.length > 1) {
-          filter.clinicId = { $in: scopedClinicIds };
-        }
-      }
+      // safety net: no subscription context
+      return [];
     }
 
     // If hasOutstandingInvoice=true, restrict to patients who have at least one
-    // posted invoice with unpaid or partially_paid status in the same clinic scope.
+    // posted invoice with unpaid or partially_paid status within the same subscription.
     if (hasOutstandingInvoice) {
       const invoiceFilter: any = {
         deletedAt: { $exists: false },
         invoiceStatus: 'posted',
         paymentStatus: { $in: ['unpaid', 'partially_paid'] },
       };
-      if (scopedClinicIds.length === 1) {
-        invoiceFilter.clinicId = scopedClinicIds[0];
-      } else if (scopedClinicIds.length > 1) {
-        invoiceFilter.clinicId = { $in: scopedClinicIds };
-      } else if (clinicId && Types.ObjectId.isValid(clinicId)) {
-        invoiceFilter.clinicId = new Types.ObjectId(clinicId);
+      if (subscriptionId) {
+        invoiceFilter.subscriptionId = new Types.ObjectId(subscriptionId);
       }
       const invoiceDocs = await this.invoiceModel
         .find(invoiceFilter, { patientId: 1 })
@@ -512,19 +479,15 @@ export class PatientService {
     }
 
     // If hasBookableSession=true, restrict to patients who have at least one
-    // draft or posted invoice with remaining (unboooked) sessions in the same clinic.
+    // draft or posted invoice with remaining (unbooked) sessions within the same subscription.
     if (hasBookableSession) {
       const invoiceFilter: any = {
         deletedAt: { $exists: false },
         invoiceStatus: { $in: ['draft', 'posted'] },
         paymentStatus: { $ne: 'paid' },
       };
-      if (scopedClinicIds.length === 1) {
-        invoiceFilter.clinicId = scopedClinicIds[0];
-      } else if (scopedClinicIds.length > 1) {
-        invoiceFilter.clinicId = { $in: scopedClinicIds };
-      } else if (clinicId && Types.ObjectId.isValid(clinicId)) {
-        invoiceFilter.clinicId = new Types.ObjectId(clinicId);
+      if (subscriptionId) {
+        invoiceFilter.subscriptionId = new Types.ObjectId(subscriptionId);
       }
       const invoiceDocs = await this.invoiceModel.find(invoiceFilter).lean();
 
@@ -699,39 +662,9 @@ export class PatientService {
       return filter;
     }
 
+    // Tenant isolation: subscription is the only visibility boundary for patients.
     if (scope.subscriptionId) {
       filter.subscriptionId = new Types.ObjectId(scope.subscriptionId);
-    }
-
-    if (scope.role === UserRole.OWNER) {
-      if (scope.organizationId) {
-        filter.organizationId = new Types.ObjectId(scope.organizationId);
-      } else {
-        const scopedClinicIds = this.getScopedClinicIds(scope);
-        if (scopedClinicIds.length === 1) {
-          filter.clinicId = scopedClinicIds[0];
-        } else if (scopedClinicIds.length > 1) {
-          filter.clinicId = { $in: scopedClinicIds };
-        } else if (scope.clinicId) {
-          filter.clinicId = new Types.ObjectId(scope.clinicId);
-        } else if (scope.complexId) {
-          filter.complexId = new Types.ObjectId(scope.complexId);
-        }
-      }
-      return filter;
-    }
-
-    const scopedClinicIds = this.getScopedClinicIds(scope);
-    if (scopedClinicIds.length === 1) {
-      filter.clinicId = scopedClinicIds[0];
-    } else if (scopedClinicIds.length > 1) {
-      filter.clinicId = { $in: scopedClinicIds };
-    } else if (scope.clinicId) {
-      filter.clinicId = new Types.ObjectId(scope.clinicId);
-    } else if (scope.complexId) {
-      filter.complexId = new Types.ObjectId(scope.complexId);
-    } else if (scope.organizationId) {
-      filter.organizationId = new Types.ObjectId(scope.organizationId);
     }
 
     return filter;

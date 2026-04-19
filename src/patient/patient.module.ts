@@ -8,6 +8,7 @@ import { AppointmentSchema } from '../database/schemas/appointment.schema';
 import { SubscriptionSchema } from '../database/schemas/subscription.schema';
 import { SubscriptionPlanSchema } from '../database/schemas/subscription-plan.schema';
 import { InvoiceSchema } from '../database/schemas/invoice.schema';
+import { ClinicSchema } from '../database/schemas/clinic.schema';
 import { SubscriptionModule } from '../subscription/subscription.module';
 import { AuthModule } from '../auth/auth.module';
 
@@ -20,6 +21,7 @@ import { AuthModule } from '../auth/auth.module';
       { name: 'Subscription', schema: SubscriptionSchema },
       { name: 'SubscriptionPlan', schema: SubscriptionPlanSchema },
       { name: 'Invoice', schema: InvoiceSchema },
+      { name: 'Clinic', schema: ClinicSchema },
     ]),
     SubscriptionModule,
     AuthModule,
