@@ -40,6 +40,12 @@ import { EmailService } from '../auth/email.service';
 @Injectable()
 export class EmployeeService {
   private readonly logger = new Logger(EmployeeService.name);
+  private readonly uniqueEmployeeFields = [
+    'username',
+    'email',
+    'phone',
+    'cardNumber',
+  ] as const;
 
   private toObjectIdString(value: any): string | null {
     if (!value) {
@@ -113,6 +119,55 @@ export class EmployeeService {
     private readonly sessionService: SessionService,
     private readonly emailService: EmailService,
   ) {}
+
+  async isEmployeeFieldValueAvailable(
+    field: 'username' | 'email' | 'phone' | 'cardNumber',
+    value: string,
+  ): Promise<boolean> {
+    const normalizedValue = (value || '').trim();
+
+    if (!normalizedValue) {
+      throw new BadRequestException(`${field} is required`);
+    }
+
+    if (!this.uniqueEmployeeFields.includes(field)) {
+      throw new BadRequestException('Invalid unique field');
+    }
+
+    if (field === 'username') {
+      const existingUser = await this.userModel
+        .findOne({ username: normalizedValue.toLowerCase() })
+        .select('_id')
+        .lean()
+        .exec();
+      return !existingUser;
+    }
+
+    if (field === 'email') {
+      const existingUser = await this.userModel
+        .findOne({ email: normalizedValue.toLowerCase() })
+        .select('_id')
+        .lean()
+        .exec();
+      return !existingUser;
+    }
+
+    if (field === 'phone') {
+      const existingUser = await this.userModel
+        .findOne({ phone: normalizedValue })
+        .select('_id')
+        .lean()
+        .exec();
+      return !existingUser;
+    }
+
+    const existingEmployee = await this.employeeProfileModel
+      .findOne({ cardNumber: normalizedValue })
+      .select('_id')
+      .lean()
+      .exec();
+    return !existingEmployee;
+  }
 
   /**
    * Generate unique employee number
@@ -1087,8 +1142,23 @@ export class EmployeeService {
       {
         $lookup: {
           from: 'employee_documents',
-          localField: '_id',
-          foreignField: 'userId',
+          let: { userId: '$_id' },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ['$userId', '$$userId'] },
+                    { $eq: ['$isActive', true] },
+                    { $ne: ['$status', 'archived'] },
+                  ],
+                },
+              },
+            },
+            {
+              $sort: { createdAt: -1 },
+            },
+          ],
           as: 'documents',
         },
       },
@@ -2191,6 +2261,7 @@ export class EmployeeService {
       .find({
         userId: new Types.ObjectId(employeeId),
         isActive: true,
+        status: { $ne: 'archived' },
       })
       .populate('uploadedBy', 'firstName lastName')
       .populate('verifiedBy', 'firstName lastName')

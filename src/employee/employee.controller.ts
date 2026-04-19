@@ -177,6 +177,73 @@ export class EmployeeController {
   }
 
   /**
+   * Validate unique employee fields in real time
+   * GET /employees/validate-unique
+   */
+  @ApiOperation({
+    summary: 'Validate unique employee field',
+    description:
+      'Checks whether a unique employee field value is available before create/update flows.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Validation completed successfully',
+    schema: {
+      example: {
+        success: true,
+        message: 'Value is available',
+        data: {
+          field: 'email',
+          value: 'doctor@cliniva.com',
+          isAvailable: true,
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid field or value',
+  })
+  @ApiBearerAuth()
+  @ApiQuery({
+    name: 'field',
+    required: true,
+    enum: ['username', 'email', 'phone', 'cardNumber'],
+  })
+  @ApiQuery({
+    name: 'value',
+    required: true,
+    type: String,
+  })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.MANAGER)
+  @Get('validate-unique')
+  async validateUniqueField(
+    @Query('field')
+    field: 'username' | 'email' | 'phone' | 'cardNumber',
+    @Query('value') value: string,
+  ) {
+    if (!field || !value) {
+      throw new BadRequestException('Both field and value are required');
+    }
+
+    const isAvailable = await this.employeeService.isEmployeeFieldValueAvailable(
+      field,
+      value,
+    );
+
+    return {
+      success: true,
+      message: isAvailable ? 'Value is available' : 'Value already exists',
+      data: {
+        field,
+        value,
+        isAvailable,
+      },
+    };
+  }
+
+  /**
    * Get all employees with filtering and pagination
    * GET /employees
    */
