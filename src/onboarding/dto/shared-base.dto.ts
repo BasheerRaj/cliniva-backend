@@ -312,6 +312,32 @@ export class BusinessProfileDto {
   ceoName?: string; // CEO, Director, Manager name
 }
 
+export class LegalItemDto {
+  @ApiPropertyOptional({
+    description: 'Policy item title',
+    example: 'Data Retention',
+    type: String,
+  })
+  @Transform(({ value }) =>
+    typeof value === 'string' && value.trim() === '' ? undefined : value,
+  )
+  @IsString()
+  @IsOptional()
+  title?: string;
+
+  @ApiPropertyOptional({
+    description: 'Policy item content',
+    example: 'We keep records for 5 years.',
+    type: String,
+  })
+  @Transform(({ value }) =>
+    typeof value === 'string' && value.trim() === '' ? undefined : value,
+  )
+  @IsString()
+  @IsOptional()
+  content?: string;
+}
+
 // Shared legal information DTO - used across all entities
 export class LegalInfoDto {
   @ApiPropertyOptional({
@@ -385,4 +411,24 @@ export class LegalInfoDto {
   @IsUrl()
   @IsOptional()
   privacyUrl?: string;
+
+  @ApiPropertyOptional({
+    description: 'Terms and conditions entries',
+    type: [LegalItemDto],
+  })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => LegalItemDto)
+  @IsOptional()
+  termsConditions?: LegalItemDto[];
+
+  @ApiPropertyOptional({
+    description: 'Privacy policy entries',
+    type: [LegalItemDto],
+  })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => LegalItemDto)
+  @IsOptional()
+  privacyPolicy?: LegalItemDto[];
 }

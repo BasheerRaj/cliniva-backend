@@ -165,7 +165,14 @@ export class OrganizationController {
     type: String,
   })
   @Get(':id')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.OWNER,
+    UserRole.ADMIN,
+    UserRole.STAFF,
+    UserRole.DOCTOR,
+  )
   async getOrganization(@Param('id') id: string, @Req() req) {
     try {
       const organization = await this.organizationService.getOrganization(id, req.user);
@@ -366,6 +373,14 @@ export class OrganizationController {
     type: String,
   })
   @Get('subscription/:subscriptionId')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.OWNER,
+    UserRole.ADMIN,
+    UserRole.STAFF,
+    UserRole.DOCTOR,
+  )
   async getBySubscription(@Param('subscriptionId') subscriptionId: string) {
     try {
       const organization =

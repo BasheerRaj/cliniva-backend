@@ -1035,11 +1035,33 @@ export class OnboardingService {
       }
 
       // Update organization with legal information (same structure as DTO)
+      const normalizedTermsConditions = (dto.termsConditions || [])
+        .map((item: { title?: string; content?: string }) => ({
+          title: item?.title?.trim(),
+          content: item?.content?.trim(),
+        }))
+        .filter((item: { title?: string; content?: string }) => item.title || item.content);
+
+      const normalizedPrivacyPolicy = (dto.privacyPolicy || [])
+        .map((item: { title?: string; content?: string }) => ({
+          title: item?.title?.trim(),
+          content: item?.content?.trim(),
+        }))
+        .filter((item: { title?: string; content?: string }) => item.title || item.content);
+
       const updateData = {
         vatNumber: dto.vatNumber,
         crNumber: dto.crNumber,
         termsConditionsUrl: dto.termsConditionsUrl ?? dto.termsUrl,
         privacyPolicyUrl: dto.privacyPolicyUrl ?? dto.privacyUrl,
+        termsConditions:
+          normalizedTermsConditions.length > 0
+            ? normalizedTermsConditions
+            : undefined,
+        privacyPolicy:
+          normalizedPrivacyPolicy.length > 0
+            ? normalizedPrivacyPolicy
+            : undefined,
       };
 
       const updatedOrg = await this.organizationService.updateOrganization(

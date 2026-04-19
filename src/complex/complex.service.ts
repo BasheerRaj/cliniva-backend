@@ -63,14 +63,62 @@ export class ComplexService {
 
     let targetSubscriptionId = query.subscriptionId;
     let targetOrganizationId = query.organizationId;
+    let scopedComplexIds: Types.ObjectId[] | null = null;
 
     // TENANT ISOLATION (ISSUE-009)
     if (requestingUser && requestingUser.role !== 'super_admin') {
+      const requestingRole = String(requestingUser.role || '').toLowerCase();
+
       if (requestingUser.subscriptionId) {
         targetSubscriptionId = requestingUser.subscriptionId;
       }
       if (requestingUser.organizationId) {
         targetOrganizationId = requestingUser.organizationId;
+      }
+
+      // Assignment scoping for non-admin roles
+      if (requestingRole === 'doctor' || requestingRole === 'staff') {
+        const allowedComplexIds = new Set<string>();
+
+        const directComplexId = requestingUser.complexId?.toString?.() ?? requestingUser.complexId;
+        if (directComplexId && Types.ObjectId.isValid(directComplexId)) {
+          allowedComplexIds.add(directComplexId.toString());
+        }
+
+        const clinicIdCandidates = new Set<string>();
+        const directClinicId = requestingUser.clinicId?.toString?.() ?? requestingUser.clinicId;
+        if (directClinicId && Types.ObjectId.isValid(directClinicId)) {
+          clinicIdCandidates.add(directClinicId.toString());
+        }
+        if (Array.isArray(requestingUser.clinicIds)) {
+          for (const clinicId of requestingUser.clinicIds) {
+            const candidate = clinicId?.toString?.() ?? clinicId;
+            if (candidate && Types.ObjectId.isValid(candidate)) {
+              clinicIdCandidates.add(candidate.toString());
+            }
+          }
+        }
+
+        if (clinicIdCandidates.size > 0) {
+          const clinics = await this.complexModel.db
+            .collection('clinics')
+            .find(
+              { _id: { $in: Array.from(clinicIdCandidates).map((id) => new Types.ObjectId(id)) } },
+              { projection: { complexId: 1 } },
+            )
+            .toArray();
+
+          for (const clinic of clinics) {
+            const complexId = clinic?.complexId?.toString?.();
+            if (complexId && Types.ObjectId.isValid(complexId)) {
+              allowedComplexIds.add(complexId);
+            }
+          }
+        }
+
+        scopedComplexIds = Array.from(allowedComplexIds).map(
+          (id) => new Types.ObjectId(id),
+        );
       }
     }
 
@@ -85,6 +133,10 @@ export class ComplexService {
     // Filter by subscriptionId
     if (targetSubscriptionId) {
       filter.subscriptionId = this.buildSubscriptionMatch(targetSubscriptionId);
+    }
+
+    if (scopedComplexIds !== null) {
+      filter._id = { $in: scopedComplexIds };
     }
 
     // Status visibility:
@@ -544,18 +596,42 @@ export class ComplexService {
         complexOrganizationId === requestingUser.organizationId;
 
       const isOwnerOfComplex = complexOwnerId === requestingUserId;
-      const isAssignedDoctorOrStaff =
-        (requestingRole === 'doctor' || requestingRole === 'staff') &&
-        !!requestingComplexId &&
-        !!currentComplexId &&
-        currentComplexId.toString() === requestingComplexId.toString();
+      if (requestingRole === 'doctor' || requestingRole === 'staff') {
+        let isAssignedDoctorOrStaff =
+          !!requestingComplexId &&
+          !!currentComplexId &&
+          currentComplexId.toString() === requestingComplexId.toString();
 
-      if (
-        !subscriptionMatch &&
-        !organizationMatch &&
-        !isOwnerOfComplex &&
-        !isAssignedDoctorOrStaff
-      ) {
+        if (!isAssignedDoctorOrStaff && currentComplexId && Array.isArray(requestingUser.clinicIds) && requestingUser.clinicIds.length > 0) {
+          const assignedClinicIds = requestingUser.clinicIds
+            .map((id: any) => id?.toString?.() ?? id)
+            .filter((id: string) => Types.ObjectId.isValid(id))
+            .map((id: string) => new Types.ObjectId(id));
+
+          if (assignedClinicIds.length > 0) {
+            const matchedClinic = await this.complexModel.db
+              .collection('clinics')
+              .findOne(
+                {
+                  _id: { $in: assignedClinicIds },
+                  complexId: new Types.ObjectId(currentComplexId),
+                },
+                { projection: { _id: 1 } },
+              );
+            isAssignedDoctorOrStaff = !!matchedClinic;
+          }
+        }
+
+        if (!subscriptionMatch || !isAssignedDoctorOrStaff) {
+          throw new ForbiddenException({
+            message: {
+              ar: 'ليس لديك صلاحية للوصول إلى هذا المجمع',
+              en: 'You do not have permission to access this complex',
+            },
+            code: 'INSUFFICIENT_PERMISSIONS',
+          });
+        }
+      } else if (!subscriptionMatch && !organizationMatch && !isOwnerOfComplex) {
         throw new ForbiddenException({
           message: {
             ar: 'ليس لديك صلاحية للوصول إلى هذا المجمع',

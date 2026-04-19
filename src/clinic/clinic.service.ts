@@ -673,6 +673,44 @@ export class ClinicService {
           code: 'INSUFFICIENT_PERMISSIONS',
         });
       }
+
+      const requestingRole = String(requestingUser.role || '').toLowerCase();
+      if (requestingRole === 'doctor' || requestingRole === 'staff') {
+        const currentClinicId = clinic._id.toString();
+        const currentComplexId = clinic.complexId?.toString?.() ?? null;
+
+        const assignedClinicIds = new Set<string>();
+        const directClinicId = requestingUser.clinicId?.toString?.() ?? requestingUser.clinicId;
+        if (directClinicId && Types.ObjectId.isValid(directClinicId)) {
+          assignedClinicIds.add(directClinicId.toString());
+        }
+        if (Array.isArray(requestingUser.clinicIds)) {
+          for (const clinicId of requestingUser.clinicIds) {
+            const candidate = clinicId?.toString?.() ?? clinicId;
+            if (candidate && Types.ObjectId.isValid(candidate)) {
+              assignedClinicIds.add(candidate.toString());
+            }
+          }
+        }
+
+        const assignedComplexId =
+          requestingUser.complexId?.toString?.() ?? requestingUser.complexId;
+        const hasDirectClinicAccess = assignedClinicIds.has(currentClinicId);
+        const hasComplexScopeAccess =
+          !!assignedComplexId &&
+          !!currentComplexId &&
+          assignedComplexId.toString() === currentComplexId.toString();
+
+        if (!hasDirectClinicAccess && !hasComplexScopeAccess) {
+          throw new ForbiddenException({
+            message: {
+              ar: 'ليس لديك صلاحية للوصول إلى هذه العيادة',
+              en: 'You do not have permission to access this clinic',
+            },
+            code: 'INSUFFICIENT_PERMISSIONS',
+          });
+        }
+      }
     }
 
     // 2. Calculate doctors capacity with personnel list (match primary clinicId OR secondary clinicIds)
