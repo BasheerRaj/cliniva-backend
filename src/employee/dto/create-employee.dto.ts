@@ -18,6 +18,7 @@ import {
   Matches,
   ValidateIf,
 } from 'class-validator';
+import { PhoneDto } from '../../common/dto/phone.dto';
 import { Transform, Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -203,6 +204,16 @@ export class CreateEmployeeDto {
     }),
   })
   phone: string;
+
+  @ApiPropertyOptional({
+    description: 'Additional phone numbers for the employee (supports multiple entries)',
+    type: [PhoneDto],
+  })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => PhoneDto)
+  phones?: PhoneDto[];
 
   @ApiProperty({
     description: 'Employee role in the organization',
@@ -769,6 +780,16 @@ export class UpdateEmployeeDto {
   @MinLength(10)
   @MaxLength(20)
   phone?: string;
+
+  @ApiPropertyOptional({
+    description: 'Additional phone numbers for the employee (supports multiple entries)',
+    type: [PhoneDto],
+  })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => PhoneDto)
+  phones?: PhoneDto[];
 
   @ApiPropertyOptional({
     description: 'Employee nationality',

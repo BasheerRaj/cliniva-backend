@@ -1,12 +1,16 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  IsArray,
   IsEmail,
   IsOptional,
   IsString,
   MinLength,
   Matches,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 import { IsPhoneNumberWithCountryCode } from '../../common/decorators/phone-validation.decorator';
+import { PhoneDto } from '../../common/dto/phone.dto';
 
 /**
  * DTO for users updating their own profile
@@ -52,6 +56,16 @@ export class UpdateOwnProfileDto {
     '+966501234567',
   )
   phone?: string;
+
+  @ApiPropertyOptional({
+    description: 'List of phone numbers for the user (supports multiple entries)',
+    type: [PhoneDto],
+  })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => PhoneDto)
+  phones?: PhoneDto[];
 
   @ApiPropertyOptional({
     description: 'User nationality',

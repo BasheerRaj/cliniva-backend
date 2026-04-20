@@ -68,7 +68,9 @@ function ValidateWorkingHours(validationOptions?: ValidationOptions) {
           };
 
           const openingMinutes = timeToMinutes(openingTime);
-          const closingMinutes = timeToMinutes(closingTime);
+          // Midnight (00:00) as closing time means end-of-day (24:00 = 1440 min)
+          const closingMinutes =
+            closingTime === '00:00' ? 1440 : timeToMinutes(closingTime);
 
           // Closing time must be after opening time
           if (closingMinutes <= openingMinutes) {
@@ -112,7 +114,9 @@ function ValidateWorkingHours(validationOptions?: ValidationOptions) {
           };
 
           const openingMinutes = timeToMinutes(openingTime);
-          const closingMinutes = timeToMinutes(closingTime);
+          // Midnight (00:00) as closing time means end-of-day (24:00 = 1440 min)
+          const closingMinutes =
+            closingTime === '00:00' ? 1440 : timeToMinutes(closingTime);
 
           // Check closing time
           if (closingMinutes <= openingMinutes) {

@@ -2,7 +2,6 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
-  ConflictException,
   ForbiddenException,
   Logger,
 } from '@nestjs/common';
@@ -86,10 +85,8 @@ export class UserAccessService {
     });
 
     if (existingAccess) {
-      throw new ConflictException({
-        message: ERROR_MESSAGES.USER_ACCESS_EXISTS,
-        code: 'USER_ACCESS_EXISTS',
-      });
+      this.logger.log(`User access already exists, returning existing record`);
+      return existingAccess;  // idempotent: return existing instead of throwing
     }
 
     const accessData = {

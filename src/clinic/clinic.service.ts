@@ -878,7 +878,12 @@ export class ClinicService {
     // 8. Return complete clinic details
     return {
       ...clinic,
-      personInCharge: clinic.personInChargeId || null,
+      personInCharge: clinic.personInChargeId
+        ? {
+            ...(clinic.personInChargeId as any),
+            name: `${(clinic.personInChargeId as any).firstName ?? ''} ${(clinic.personInChargeId as any).lastName ?? ''}`.trim(),
+          }
+        : null,
       workingHours: workingSchedule,
       workingSchedule,
       doctors: doctorsCapacity.list.map((doc: any) => ({

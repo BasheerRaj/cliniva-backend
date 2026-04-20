@@ -1,4 +1,5 @@
 import {
+  IsArray,
   IsEmail,
   IsNotEmpty,
   IsString,
@@ -7,11 +8,13 @@ import {
   IsOptional,
   Matches,
   IsMongoId,
+  ValidateNested,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { UserRole } from '../../common/enums/user-role.enum';
-import { Transform } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import { IsPhoneNumberWithCountryCode } from '../../common/decorators/phone-validation.decorator';
+import { PhoneDto } from '../../common/dto/phone.dto';
 
 export class CreateUserDto {
   @ApiProperty({
@@ -154,6 +157,16 @@ export class CreateUserDto {
     '+966501234567',
   )
   phone?: string;
+
+  @ApiPropertyOptional({
+    description: 'List of phone numbers for the user (supports multiple entries)',
+    type: [PhoneDto],
+  })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => PhoneDto)
+  phones?: PhoneDto[];
 
   @ApiPropertyOptional({
     description: 'User nationality',

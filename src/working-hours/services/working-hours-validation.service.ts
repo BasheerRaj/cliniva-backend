@@ -654,9 +654,9 @@ export class WorkingHoursValidationService {
     }
 
     const parentOpen = this.parseTime(parentDay.openingTime);
-    const parentClose = this.parseTime(parentDay.closingTime);
+    const parentClose = this.parseClosingTime(parentDay.closingTime);
     const childOpen = this.parseTime(childDay.openingTime);
-    const childClose = this.parseTime(childDay.closingTime);
+    const childClose = this.parseClosingTime(childDay.closingTime);
 
     // Child opening time must be >= parent opening time
     if (childOpen < parentOpen) {
@@ -703,5 +703,19 @@ export class WorkingHoursValidationService {
   private parseTime(timeString: string): number {
     const [hours, minutes] = timeString.split(':').map(Number);
     return hours * 60 + minutes;
+  }
+
+  /**
+   * Parses a closing time string (HH:mm) to minutes for comparison.
+   * Treats "00:00" (midnight) as end-of-day (1440 minutes = 24:00) rather
+   * than start-of-day, allowing businesses that close at midnight to be valid.
+   *
+   * @private
+   * @param {string} timeString - Closing time in HH:mm format
+   * @returns {number} Time in minutes (00:00 → 1440)
+   */
+  private parseClosingTime(timeString: string): number {
+    if (timeString === '00:00') return 1440;
+    return this.parseTime(timeString);
   }
 }

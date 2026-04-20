@@ -47,7 +47,7 @@ export class OrganizationOverviewDto {
     example: 'https://example.com/logo.png',
     type: String,
   })
-  @IsUrl()
+  @IsString()
   @IsOptional()
   logoUrl?: string;
 

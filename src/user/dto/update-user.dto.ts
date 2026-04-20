@@ -1,5 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  IsArray,
   IsEmail,
   IsEnum,
   IsOptional,
@@ -8,8 +9,11 @@ import {
   IsBoolean,
   IsMongoId,
   Matches,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 import { UserRole } from '../../common/enums/user-role.enum';
+import { PhoneDto } from '../../common/dto/phone.dto';
 
 /**
  * DTO for updating user information
@@ -67,6 +71,16 @@ export class UpdateUserDto {
   @IsOptional()
   @IsString()
   phone?: string;
+
+  @ApiPropertyOptional({
+    description: 'List of phone numbers for the user (supports multiple entries)',
+    type: [PhoneDto],
+  })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => PhoneDto)
+  phones?: PhoneDto[];
 
   @ApiPropertyOptional({
     description: 'User role (changing this will invalidate all sessions)',

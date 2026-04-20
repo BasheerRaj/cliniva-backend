@@ -26,6 +26,18 @@ export class User extends Document {
   phone?: string;
 
   @Prop({
+    type: [
+      {
+        number: { type: String, required: true },
+        label: String,
+        isPrimary: Boolean,
+      },
+    ],
+    default: [],
+  })
+  phones?: Array<{ number: string; label?: string; isPrimary?: boolean }>;
+
+  @Prop({
     required: true,
     type: String,
     enum: Object.values(UserRole),

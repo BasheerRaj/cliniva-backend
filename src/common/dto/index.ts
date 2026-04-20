@@ -5,3 +5,4 @@
  */
 
 export * from './response.dto';
+export * from './phone.dto';

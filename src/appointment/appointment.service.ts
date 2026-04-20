@@ -58,6 +58,8 @@ import {
   TransformedAppointment,
 } from './utils/appointment-transformer.util';
 import { getAppointmentEditLockReason } from './utils/appointment-editability.util';
+import { UserRole } from '../common/enums/user-role.enum';
+import { AppointmentStatus } from './constants/appointment-status.enum';
 
 @Injectable()
 export class AppointmentService {
@@ -3705,6 +3707,7 @@ export class AppointmentService {
     appointmentId: string,
     statusDto: { status: string; notes?: string; reason?: string; newDate?: string; newTime?: string },
     userId?: string,
+    requestingUserRole?: string,
   ): Promise<Appointment> {
     if (!Types.ObjectId.isValid(appointmentId)) {
       throw new BadRequestException({
@@ -3724,6 +3727,19 @@ export class AppointmentService {
         },
         code: 'USER_ID_REQUIRED',
       });
+    }
+
+    // Doctor role restriction: doctors may ONLY mark appointments as completed
+    if (requestingUserRole === UserRole.DOCTOR) {
+      if (statusDto.status !== AppointmentStatus.COMPLETED) {
+        throw new ForbiddenException({
+          message: {
+            en: 'Doctors can only mark appointments as Completed',
+            ar: 'يمكن للأطباء فقط تحديد حالة المواعيد كـ "مكتمل"',
+          },
+          code: 'APT_ROLE_RESTRICT',
+        });
+      }
     }
 
     // Use the new AppointmentStatusService for proper status transition validation

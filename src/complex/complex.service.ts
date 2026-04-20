@@ -891,7 +891,7 @@ export class ComplexService {
     // Check department restrictions if departmentIds are being updated (Requirements 4.2, 4.3, 4.4)
     let departmentRestrictions: DepartmentRestriction[] | undefined;
     let currentDepartmentIds: string[] = [];
-    if (updateComplexDto.departmentIds !== undefined) {
+    if (updateComplexDto.departmentIds != null) {
       // Get current department IDs from complex_departments
       const currentComplexDepartments = await this.complexModel.db
         .collection('complex_departments')
@@ -901,13 +901,14 @@ export class ComplexService {
         })
         .toArray();
 
-      currentDepartmentIds = currentComplexDepartments.map((cd) =>
-        cd.departmentId.toString(),
-      );
+      currentDepartmentIds = (currentComplexDepartments ?? [])
+        .filter((cd) => cd.departmentId != null)
+        .map((cd) => cd.departmentId.toString());
 
       // Find departments being removed (in current but not in new)
+      const newIds = (updateComplexDto.departmentIds ?? []) as string[];
       const removedDepartmentIds = currentDepartmentIds.filter(
-        (id) => !updateComplexDto.departmentIds!.includes(id),
+        (id) => !newIds.includes(id),
       );
 
       // Check if any removed departments are linked to active clinics
@@ -1036,8 +1037,8 @@ export class ComplexService {
     await complex.save();
 
     // Sync complex_departments if departmentIds were provided
-    if (departmentIds !== undefined) {
-      const newDepartmentIds = departmentIds as string[];
+    if (departmentIds != null) {
+      const newDepartmentIds = (departmentIds ?? []) as string[];
 
       // Add departments that are in new list but not currently linked
       const depsToAdd = newDepartmentIds.filter(
@@ -1842,6 +1843,16 @@ export class ComplexService {
     userId?: string,
     requestingUser?: any,
   ): Promise<StatusChangeResponse> {
+    if (requestingUser?.planType === 'complex') {
+      throw new ForbiddenException({
+        message: {
+          ar: 'لا يمكن تغيير حالة المجمع في خطة المجمع',
+          en: 'Status change is not allowed for Complex Plan subscriptions',
+        },
+        code: 'COMPLEX_PLAN_RESTRICTION',
+      });
+    }
+
     // Validate complex exists (Requirement 6.1)
     const complex = await this.complexModel.findById(complexId).exec();
     if (!complex) {

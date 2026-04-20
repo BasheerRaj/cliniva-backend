@@ -1575,6 +1575,7 @@ export class AppointmentController {
       id,
       changeStatusDto,
       req.user?.userId,
+      req.user?.role,
     );
     return {
       success: true,

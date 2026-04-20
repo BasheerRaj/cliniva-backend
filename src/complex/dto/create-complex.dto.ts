@@ -398,6 +398,8 @@ export class UpdateComplexDto {
     isArray: true,
   })
   @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
   departmentIds?: string[];
 }
 

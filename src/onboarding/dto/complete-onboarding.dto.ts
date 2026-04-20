@@ -287,7 +287,7 @@ export class OrganizationDto {
     example: 'https://example.com/logo.png',
     type: String,
   })
-  @IsUrl()
+  @IsString()
   @IsOptional()
   logoUrl?: string;
 
@@ -370,7 +370,7 @@ export class ComplexDto {
     example: 'https://example.com/complex-logo.png',
     type: String,
   })
-  @IsUrl()
+  @IsString()
   @IsOptional()
   logoUrl?: string;
 
@@ -519,7 +519,7 @@ export class ClinicDto {
     example: 'https://example.com/clinic-logo.png',
     type: String,
   })
-  @IsUrl()
+  @IsString()
   @IsOptional()
   logoUrl?: string;
 

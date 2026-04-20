@@ -168,7 +168,7 @@ export class ClinicOverviewDto {
     example: 'https://example.com/clinic-logo.png',
     type: String,
   })
-  @IsUrl()
+  @IsString()
   @IsOptional()
   logoUrl?: string;
 
