@@ -302,6 +302,30 @@ export class DepartmentService {
   }
 
   /**
+   * Find a ComplexDepartment by either its own _id (junction record)
+   * or by the underlying Department document _id (departmentId field).
+   * Accepts an optional complexId to narrow the fallback search.
+   */
+  async findComplexDepartmentByAnyId(
+    id: string,
+    complexId?: string,
+  ): Promise<ComplexDepartment | null> {
+    const byJunctionId = await this.complexDepartmentModel
+      .findById(id)
+      .populate('departmentId', 'name description status')
+      .exec();
+    if (byJunctionId) return byJunctionId;
+
+    const query: any = { departmentId: id };
+    if (complexId) query.complexId = complexId;
+
+    return await this.complexDepartmentModel
+      .findOne(query)
+      .populate('departmentId', 'name description status')
+      .exec();
+  }
+
+  /**
    * Validate that a department exists and return it
    *
    * This method performs validation to ensure a department exists in the database

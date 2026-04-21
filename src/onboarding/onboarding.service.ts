@@ -1549,9 +1549,9 @@ export class OnboardingService {
                 (department._id as any)?.toString(),
               );
 
-            // Return full department data so the frontend can display name/description
+            // id = junction record _id so frontend can pass it as complexDepartmentId
             createdDepartments.push({
-              id: (department._id as any)?.toString(),
+              id: (junction._id as any)?.toString(),
               name: department.name,
               description: department.description,
               isActive: junction.isActive,
@@ -2057,12 +2057,14 @@ export class OnboardingService {
         userComplexName: userComplex?.name,
       });
 
-      // Validate complexDepartmentId if provided
+      // Validate complexDepartmentId if provided and normalise to junction _id
+      let resolvedComplexDepartmentId: string | undefined;
       if (dto.complexDepartmentId && dto.complexDepartmentId.trim() !== '') {
         try {
           const department =
-            await this.departmentService.getComplexDepartmentById(
+            await this.departmentService.findComplexDepartmentByAnyId(
               dto.complexDepartmentId,
+              userComplex?._id?.toString(),
             );
 
           if (!department) {
@@ -2101,8 +2103,12 @@ export class OnboardingService {
             }
           }
 
+          // Always store the junction record _id so subsequent lookups work
+          resolvedComplexDepartmentId = (department as any)._id?.toString();
+
           console.log('✅ Department validation passed:', {
-            departmentId: dto.complexDepartmentId,
+            incomingId: dto.complexDepartmentId,
+            resolvedJunctionId: resolvedComplexDepartmentId,
             departmentName: (department.departmentId as any)?.name || 'Unknown',
           });
         } catch (error) {
@@ -2147,10 +2153,7 @@ export class OnboardingService {
         subscriptionId: (subscription._id as any).toString(),
         organizationId: userOrg?._id || null,
         complexId: userComplex?._id || null,
-        complexDepartmentId:
-          dto.complexDepartmentId && dto.complexDepartmentId.trim() !== ''
-            ? dto.complexDepartmentId
-            : undefined,
+        complexDepartmentId: resolvedComplexDepartmentId ?? undefined,
         // Capacity settings — only override when provided so schema defaults are
         // not replaced with undefined on subsequent saves
         ...(dto.capacity?.maxStaff !== undefined && { maxStaff: dto.capacity.maxStaff }),
