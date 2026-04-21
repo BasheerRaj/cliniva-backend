@@ -11,6 +11,8 @@ import { AuditLogSchema } from '../database/schemas/audit-log.schema';
 import { SubscriptionSchema } from '../database/schemas/subscription.schema';
 import { SubscriptionPlanSchema } from '../database/schemas/subscription-plan.schema';
 import { UserAccessSchema } from '../database/schemas/user-access.schema';
+import { ComplexDepartmentSchema } from '../database/schemas/complex-department.schema';
+import { DepartmentSchema } from '../database/schemas/department.schema';
 import { SubscriptionModule } from '../subscription/subscription.module';
 import { CommonModule } from '../common/common.module';
 import { AuthModule } from '../auth/auth.module';
@@ -31,6 +33,8 @@ import { AuditService } from '../auth/audit.service';
       { name: 'Subscription', schema: SubscriptionSchema },
       { name: 'SubscriptionPlan', schema: SubscriptionPlanSchema },
       { name: 'UserAccess', schema: UserAccessSchema },
+      { name: 'ComplexDepartment', schema: ComplexDepartmentSchema },
+      { name: 'Department', schema: DepartmentSchema },
     ]),
     SubscriptionModule,
     CommonModule,

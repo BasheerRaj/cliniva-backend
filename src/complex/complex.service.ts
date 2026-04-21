@@ -1853,18 +1853,6 @@ export class ComplexService {
       });
     }
 
-    // Validate complex exists (Requirement 6.1)
-    const complex = await this.complexModel.findById(complexId).exec();
-    if (!complex) {
-      throw new NotFoundException({
-        code: 'COMPLEX_006',
-        message: ERROR_CODES.COMPLEX_006.message,
-      });
-    }
-
-    // TENANT ISOLATION (ISSUE-009)
-    await this.verifyComplexOwnership(complex, requestingUser);
-
     // Start MongoDB transaction if supported (Requirement 6.8)
     const { session, useTransaction } = await TransactionUtil.startTransaction(
       this.connection,
@@ -1886,6 +1874,9 @@ export class ComplexService {
           message: ERROR_CODES.COMPLEX_006.message,
         });
       }
+
+      // TENANT ISOLATION (ISSUE-009)
+      await this.verifyComplexOwnership(complex, requestingUser);
 
       let servicesDeactivated = 0;
       let clinicsTransferred = 0;

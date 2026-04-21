@@ -263,8 +263,9 @@ export class OrganizationService {
     return organization ? this.formatOrganizationResponse(organization) : null;
   }
 
-  async getAllOrganizations(): Promise<Organization[]> {
-    const organizations = await this.organizationModel.find().exec();
+  async getAllOrganizations(ownerId?: string): Promise<Organization[]> {
+    const filter = ownerId ? { ownerId: new Types.ObjectId(ownerId) } : {};
+    const organizations = await this.organizationModel.find(filter).exec();
     return organizations.map((org) => this.formatOrganizationResponse(org));
   }
 

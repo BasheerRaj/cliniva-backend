@@ -10,6 +10,8 @@ import { Clinic } from '../database/schemas/clinic.schema';
 import { Complex } from '../database/schemas/complex.schema';
 import { WorkingHours } from '../database/schemas/working-hours.schema';
 import { UserAccess } from '../database/schemas/user-access.schema';
+import { ComplexDepartment } from '../database/schemas/complex-department.schema';
+import { Department } from '../database/schemas/department.schema';
 import {
   CreateClinicDto,
   UpdateClinicDto,
@@ -37,6 +39,10 @@ export class ClinicService {
     private readonly workingHoursModel: Model<WorkingHours>,
     @InjectModel('UserAccess')
     private readonly userAccessModel: Model<UserAccess>,
+    @InjectModel('ComplexDepartment')
+    private readonly complexDepartmentModel: Model<ComplexDepartment>,
+    @InjectModel('Department')
+    private readonly departmentModel: Model<Department>,
     private readonly subscriptionService: SubscriptionService,
   ) { }
 
@@ -875,7 +881,29 @@ export class ClinicService {
       );
     }
 
-    // 8. Return complete clinic details
+    // 8. Resolve department from complexDepartmentId junction record
+    let department: { _id: string; name: string; description?: string } | null = null;
+    if (clinic.complexDepartmentId) {
+      try {
+        const junctionRecord = await this.complexDepartmentModel
+          .findById(clinic.complexDepartmentId)
+          .populate<{ departmentId: Department }>('departmentId', 'name description')
+          .lean()
+          .exec();
+        if (junctionRecord?.departmentId) {
+          const dep = junctionRecord.departmentId as any;
+          department = {
+            _id: dep._id.toString(),
+            name: dep.name,
+            description: dep.description,
+          };
+        }
+      } catch {
+        // non-blocking — department will be null
+      }
+    }
+
+    // 9. Return complete clinic details
     return {
       ...clinic,
       personInCharge: clinic.personInChargeId
@@ -905,6 +933,7 @@ export class ClinicService {
       },
       scheduledAppointmentsCount,
       recommendations,
+      department,
     };
   }
 

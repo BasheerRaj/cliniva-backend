@@ -13,6 +13,25 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { ContactInfoDto, LegalInfoDto } from './shared-base.dto';
 import { InheritanceSettingsDto } from './step-progress.dto';
 
+export class NewComplexDepartmentDto {
+  @ApiProperty({
+    description: 'New department name to create',
+    example: 'Cardiology',
+    type: String,
+  })
+  @IsString()
+  name: string;
+
+  @ApiPropertyOptional({
+    description: 'Optional department description',
+    example: 'Handles heart and cardiovascular care',
+    type: String,
+  })
+  @IsString()
+  @IsOptional()
+  description?: string;
+}
+
 // Complex overview form - basic entity information
 export class ComplexOverviewDto {
   @ApiProperty({
@@ -125,6 +144,16 @@ export class ComplexOverviewDto {
   @IsString({ each: true })
   @IsOptional()
   newDepartmentNames?: string[]; // New department names to create
+
+  @ApiPropertyOptional({
+    description: 'Array of new departments to create with optional descriptions',
+    type: [NewComplexDepartmentDto],
+  })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => NewComplexDepartmentDto)
+  @IsOptional()
+  newDepartments?: NewComplexDepartmentDto[];
 
   // Inheritance settings to control data inheritance from parent entities
   @ApiPropertyOptional({

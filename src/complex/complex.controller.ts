@@ -440,6 +440,8 @@ export class ComplexController {
         },
       };
     } catch (error) {
+      if (error instanceof ForbiddenException) throw error;
+
       // Handle BadRequestException with bilingual error
       if (error instanceof BadRequestException) {
         const errorResponse = error.getResponse() as any;
@@ -833,6 +835,8 @@ export class ComplexController {
     try {
       return await this.complexService.getComplexDetails(id, req.user);
     } catch (error) {
+      if (error instanceof ForbiddenException) throw error;
+
       // Handle NotFoundException with bilingual error
       if (error instanceof NotFoundException) {
         const errorResponse = error.getResponse() as any;
@@ -845,21 +849,6 @@ export class ComplexController {
               en: 'Complex not found',
             },
             details: errorResponse.details,
-          },
-        };
-      }
-
-      // Handle ForbiddenException with bilingual error
-      if (error instanceof ForbiddenException) {
-        const errorResponse = error.getResponse() as any;
-        return {
-          success: false,
-          error: {
-            code: errorResponse.code || 'INSUFFICIENT_PERMISSIONS',
-            message: errorResponse.message || {
-              ar: 'ليس لديك صلاحية للوصول إلى هذا المجمع',
-              en: 'You do not have permission to access this complex',
-            },
           },
         };
       }
@@ -1047,6 +1036,8 @@ export class ComplexController {
       // Return the result which includes departmentRestrictions if any
       return result;
     } catch (error) {
+      if (error instanceof ForbiddenException) throw error;
+
       // Handle NotFoundException with bilingual error
       if (error instanceof NotFoundException) {
         const errorResponse = error.getResponse() as any;
@@ -1231,6 +1222,8 @@ export class ComplexController {
       // Return the result which includes departmentRestrictions if any
       return result;
     } catch (error) {
+      if (error instanceof ForbiddenException) throw error;
+
       // Handle NotFoundException with bilingual error
       if (error instanceof NotFoundException) {
         const errorResponse = error.getResponse() as any;
@@ -1361,6 +1354,8 @@ export class ComplexController {
     try {
       return await this.complexService.softDeleteComplex(id, req.user);
     } catch (error) {
+      if (error instanceof ForbiddenException) throw error;
+
       // Handle NotFoundException with bilingual error
       if (error instanceof NotFoundException) {
         const errorResponse = error.getResponse() as any;
@@ -1559,6 +1554,8 @@ export class ComplexController {
         req.user,
       );
     } catch (error) {
+      if (error instanceof ForbiddenException) throw error;
+
       if (error instanceof NotFoundException) {
         const errorResponse = error.getResponse() as any;
         throw new NotFoundException({
@@ -1710,6 +1707,8 @@ export class ComplexController {
     try {
       return await this.complexService.getComplexCapacity(id, req.user);
     } catch (error) {
+      if (error instanceof ForbiddenException) throw error;
+
       // Handle NotFoundException with bilingual error
       if (error instanceof NotFoundException) {
         const errorResponse = error.getResponse() as any;
@@ -1870,6 +1869,8 @@ export class ComplexController {
         req.user,
       );
     } catch (error) {
+      if (error instanceof ForbiddenException) throw error;
+
       // Handle NotFoundException with bilingual error
       if (error instanceof NotFoundException) {
         const errorResponse = error.getResponse() as any;
@@ -1981,6 +1982,8 @@ export class ComplexController {
     try {
       return await this.complexService.removePersonInCharge(id, req.user);
     } catch (error) {
+      if (error instanceof ForbiddenException) throw error;
+
       // Handle NotFoundException with bilingual error
       if (error instanceof NotFoundException) {
         const errorResponse = error.getResponse() as any;
@@ -2180,6 +2183,8 @@ export class ComplexController {
         req.user,
       );
     } catch (error) {
+      if (error instanceof ForbiddenException) throw error;
+
       // Handle NotFoundException with bilingual error
       if (error instanceof NotFoundException) {
         const errorResponse = error.getResponse() as any;

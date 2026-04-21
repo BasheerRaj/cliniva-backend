@@ -2,7 +2,6 @@ import {
   IsString,
   IsOptional,
   IsNumber,
-  IsUrl,
   IsEmail,
   IsArray,
   ValidateNested,
@@ -372,7 +371,7 @@ export class LegalInfoDto {
   @Transform(({ value }) =>
     typeof value === 'string' && value.trim() === '' ? undefined : value,
   )
-  @IsUrl()
+  @IsString()
   @IsOptional()
   termsConditionsUrl?: string;
 
@@ -384,7 +383,7 @@ export class LegalInfoDto {
   @Transform(({ value }) =>
     typeof value === 'string' && value.trim() === '' ? undefined : value,
   )
-  @IsUrl()
+  @IsString()
   @IsOptional()
   privacyPolicyUrl?: string;
 
@@ -396,7 +395,7 @@ export class LegalInfoDto {
   @Transform(({ value }) =>
     typeof value === 'string' && value.trim() === '' ? undefined : value,
   )
-  @IsUrl()
+  @IsString()
   @IsOptional()
   termsUrl?: string;
 
@@ -408,7 +407,7 @@ export class LegalInfoDto {
   @Transform(({ value }) =>
     typeof value === 'string' && value.trim() === '' ? undefined : value,
   )
-  @IsUrl()
+  @IsString()
   @IsOptional()
   privacyUrl?: string;
 

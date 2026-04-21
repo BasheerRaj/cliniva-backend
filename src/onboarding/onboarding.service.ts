@@ -893,11 +893,8 @@ export class OnboardingService {
       }
 
       // Check if user already has an organization
-      const organizations =
-        await this.organizationService.getAllOrganizations();
-      const existingOrg = organizations.find(
-        (org) => org.ownerId?.toString() === userId,
-      );
+      const [existingOrg] =
+        await this.organizationService.getAllOrganizations(userId);
 
       if (existingOrg) {
         // Strictly enforce plan limit - one organization per company plan user
@@ -971,11 +968,8 @@ export class OnboardingService {
   async saveOrganizationContact(userId: string, dto: OrganizationContactDto) {
     try {
       // Find existing organization for this user
-      const organizations =
-        await this.organizationService.getAllOrganizations();
-      const userOrg = organizations.find(
-        (org) => org.ownerId?.toString() === userId,
-      );
+      const [userOrg] =
+        await this.organizationService.getAllOrganizations(userId);
 
       if (!userOrg) {
         throw new BadRequestException(
@@ -1022,11 +1016,8 @@ export class OnboardingService {
   async saveOrganizationLegal(userId: string, dto: OrganizationLegalDto) {
     try {
       // Find existing organization for this user
-      const organizations =
-        await this.organizationService.getAllOrganizations();
-      const userOrg = organizations.find(
-        (org) => org.ownerId?.toString() === userId,
-      );
+      const [userOrg] =
+        await this.organizationService.getAllOrganizations(userId);
 
       if (!userOrg) {
         throw new BadRequestException(
@@ -1107,11 +1098,8 @@ export class OnboardingService {
   async completeOrganizationSetup(userId: string) {
     try {
       // Find the user's organization
-      const organizations =
-        await this.organizationService.getAllOrganizations();
-      const userOrg = organizations.find(
-        (org) => org.ownerId?.toString() === userId,
-      );
+      const [userOrg] =
+        await this.organizationService.getAllOrganizations(userId);
 
       if (!userOrg) {
         throw new BadRequestException('Organization not found for user');
@@ -1284,14 +1272,46 @@ export class OnboardingService {
    * Helper method to find user's complex with robust lookup logic
    */
   private async findUserComplex(userId: string): Promise<any> {
+    const user = await this.userModel
+      .findById(userId)
+      .select('_id complexId')
+      .lean()
+      .exec();
+
+    // Prefer the complex explicitly assigned to the user. During onboarding this is
+    // the safest source of truth and avoids resolving an older sibling complex from
+    // the same organization.
+    if (user?.complexId) {
+      const scopedComplexId = user.complexId.toString();
+      const [userOrg] =
+        await this.organizationService.getAllOrganizations(userId);
+
+      if (userOrg) {
+        try {
+          const complexes = await this.complexService.getComplexesByOrganization(
+            (userOrg._id as any).toString(),
+          );
+          const scopedComplex = complexes.find(
+            (complex: any) => complex?._id?.toString() === scopedComplexId,
+          );
+          if (scopedComplex) {
+            return scopedComplex;
+          }
+        } catch (error) {
+          console.warn(
+            `Could not resolve complex from organization scope for user ${userId}:`,
+            error.message,
+          );
+        }
+      }
+    }
+
     let userComplex: any | null = null;
 
     const subscription =
       await this.subscriptionService.getSubscriptionByUser(userId);
-    const organizations = await this.organizationService.getAllOrganizations();
-    const userOrg = organizations.find(
-      (org) => org.ownerId?.toString() === userId,
-    );
+    const [userOrg] =
+      await this.organizationService.getAllOrganizations(userId);
 
     // First try to find complex through organization
     if (userOrg) {
@@ -1299,13 +1319,12 @@ export class OnboardingService {
         const complexes = await this.complexService.getComplexesByOrganization(
           (userOrg._id as any).toString(),
         );
-        // Find complex owned by this user, or take the first one
+        // Prefer a complex owned by this user. Falling back to the first complex in an
+        // organization can leak a stale onboarding scope when older complexes exist.
         userComplex =
           complexes.find(
             (complex: any) => complex.ownerId?.toString() === userId,
-          ) ||
-          complexes[0] ||
-          null;
+          ) || null;
       } catch (error) {
         console.log('No complexes found for organization:', error.message);
       }
@@ -1392,15 +1411,19 @@ export class OnboardingService {
       (clinic: any) => clinic?.ownerId?.toString() === userId,
     );
 
-    const resolvedClinic = matchedByName || matchedByOwner || clinics[0];
+    const resolvedClinic = matchedByName || matchedByOwner || null;
 
-    if (resolvedClinic?._id) {
+    if (!resolvedClinic) {
+      throw new NotFoundException('No matching clinic found for this user');
+    }
+
+    if (resolvedClinic._id) {
       await this.userModel.findByIdAndUpdate(userId, {
         $set: { clinicId: resolvedClinic._id },
       });
     }
 
-    return resolvedClinic || null;
+    return resolvedClinic;
   }
 
   async saveComplexOverview(userId: string, dto: ComplexOverviewDto) {
@@ -1415,11 +1438,8 @@ export class OnboardingService {
       }
 
       // Get organization (may be null for complex-only plans)
-      const organizations =
-        await this.organizationService.getAllOrganizations();
-      const userOrg = organizations.find(
-        (org) => org.ownerId?.toString() === userId,
-      );
+      const [userOrg] =
+        await this.organizationService.getAllOrganizations(userId);
 
       // Handle shared logo URL
       const logoUrl = dto.logoUrl;
@@ -1481,14 +1501,28 @@ export class OnboardingService {
       const complexId = complex._id?.toString();
       console.log('✅ Complex saved with ID:', complexId);
 
+      await this.userModel.findByIdAndUpdate(userId, {
+        $set: { complexId: complex._id },
+      });
+
       // Link existing departments to complex
       const allDepartments = await this.departmentService.getAllDepartments();
+      const requestedNewDepartments =
+        dto.newDepartments?.map((department) => ({
+          name: department.name?.trim(),
+          description: department.description?.trim(),
+        })) ??
+        dto.newDepartmentNames?.map((name) => ({
+          name: name?.trim(),
+          description: undefined,
+        })) ??
+        [];
 
       // Create new departments and link to complex
       const createdDepartments: any[] = [];
-      if (dto.newDepartmentNames && dto.newDepartmentNames.length > 0) {
-        for (const deptName of dto.newDepartmentNames) {
-          const nameTrimmed = deptName.trim();
+      if (requestedNewDepartments.length > 0) {
+        for (const requestedDepartment of requestedNewDepartments) {
+          const nameTrimmed = requestedDepartment.name?.trim();
           if (nameTrimmed) {
             // Check for existing department
             let department = allDepartments.find(
@@ -1498,7 +1532,9 @@ export class OnboardingService {
               department = await this.departmentService.createDepartment(
                 {
                   name: nameTrimmed,
-                  description: `Department for ${dto.name}`,
+                  description:
+                    requestedDepartment.description ||
+                    `Department for ${dto.name}`,
                 },
                 {
                   subscriptionId: (subscription._id as any).toString(),
@@ -1567,11 +1603,8 @@ export class OnboardingService {
       console.log('✅ Found complex:', userComplex._id);
 
       // Get organization for inheritance
-      const organizations =
-        await this.organizationService.getAllOrganizations();
-      const userOrg = organizations.find(
-        (org) => org.ownerId?.toString() === userId,
-      );
+      const [userOrg] =
+        await this.organizationService.getAllOrganizations(userId);
 
       // Apply inheritance if organization exists
       let contactData = dto;
@@ -1832,11 +1865,8 @@ export class OnboardingService {
       }
 
       // Get related entities (may be null for clinic-only plans)
-      const organizations =
-        await this.organizationService.getAllOrganizations();
-      const userOrg = organizations.find(
-        (org) => org.ownerId?.toString() === userId,
-      );
+      const [userOrg] =
+        await this.organizationService.getAllOrganizations(userId);
 
       // Use robust helper method to find user's complex
       const userComplex = await this.findUserComplex(userId);
@@ -2326,8 +2356,11 @@ export class OnboardingService {
     } catch (error) {
       console.error('Error saving clinic overview:', error);
 
-      // Re-throw BadRequestException as-is to preserve bilingual error messages
-      if (error instanceof BadRequestException) {
+      // Re-throw known HTTP exceptions as-is to preserve error messages
+      if (
+        error instanceof BadRequestException ||
+        error instanceof NotFoundException
+      ) {
         throw error;
       }
 
@@ -2361,11 +2394,8 @@ export class OnboardingService {
       console.log('✅ Found clinic:', userClinic._id, 'for user:', userId);
 
       // Get related entities for inheritance (may be null for clinic-only plans)
-      const organizations =
-        await this.organizationService.getAllOrganizations();
-      const userOrg = organizations.find(
-        (org) => org.ownerId?.toString() === userId,
-      );
+      const [userOrg] =
+        await this.organizationService.getAllOrganizations(userId);
 
       // Use robust helper method to find user's complex
       const userComplex = await this.findUserComplex(userId);
@@ -2422,6 +2452,12 @@ export class OnboardingService {
       };
     } catch (error) {
       console.error('Error saving clinic contact:', error);
+      if (
+        error instanceof BadRequestException ||
+        error instanceof NotFoundException
+      ) {
+        throw error;
+      }
       throw new InternalServerErrorException('Failed to save clinic contact');
     }
   }
@@ -2563,6 +2599,12 @@ export class OnboardingService {
       };
     } catch (error) {
       console.error('Error saving clinic services and capacity:', error);
+      if (
+        error instanceof BadRequestException ||
+        error instanceof NotFoundException
+      ) {
+        throw error;
+      }
       throw new InternalServerErrorException(
         'Failed to save clinic services and capacity',
       );
@@ -2611,6 +2653,12 @@ export class OnboardingService {
       };
     } catch (error) {
       console.error('Error saving clinic legal information:', error);
+      if (
+        error instanceof BadRequestException ||
+        error instanceof NotFoundException
+      ) {
+        throw error;
+      }
       throw new InternalServerErrorException(
         'Failed to save clinic legal information',
       );
@@ -2814,6 +2862,7 @@ export class OnboardingService {
       console.error('Error saving clinic schedule:', error);
       if (
         error instanceof BadRequestException ||
+        error instanceof NotFoundException ||
         error instanceof InternalServerErrorException
       ) {
         throw error;
@@ -2867,6 +2916,12 @@ export class OnboardingService {
       };
     } catch (error) {
       console.error('Error completing clinic setup:', error);
+      if (
+        error instanceof BadRequestException ||
+        error instanceof NotFoundException
+      ) {
+        throw error;
+      }
       throw new InternalServerErrorException('Failed to complete clinic setup');
     }
   }
@@ -2904,10 +2959,8 @@ export class OnboardingService {
     };
 
     // Check what entities exist for this user by getting organizations and finding user's org
-    const organizations = await this.organizationService.getAllOrganizations();
-    const existingOrg = organizations.find(
-      (org) => org.ownerId?.toString() === userId,
-    );
+    const [existingOrg] =
+      await this.organizationService.getAllOrganizations(userId);
 
     if (existingOrg) {
       progress.stepData.organizationId = (existingOrg._id as any).toString();

@@ -46,103 +46,73 @@ function ValidateWorkingHours(validationOptions?: ValidationOptions) {
       target: object.constructor,
       propertyName: propertyName,
       options: validationOptions,
-      validator: {
-        validate(value: any, args: ValidationArguments) {
-          const obj = args.object as any;
+      validator: (() => {
+        let errorMessage = '{"ar":"ساعات العمل غير صالحة","en":"Invalid working hours"}';
+        return {
+          validate(value: any, args: ValidationArguments) {
+            const obj = args.object as any;
 
-          // Skip validation if not a working day
-          if (!obj.isWorkingDay) return true;
+            // Skip validation if not a working day
+            if (!obj.isWorkingDay) return true;
 
-          const { openingTime, closingTime, breakStartTime, breakEndTime } =
-            obj;
+            const { openingTime, closingTime, breakStartTime, breakEndTime } =
+              obj;
 
-          // If working day, opening and closing times are required
-          if (!openingTime || !closingTime) {
-            return false;
-          }
-
-          // Convert time strings to minutes for comparison
-          const timeToMinutes = (time: string): number => {
-            const [hours, minutes] = time.split(':').map(Number);
-            return hours * 60 + minutes;
-          };
-
-          const openingMinutes = timeToMinutes(openingTime);
-          // Midnight (00:00) as closing time means end-of-day (24:00 = 1440 min)
-          const closingMinutes =
-            closingTime === '00:00' ? 1440 : timeToMinutes(closingTime);
-
-          // Closing time must be after opening time
-          if (closingMinutes <= openingMinutes) {
-            return false;
-          }
-
-          // If break times are provided, validate them
-          if (breakStartTime && breakEndTime) {
-            const breakStartMinutes = timeToMinutes(breakStartTime);
-            const breakEndMinutes = timeToMinutes(breakEndTime);
-
-            // Break end must be after break start
-            if (breakEndMinutes <= breakStartMinutes) {
+            // If working day, opening and closing times are required
+            if (!openingTime || !closingTime) {
+              errorMessage =
+                '{"ar":"وقت الفتح والإغلاق مطلوبان لأيام العمل","en":"Opening and closing times are required for working days"}';
               return false;
             }
 
-            // Break must be within working hours
-            if (
-              breakStartMinutes < openingMinutes ||
-              breakEndMinutes > closingMinutes
-            ) {
+            // Convert time strings to minutes for comparison
+            const timeToMinutes = (time: string): number => {
+              const [hours, minutes] = time.split(':').map(Number);
+              return hours * 60 + minutes;
+            };
+
+            const openingMinutes = timeToMinutes(openingTime);
+            // Midnight (00:00) as closing time means end-of-day (24:00 = 1440 min)
+            const closingMinutes =
+              closingTime === '00:00' ? 1440 : timeToMinutes(closingTime);
+
+            // Closing time must be after opening time
+            if (closingMinutes <= openingMinutes) {
+              errorMessage =
+                '{"ar":"وقت الإغلاق يجب أن يكون بعد وقت الفتح","en":"Closing time must be after opening time"}';
               return false;
             }
-          }
 
-          return true;
-        },
-        defaultMessage(args: ValidationArguments) {
-          const obj = args.object as any;
-          const { openingTime, closingTime, breakStartTime, breakEndTime } =
-            obj;
+            // If break times are provided, validate them
+            if (breakStartTime && breakEndTime) {
+              const breakStartMinutes = timeToMinutes(breakStartTime);
+              const breakEndMinutes = timeToMinutes(breakEndTime);
 
-          // If working day but missing times
-          if (obj.isWorkingDay && (!openingTime || !closingTime)) {
-            return '{"ar":"وقت الفتح والإغلاق مطلوبان لأيام العمل","en":"Opening and closing times are required for working days"}';
-          }
+              // Break end must be after break start
+              if (breakEndMinutes <= breakStartMinutes) {
+                errorMessage =
+                  '{"ar":"وقت نهاية الاستراحة يجب أن يكون بعد وقت البداية","en":"Break end time must be after break start time"}';
+                return false;
+              }
 
-          const timeToMinutes = (time: string): number => {
-            const [hours, minutes] = time.split(':').map(Number);
-            return hours * 60 + minutes;
-          };
-
-          const openingMinutes = timeToMinutes(openingTime);
-          // Midnight (00:00) as closing time means end-of-day (24:00 = 1440 min)
-          const closingMinutes =
-            closingTime === '00:00' ? 1440 : timeToMinutes(closingTime);
-
-          // Check closing time
-          if (closingMinutes <= openingMinutes) {
-            return '{"ar":"وقت الإغلاق يجب أن يكون بعد وقت الفتح","en":"Closing time must be after opening time"}';
-          }
-
-          // Check break times
-          if (breakStartTime && breakEndTime) {
-            const breakStartMinutes = timeToMinutes(breakStartTime);
-            const breakEndMinutes = timeToMinutes(breakEndTime);
-
-            if (breakEndMinutes <= breakStartMinutes) {
-              return '{"ar":"وقت نهاية الاستراحة يجب أن يكون بعد وقت البداية","en":"Break end time must be after break start time"}';
+              // Break must be within working hours (inclusive on both boundaries)
+              const breakWithinHours =
+                breakStartMinutes >= openingMinutes &&
+                breakEndMinutes <= closingMinutes;
+              if (!breakWithinHours) {
+                errorMessage =
+                  '{"ar":"وقت الاستراحة يجب أن يكون ضمن ساعات العمل","en":"Break time must be within working hours"}';
+                return false;
+              }
             }
 
-            if (
-              breakStartMinutes < openingMinutes ||
-              breakEndMinutes > closingMinutes
-            ) {
-              return '{"ar":"وقت الاستراحة يجب أن يكون ضمن ساعات العمل","en":"Break time must be within working hours"}';
-            }
-          }
-
-          return '{"ar":"ساعات العمل غير صالحة","en":"Invalid working hours"}';
-        },
-      },
+            return true;
+          },
+          defaultMessage(_args: ValidationArguments) {
+            return errorMessage;
+          },
+        };
+      })(),
     });
   };
 }

@@ -328,9 +328,11 @@ export class ValidationUtil {
     }
 
     const parentOpen = this.parseTime(parentDay.openingTime);
-    const parentClose = this.parseTime(parentDay.closingTime);
+    const adjustedParentClosing = parentDay.closingTime === '00:00' ? '24:00' : parentDay.closingTime;
+    const parentClose = this.parseTime(adjustedParentClosing);
     const childOpen = this.parseTime(childDay.openingTime);
-    const childClose = this.parseTime(childDay.closingTime);
+    const adjustedChildClosing = childDay.closingTime === '00:00' ? '24:00' : childDay.closingTime;
+    const childClose = this.parseTime(adjustedChildClosing);
 
     // Child opening time must be >= parent opening time
     if (childOpen < parentOpen) {
@@ -395,7 +397,8 @@ export class ValidationUtil {
   ): boolean {
     const check = this.parseTime(checkTime);
     const start = this.parseTime(startTime);
-    const end = this.parseTime(endTime);
+    const adjustedEndTime = endTime === '00:00' ? '24:00' : endTime;
+    const end = this.parseTime(adjustedEndTime);
 
     return check >= start && check <= end;
   }
