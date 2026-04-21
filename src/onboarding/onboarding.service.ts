@@ -1549,9 +1549,15 @@ export class OnboardingService {
                 (department._id as any)?.toString(),
               );
 
-            // Return the junction ID in the results so subsequent steps (like clinic creation)
-            // can correctly reference the department within this specific complex
-            createdDepartments.push(junction);
+            // Return full department data so the frontend can display name/description
+            createdDepartments.push({
+              id: (department._id as any)?.toString(),
+              name: department.name,
+              description: department.description,
+              isActive: junction.isActive,
+              complexId: (junction.complexId as any)?.toString(),
+              departmentId: (junction.departmentId as any)?.toString(),
+            });
           }
         }
       }
@@ -2121,7 +2127,7 @@ export class OnboardingService {
       }
 
       // Prepare clinic data
-      let clinicData = {
+      let clinicData: any = {
         name: dto.name,
         headDoctorName: dto.headDoctorName,
         specialization: dto.specialization,
@@ -2145,6 +2151,12 @@ export class OnboardingService {
           dto.complexDepartmentId && dto.complexDepartmentId.trim() !== ''
             ? dto.complexDepartmentId
             : undefined,
+        // Capacity settings — only override when provided so schema defaults are
+        // not replaced with undefined on subsequent saves
+        ...(dto.capacity?.maxStaff !== undefined && { maxStaff: dto.capacity.maxStaff }),
+        ...(dto.capacity?.maxDoctors !== undefined && { maxDoctors: dto.capacity.maxDoctors }),
+        ...(dto.capacity?.maxPatients !== undefined && { maxPatients: dto.capacity.maxPatients }),
+        ...(dto.capacity?.sessionDuration !== undefined && { sessionDuration: dto.capacity.sessionDuration }),
       };
 
       console.log(
