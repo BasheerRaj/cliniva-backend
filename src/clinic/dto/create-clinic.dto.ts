@@ -9,7 +9,7 @@ import {
   IsBoolean,
   ValidateNested,
 } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Type, Transform } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class ClinicAddressDto {
@@ -151,6 +151,7 @@ export class CreateClinicDto {
     example: 'https://cardiology-clinic.com',
     type: String,
   })
+  @Transform(({ value }) => (value === '' ? undefined : value))
   @IsUrl()
   @IsOptional()
   website?: string;
@@ -347,6 +348,7 @@ export class UpdateClinicDto {
     example: 'https://cardiology-clinic.com',
     type: String,
   })
+  @Transform(({ value }) => (value === '' ? undefined : value))
   @IsUrl()
   @IsOptional()
   website?: string;
