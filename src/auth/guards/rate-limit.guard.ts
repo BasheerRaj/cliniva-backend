@@ -76,9 +76,8 @@ export class RateLimitGuard implements CanActivate {
           break;
 
         case RateLimitType.LOGIN_ATTEMPT:
-          // Rate limit by IP address
-          allowed =
-            await this.rateLimitService.checkLoginAttemptLimit(ipAddress);
+          // Disabled: IP-based lockout was blocking all accounts from the same IP
+          allowed = true;
           break;
 
         case RateLimitType.PASSWORD_CHANGE:
