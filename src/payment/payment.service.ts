@@ -35,6 +35,23 @@ import { assertSameTenant, TenantUser } from '../common/utils/tenant-scope.util'
 export class PaymentService {
   private readonly logger = new Logger(PaymentService.name);
 
+  private resolvePaymentCounterScopeKey(params: {
+    organizationId?: Types.ObjectId | string | null;
+    subscriptionId?: Types.ObjectId | string | null;
+    clinicId?: Types.ObjectId | string | null;
+  }): string {
+    const organizationId = params.organizationId?.toString?.() ?? params.organizationId;
+    if (organizationId) return String(organizationId);
+
+    const subscriptionId = params.subscriptionId?.toString?.() ?? params.subscriptionId;
+    if (subscriptionId) return String(subscriptionId);
+
+    const clinicId = params.clinicId?.toString?.() ?? params.clinicId;
+    if (clinicId) return String(clinicId);
+
+    return 'global';
+  }
+
   private getScopedClinicObjectIds(
     userClinicId?: string | null,
     userClinicIds?: string[],
@@ -374,8 +391,12 @@ export class PaymentService {
     }
 
     const firstInvoice = invoiceDocs[0];
-    const organizationId = (firstInvoice as any).organizationId?.toString();
-    const paymentId = await this.generatePaymentId(organizationId);
+    const paymentCounterScope = this.resolvePaymentCounterScopeKey({
+      organizationId: (firstInvoice as any).organizationId,
+      subscriptionId: (firstInvoice as any).subscriptionId,
+      clinicId: primaryClinicContext.clinicId,
+    });
+    const paymentId = await this.generatePaymentId(paymentCounterScope);
 
     const payment = new this.paymentModel({
       paymentId,
@@ -405,7 +426,7 @@ export class PaymentService {
       } catch (err: any) {
         if (err.code === 11000 && err.keyPattern?.paymentId && retriesMulti < 10) {
           retriesMulti++;
-          payment.paymentId = await this.generatePaymentId(organizationId);
+          payment.paymentId = await this.generatePaymentId(paymentCounterScope);
           this.logger.warn(`Payment ID collision, retrying with ${payment.paymentId} (attempt ${retriesMulti})`);
         } else {
           throw err;
@@ -583,8 +604,12 @@ export class PaymentService {
     }
 
     // Generate unique Payment ID (atomic via counter)
-    const organizationId = (invoice as any).organizationId?.toString();
-    const paymentId = await this.generatePaymentId(organizationId);
+    const paymentCounterScope = this.resolvePaymentCounterScopeKey({
+      organizationId: (invoice as any).organizationId,
+      subscriptionId: (invoice as any).subscriptionId,
+      clinicId: invoiceClinicContext.clinicId,
+    });
+    const paymentId = await this.generatePaymentId(paymentCounterScope);
 
     // Create payment record
     const payment = new this.paymentModel({
@@ -614,7 +639,7 @@ export class PaymentService {
       } catch (err: any) {
         if (err.code === 11000 && err.keyPattern?.paymentId && retriesSingle < 10) {
           retriesSingle++;
-          payment.paymentId = await this.generatePaymentId(organizationId);
+          payment.paymentId = await this.generatePaymentId(paymentCounterScope);
           this.logger.warn(`Payment ID collision, retrying with ${payment.paymentId} (attempt ${retriesSingle})`);
         } else {
           throw err;

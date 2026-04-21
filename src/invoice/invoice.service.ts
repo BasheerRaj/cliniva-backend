@@ -32,6 +32,23 @@ import { assertSameTenant, TenantUser } from '../common/utils/tenant-scope.util'
 export class InvoiceService implements OnModuleInit {
   private readonly logger = new Logger(InvoiceService.name);
 
+  private resolveInvoiceCounterScopeKey(params: {
+    organizationId?: Types.ObjectId | string | null;
+    subscriptionId?: Types.ObjectId | string | null;
+    clinicId?: Types.ObjectId | string | null;
+  }): string {
+    const organizationId = params.organizationId?.toString?.() ?? params.organizationId;
+    if (organizationId) return String(organizationId);
+
+    const subscriptionId = params.subscriptionId?.toString?.() ?? params.subscriptionId;
+    if (subscriptionId) return String(subscriptionId);
+
+    const clinicId = params.clinicId?.toString?.() ?? params.clinicId;
+    if (clinicId) return String(clinicId);
+
+    return 'global';
+  }
+
   private async sanitizeDeletedAppointmentSessions(invoice: any): Promise<any> {
     const appointmentIds = Array.from(
       new Set(
@@ -549,8 +566,13 @@ export class InvoiceService implements OnModuleInit {
     const totalAmount = Math.max(0, +(subtotal - totalDiscount + totalTax).toFixed(2));
 
     // 6. Generate draft number via counterModel (atomic)
+    const invoiceCounterScope = this.resolveInvoiceCounterScopeKey({
+      organizationId,
+      subscriptionId,
+      clinicId: resolvedClinicId,
+    });
     const invoiceNumber = await this.invoiceNumberService.generateDraftNumber(
-      organizationId ? organizationId.toString() : resolvedClinicId || subscriptionId,
+      invoiceCounterScope,
     );
 
     // 7. Create invoice (retry on invoice number collision)
@@ -590,7 +612,7 @@ export class InvoiceService implements OnModuleInit {
         if (err.code === 11000 && err.keyPattern?.invoiceNumber && retries < 10) {
           retries++;
           const nextInvoiceNumber = await this.invoiceNumberService.generateDraftNumber(
-            organizationId ? organizationId.toString() : resolvedClinicId || subscriptionId,
+            invoiceCounterScope,
           );
           invoice = new this.invoiceModel({
             ...invoiceBase,
@@ -1085,11 +1107,13 @@ export class InvoiceService implements OnModuleInit {
     invoice.draftNumber = invoice.invoiceNumber;
 
     // Generate official INV-xxxx number (atomic via Counter)
-    const organizationId = invoice.organizationId
-      ? invoice.organizationId.toString()
-      : 'global';
+    const invoiceCounterScope = this.resolveInvoiceCounterScopeKey({
+      organizationId: invoice.organizationId as any,
+      subscriptionId: (invoice as any).subscriptionId,
+      clinicId: invoice.clinicId as any,
+    });
     invoice.invoiceNumber =
-      await this.invoiceNumberService.generatePostedNumber(organizationId);
+      await this.invoiceNumberService.generatePostedNumber(invoiceCounterScope);
 
     invoice.invoiceStatus = 'posted';
     // BZR-b3c4d5e6: Payment is "not_due" at booking time; transitions to "unpaid"
@@ -1109,7 +1133,7 @@ export class InvoiceService implements OnModuleInit {
         if (err.code === 11000 && err.keyPattern?.invoiceNumber && retries < 10) {
           retries++;
           invoice.invoiceNumber =
-            await this.invoiceNumberService.generatePostedNumber(organizationId);
+            await this.invoiceNumberService.generatePostedNumber(invoiceCounterScope);
           this.logger.warn(
             `Invoice number collision, retrying with ${invoice.invoiceNumber} (attempt ${retries})`,
           );

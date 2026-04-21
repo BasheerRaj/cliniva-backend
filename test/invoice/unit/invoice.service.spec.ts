@@ -390,6 +390,23 @@ describe('InvoiceService', () => {
       expect(draft.invoiceNumber).toBe('INV-0007');
     });
 
+    it('should scope posted numbering by subscription when organization is absent', async () => {
+      const subscriptionId = new Types.ObjectId();
+      const draft = buildInvoice({
+        invoiceStatus: 'draft',
+        organizationId: undefined,
+        subscriptionId,
+      });
+      invoiceModel.findById.mockResolvedValue(draft);
+      invoiceNumberService.generatePostedNumber.mockResolvedValue('INV-0001');
+
+      await service.transitionToPosted(MOCK_IDS.invoice.toString());
+
+      expect(invoiceNumberService.generatePostedNumber).toHaveBeenCalledWith(
+        subscriptionId.toString(),
+      );
+    });
+
     it('should set postedAt to a Date on transition', async () => {
       const draft = buildInvoice({ invoiceStatus: 'draft' });
       invoiceModel.findById.mockResolvedValue(draft);
