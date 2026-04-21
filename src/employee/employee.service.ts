@@ -864,10 +864,18 @@ export class EmployeeService {
     if (requestingUser && requestingUser.role === 'doctor') {
       userFilter._id = new Types.ObjectId(requestingUser.userId || requestingUser.id);
     } else if (requestingUser && requestingUser.role === 'staff') {
-      // Staff may only list doctors (already handled by role = 'doctor' above)
-      // but we still want to keep them scoped to their clinic
       role = 'doctor';
       userFilter.role = 'doctor';
+      // Staff are scoped strictly to their assigned clinic(s) — override any broader
+      // scope that the UserAccess lookup may have resolved (e.g. complex-level access
+      // expanding to all clinics within the complex).
+      if (Array.isArray(requestingUser.clinicIds) && requestingUser.clinicIds.length > 0) {
+        effectiveClinicId = requestingUser.clinicIds;
+        effectiveComplexId = undefined;
+      } else if (requestingUser.clinicId) {
+        effectiveClinicId = requestingUser.clinicId.toString();
+        effectiveComplexId = undefined;
+      }
     }
 
     if (firstName) userFilter.firstName = { $regex: firstName, $options: 'i' };
