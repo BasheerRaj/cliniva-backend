@@ -3,6 +3,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { PDFDocument, rgb, StandardFonts, PDFPage, PDFFont } from 'pdf-lib';
 import { Invoice } from '../database/schemas/invoice.schema';
+import { Payment } from '../database/schemas/payment.schema';
 import { NOT_FOUND_ERRORS } from './constants/invoice-messages';
 
 /**
@@ -16,6 +17,7 @@ import { NOT_FOUND_ERRORS } from './constants/invoice-messages';
 export class InvoicePdfService {
   constructor(
     @InjectModel(Invoice.name) private invoiceModel: Model<Invoice>,
+    @InjectModel(Payment.name) private paymentModel: Model<Payment>,
   ) {}
 
   /**
@@ -36,13 +38,27 @@ export class InvoicePdfService {
       throw new NotFoundException(NOT_FOUND_ERRORS.INVOICE);
     }
 
+    // BUG 9 FIX: Fetch payments linked to this invoice (via invoiceId or invoiceIds array)
+    const payments = await this.paymentModel
+      .find({
+        $or: [
+          { invoiceId: new Types.ObjectId(invoiceId) },
+          { invoiceIds: new Types.ObjectId(invoiceId) },
+        ],
+        deletedAt: { $exists: false },
+      })
+      .populate({ path: 'addedBy', select: 'firstName lastName' })
+      .sort({ paymentDate: 1 })
+      .lean()
+      .exec();
+
     const pdfDoc = await PDFDocument.create();
     const page = pdfDoc.addPage([595.28, 841.89]); // A4
 
     const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
     const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
-    this.drawContent(page, font, fontBold, invoice);
+    this.drawContent(page, font, fontBold, invoice, payments);
 
     const pdfBytes = await pdfDoc.save();
     const buffer = Buffer.from(pdfBytes);
@@ -53,7 +69,7 @@ export class InvoicePdfService {
 
   // ─── Drawing helpers ────────────────────────────────────────────────────────
 
-  private drawContent(page: PDFPage, font: PDFFont, fontBold: PDFFont, invoice: any): void {
+  private drawContent(page: PDFPage, font: PDFFont, fontBold: PDFFont, invoice: any, payments: any[] = []): void {
     const { width, height } = page.getSize();
     const margin = 50;
     const contentWidth = width - margin * 2;
@@ -215,6 +231,85 @@ export class InvoicePdfService {
     y = this.drawSummaryRow(page, font, fontBold, summaryX, y, 'Balance Due', this.fmt(balance), balance > 0);
 
     y -= 20;
+
+    // ── Payment History (BUG 9 FIX) ─────────────────────────────────────────
+    if (y > 100) {
+      y = this.drawSectionHeader(page, fontBold, margin, y, 'Payment History');
+
+      if (!payments || payments.length === 0) {
+        page.drawText('No payments recorded.', {
+          x: margin,
+          y,
+          size: 9,
+          font,
+          color: rgb(0.5, 0.5, 0.5),
+        });
+        y -= 16;
+      } else {
+        // Table header
+        const pColX = [margin, margin + 100, margin + 230, margin + 320, margin + 410];
+        const pHeaders = ['Payment Date', 'Method', 'Amount', 'Notes', 'Added By'];
+        pHeaders.forEach((h, i) => {
+          page.drawText(h, {
+            x: pColX[i],
+            y,
+            size: 8,
+            font: fontBold,
+            color: rgb(0.13, 0.43, 0.73),
+          });
+        });
+        y -= 5;
+        page.drawLine({
+          start: { x: margin, y },
+          end: { x: width - margin, y },
+          thickness: 0.4,
+          color: rgb(0.8, 0.8, 0.8),
+        });
+        y -= 11;
+
+        let totalPaid = 0;
+        for (const pmt of payments) {
+          if (y < 80) break;
+          const pmtDate = pmt.paymentDate
+            ? new Date(pmt.paymentDate).toLocaleDateString('en-GB')
+            : '-';
+          const method = (pmt.paymentMethod || '-').replace(/_/g, ' ');
+          const amount = this.fmt(pmt.amount);
+          const notes = (pmt.notes || '-').substring(0, 20);
+          const addedBy = pmt.addedBy
+            ? `${pmt.addedBy.firstName || ''} ${pmt.addedBy.lastName || ''}`.trim() || '-'
+            : '-';
+
+          totalPaid += pmt.amount || 0;
+
+          page.drawText(pmtDate, { x: pColX[0], y, size: 8, font, color: rgb(0.3, 0.3, 0.3) });
+          page.drawText(method, { x: pColX[1], y, size: 8, font, color: rgb(0.3, 0.3, 0.3) });
+          page.drawText(amount, { x: pColX[2], y, size: 8, font, color: rgb(0.2, 0.2, 0.2) });
+          page.drawText(notes, { x: pColX[3], y, size: 8, font, color: rgb(0.3, 0.3, 0.3) });
+          page.drawText(addedBy, { x: pColX[4], y, size: 8, font, color: rgb(0.3, 0.3, 0.3) });
+          y -= 13;
+        }
+
+        // Summary row
+        if (y > 80) {
+          page.drawLine({
+            start: { x: margin, y },
+            end: { x: width - margin, y },
+            thickness: 0.4,
+            color: rgb(0.8, 0.8, 0.8),
+          });
+          y -= 11;
+          const outstandingBalance = Math.max(0, (invoice.totalAmount || 0) - totalPaid);
+          page.drawText('Total Paid:', { x: pColX[0], y, size: 9, font: fontBold, color: rgb(0.2, 0.2, 0.2) });
+          page.drawText(this.fmt(totalPaid), { x: pColX[2], y, size: 9, font: fontBold, color: rgb(0.2, 0.2, 0.2) });
+          page.drawText('Outstanding Balance:', { x: pColX[3], y, size: 9, font: fontBold, color: outstandingBalance > 0 ? rgb(0.8, 0.2, 0.2) : rgb(0.2, 0.6, 0.2) });
+          page.drawText(this.fmt(outstandingBalance), { x: pColX[4], y, size: 9, font: fontBold, color: outstandingBalance > 0 ? rgb(0.8, 0.2, 0.2) : rgb(0.2, 0.6, 0.2) });
+          y -= 16;
+        }
+      }
+    }
+
+    y -= 10;
 
     // ── Notes ────────────────────────────────────────────────────────────────
     if (invoice.notes && y > 100) {

@@ -193,14 +193,42 @@ export class AppointmentService {
       appointmentStart.getTime() + durationMinutes * 60000,
     );
 
-    // Build query to find overlapping appointments
+    // Build query to find overlapping appointments using proper time-range intersection:
+    // overlap when: existingStart < newEnd AND existingEnd > newStart
+    // BUG 6 FIX: replaced single-arm $or with two-condition $and expression
     const overlapQuery: any = {
-      $or: [
+      $and: [
+        // Condition 1: existingStart < newEnd
         {
-          $and: [
-            {
-              $expr: {
-                $lte: [
+          $expr: {
+            $lt: [
+              {
+                $dateFromString: {
+                  dateString: {
+                    $concat: [
+                      {
+                        $dateToString: {
+                          format: '%Y-%m-%d',
+                          date: '$appointmentDate',
+                        },
+                      },
+                      'T',
+                      '$appointmentTime',
+                      ':00',
+                    ],
+                  },
+                },
+              },
+              appointmentEnd,
+            ],
+          },
+        },
+        // Condition 2: existingEnd > newStart
+        {
+          $expr: {
+            $gt: [
+              {
+                $add: [
                   {
                     $dateFromString: {
                       dateString: {
@@ -218,43 +246,15 @@ export class AppointmentService {
                       },
                     },
                   },
-                  appointmentStart,
+                  { $multiply: ['$durationMinutes', 60000] },
                 ],
               },
-            },
-            {
-              $expr: {
-                $gt: [
-                  {
-                    $add: [
-                      {
-                        $dateFromString: {
-                          dateString: {
-                            $concat: [
-                              {
-                                $dateToString: {
-                                  format: '%Y-%m-%d',
-                                  date: '$appointmentDate',
-                                },
-                              },
-                              'T',
-                              '$appointmentTime',
-                              ':00',
-                            ],
-                          },
-                        },
-                      },
-                      { $multiply: ['$durationMinutes', 60000] },
-                    ],
-                  },
-                  appointmentStart,
-                ],
-              },
-            },
-          ],
+              appointmentStart,
+            ],
+          },
         },
       ],
-      status: { $nin: ['cancelled', 'no_show'] },
+      status: { $nin: ['cancelled', 'deleted', 'no_show'] },
       deletedAt: { $exists: false },
     };
 
@@ -276,18 +276,16 @@ export class AppointmentService {
       });
     }
 
-    // Check patient conflicts
+    // Check patient conflicts — BUG 6 FIX: throw immediately with specific message
     const patientConflicts = await this.appointmentModel.find({
       ...overlapQuery,
       patientId: new Types.ObjectId(patientId),
     });
 
     if (patientConflicts.length > 0) {
-      conflicts.push({
-        conflictType: 'patient_busy',
-        message: 'Patient has another appointment at this time',
-        conflictingAppointmentId: (patientConflicts[0] as any)._id.toString(),
-      });
+      throw new ConflictException(
+        'This patient already has another appointment at the selected time. Please choose a different slot.',
+      );
     }
 
     // Check clinic conflicts (Strict: 1 Appointment/Clinic)
@@ -4623,9 +4621,18 @@ export class AppointmentService {
       }
     }
 
-    // 1. Get all active doctors assigned to this clinic
+    // 1. Get all active doctors/staff assigned to this specific clinic.
+    // BUG 5 FIX: check BOTH clinicId (single) and clinicIds (array) so staff
+    // whose primary or secondary assignment includes the requested clinicId are
+    // returned — but staff assigned to OTHER clinics are NOT returned.
+    // Admin/super_admin are not affected (they bypass this method entirely
+    // and are excluded from the 'doctor' role filter below).
+    const requestedClinicObjId = new Types.ObjectId(clinicId);
     const doctorQuery: any = {
-      clinicId: new Types.ObjectId(clinicId),
+      $or: [
+        { clinicId: requestedClinicObjId },
+        { clinicIds: requestedClinicObjId },
+      ],
       role: 'doctor',
       isActive: true,
       deletedAt: { $exists: false },

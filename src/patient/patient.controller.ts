@@ -14,6 +14,7 @@ import {
   ValidationPipe,
   ParseIntPipe,
   BadRequestException,
+  NotFoundException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -647,7 +648,7 @@ Scope is enforced by the caller's role:
     },
   })
   @UseGuards(RolesGuard)
-  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN, UserRole.STAFF)
   async deletePatient(@Param('id') id: string, @Request() req: any) {
     try {
       await this.patientService.deletePatient(id, req.user?.userId);
@@ -656,6 +657,9 @@ Scope is enforced by the caller's role:
         message: 'Patient deleted successfully',
       };
     } catch (error) {
+      if (error instanceof BadRequestException || error instanceof NotFoundException) {
+        throw error;
+      }
       return {
         success: false,
         message: 'Failed to delete patient',

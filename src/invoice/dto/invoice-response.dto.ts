@@ -100,8 +100,17 @@ export class InvoiceResponseDto {
   @ApiProperty({ example: 50 })
   discountAmount: number;
 
+  @ApiProperty({ example: 50 })
+  totalDiscount: number;
+
   @ApiProperty({ example: 15 })
   taxAmount: number;
+
+  @ApiProperty({ example: 15 })
+  totalTax: number;
+
+  @ApiPropertyOptional({ example: 'Main Clinic' })
+  businessName?: string | null;
 
   @ApiProperty({ example: 165 })
   totalAmount: number;

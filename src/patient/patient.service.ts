@@ -983,6 +983,32 @@ export class PatientService {
       throw new BadRequestException(ERROR_MESSAGES.PATIENT_MUST_BE_DEACTIVATED);
     }
 
+    const patientObjectId = new Types.ObjectId(patientId);
+
+    // Check 1: Block deletion if patient has any non-cancelled invoice that isn't fully paid
+    // Covers draft/not_due, posted/unpaid, posted/partially_paid, posted/not_due
+    const outstandingInvoice = await this.invoiceModel.findOne({
+      patientId: patientObjectId,
+      deletedAt: { $exists: false },
+      invoiceStatus: { $ne: 'cancelled' },
+      paymentStatus: { $ne: 'paid' },
+    });
+    if (outstandingInvoice) {
+      throw new BadRequestException({ message: ERROR_MESSAGES.PATIENT_HAS_UNPAID_INVOICES });
+    }
+
+    // Check 2: Active appointments across ALL clinics
+    const activeAppointment = await this.appointmentModel.findOne({
+      patientId: patientObjectId,
+      deletedAt: { $exists: false },
+      status: { $nin: ['cancelled', 'deleted'] },
+    });
+    if (activeAppointment) {
+      throw new BadRequestException(
+        'Unable to delete the patient because there are active appointments associated with this patient.',
+      );
+    }
+
     this.logger.log(`Soft deleting patient: ${patientId}`);
 
     const result = await this.patientModel

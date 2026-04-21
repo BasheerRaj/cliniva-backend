@@ -662,6 +662,11 @@ export const ERROR_MESSAGES = {
     en: 'This time is blocked for other tasks or special leave',
   } as BilingualMessage,
 
+  PATIENT_HAS_UNPAID_INVOICES: {
+    ar: 'لا يمكن حذف المريض لوجود فواتير غير مكتملة الدفع أو قيد المعالجة مرتبطة به',
+    en: 'Cannot delete patient because there are outstanding or unpaid invoices associated with this patient',
+  } as BilingualMessage,
+
   PATIENT_MUST_BE_DEACTIVATED: {
     ar: 'يجب إلغاء تفعيل المريض قبل الحذف',
     en: 'Patient must be deactivated before deletion',

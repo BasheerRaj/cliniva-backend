@@ -1705,7 +1705,7 @@ export class InvoiceService implements OnModuleInit {
       deletedAt: { $exists: false },
     };
 
-    const [payments, total] = await Promise.all([
+    const [rawPayments, total] = await Promise.all([
       this.paymentModel
         .find(filter)
         .sort({ createdAt: -1 })
@@ -1715,6 +1715,25 @@ export class InvoiceService implements OnModuleInit {
         .lean(),
       this.paymentModel.countDocuments(filter),
     ]);
+
+    const payments = rawPayments.map((payment: any) => {
+      const allocations: Array<{ invoiceId: any; amount: number }> =
+        payment.invoiceAllocations || [];
+      const isMultiInvoice = allocations.length > 1;
+      let allocatedAmount = payment.amount;
+      if (isMultiInvoice) {
+        const match = allocations.find(
+          (a) => a.invoiceId?.toString() === invoiceId,
+        );
+        allocatedAmount = match ? match.amount : 0;
+      }
+      return {
+        ...payment,
+        allocatedAmount,
+        totalPaymentAmount: payment.amount,
+        isMultiInvoice,
+      };
+    });
 
     return ResponseBuilder.paginated(
       payments,
@@ -1760,11 +1779,14 @@ export class InvoiceService implements OnModuleInit {
       services: invoice.services,
       subtotal: invoice.subtotal,
       discountAmount: invoice.discountAmount,
+      totalDiscount: invoice.discountAmount,
       taxAmount: invoice.taxAmount,
+      totalTax: invoice.taxAmount,
       totalAmount: invoice.totalAmount,
       paidAmount: invoice.paidAmount,
       balanceDue: outstandingBalance,
       outstandingBalance,
+      businessName: invoice.clinicId?.name ?? null,
       status: invoice.invoiceStatus,
       invoiceStatus: invoice.invoiceStatus,
       paymentStatus: invoice.paymentStatus,

@@ -420,7 +420,7 @@ export class PaymentController {
    */
   @Put(':id')
   @HttpCode(HttpStatus.OK)
-  @Roles(UserRole.STAFF, UserRole.ADMIN, UserRole.MANAGER, UserRole.OWNER)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN)
   @ApiOperation({
     summary: 'Update a payment',
     description:

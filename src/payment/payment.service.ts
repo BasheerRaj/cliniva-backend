@@ -687,6 +687,60 @@ export class PaymentService {
             },
           );
         }
+      } else {
+        // BUG 7 FIX: Mode B — no sessionAllocations provided.
+        // Distribute payment sequentially: oldest session (lowest sessionOrder) filled first.
+        const invoiceForDist = await this.invoiceModel
+          .findOne({ _id: new Types.ObjectId(createPaymentDto.invoiceId), deletedAt: { $exists: false } })
+          .lean();
+
+        if (invoiceForDist) {
+          // Flatten all sessions across all services, ordered by sessionOrder ascending
+          type SessionEntry = {
+            invoiceItemId: Types.ObjectId;
+            lineTotal: number;
+            paidAmount: number;
+            sessionOrder: number;
+          };
+          const allSessions: SessionEntry[] = [];
+          for (const svc of (invoiceForDist as any).services || []) {
+            for (const sess of (svc.sessions || [])) {
+              allSessions.push({
+                invoiceItemId: sess.invoiceItemId,
+                lineTotal: sess.lineTotal || 0,
+                paidAmount: sess.paidAmount || 0,
+                sessionOrder: sess.sessionOrder ?? 0,
+              });
+            }
+          }
+          allSessions.sort((a, b) => a.sessionOrder - b.sessionOrder);
+
+          let remaining = createPaymentDto.amount;
+          for (const sess of allSessions) {
+            if (remaining <= 0) break;
+            const unpaid = Math.max(0, sess.lineTotal - sess.paidAmount);
+            if (unpaid <= 0) continue;
+            const toApply = Math.min(unpaid, remaining);
+            remaining -= toApply;
+
+            await this.invoiceModel.updateOne(
+              {
+                _id: new Types.ObjectId(createPaymentDto.invoiceId),
+                deletedAt: { $exists: false },
+              },
+              {
+                $inc: {
+                  'services.$[].sessions.$[item].paidAmount': toApply,
+                },
+              },
+              {
+                arrayFilters: [
+                  { 'item.invoiceItemId': new Types.ObjectId(sess.invoiceItemId) },
+                ],
+              },
+            );
+          }
+        }
       }
 
       // Call balance service to update invoice-level paidAmount and paymentStatus
@@ -1175,9 +1229,22 @@ export class PaymentService {
       ? Math.max(0, payment.invoiceId.totalAmount - payment.invoiceId.paidAmount)
       : 0;
 
+    // BUG 10 FIX: For multi-invoice payments, use the per-invoice allocatedAmount from
+    // invoiceAllocations rather than returning payment.amount for every invoice.
+    // For single-invoice payments (no allocations or length === 1), return payment.amount.
+    const allocations: Array<{ invoiceId: any; amount: number }> = payment.invoiceAllocations || [];
+    const isMultiInvoice = allocations.length > 1;
+
     const invoicesArray = (payment.invoiceIds || [])
       .map((inv: any) => {
         if (!inv || !inv._id) return null;
+        let allocatedAmount = payment.amount;
+        if (isMultiInvoice) {
+          const alloc = allocations.find(
+            (a) => a.invoiceId?.toString() === inv._id.toString(),
+          );
+          allocatedAmount = alloc ? alloc.amount : 0;
+        }
         return {
           _id: inv._id.toString(),
           invoiceNumber: inv.invoiceNumber,
@@ -1186,6 +1253,7 @@ export class PaymentService {
           paidAmount: inv.paidAmount,
           outstandingBalance: Math.max(0, (inv.totalAmount || 0) - (inv.paidAmount || 0)),
           paymentStatus: inv.paymentStatus,
+          allocatedAmount,
         };
       })
       .filter(Boolean);
