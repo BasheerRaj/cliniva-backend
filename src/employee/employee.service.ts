@@ -136,7 +136,7 @@ export class EmployeeService {
 
     if (field === 'username') {
       const existingUser = await this.userModel
-        .findOne({ username: normalizedValue.toLowerCase() })
+        .findOne({ username: normalizedValue.toLowerCase(), isActive: true })
         .select('_id')
         .lean()
         .exec();
@@ -145,7 +145,7 @@ export class EmployeeService {
 
     if (field === 'email') {
       const existingUser = await this.userModel
-        .findOne({ email: normalizedValue.toLowerCase() })
+        .findOne({ email: normalizedValue.toLowerCase(), isActive: true })
         .select('_id')
         .lean()
         .exec();
@@ -154,7 +154,7 @@ export class EmployeeService {
 
     if (field === 'phone') {
       const existingUser = await this.userModel
-        .findOne({ phone: normalizedValue })
+        .findOne({ phone: normalizedValue, isActive: true })
         .select('_id')
         .lean()
         .exec();
@@ -162,7 +162,7 @@ export class EmployeeService {
     }
 
     const existingEmployee = await this.employeeProfileModel
-      .findOne({ cardNumber: normalizedValue })
+      .findOne({ cardNumber: normalizedValue, isActive: true })
       .select('_id')
       .lean()
       .exec();
@@ -210,6 +210,7 @@ export class EmployeeService {
       // Check username uniqueness
       const existingUserByUsername = await this.userModel.findOne({
         username: createDto.username.toLowerCase().trim(),
+        isActive: true,
       });
 
       if (existingUserByUsername) {
@@ -219,6 +220,7 @@ export class EmployeeService {
       // Check email uniqueness
       const existingUserByEmail = await this.userModel.findOne({
         email: createDto.email,
+        isActive: true,
       });
 
       if (existingUserByEmail) {
@@ -229,6 +231,7 @@ export class EmployeeService {
       if (createDto.phone) {
         const existingUserByPhone = await this.userModel.findOne({
           phone: createDto.phone,
+          isActive: true,
         });
 
         if (existingUserByPhone) {
@@ -240,6 +243,7 @@ export class EmployeeService {
       if (createDto.employeeNumber) {
         const existingEmployee = await this.employeeProfileModel.findOne({
           employeeNumber: createDto.employeeNumber,
+          isActive: true,
         });
 
         if (existingEmployee) {
@@ -251,6 +255,7 @@ export class EmployeeService {
       if (createDto.cardNumber) {
         const existingEmployeeByCard = await this.employeeProfileModel.findOne({
           cardNumber: createDto.cardNumber,
+          isActive: true,
         });
 
         if (existingEmployeeByCard) {

@@ -157,6 +157,7 @@ export class AuthService {
 
       const existingUserByUsername = await this.userModel.findOne({
         username: normalizedUsername,
+        isActive: true,
       });
 
       if (existingUserByUsername) {
@@ -174,6 +175,7 @@ export class AuthService {
       if (normalizedEmail) {
         const existingUserByEmail = await this.userModel.findOne({
           email: normalizedEmail,
+          isActive: true,
         });
 
         if (existingUserByEmail) {
