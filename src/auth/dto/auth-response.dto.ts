@@ -293,6 +293,14 @@ export class UserProfileDto {
   })
   isOwner: boolean;
 
+   @ApiPropertyOptional({
+    description: 'Profile picture URL',
+    example: 'https://example.com/photo.jpg',
+    type: String,
+    nullable: true,
+  })
+  profilePictureUrl?: string | null;
+
   constructor(user: User) {
     this.id = (user._id as any).toString();
     this.username = user.username;
@@ -332,5 +340,7 @@ export class UserProfileDto {
     this.onboardingProgress = user.onboardingProgress;
     this.planType = user.planType ?? null;
     this.isOwner = user.role === 'owner';
+    this.profilePictureUrl = user.profilePictureUrl ?? null; 
+
   }
 }
