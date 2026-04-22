@@ -602,5 +602,129 @@ describe('ClinicWorkingHoursService', () => {
       expect(result.errors[0].dayOfWeek).toBe('monday');
       expect(result.errors[1].dayOfWeek).toBe('tuesday');
     });
+
+    it('should reject when clinic end time is before opening time', async () => {
+      // Arrange
+      const complexHours = [
+        {
+          dayOfWeek: 'monday',
+          isWorkingDay: true,
+          openingTime: '03:00',
+          closingTime: '21:00',
+        },
+      ];
+
+      const proposedHours = [
+        {
+          dayOfWeek: 'monday',
+          isWorkingDay: true,
+          openingTime: '03:00',
+          closingTime: '02:00', // Before opening time
+        },
+      ];
+
+      mockClinicModel.findById.mockResolvedValue(mockClinic);
+      mockWorkingHoursModel.find.mockReturnValue({
+        lean: jest.fn().mockResolvedValue(complexHours),
+      });
+      mockAppointmentModel.find.mockReturnValue({
+        populate: jest.fn().mockReturnThis(),
+        lean: jest.fn().mockResolvedValue([]),
+      });
+
+      // Act
+      const result = await service.validateWorkingHours(
+        mockClinicId,
+        proposedHours as any,
+      );
+
+      // Assert
+      expect(result.isValid).toBe(false);
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors[0].message.en).toContain(
+        'Closing time must be after opening time',
+      );
+    });
+
+    it('should handle 00:00 as 24:00 for closing times', async () => {
+      // Arrange
+      const complexHours = [
+        {
+          dayOfWeek: 'monday',
+          isWorkingDay: true,
+          openingTime: '08:00',
+          closingTime: '00:00', // Midnight
+        },
+      ];
+
+      const proposedHours = [
+        {
+          dayOfWeek: 'monday',
+          isWorkingDay: true,
+          openingTime: '09:00',
+          closingTime: '23:00',
+        },
+      ];
+
+      mockClinicModel.findById.mockResolvedValue(mockClinic);
+      mockWorkingHoursModel.find.mockReturnValue({
+        lean: jest.fn().mockResolvedValue(complexHours),
+      });
+      mockAppointmentModel.find.mockReturnValue({
+        populate: jest.fn().mockReturnThis(),
+        lean: jest.fn().mockResolvedValue([]),
+      });
+
+      // Act
+      const result = await service.validateWorkingHours(
+        mockClinicId,
+        proposedHours as any,
+      );
+
+      // Assert
+      expect(result.isValid).toBe(true);
+    });
+
+    it('should reject if clinic closes at 00:00 but complex closes earlier', async () => {
+      // Arrange
+      const complexHours = [
+        {
+          dayOfWeek: 'monday',
+          isWorkingDay: true,
+          openingTime: '08:00',
+          closingTime: '22:00',
+        },
+      ];
+
+      const proposedHours = [
+        {
+          dayOfWeek: 'monday',
+          isWorkingDay: true,
+          openingTime: '09:00',
+          closingTime: '00:00', // Midnight (24:00) > 22:00
+        },
+      ];
+
+      mockClinicModel.findById.mockResolvedValue(mockClinic);
+      mockWorkingHoursModel.find.mockReturnValue({
+        lean: jest.fn().mockResolvedValue(complexHours),
+      });
+      mockAppointmentModel.find.mockReturnValue({
+        populate: jest.fn().mockReturnThis(),
+        lean: jest.fn().mockResolvedValue([]),
+      });
+
+      // Act
+      const result = await service.validateWorkingHours(
+        mockClinicId,
+        proposedHours as any,
+      );
+
+      // Assert
+      expect(result.isValid).toBe(false);
+      expect(result.errors[0].message.en).toContain(
+        'must be within complex hours',
+      );
+    });
   });
 });

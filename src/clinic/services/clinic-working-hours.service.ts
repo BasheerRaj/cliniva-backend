@@ -197,9 +197,25 @@ export class ClinicWorkingHoursService {
         }
 
         const clinicOpen = this.parseTime(clinicDay.openingTime);
-        const clinicClose = this.parseTime(clinicDay.closingTime);
+        const clinicClose = this.parseTime(clinicDay.closingTime, true);
         const complexOpen = this.parseTime(complexDay.openingTime);
-        const complexClose = this.parseTime(complexDay.closingTime);
+        const complexClose = this.parseTime(complexDay.closingTime, true);
+
+        // Rule: End time must be after start time
+        if (clinicOpen >= clinicClose) {
+          errors.push({
+            dayOfWeek: clinicDay.dayOfWeek,
+            message: {
+              ar: `وقت الإغلاق يجب أن يكون بعد وقت الافتتاح`,
+              en: `Closing time must be after opening time`,
+            },
+            clinicHours: {
+              openingTime: clinicDay.openingTime,
+              closingTime: clinicDay.closingTime,
+            },
+          });
+          continue;
+        }
 
         if (clinicOpen < complexOpen || clinicClose > complexClose) {
           errors.push({
@@ -292,7 +308,7 @@ export class ClinicWorkingHoursService {
 
       const appointmentTime = this.parseTime(appointment.appointmentTime);
       const openingTime = this.parseTime(proposedDay.openingTime);
-      const closingTime = this.parseTime(proposedDay.closingTime);
+      const closingTime = this.parseTime(proposedDay.closingTime, true);
 
       if (appointmentTime < openingTime || appointmentTime >= closingTime) {
         appointmentConflicts.push({
@@ -322,10 +338,17 @@ export class ClinicWorkingHoursService {
   /**
    * Parse time string (HH:mm) to minutes since midnight
    */
-  private parseTime(timeStr: string): number {
+  private parseTime(timeStr: string, isClosingTime = false): number {
     if (!timeStr) return 0;
     const [hours, minutes] = timeStr.split(':').map(Number);
-    return hours * 60 + minutes;
+    let totalMinutes = hours * 60 + minutes;
+
+    // Handle 00:00 as 24:00 (1440 minutes) for closing times
+    if (isClosingTime && totalMinutes === 0) {
+      totalMinutes = 1440;
+    }
+
+    return totalMinutes;
   }
 
   /**
