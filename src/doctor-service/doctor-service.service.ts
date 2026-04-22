@@ -96,10 +96,14 @@ export class DoctorServiceService {
     }
     this.assertTenantAccess(doctor.subscriptionId, requestingUser);
 
-    // Validate doctor works at this clinic
-    // Check User.clinicId OR EmployeeShift with clinic entity
+    // Validate doctor works at this clinic.
+    // Accept primary clinicId, multi-clinic clinicIds[] assignment, or active clinic shift.
+    const doctorClinicIds = Array.isArray((doctor as any).clinicIds)
+      ? (doctor as any).clinicIds.map((id: any) => id?.toString()).filter(Boolean)
+      : [];
     const doctorWorksAtClinic =
       doctor.clinicId?.toString() === dto.clinicId ||
+      doctorClinicIds.includes(dto.clinicId) ||
       (await this.employeeShiftModel.exists({
         userId: new Types.ObjectId(dto.doctorId),
         entityType: 'clinic',
@@ -116,20 +120,38 @@ export class DoctorServiceService {
       });
     }
 
-    // Validate service is available at this clinic
-    const clinicService = await this.clinicServiceModel.findOne({
-      clinicId: new Types.ObjectId(dto.clinicId),
-      serviceId: new Types.ObjectId(serviceId),
-      isActive: true,
-    });
+    // Validate service is available at this clinic.
+    // Accept direct service.clinicIds[] relationship first.
+    const serviceListsClinic = Array.isArray((service as any).clinicIds)
+      ? (service as any).clinicIds
+          .map((id: any) => id?.toString())
+          .includes(dto.clinicId)
+      : false;
 
-    if (!clinicService) {
-      throw new BadRequestException({
-        message: {
-          ar: 'الخدمة غير متاحة في هذه العيادة',
-          en: 'Service is not available at this clinic',
-        },
+    if (!serviceListsClinic) {
+      // If explicit clinic_services mappings exist for this service, enforce them.
+      // If none exist, keep permissive behavior for legacy data.
+      const totalClinicAssignments = await this.clinicServiceModel.countDocuments({
+        serviceId: new Types.ObjectId(serviceId),
+        isActive: true,
       });
+
+      if (totalClinicAssignments > 0) {
+        const clinicService = await this.clinicServiceModel.findOne({
+          clinicId: new Types.ObjectId(dto.clinicId),
+          serviceId: new Types.ObjectId(serviceId),
+          isActive: true,
+        });
+
+        if (!clinicService) {
+          throw new BadRequestException({
+            message: {
+              ar: 'الخدمة غير متاحة في هذه العيادة',
+              en: 'Service is not available at this clinic',
+            },
+          });
+        }
+      }
     }
 
     // Check if already assigned
@@ -707,5 +729,4 @@ export class DoctorServiceService {
     }
   }
 }
-
 
