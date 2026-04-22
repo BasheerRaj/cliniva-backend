@@ -612,7 +612,7 @@ export class InvoiceService implements OnModuleInit {
     // 8. Return via ResponseBuilder.success shape
     return this.mapToResponseDto(
       await invoice.populate([
-        { path: 'patientId', select: 'firstName lastName patientNumber' },
+        { path: 'patientId', select: 'firstName lastName patientNumber profilePicture' },
         { path: 'clinicId', select: 'name' },
         { path: 'createdBy', select: 'firstName lastName email' },
       ]),
@@ -755,7 +755,7 @@ export class InvoiceService implements OnModuleInit {
         .skip(skip)
         .limit(limit)
         .populate([
-          { path: 'patientId', select: 'firstName lastName patientNumber' },
+  { path: 'patientId', select: 'firstName lastName patientNumber profilePicture' },
           { path: 'clinicId', select: 'name' },
         ])
         .exec(),
@@ -891,7 +891,7 @@ export class InvoiceService implements OnModuleInit {
     const invoice = await this.invoiceModel
       .findById(id)
       .populate([
-        { path: 'patientId', select: 'firstName lastName patientNumber' },
+        { path: 'patientId', select: 'firstName lastName patientNumber profilePicture' },
         { path: 'clinicId', select: 'name' },
         { path: 'createdBy', select: 'firstName lastName email' },
         { path: 'updatedBy', select: 'firstName lastName email' },
@@ -1046,7 +1046,7 @@ export class InvoiceService implements OnModuleInit {
 
     return this.mapToResponseDto(
       await invoice.populate([
-        { path: 'patientId', select: 'firstName lastName patientNumber' },
+        { path: 'patientId', select: 'firstName lastName patientNumber profilePicture' },
         { path: 'clinicId', select: 'name' },
         { path: 'createdBy', select: 'firstName lastName email' },
         { path: 'updatedBy', select: 'firstName lastName email' },
@@ -1070,7 +1070,7 @@ export class InvoiceService implements OnModuleInit {
     if (invoice.invoiceStatus === 'posted') {
       return this.mapToResponseDto(
         await invoice.populate([
-          { path: 'patientId', select: 'firstName lastName patientNumber' },
+          { path: 'patientId', select: 'firstName lastName patientNumber profilePicture' },
           { path: 'clinicId', select: 'name' },
           { path: 'createdBy', select: 'firstName lastName email' },
         ]),
@@ -1125,7 +1125,7 @@ export class InvoiceService implements OnModuleInit {
 
     return this.mapToResponseDto(
       await invoice.populate([
-        { path: 'patientId', select: 'firstName lastName patientNumber' },
+        { path: 'patientId', select: 'firstName lastName patientNumber profilePicture' },
         { path: 'clinicId', select: 'name' },
         { path: 'createdBy', select: 'firstName lastName email' },
       ]),
@@ -1266,7 +1266,7 @@ export class InvoiceService implements OnModuleInit {
       .find(filter)
       .sort({ createdAt: -1 })
       .populate([
-        { path: 'patientId', select: 'firstName lastName patientNumber' },
+{ path: 'patientId', select: 'firstName lastName patientNumber profilePicture' },
         { path: 'clinicId', select: 'name' },
       ])
       .exec();
@@ -1543,7 +1543,7 @@ export class InvoiceService implements OnModuleInit {
       .find(filter)
       .sort({ createdAt: -1 })
       .populate([
-        { path: 'patientId', select: 'firstName lastName patientNumber' },
+{ path: 'patientId', select: 'firstName lastName patientNumber profilePicture' },
         { path: 'clinicId', select: 'name' },
       ])
       .exec();
@@ -1675,7 +1675,7 @@ export class InvoiceService implements OnModuleInit {
 
     return this.mapToResponseDto(
       await invoice.populate([
-        { path: 'patientId', select: 'firstName lastName patientNumber' },
+{ path: 'patientId', select: 'firstName lastName patientNumber profilePicture' },
         { path: 'clinicId', select: 'name' },
       ]),
     );
@@ -1747,6 +1747,7 @@ export class InvoiceService implements OnModuleInit {
             firstName: invoice.patientId.firstName,
             lastName: invoice.patientId.lastName,
             patientNumber: invoice.patientId.patientNumber,
+            profilePicture: invoice.patientId.profilePicture || null,
           }
         : undefined,
       clinic: invoice.clinicId

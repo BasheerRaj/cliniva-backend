@@ -1417,6 +1417,7 @@ export class ComplexService {
         role: 1,
         isActive: 1,
         clinicId: 1,
+         profilePictureUrl: 1,
       })
       .sort({ firstName: 1, lastName: 1 })
       .toArray();
@@ -1470,6 +1471,7 @@ export class ComplexService {
         clinic: clinicId ? clinicNameMap.get(clinicId) || null : null,
         userType: user.role,
         status: user.isActive ? 'active' : 'inactive',
+        profilePictureUrl: user.profilePictureUrl || null, 
       };
     });
   }
