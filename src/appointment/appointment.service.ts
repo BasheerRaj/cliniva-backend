@@ -899,8 +899,19 @@ export class AppointmentService {
       filter.doctorId = new Types.ObjectId(userId);
     } else if (userRole === 'staff' && userClinicId && !clinicIds) {
       filter.clinicId = new Types.ObjectId(userClinicId);
-    } else if (userRole === 'admin' && userClinicId && !clinicIds) {
-      filter.clinicId = new Types.ObjectId(userClinicId);
+    } else if (userRole === 'admin' && !clinicIds) {
+      const adminClinicIds = Array.isArray(userClinicIds)
+        ? userClinicIds.filter((id: string) => Types.ObjectId.isValid(String(id)))
+        : userClinicId
+        ? [String(userClinicId)]
+        : [];
+      if (adminClinicIds.length > 1) {
+        filter.clinicId = { $in: adminClinicIds.map((id: string) => new Types.ObjectId(id)) };
+      } else if (adminClinicIds.length === 1) {
+        filter.clinicId = new Types.ObjectId(adminClinicIds[0]);
+      } else if (userClinicId) {
+        filter.clinicId = new Types.ObjectId(userClinicId);
+      }
     } else if (userRole === 'owner' || userRole === 'manager') {
       // Owner/Manager scoping: must be restricted to their subscription/complex
       const queryComplexId = (query as any).complexId || complexId;
@@ -4797,9 +4808,12 @@ export class AppointmentService {
       : 'clinic';
     const context: AppointmentPageContextResponseDto = {
       planType,
+      role: requestingUser.role,
       clinics: [],
       doctors: [],
+      services: [],
     };
+    let contextDoctorSource: any[] = [];
 
     const organizationId = requestingUser.organizationId;
     const subscriptionId = requestingUser.subscriptionId;
@@ -4818,6 +4832,242 @@ export class AppointmentService {
       tenantScopeFilter.organizationId = new Types.ObjectId(organizationId);
     }
 
+    const buildDoctorClinicIds = (doctor: any): string[] => {
+      const clinicIdsSet = new Set<string>();
+      if (Array.isArray(doctor?.clinicIds)) {
+        for (const assignedClinicId of doctor.clinicIds) {
+          if (assignedClinicId) {
+            clinicIdsSet.add(assignedClinicId.toString());
+          }
+        }
+      }
+      if (doctor?.clinicId) {
+        clinicIdsSet.add(doctor.clinicId.toString());
+      }
+      return Array.from(clinicIdsSet);
+    };
+
+    const mapWorkingHoursDay = (workingHour: any) => ({
+      dayOfWeek: workingHour.dayOfWeek,
+      isWorkingDay: workingHour.isWorkingDay,
+      openingTime: workingHour.openingTime,
+      closingTime: workingHour.closingTime,
+      breakStartTime: workingHour.breakStartTime,
+      breakEndTime: workingHour.breakEndTime,
+    });
+
+    const enrichContextWithRelations = async (doctorSource: any[]): Promise<void> => {
+      const clinicObjIds = context.clinics
+        .map((clinic) => clinic._id)
+        .filter((id) => Types.ObjectId.isValid(id))
+        .map((id) => new Types.ObjectId(id));
+      const doctorObjIds = doctorSource
+        .map((doctor) => doctor?._id)
+        .filter((id) => Types.ObjectId.isValid(String(id)))
+        .map((id) => new Types.ObjectId(id.toString()));
+
+      const [
+        clinicServiceRecords,
+        clinicWorkingHoursRecords,
+        doctorServiceRecords,
+        doctorWorkingHoursRecords,
+      ] = await Promise.all([
+        clinicObjIds.length > 0
+          ? this.clinicServiceModel
+              .find({ clinicId: { $in: clinicObjIds } })
+              .select('clinicId serviceId')
+              .lean()
+              .exec()
+          : Promise.resolve([]),
+        clinicObjIds.length > 0
+          ? this.workingHoursModel
+              .find({
+                entityType: 'clinic',
+                entityId: { $in: clinicObjIds },
+                isActive: { $ne: false },
+              })
+              .select(
+                'entityId dayOfWeek isWorkingDay openingTime closingTime breakStartTime breakEndTime',
+              )
+              .lean()
+              .exec()
+          : Promise.resolve([]),
+        doctorObjIds.length > 0
+          ? this.doctorServiceModel
+              .find({
+                doctorId: { $in: doctorObjIds },
+                isActive: true,
+              })
+              .select('doctorId serviceId')
+              .lean()
+              .exec()
+          : Promise.resolve([]),
+        doctorObjIds.length > 0
+          ? this.workingHoursModel
+              .find({
+                entityType: 'doctor',
+                entityId: { $in: doctorObjIds },
+                isActive: { $ne: false },
+              })
+              .select(
+                'entityId dayOfWeek isWorkingDay openingTime closingTime breakStartTime breakEndTime',
+              )
+              .lean()
+              .exec()
+          : Promise.resolve([]),
+      ]);
+
+      const clinicServicesMap = new Map<string, Set<string>>();
+      for (const record of clinicServiceRecords as any[]) {
+        const recordClinicId = record.clinicId?.toString();
+        const recordServiceId = record.serviceId?.toString();
+        if (!recordClinicId || !recordServiceId) continue;
+        if (!clinicServicesMap.has(recordClinicId)) {
+          clinicServicesMap.set(recordClinicId, new Set<string>());
+        }
+        clinicServicesMap.get(recordClinicId)!.add(recordServiceId);
+      }
+
+      const clinicWorkingHoursMap = new Map<string, any[]>();
+      for (const record of clinicWorkingHoursRecords as any[]) {
+        const recordClinicId = record.entityId?.toString();
+        if (!recordClinicId) continue;
+        if (!clinicWorkingHoursMap.has(recordClinicId)) {
+          clinicWorkingHoursMap.set(recordClinicId, []);
+        }
+        clinicWorkingHoursMap.get(recordClinicId)!.push(mapWorkingHoursDay(record));
+      }
+
+      context.clinics = context.clinics.map((clinic) => ({
+        ...clinic,
+        services: Array.from(clinicServicesMap.get(clinic._id) || []),
+        workingHours: clinicWorkingHoursMap.get(clinic._id) || [],
+      }));
+
+      const doctorServicesMap = new Map<string, Set<string>>();
+      for (const record of doctorServiceRecords as any[]) {
+        const recordDoctorId = record.doctorId?.toString();
+        const recordServiceId = record.serviceId?.toString();
+        if (!recordDoctorId || !recordServiceId) continue;
+        if (!doctorServicesMap.has(recordDoctorId)) {
+          doctorServicesMap.set(recordDoctorId, new Set<string>());
+        }
+        doctorServicesMap.get(recordDoctorId)!.add(recordServiceId);
+      }
+
+      const doctorWorkingHoursMap = new Map<string, any[]>();
+      for (const record of doctorWorkingHoursRecords as any[]) {
+        const recordDoctorId = record.entityId?.toString();
+        if (!recordDoctorId) continue;
+        if (!doctorWorkingHoursMap.has(recordDoctorId)) {
+          doctorWorkingHoursMap.set(recordDoctorId, []);
+        }
+        doctorWorkingHoursMap.get(recordDoctorId)!.push(mapWorkingHoursDay(record));
+      }
+
+      context.doctors = doctorSource.map((doctor: any) => {
+        const doctorId = doctor._id.toString();
+        const doctorName = `${doctor?.firstName || ''} ${doctor?.lastName || ''}`.trim();
+        return {
+          _id: doctorId,
+          name: doctorName,
+          clinicIds: buildDoctorClinicIds(doctor),
+          serviceIds: Array.from(doctorServicesMap.get(doctorId) || []),
+          workingHours: doctorWorkingHoursMap.get(doctorId) || [],
+        };
+      });
+
+      const uniqueServiceIds = Array.from(
+        new Set(
+          (clinicServiceRecords as any[])
+            .map((record) => record.serviceId?.toString())
+            .filter((id): id is string => Boolean(id)),
+        ),
+      );
+      const serviceObjIds = uniqueServiceIds
+        .filter((id) => Types.ObjectId.isValid(id))
+        .map((id) => new Types.ObjectId(id));
+
+      const serviceDocs =
+        serviceObjIds.length > 0
+          ? await this.serviceModel
+              .find({ _id: { $in: serviceObjIds } })
+              .select('_id name duration durationMinutes clinicIds')
+              .lean()
+              .exec()
+          : [];
+
+      // Allowed clinic IDs (already role-scoped) for filtering Service.clinicIds field.
+      const allowedClinicIdSet = new Set(
+        (context.clinics as any[]).map((c) => c._id?.toString()).filter(Boolean),
+      );
+
+      context.services = (serviceDocs as any[]).map((serviceDoc) => {
+        const serviceId = serviceDoc._id.toString();
+        const clinicIdSet = new Set(
+          (clinicServiceRecords as any[])
+            .filter((record) => record.serviceId?.toString() === serviceId)
+            .map((record) => record.clinicId?.toString())
+            .filter((id): id is string => Boolean(id)),
+        );
+        // Union with Service.clinicIds field (filtered by user's allowed scope) so
+        // services assigned via the document field but missing junction records
+        // still appear with their full clinic list.
+        if (Array.isArray(serviceDoc.clinicIds)) {
+          for (const cid of serviceDoc.clinicIds) {
+            const cidStr = cid?.toString();
+            if (cidStr && allowedClinicIdSet.has(cidStr)) {
+              clinicIdSet.add(cidStr);
+            }
+          }
+        }
+        const clinicIds = Array.from(clinicIdSet);
+        const doctorIds = Array.from(
+          new Set(
+            (doctorServiceRecords as any[])
+              .filter((record) => record.serviceId?.toString() === serviceId)
+              .map((record) => record.doctorId?.toString())
+              .filter((id): id is string => Boolean(id)),
+          ),
+        );
+        return {
+          _id: serviceId,
+          name: serviceDoc.name,
+          duration: serviceDoc.durationMinutes ?? serviceDoc.duration,
+          clinicIds,
+          doctorIds,
+        };
+      });
+
+      // Include permissive services (0 junction records) — all clinics can use them.
+      // The /services/filter-header endpoint already returns these correctly; the context
+      // must mirror that so the frontend can pre-fill slot duration on click.
+      if (subscriptionId && Types.ObjectId.isValid(subscriptionId)) {
+        const junctionServiceIdSet = new Set(context.services.map((s: any) => s._id));
+        const allScopeServices = await this.serviceModel
+          .find({
+            subscriptionId: new Types.ObjectId(subscriptionId),
+            deletedAt: { $exists: false },
+          })
+          .select('_id name duration durationMinutes')
+          .lean()
+          .exec();
+
+        for (const svc of allScopeServices as any[]) {
+          const svcId = svc._id.toString();
+          if (!junctionServiceIdSet.has(svcId)) {
+            context.services.push({
+              _id: svcId,
+              name: svc.name,
+              duration: svc.durationMinutes ?? svc.duration,
+              clinicIds: context.clinics.map((c: any) => c._id),
+              doctorIds: context.doctors.map((d: any) => d._id),
+            });
+          }
+        }
+      }
+    };
+
     // Strict UI restriction: Doctors should only see themselves in the doctor filter
     if (userRole === 'doctor' && userId) {
       const doctor = await this.userModel
@@ -4828,17 +5078,21 @@ export class AppointmentService {
           deletedAt: { $exists: false },
           ...tenantScopeFilter,
         })
-        .select('_id firstName lastName clinicId organizationId complexId')
+        .select('_id firstName lastName clinicId clinicIds organizationId complexId')
         .lean()
         .exec();
       
       if (doctor) {
-        context.doctors = [{
-          _id: doctor._id.toString(),
-          firstName: (doctor as any).firstName,
-          lastName: (doctor as any).lastName,
-          clinicId: (doctor as any).clinicId?.toString(),
-        }];
+        contextDoctorSource = [doctor];
+        context.doctors = [
+          {
+            _id: doctor._id.toString(),
+            name: `${(doctor as any).firstName || ''} ${(doctor as any).lastName || ''}`.trim(),
+            clinicIds: buildDoctorClinicIds(doctor),
+            serviceIds: [],
+            workingHours: [],
+          },
+        ];
 
         // Still need to populate clinics context for the doctor's dropdown
         if (doctor.clinicId) {
@@ -4848,12 +5102,21 @@ export class AppointmentService {
               isActive: true,
               ...tenantScopeFilter,
             })
-            .select('_id name')
+            .select('_id name complexId')
             .lean();
           if (clinic) {
-            context.clinics = [{ _id: clinic._id.toString(), name: clinic.name }];
+            context.clinics = [
+              {
+                _id: clinic._id.toString(),
+                name: clinic.name,
+                complexId: (clinic as any).complexId?.toString(),
+                services: [],
+                workingHours: [],
+              },
+            ];
           }
         }
+        await enrichContextWithRelations(contextDoctorSource);
         return context;
       }
     }
@@ -4892,6 +5155,8 @@ export class AppointmentService {
         _id: c._id.toString(),
         name: c.name,
         complexId: c.complexId?.toString(),
+        services: [],
+        workingHours: [],
       }));
 
       const contextClinicObjectIds = clinics.map((c: any) => c._id);
@@ -4906,14 +5171,16 @@ export class AppointmentService {
             { clinicIds: { $in: contextClinicObjectIds } },
           ],
         })
-        .select('_id firstName lastName clinicId')
+        .select('_id firstName lastName clinicId clinicIds')
         .lean()
         .exec();
+      contextDoctorSource = doctors;
       context.doctors = doctors.map((d: any) => ({
         _id: d._id.toString(),
-        firstName: d.firstName,
-        lastName: d.lastName,
-        clinicId: d.clinicId?.toString(),
+        name: `${d.firstName || ''} ${d.lastName || ''}`.trim(),
+        clinicIds: buildDoctorClinicIds(d),
+        serviceIds: [],
+        workingHours: [],
       }));
     } else if (planType === 'complex' && complexId) {
       const compObjId = new Types.ObjectId(complexId);
@@ -4925,10 +5192,16 @@ export class AppointmentService {
           deletedAt: { $exists: false },
           isActive: true,
         })
-        .select('_id name')
+        .select('_id name complexId')
         .lean()
         .exec();
-      context.clinics = clinics.map((c: any) => ({ _id: c._id.toString(), name: c.name }));
+      context.clinics = clinics.map((c: any) => ({
+        _id: c._id.toString(),
+        name: c.name,
+        complexId: c.complexId?.toString(),
+        services: [],
+        workingHours: [],
+      }));
 
       const contextClinicObjectIds = clinics.map((c: any) => c._id);
       const doctors = await this.userModel
@@ -4943,14 +5216,16 @@ export class AppointmentService {
             { clinicIds: { $in: contextClinicObjectIds } },
           ],
         })
-        .select('_id firstName lastName clinicId')
+        .select('_id firstName lastName clinicId clinicIds')
         .lean()
         .exec();
+      contextDoctorSource = doctors;
       context.doctors = doctors.map((d: any) => ({
         _id: d._id.toString(),
-        firstName: d.firstName,
-        lastName: d.lastName,
-        clinicId: d.clinicId?.toString(),
+        name: `${d.firstName || ''} ${d.lastName || ''}`.trim(),
+        clinicIds: buildDoctorClinicIds(d),
+        serviceIds: [],
+        workingHours: [],
       }));
     } else if (assignedClinicIds.length > 0) {
       // Prefer explicit multi-clinic assignments when present.
@@ -4969,6 +5244,8 @@ export class AppointmentService {
         _id: c._id.toString(),
         name: c.name,
         complexId: c.complexId?.toString(),
+        services: [],
+        workingHours: [],
       }));
 
       const doctors = await this.userModel
@@ -4982,14 +5259,16 @@ export class AppointmentService {
             { clinicIds: { $in: clinicObjectIds } },
           ],
         })
-        .select('_id firstName lastName clinicId')
+        .select('_id firstName lastName clinicId clinicIds')
         .lean()
         .exec();
+      contextDoctorSource = doctors;
       context.doctors = doctors.map((d: any) => ({
         _id: d._id.toString(),
-        firstName: d.firstName,
-        lastName: d.lastName,
-        clinicId: d.clinicId?.toString(),
+        name: `${d.firstName || ''} ${d.lastName || ''}`.trim(),
+        clinicIds: buildDoctorClinicIds(d),
+        serviceIds: [],
+        workingHours: [],
       }));
     } else if (clinicId) {
       const clObjId = new Types.ObjectId(clinicId);
@@ -5000,11 +5279,19 @@ export class AppointmentService {
           isActive: true,
           ...tenantScopeFilter,
         })
-        .select('_id name')
+        .select('_id name complexId')
         .lean()
         .exec();
       if (clinic) {
-        context.clinics = [{ _id: clinic._id.toString(), name: clinic.name }];
+        context.clinics = [
+          {
+            _id: clinic._id.toString(),
+            name: clinic.name,
+            complexId: (clinic as any).complexId?.toString(),
+            services: [],
+            workingHours: [],
+          },
+        ];
       }
 
       const doctors = await this.userModel
@@ -5018,16 +5305,20 @@ export class AppointmentService {
             { clinicIds: { $in: [clObjId] } },
           ],
         })
-        .select('_id firstName lastName')
+        .select('_id firstName lastName clinicId clinicIds')
         .lean()
         .exec();
+      contextDoctorSource = doctors;
       context.doctors = doctors.map((d: any) => ({
         _id: d._id.toString(),
-        firstName: d.firstName,
-        lastName: d.lastName,
+        name: `${d.firstName || ''} ${d.lastName || ''}`.trim(),
+        clinicIds: buildDoctorClinicIds(d),
+        serviceIds: [],
+        workingHours: [],
       }));
     }
 
+    await enrichContextWithRelations(contextDoctorSource);
     return context;
   }
 

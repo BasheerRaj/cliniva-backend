@@ -2177,6 +2177,37 @@ export class ServiceService {
     let finalClinicIds = mappedClinicIds;
     let finalDoctorIds = mappedDoctorIds;
 
+    // Also union the Service.clinicIds field on the service document itself.
+    // The service document carries its own clinicIds list (the source of truth used
+    // by the service-details UI). When a clinic was assigned via this field but no
+    // ClinicService junction record was created, the calendar filter would otherwise
+    // miss it. Filter to user's allowed scope so role boundaries are preserved.
+    const serviceDocsForClinicUnion = (await this.serviceModel
+      .find({ _id: { $in: serviceObjectIds }, deletedAt: { $exists: false } })
+      .select('clinicIds')
+      .lean()
+      .exec()) as any[];
+    const allowedClinicStringSet = new Set(
+      (allowedClinics as any[]).map((id) => id.toString()),
+    );
+    const finalClinicIdStringSet = new Set(
+      (finalClinicIds as any[]).map((id) => id.toString()),
+    );
+    for (const svc of serviceDocsForClinicUnion) {
+      if (!Array.isArray(svc.clinicIds)) continue;
+      for (const cid of svc.clinicIds) {
+        const cidStr = cid?.toString();
+        if (
+          cidStr &&
+          allowedClinicStringSet.has(cidStr) &&
+          !finalClinicIdStringSet.has(cidStr)
+        ) {
+          finalClinicIds.push(new Types.ObjectId(cidStr));
+          finalClinicIdStringSet.add(cidStr);
+        }
+      }
+    }
+
     // For each service, check if it has explicit assignments in our clinics.
     // If ANY service in the set has 0 assignments, then ALL doctors in those clinics
     // are authorized for that specific service, so they MUST be in the union.
