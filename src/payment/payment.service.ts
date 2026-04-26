@@ -35,23 +35,6 @@ import { assertSameTenant, TenantUser } from '../common/utils/tenant-scope.util'
 export class PaymentService {
   private readonly logger = new Logger(PaymentService.name);
 
-  private resolvePaymentCounterScopeKey(params: {
-    organizationId?: Types.ObjectId | string | null;
-    subscriptionId?: Types.ObjectId | string | null;
-    clinicId?: Types.ObjectId | string | null;
-  }): string {
-    const organizationId = params.organizationId?.toString?.() ?? params.organizationId;
-    if (organizationId) return String(organizationId);
-
-    const subscriptionId = params.subscriptionId?.toString?.() ?? params.subscriptionId;
-    if (subscriptionId) return String(subscriptionId);
-
-    const clinicId = params.clinicId?.toString?.() ?? params.clinicId;
-    if (clinicId) return String(clinicId);
-
-    return 'global';
-  }
-
   private getScopedClinicObjectIds(
     userClinicId?: string | null,
     userClinicIds?: string[],
@@ -391,12 +374,7 @@ export class PaymentService {
     }
 
     const firstInvoice = invoiceDocs[0];
-    const paymentCounterScope = this.resolvePaymentCounterScopeKey({
-      organizationId: (firstInvoice as any).organizationId,
-      subscriptionId: (firstInvoice as any).subscriptionId,
-      clinicId: primaryClinicContext.clinicId,
-    });
-    const paymentId = await this.generatePaymentId(paymentCounterScope);
+    const paymentId = await this.generatePaymentId();
 
     const payment = new this.paymentModel({
       paymentId,
@@ -426,7 +404,8 @@ export class PaymentService {
       } catch (err: any) {
         if (err.code === 11000 && err.keyPattern?.paymentId && retriesMulti < 10) {
           retriesMulti++;
-          payment.paymentId = await this.generatePaymentId(paymentCounterScope);
+          await this.syncPaymentCounterWithExistingIds();
+          payment.paymentId = await this.generatePaymentId();
           this.logger.warn(`Payment ID collision, retrying with ${payment.paymentId} (attempt ${retriesMulti})`);
         } else {
           throw err;
@@ -604,12 +583,7 @@ export class PaymentService {
     }
 
     // Generate unique Payment ID (atomic via counter)
-    const paymentCounterScope = this.resolvePaymentCounterScopeKey({
-      organizationId: (invoice as any).organizationId,
-      subscriptionId: (invoice as any).subscriptionId,
-      clinicId: invoiceClinicContext.clinicId,
-    });
-    const paymentId = await this.generatePaymentId(paymentCounterScope);
+    const paymentId = await this.generatePaymentId();
 
     // Create payment record
     const payment = new this.paymentModel({
@@ -639,7 +613,8 @@ export class PaymentService {
       } catch (err: any) {
         if (err.code === 11000 && err.keyPattern?.paymentId && retriesSingle < 10) {
           retriesSingle++;
-          payment.paymentId = await this.generatePaymentId(paymentCounterScope);
+          await this.syncPaymentCounterWithExistingIds();
+          payment.paymentId = await this.generatePaymentId();
           this.logger.warn(`Payment ID collision, retrying with ${payment.paymentId} (attempt ${retriesSingle})`);
         } else {
           throw err;
@@ -1102,10 +1077,11 @@ export class PaymentService {
       if (updatePaymentDto.amount <= 0) {
         throw new BadRequestException(PAYMENT_ERRORS.AMOUNT_ZERO);
       }
-      const currentOutstanding = Math.max(0, invoice.totalAmount - invoice.paidAmount);
-      const maxAllowedAmount = currentOutstanding + payment.amount;
-      if (updatePaymentDto.amount > maxAllowedAmount) {
-        throw new BadRequestException(PAYMENT_ERRORS.AMOUNT_EXCEEDS_BALANCE);
+      if (updatePaymentDto.amount !== payment.amount) {
+        throw new BadRequestException({
+          message: PAYMENT_ERRORS.AMOUNT_EDIT_NOT_SUPPORTED,
+          code: 'PAYMENT_AMOUNT_EDIT_NOT_SUPPORTED',
+        });
       }
     }
 
@@ -1118,25 +1094,12 @@ export class PaymentService {
       }
     }
 
-    const oldAmount = payment.amount;
-    const newAmount = updatePaymentDto.amount ?? oldAmount;
-    const amountDifference = newAmount - oldAmount;
-
-    if (updatePaymentDto.amount !== undefined) payment.amount = updatePaymentDto.amount;
     if (updatePaymentDto.paymentMethod) payment.paymentMethod = updatePaymentDto.paymentMethod;
     if (updatePaymentDto.paymentDate) payment.paymentDate = new Date(updatePaymentDto.paymentDate);
     if (updatePaymentDto.notes !== undefined) payment.notes = updatePaymentDto.notes;
 
     payment.updatedBy = new Types.ObjectId(userId);
     await payment.save();
-
-    if (amountDifference !== 0) {
-      const totalPaid = invoice.paidAmount + amountDifference;
-      await this.paymentBalanceService.recalculateInvoiceBalances(
-        payment.invoiceId.toString(),
-        totalPaid,
-      );
-    }
 
     if (updatePaymentDto.paymentDate) {
       const latestPayment = await this.paymentModel
@@ -1149,7 +1112,7 @@ export class PaymentService {
     }
 
     this.logger.log(
-      `Payment updated: ${payment.paymentId} by user ${userId}, amount changed from ${oldAmount} to ${newAmount}`,
+      `Payment updated: ${payment.paymentId} by user ${userId}`,
     );
 
     const populatedPayment = await this.paymentModel
@@ -1234,16 +1197,73 @@ export class PaymentService {
   }
 
   /**
-   * Generate unique payment ID using atomic counter (S-5: prevents race conditions).
+   * Payment IDs are globally unique, so they must be backed by one global sequence.
+   * Tenant-scoped counters can emit the same visible PAY-#### across tenants.
    */
-  private async generatePaymentId(organizationId?: string): Promise<string> {
-    const key = `PAY:${organizationId || 'global'}`;
-    const counter = await this.counterModel.findOneAndUpdate(
+  private async generatePaymentId(): Promise<string> {
+    const key = 'PAY:global';
+    let counter = await this.counterModel.findOneAndUpdate(
       { key },
       { $inc: { seq: 1 } },
       { new: true, upsert: true }
     );
+
+    // Self-heal if the counter is behind already-issued PAY-#### records
+    // (e.g. legacy tenant-scoped counters, seeded data, or a reset counter).
+    const maxExistingSeq = await this.getMaxExistingPaymentSequence();
+    if (counter.seq <= maxExistingSeq) {
+      await this.syncPaymentCounterWithExistingIds(maxExistingSeq);
+      counter = await this.counterModel.findOneAndUpdate(
+        { key },
+        { $inc: { seq: 1 } },
+        { new: true, upsert: true }
+      );
+    }
+
     return `PAY-${String(counter.seq).padStart(4, '0')}`;
+  }
+
+  private async syncPaymentCounterWithExistingIds(
+    knownMaxExistingSeq?: number,
+  ): Promise<number> {
+    const key = 'PAY:global';
+    const maxExistingSeq =
+      knownMaxExistingSeq ?? (await this.getMaxExistingPaymentSequence());
+
+    await this.counterModel.findOneAndUpdate(
+      { key },
+      { $max: { seq: maxExistingSeq } },
+      { new: true, upsert: true },
+    );
+
+    return maxExistingSeq;
+  }
+
+  private async getMaxExistingPaymentSequence(): Promise<number> {
+    const result = await this.paymentModel.aggregate([
+      {
+        $match: {
+          paymentId: { $regex: '^PAY-[0-9]+$' },
+        },
+      },
+      {
+        $project: {
+          seq: {
+            $toInt: {
+              $substrBytes: [
+                '$paymentId',
+                4,
+                { $subtract: [{ $strLenBytes: '$paymentId' }, 4] },
+              ],
+            },
+          },
+        },
+      },
+      { $sort: { seq: -1 } },
+      { $limit: 1 },
+    ]);
+
+    return result[0]?.seq ?? 0;
   }
 
   /**

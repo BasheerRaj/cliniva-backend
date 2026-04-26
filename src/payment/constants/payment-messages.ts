@@ -45,6 +45,10 @@ export const PAYMENT_ERRORS = {
     ar: 'تاريخ الدفع غير صالح',
     en: 'Invalid payment date',
   },
+  AMOUNT_EDIT_NOT_SUPPORTED: {
+    ar: 'لا يمكن تعديل مبلغ الدفعة بعد الإنشاء. احذف الدفعة وأنشئ دفعة جديدة بالقيم الصحيحة',
+    en: 'Payment amount cannot be edited after creation. Delete the payment and create a new one with the correct amounts',
+  },
 };
 
 export const SUCCESS_MESSAGES = {
