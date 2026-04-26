@@ -1116,9 +1116,8 @@ export class InvoiceService implements OnModuleInit {
       await this.invoiceNumberService.generatePostedNumber(invoiceCounterScope);
 
     invoice.invoiceStatus = 'posted';
-    // BZR-b3c4d5e6: Payment is "not_due" at booking time; transitions to "unpaid"
-    // only after the first appointment is concluded (see concludeAppointment hook).
-    invoice.paymentStatus = 'not_due';
+    // Once an invoice is posted, payment becomes due immediately.
+    invoice.paymentStatus = 'unpaid';
     invoice.postedAt = new Date();
 
     // Retry loop: if the generated number collides with an existing invoice

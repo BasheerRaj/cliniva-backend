@@ -43,8 +43,14 @@ describe('ServiceService', () => {
   let MockServiceModel: any;
   let mockAppointmentModel: any;
   let mockClinicServiceModel: any;
+  let mockServiceCategoryModel: any;
   let mockNotificationModel: any;
   let mockUserModel: any;
+  let mockDoctorServiceModel: any;
+  let mockClinicModel: any;
+  let mockComplexModel: any;
+  let mockEmployeeShiftModel: any;
+  let mockInvoiceModel: any;
 
   // Dependency mocks
   let mockServiceOfferService: any;
@@ -73,8 +79,38 @@ describe('ServiceService', () => {
       findOne: jest.fn(),
     };
 
+    mockServiceCategoryModel = {
+      findOne: jest.fn(),
+      find: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue([]) }),
+    };
+
     mockNotificationModel = {
       create: jest.fn().mockResolvedValue({}),
+    };
+
+    mockDoctorServiceModel = {
+      find: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue([]) }),
+      findOne: jest.fn(),
+      deleteMany: jest.fn().mockResolvedValue({ deletedCount: 0 }),
+    };
+
+    mockClinicModel = {
+      find: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue([]) }),
+      findById: jest.fn(),
+      findOne: jest.fn(),
+    };
+
+    mockComplexModel = {
+      findById: jest.fn(),
+      findOne: jest.fn(),
+    };
+
+    mockEmployeeShiftModel = {
+      find: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue([]) }),
+    };
+
+    mockInvoiceModel = {
+      countDocuments: jest.fn().mockResolvedValue(0),
     };
 
     mockUserModel = {
@@ -97,10 +133,16 @@ describe('ServiceService', () => {
       providers: [
         ServiceService,
         { provide: getModelToken('Service'), useValue: MockServiceModel },
+        { provide: getModelToken('ServiceCategory'), useValue: mockServiceCategoryModel },
         { provide: getModelToken('ClinicService'), useValue: mockClinicServiceModel },
         { provide: getModelToken('Appointment'), useValue: mockAppointmentModel },
         { provide: getModelToken('Notification'), useValue: mockNotificationModel },
         { provide: getModelToken('User'), useValue: mockUserModel },
+        { provide: getModelToken('DoctorService'), useValue: mockDoctorServiceModel },
+        { provide: getModelToken('Clinic'), useValue: mockClinicModel },
+        { provide: getModelToken('Complex'), useValue: mockComplexModel },
+        { provide: getModelToken('EmployeeShift'), useValue: mockEmployeeShiftModel },
+        { provide: getModelToken('Invoice'), useValue: mockInvoiceModel },
         { provide: ServiceOfferService, useValue: mockServiceOfferService },
         { provide: SessionManagerService, useValue: mockSessionManagerService },
       ],
@@ -169,7 +211,16 @@ describe('ServiceService', () => {
       await service.createService({ ...baseDto, sessions } as any);
 
       const constructorArg = MockServiceModel.mock.calls[0][0];
-      expect(constructorArg.sessions).toBe(processed);
+      expect(constructorArg.sessions).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            _id: processed[0]._id,
+            name: 'Step 1',
+            duration: 30,
+            order: 1,
+          }),
+        ]),
+      );
     });
 
     it('should NOT call validateAndProcessSessions when sessions is empty array', async () => {
@@ -247,7 +298,16 @@ describe('ServiceService', () => {
 
       await service.updateService(serviceId, { sessions } as any);
 
-      expect(mockDoc.sessions).toBe(processed);
+      expect(mockDoc.sessions).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            _id: processed[0]._id,
+            name: 'Step A',
+            duration: 30,
+            order: 1,
+          }),
+        ]),
+      );
     });
 
     it('should set service.sessions to [] when sessions is empty array', async () => {
@@ -432,6 +492,7 @@ describe('ServiceService', () => {
 
     it('should call findByIdAndUpdate with isActive: false when no active appointments', async () => {
       mockAppointmentModel.countDocuments.mockResolvedValue(0);
+      mockInvoiceModel.countDocuments.mockResolvedValue(0);
 
       await service.deleteService(serviceId);
 
@@ -443,6 +504,7 @@ describe('ServiceService', () => {
 
     it('should include deletedAt in the update when soft-deleting', async () => {
       mockAppointmentModel.countDocuments.mockResolvedValue(0);
+      mockInvoiceModel.countDocuments.mockResolvedValue(0);
 
       await service.deleteService(serviceId);
 
@@ -453,6 +515,7 @@ describe('ServiceService', () => {
     it('should include deletedBy in the update when userId is provided', async () => {
       const userId = oid();
       mockAppointmentModel.countDocuments.mockResolvedValue(0);
+      mockInvoiceModel.countDocuments.mockResolvedValue(0);
 
       await service.deleteService(serviceId, userId);
 
@@ -466,6 +529,23 @@ describe('ServiceService', () => {
       await expect(service.deleteService(serviceId)).rejects.toThrow(
         NotFoundException,
       );
+    });
+
+    it('should block deletion when linked invoices exist', async () => {
+      mockAppointmentModel.countDocuments.mockResolvedValue(0);
+      mockInvoiceModel.countDocuments.mockResolvedValue(2);
+
+      await expect(service.deleteService(serviceId)).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('should include linkedInvoicesCount in the error when invoice linkage blocks deletion', async () => {
+      mockAppointmentModel.countDocuments.mockResolvedValue(0);
+      mockInvoiceModel.countDocuments.mockResolvedValue(4);
+
+      const err = await service.deleteService(serviceId).catch((e) => e);
+      expect(err.response.linkedInvoicesCount).toBe(4);
     });
   });
 });

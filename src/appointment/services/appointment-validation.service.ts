@@ -367,23 +367,6 @@ export class AppointmentValidationService {
       `Validating doctor-service authorization: doctor=${doctorId}, service=${serviceId}, clinic=${clinicId}`,
     );
 
-    // Check if ANY doctor-service assignments exist for this service IN THIS CLINIC.
-    // If none exist, the service has no explicitly assigned doctors in this clinic — 
-    // use permissive default: any active doctor at the clinic can provide it.
-    const assignmentsInClinic = await this.doctorServiceModel.countDocuments({
-      serviceId: new Types.ObjectId(serviceId),
-      clinicId: new Types.ObjectId(clinicId),
-      isActive: true,
-    });
-
-    if (assignmentsInClinic === 0) {
-      this.logger.debug(
-        `No doctor-service assignments configured for service=${serviceId} in clinic=${clinicId} — skipping authorization check (permissive default)`,
-      );
-      return;
-    }
-
-    // Assignments exist in this clinic — enforce that this specific doctor is in the authorized set
     const doctorService = await this.doctorServiceModel.findOne({
       doctorId: new Types.ObjectId(doctorId),
       serviceId: new Types.ObjectId(serviceId),
@@ -394,8 +377,8 @@ export class AppointmentValidationService {
     if (!doctorService) {
       throw new ConflictException({
         message: {
-          ar: 'الطبيب غير مصرح له بتقديم هذه الخدمة في هذه العيادة',
-          en: 'Doctor is not authorized to provide this service at this clinic',
+          ar: 'الطبيب غير معيّن لتقديم هذه الخدمة في هذه العيادة',
+          en: 'Doctor is not assigned to provide this service at this clinic',
         },
         doctorId,
         serviceId,

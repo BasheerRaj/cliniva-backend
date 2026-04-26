@@ -312,7 +312,19 @@ export class SpecialtyService implements OnModuleInit {
               },
             },
           },
-          assignedDoctorsCount: { $size: '$doctorAssignments' },
+        },
+      },
+      {
+        $addFields: {
+          assignedDoctorsCount: {
+            $size: {
+              $filter: {
+                input: '$doctorAssignments',
+                as: 'assignment',
+                cond: { $eq: [{ $ifNull: ['$$assignment.isActive', true] }, true] },
+              },
+            },
+          },
           activeDoctorsCount: {
             $size: {
               $filter: {

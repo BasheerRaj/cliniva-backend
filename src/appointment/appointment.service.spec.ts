@@ -10,9 +10,11 @@ import { WorkingHoursIntegrationService } from './services/working-hours-integra
 import { AppointmentValidationService } from './services/appointment-validation.service';
 import { AppointmentStatusService } from './services/appointment-status.service';
 import { AppointmentCalendarService } from './services/appointment-calendar.service';
+import { AppointmentWorkingHoursService } from './services/appointment-working-hours.service';
 import { AppointmentSessionService } from './services/appointment-session.service';
 import { NotificationService } from '../notification/notification.service';
 import { AuditService } from '../auth/audit.service';
+import { InvoiceService } from '../invoice/invoice.service';
 import { SESSION_ERROR_MESSAGES } from './constants/session-error-messages.constant';
 
 // ---------------------------------------------------------------------------
@@ -66,8 +68,10 @@ describe('AppointmentService', () => {
   let mockAppointmentValidationService: any;
   let mockAppointmentSessionService: any;
   let mockWorkingHoursIntegrationService: any;
+  let mockAppointmentWorkingHoursService: any;
   let mockNotificationService: any;
   let mockAuditService: any;
+  let mockInvoiceService: any;
 
   let mockSave: jest.Mock;
 
@@ -103,6 +107,12 @@ describe('AppointmentService', () => {
     mockWorkingHoursIntegrationService = {
       getEffectiveWorkingHours: jest.fn().mockResolvedValue(null),
       isTimeBlocked: jest.fn().mockResolvedValue(false),
+      getClinicWorkingHours: jest.fn().mockResolvedValue([]),
+      getDoctorWorkingHours: jest.fn().mockResolvedValue([]),
+    };
+
+    mockAppointmentWorkingHoursService = {
+      validateWorkingHours: jest.fn().mockResolvedValue(undefined),
     };
 
     mockNotificationService = {
@@ -113,6 +123,8 @@ describe('AppointmentService', () => {
       logSecurityEvent: jest.fn().mockResolvedValue({}),
     };
 
+    mockInvoiceService = {};
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AppointmentService,
@@ -120,7 +132,15 @@ describe('AppointmentService', () => {
         { provide: getModelToken('Patient'), useValue: {} },
         { provide: getModelToken('User'), useValue: {} },
         { provide: getModelToken('Clinic'), useValue: {} },
+        { provide: getModelToken('Complex'), useValue: {} },
         { provide: getModelToken('Service'), useValue: mockServiceModel },
+        { provide: getModelToken('Invoice'), useValue: {} },
+        { provide: getModelToken('Payment'), useValue: {} },
+        { provide: getModelToken('MedicalReport'), useValue: {} },
+        { provide: getModelToken('ClinicService'), useValue: {} },
+        { provide: getModelToken('DoctorService'), useValue: {} },
+        { provide: getModelToken('EmployeeShift'), useValue: {} },
+        { provide: getModelToken('WorkingHours'), useValue: {} },
         { provide: WorkingHoursIntegrationService, useValue: mockWorkingHoursIntegrationService },
         { provide: AppointmentValidationService, useValue: mockAppointmentValidationService },
         { provide: AppointmentStatusService, useValue: {} },
@@ -128,6 +148,8 @@ describe('AppointmentService', () => {
         { provide: AppointmentSessionService, useValue: mockAppointmentSessionService },
         { provide: NotificationService, useValue: mockNotificationService },
         { provide: AuditService, useValue: mockAuditService },
+        { provide: InvoiceService, useValue: mockInvoiceService },
+        { provide: AppointmentWorkingHoursService, useValue: mockAppointmentWorkingHoursService },
       ],
     }).compile();
 

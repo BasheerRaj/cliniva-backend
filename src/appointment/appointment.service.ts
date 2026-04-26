@@ -4591,9 +4591,8 @@ export class AppointmentService {
     userRole?: string,
     serviceIds?: string[],
   ): Promise<{ _id: string; name: string }[]> {
-    // 0. If serviceId or serviceIds provided, filter to doctors authorized for those services via DoctorService junction.
-    //    FALLBACK: if no records exist (service has no assigned doctors yet), skip the filter —
-    //    any doctor at the clinic is returned. Consistent with validateDoctorServiceAuthorization.
+    // 0. If serviceId or serviceIds are provided, only return doctors explicitly
+    // assigned to at least one of those services in the requested clinic.
     let authorizedDoctorIds: Types.ObjectId[] | null = null;
 
     // Use union of serviceId and serviceIds
@@ -4603,9 +4602,6 @@ export class AppointmentService {
     }
 
     if (effectiveServiceIds.length > 0) {
-      // Check each service individually. If ANY service is permissive (has 0 assignments in this clinic),
-      // then ALL doctors at the clinic are authorized for that service, so they should be in the union.
-      let isAnyServicePermissive = false;
       const allAuthorizedInUnion = new Set<string>();
 
       for (const sId of effectiveServiceIds) {
@@ -4617,18 +4613,13 @@ export class AppointmentService {
           })
           .distinct('doctorId');
 
-        if (doctorServiceEntries.length === 0) {
-          isAnyServicePermissive = true;
-          break; // Optimization: once one is permissive, the whole union allows all doctors
-        } else {
-          doctorServiceEntries.forEach(id => allAuthorizedInUnion.add(id.toString()));
-        }
+        doctorServiceEntries.forEach(id => allAuthorizedInUnion.add(id.toString()));
       }
 
-      if (isAnyServicePermissive) {
-        authorizedDoctorIds = null; // null triggers the permissive default later
-      } else if (allAuthorizedInUnion.size > 0) {
+      if (allAuthorizedInUnion.size > 0) {
         authorizedDoctorIds = Array.from(allAuthorizedInUnion).map(id => new Types.ObjectId(id));
+      } else {
+        authorizedDoctorIds = [];
       }
     }
 
@@ -4822,6 +4813,12 @@ export class AppointmentService {
     const assignedClinicIds = Array.isArray(requestingUser.clinicIds)
       ? requestingUser.clinicIds.filter((id: any) => Types.ObjectId.isValid(String(id)))
       : [];
+    const scopedStaffClinicIds =
+      assignedClinicIds.length > 0
+        ? assignedClinicIds
+        : clinicId && Types.ObjectId.isValid(String(clinicId))
+          ? [String(clinicId)]
+          : [];
     const userId = requestingUser.userId;
     const userRole = requestingUser.role;
     const tenantScopeFilter: any = { deletedAt: { $exists: false } };
@@ -5094,31 +5091,79 @@ export class AppointmentService {
           },
         ];
 
-        // Still need to populate clinics context for the doctor's dropdown
-        if (doctor.clinicId) {
-          const clinic = await this.clinicModel
-            .findOne({
-              _id: doctor.clinicId,
+        const doctorClinicIds = buildDoctorClinicIds(doctor).filter((id) =>
+          Types.ObjectId.isValid(id),
+        );
+        if (doctorClinicIds.length > 0) {
+          const clinics = await this.clinicModel
+            .find({
+              _id: {
+                $in: doctorClinicIds.map((id) => new Types.ObjectId(id)),
+              },
               isActive: true,
               ...tenantScopeFilter,
             })
             .select('_id name complexId')
-            .lean();
-          if (clinic) {
-            context.clinics = [
-              {
-                _id: clinic._id.toString(),
-                name: clinic.name,
-                complexId: (clinic as any).complexId?.toString(),
-                services: [],
-                workingHours: [],
-              },
-            ];
-          }
+            .lean()
+            .exec();
+          context.clinics = clinics.map((clinic: any) => ({
+            _id: clinic._id.toString(),
+            name: clinic.name,
+            complexId: clinic.complexId?.toString(),
+            services: [],
+            workingHours: [],
+          }));
         }
         await enrichContextWithRelations(contextDoctorSource);
         return context;
       }
+    }
+
+    if (userRole === 'staff' && scopedStaffClinicIds.length > 0) {
+      const clinicObjectIds = scopedStaffClinicIds.map((id: string) => new Types.ObjectId(id));
+      const clinics = await this.clinicModel
+        .find({
+          ...tenantScopeFilter,
+          _id: { $in: clinicObjectIds },
+          deletedAt: { $exists: false },
+          isActive: true,
+        })
+        .select('_id name complexId')
+        .lean()
+        .exec();
+      context.clinics = clinics.map((c: any) => ({
+        _id: c._id.toString(),
+        name: c.name,
+        complexId: c.complexId?.toString(),
+        services: [],
+        workingHours: [],
+      }));
+
+      const doctors = await this.userModel
+        .find({
+          ...tenantScopeFilter,
+          role: 'doctor',
+          isActive: true,
+          deletedAt: { $exists: false },
+          $or: [
+            { clinicId: { $in: clinicObjectIds } },
+            { clinicIds: { $in: clinicObjectIds } },
+          ],
+        })
+        .select('_id firstName lastName clinicId clinicIds')
+        .lean()
+        .exec();
+      contextDoctorSource = doctors;
+      context.doctors = doctors.map((d: any) => ({
+        _id: d._id.toString(),
+        name: `${d.firstName || ''} ${d.lastName || ''}`.trim(),
+        clinicIds: buildDoctorClinicIds(d),
+        serviceIds: [],
+        workingHours: [],
+      }));
+
+      await enrichContextWithRelations(contextDoctorSource);
+      return context;
     }
 
     if (planType === 'company' && organizationId) {

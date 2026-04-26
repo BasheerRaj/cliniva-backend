@@ -16,6 +16,7 @@ import { DoctorService } from '../database/schemas/doctor-service.schema';
 import { Clinic } from '../database/schemas/clinic.schema';
 import { Complex } from '../database/schemas/complex.schema';
 import { EmployeeShift } from '../database/schemas/employee-shift.schema';
+import { Invoice } from '../database/schemas/invoice.schema';
 import { CreateServiceDto, AssignServicesDto } from './dto/create-service.dto';
 import {
   CreateServiceWithSessionsDto,
@@ -84,6 +85,7 @@ export class ServiceService {
     @InjectModel('Complex') private readonly complexModel: Model<Complex>,
     @InjectModel('EmployeeShift')
     private readonly employeeShiftModel: Model<EmployeeShift>,
+    @InjectModel('Invoice') private readonly invoiceModel: Model<Invoice>,
     private readonly serviceOfferService: ServiceOfferService,
     private readonly sessionManagerService: SessionManagerService,
   ) {}
@@ -1564,6 +1566,21 @@ export class ServiceService {
           en: `Cannot delete service because it has ${activeAppointments} active appointments`,
         },
         activeAppointmentsCount: activeAppointments,
+      });
+    }
+
+    const linkedInvoices = await this.invoiceModel.countDocuments({
+      ...tenantFilter,
+      'services.serviceId': new Types.ObjectId(serviceId),
+    });
+
+    if (linkedInvoices > 0) {
+      throw new BadRequestException({
+        message: {
+          ar: `لا يمكن حذف الخدمة لأنها مرتبطة بـ ${linkedInvoices} فاتورة`,
+          en: `Cannot delete service because it is linked to ${linkedInvoices} invoice records`,
+        },
+        linkedInvoicesCount: linkedInvoices,
       });
     }
 

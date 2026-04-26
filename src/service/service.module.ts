@@ -15,6 +15,7 @@ import { DoctorServiceSchema } from '../database/schemas/doctor-service.schema';
 import { ClinicSchema } from '../database/schemas/clinic.schema';
 import { ComplexSchema } from '../database/schemas/complex.schema';
 import { EmployeeShiftSchema } from '../database/schemas/employee-shift.schema';
+import { InvoiceSchema } from '../database/schemas/invoice.schema';
 import { CommonModule } from '../common/common.module';
 import { AuthModule } from '../auth/auth.module';
 import { ServiceOfferModule } from '../service-offer/service-offer.module';
@@ -36,6 +37,7 @@ import { SessionValidationService } from '../appointment/services/session-valida
       { name: 'Clinic', schema: ClinicSchema },
       { name: 'Complex', schema: ComplexSchema },
       { name: 'EmployeeShift', schema: EmployeeShiftSchema },
+      { name: 'Invoice', schema: InvoiceSchema },
     ]),
     CommonModule,
     AuthModule,

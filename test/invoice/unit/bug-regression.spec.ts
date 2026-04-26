@@ -34,6 +34,7 @@ import { Patient } from '../../../src/database/schemas/patient.schema';
 import { Service } from '../../../src/database/schemas/service.schema';
 import { Clinic } from '../../../src/database/schemas/clinic.schema';
 import { Counter } from '../../../src/database/schemas/counter.schema';
+import { Payment } from '../../../src/database/schemas/payment.schema';
 
 import { MOCK_IDS, buildInvoice } from '../mocks/invoice.mocks';
 
@@ -291,6 +292,14 @@ describe('BUG-012: transitionToPosted is idempotent on already-posted invoices',
           useValue: { findOneAndUpdate: jest.fn() },
         },
         {
+          provide: getModelToken(Payment.name),
+          useValue: {
+            find: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue([]) }),
+            findOne: jest.fn(),
+            create: jest.fn(),
+          },
+        },
+        {
           provide: InvoiceNumberService,
           useValue: invoiceNumberService,
         },
@@ -371,5 +380,22 @@ describe('BUG-012: transitionToPosted is idempotent on already-posted invoices',
     await invoiceService.transitionToPosted(MOCK_IDS.invoice.toString());
 
     expect(invoiceNumberService.generatePostedNumber).toHaveBeenCalledTimes(1);
+  });
+
+  it('should set paymentStatus to unpaid when a draft invoice is posted', async () => {
+    const draftInvoice = buildInvoice({
+      invoiceStatus: 'draft',
+      invoiceNumber: 'DFT-0002',
+      paymentStatus: 'not_due',
+    });
+    invoiceModelMock.findById.mockResolvedValue(draftInvoice);
+    invoiceNumberService.generatePostedNumber.mockResolvedValue('INV-0002');
+
+    const result = await invoiceService.transitionToPosted(
+      MOCK_IDS.invoice.toString(),
+    );
+
+    expect(draftInvoice.paymentStatus).toBe('unpaid');
+    expect(result.paymentStatus).toBe('unpaid');
   });
 });
