@@ -922,6 +922,79 @@ export class UserController {
       );
     }
   }
+  @ApiOperation({
+    summary: 'Get current user profile picture',
+    description: 'Retrieve the profile picture URL of the currently authenticated user',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Profile picture retrieved successfully',
+    schema: {
+      example: {
+        success: true,
+        data: {
+          profilePictureUrl: '/uploads/profiles/profile-uuid.jpg',
+        },
+        message: {
+          ar: 'تم جلب صورة الملف الشخصي بنجاح',
+          en: 'Profile picture retrieved successfully',
+        },
+      },
+    },
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiBearerAuth()
+  @Get('me/profile-picture')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async getProfilePicture(@Request() req: any) {
+    try {
+      const userId = req.user?.id || req.user?.userId || req.user?.sub;
+  
+      if (!userId) {
+        throw new HttpException(
+          {
+            message: {
+              ar: 'معرف المستخدم غير موجود',
+              en: 'User ID not found',
+            },
+            code: 'USER_ID_NOT_FOUND',
+          },
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+  
+      const user = await this.userService.findById(userId);
+  
+      return {
+        success: true,
+        data: {
+          profilePictureUrl: user?.profilePictureUrl ?? null,
+        },
+        message: {
+          ar: 'تم جلب صورة الملف الشخصي بنجاح',
+          en: 'Profile picture retrieved successfully',
+        },
+      };
+    } catch (error: any) {
+      if (error instanceof HttpException) throw error;
+  
+      this.logger.error(
+        `Get profile picture failed: ${error?.message}`,
+        error?.stack,
+      );
+      throw new HttpException(
+        {
+          message: {
+            ar: 'فشل جلب صورة الملف الشخصي',
+            en: 'Failed to retrieve profile picture',
+          },
+          code: 'PROFILE_PICTURE_RETRIEVAL_FAILED',
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
 
   @ApiOperation({
     summary: 'Get current user login history',
