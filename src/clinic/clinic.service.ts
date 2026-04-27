@@ -728,7 +728,7 @@ export class ClinicService {
         role: 'doctor',
         isActive: true,
       })
-      .select('_id firstName lastName email role publicId')
+      .select('_id firstName lastName email role publicId profilePictureUrl')
       .lean();
 
     const toDisplayUserCode = (user: { _id: Types.ObjectId | string; publicId?: string }) => {
@@ -756,6 +756,7 @@ export class ClinicService {
         userType: 'Doctor',
         role: doc.role,
         email: doc.email,
+        profilePictureUrl: doc.profilePictureUrl || null,
       })),
     };
 
@@ -767,7 +768,7 @@ export class ClinicService {
         role: { $nin: ['doctor', 'patient', 'owner', 'super_admin'] },
         isActive: true,
       })
-      .select('_id firstName lastName email role publicId')
+      .select('_id firstName lastName email role publicId profilePictureUrl')
       .lean();
 
     const staffCount = staffList.length;
@@ -786,6 +787,7 @@ export class ClinicService {
         userType: 'Staff',
         role: staff.role,
         email: staff.email,
+        profilePictureUrl: staff.profilePictureUrl || null,
       })),
     };
 
@@ -919,12 +921,14 @@ export class ClinicService {
         userId: doc.userId,
         name: doc.name,
         userType: 'Doctor',
+        profilePictureUrl: doc.profilePictureUrl || null,
       })),
       employees: staffCapacity.list.map((staff: any) => ({
         _id: staff._id,
         userId: staff.userId,
         name: staff.name,
         userType: 'Staff',
+        profilePictureUrl: staff.profilePictureUrl || null,
       })),
       capacity: {
         doctors: doctorsCapacity,

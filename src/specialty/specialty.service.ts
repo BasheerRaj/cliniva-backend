@@ -464,6 +464,7 @@ export class SpecialtyService implements OnModuleInit {
           __v: 1,
           isActive: { $ifNull: ['$isActive', true] },
           appointmentsCount: {
+            profilePictureUrl: { $ifNull: ['$doctor.profilePictureUrl', null] }, 
             $ifNull: [{ $arrayElemAt: ['$appointmentCount.count', 0] }, 0],
           },
         },

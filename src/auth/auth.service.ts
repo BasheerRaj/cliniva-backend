@@ -1277,20 +1277,20 @@ export class AuthService {
       }
 
       // Validate new password differs from current (Requirement 1.3)
-      const isSamePassword = await this.validatePassword(
-        newPassword,
-        user.passwordHash,
-      );
+      // const isSamePassword = await this.validatePassword(
+      //   newPassword,
+      //   user.passwordHash,
+      // );
 
-      if (isSamePassword) {
-        throw new BadRequestException({
-          message: {
-            ar: 'كلمة المرور الجديدة يجب أن تختلف عن الحالية',
-            en: 'New password must differ from current password',
-          },
-          code: 'NEW_PASSWORD_SAME_AS_CURRENT',
-        });
-      }
+      // if (isSamePassword) {
+      //   throw new BadRequestException({
+      //     message: {
+      //       ar: 'كلمة المرور الجديدة يجب أن تختلف عن الحالية',
+      //       en: 'New password must differ from current password',
+      //     },
+      //     code: 'NEW_PASSWORD_SAME_AS_CURRENT',
+      //   });
+      // }
 
       // Note: Password complexity validation is handled by DTO validators (Requirement 2.2)
 
@@ -1416,20 +1416,20 @@ export class AuthService {
       }
 
       // Validate new password differs from current (Requirement 2.1)
-      const isSamePassword = await this.validatePassword(
-        newPassword,
-        user.passwordHash,
-      );
+      // const isSamePassword = await this.validatePassword(
+      //   newPassword,
+      //   user.passwordHash,
+      // );
 
-      if (isSamePassword) {
-        throw new BadRequestException({
-          message: {
-            ar: 'كلمة المرور الجديدة يجب أن تختلف عن الحالية',
-            en: 'New password must differ from current password',
-          },
-          code: 'NEW_PASSWORD_SAME_AS_CURRENT',
-        });
-      }
+      // if (isSamePassword) {
+      //   throw new BadRequestException({
+      //     message: {
+      //       ar: 'كلمة المرور الجديدة يجب أن تختلف عن الحالية',
+      //       en: 'New password must differ from current password',
+      //     },
+      //     code: 'NEW_PASSWORD_SAME_AS_CURRENT',
+      //   });
+      // }
 
       // Note: Password complexity validation is handled by DTO validators (Requirement 2.2)
 
