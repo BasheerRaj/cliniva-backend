@@ -339,6 +339,19 @@ export class ComplexService {
         message: ERROR_CODES.COMPLEX_001.message,
       });
     }
+    const isNameAvailable = await this.isNameAvailable(
+      createComplexDto.name,
+      createComplexDto.organizationId,
+    );
+    if (!isNameAvailable) {
+      throw new BadRequestException({
+        message: {
+          ar: 'اسم المجمع مستخدم بالفعل، يرجى اختيار اسم آخر',
+          en: 'Complex name already exists, please choose a different name',
+        },
+        code: 'COMPLEX_NAME_TAKEN',
+      });
+    }
 
     // Validate business profile for complex-only plans
     if (!createComplexDto.organizationId) {
@@ -1380,11 +1393,11 @@ export class ComplexService {
 
     return clinics.map((clinic, index) => {
       const picName =
-        (clinic.personInChargeId &&
-          picNameMap.get(clinic.personInChargeId.toString())) ||
-        clinic.ceoName ||
-        clinic.headDoctorName ||
-        null;
+      (clinic.personInChargeId &&
+        picNameMap.get(clinic.personInChargeId.toString())) ||
+      clinic.headDoctorName ||
+      clinic.ceoName ||
+      null;
 
       return {
         no: index + 1,
