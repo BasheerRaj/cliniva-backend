@@ -89,6 +89,7 @@ export class EmployeeService {
 
     return {
       ...employeeWithoutLinkedEntities,
+      profilePictureUrl: employee.employeeProfile?.profilePictureUrl ?? null,
       userType: employee.role,
       linkedComplex: this.toLinkedEntity(employee.complex, employee.complexId),
       linkedClinics: (employee.clinicsList || [])
